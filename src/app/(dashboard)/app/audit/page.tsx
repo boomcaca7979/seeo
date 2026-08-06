@@ -7,6 +7,7 @@ import Modal from "@/components/dashboard/Modal";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import AuditReport from "@/components/reports/AuditReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
+import DomainSelect from "@/components/dashboard/DomainSelect";
 
 // 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
 
@@ -100,7 +101,10 @@ type AuditDepth = "quick" | "full";
 
 export default function AuditPage() {
   const { show, Toast } = useToast();
-  const [domain, setDomain] = useState("");
+  const [domain, setDomain] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try { return localStorage.getItem("seeo:last-audit-domain") ?? ""; } catch { return ""; }
+  });
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -295,11 +299,12 @@ export default function AuditPage() {
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
             <label className="font-sans text-xs text-ink-40">审计域名</label>
-            <input
-              type="text"
+            <DomainSelect
               value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              placeholder="输入域名，如：example.com"
+              onChange={(d) => {
+                setDomain(d);
+                try { localStorage.setItem("seeo:last-audit-domain", d); } catch { /* ignore */ }
+              }}
               className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>

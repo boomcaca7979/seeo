@@ -1,0 +1,123 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+interface Project {
+  id: number;
+  name: string;
+  domain: string;
+}
+
+interface DomainSelectProps {
+  value: string;
+  onChange: (domain: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+const MANUAL_KEY = "__manual__";
+
+/**
+ * 域名选择器：项目下拉 + 手动输入切换。
+ * 挂载时 fetch /api/projects，无项目时直接渲染文本输入框。
+ */
+export default function DomainSelect({ value, onChange, placeholder, className }: DomainSelectProps) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [manual, setManual] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && Array.isArray(json.data)) {
+          setProjects(json.data as Project[]);
+          // 无值且项目存在时，默认选中第一个
+          if (!value && json.data.length > 0) {
+            onChange((json.data[0] as Project).domain);
+          }
+          // 无项目时切到手动输入
+          if (json.data.length === 0) {
+            setManual(true);
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const baseClass = className ?? "mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none";
+
+  if (loading) {
+    return (
+      <div className={baseClass}>
+        <span className="text-ink-40">加载项目…</span>
+      </div>
+    );
+  }
+
+  // 无项目 或 手动模式：文本输入框
+  if (manual || projects.length === 0) {
+    return (
+      <div>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder ?? "输入域名，如：example.com"}
+          className={baseClass}
+        />
+        {projects.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setManual(false)}
+            className="mt-1 font-sans text-[10px] text-ink-40 hover:text-ink-60"
+          >
+            返回选择
+          </button>
+        )}
+        {projects.length === 0 && (
+          <p className="mt-1 font-sans text-[10px] text-ink-40">
+            可先去工作台创建项目
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 下拉选择
+  const selectedValue = value && projects.some((p) => p.domain === value)
+    ? value
+    : MANUAL_KEY;
+
+  return (
+    <div>
+      <select
+        value={selectedValue}
+        onChange={(e) => {
+          if (e.target.value === MANUAL_KEY) {
+            setManual(true);
+            onChange("");
+          } else {
+            onChange(e.target.value);
+          }
+        }}
+        className={baseClass}
+      >
+        {projects.map((p) => (
+          <option key={p.id} value={p.domain}>
+            {p.name}（{p.domain}）
+          </option>
+        ))}
+        <option value={MANUAL_KEY}>手动输入…</option>
+      </select>
+    </div>
+  );
+}

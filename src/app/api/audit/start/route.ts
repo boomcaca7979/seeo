@@ -44,7 +44,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
-  // 防滥用：检查 1 小时内是否已有审计（status='failed' 的不触发冷却，允许重试）
+  // 防滥用：按 depth 分别限制 1 小时冷却
+  // - status='failed' 不触发冷却，允许重试
+  // - quick 和 full 互不影响（latest.depth !== 本次 depth 则不冷却）
   const latest = await getLatestAudit(domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({
@@ -52,15 +54,21 @@ export async function POST(req: Request) {
       data: { auditId: latest.id, status: "running", pagesCrawled: latest.pages_crawled },
     }, { status: 409 });
   }
-  if (latest && latest.status !== "failed" && latest.started_at) {
+  if (
+    latest &&
+    latest.status !== "failed" &&
+    latest.depth === depth &&
+    latest.started_at
+  ) {
     const startedAt = new Date(latest.started_at + "Z").getTime();
     if (!Number.isNaN(startedAt)) {
       const elapsed = Date.now() - startedAt;
       if (elapsed < COOLDOWN_MS) {
         const remainingMs = COOLDOWN_MS - elapsed;
         const remainingMin = Math.max(1, Math.round(remainingMs / 60_000));
+        const depthLabel = depth === "full" ? "深度审计" : "快速审计";
         return NextResponse.json({
-          error: `该域名审计冷却中，请约 ${remainingMin} 分钟后再试（1 小时内仅允许一次）`,
+          error: `该域名${depthLabel}冷却中，请约 ${remainingMin} 分钟后再试（同模式 1 小时内仅允许一次，可切另一种模式）`,
           data: { cooldownRemainingMs: remainingMs, lastAuditId: latest.id },
         }, { status: 429 });
       }
@@ -68,7 +76,7 @@ export async function POST(req: Request) {
   }
 
   // 创建审计记录
-  const audit = await createAudit(domain);
+  const audit = await createAudit(domain, depth);
 
   // 同步执行审计（不再 fire-and-forget，serverless 兼容）
   // runAudit 内部已处理 finishAudit / addAuditIssue / 失败兜底

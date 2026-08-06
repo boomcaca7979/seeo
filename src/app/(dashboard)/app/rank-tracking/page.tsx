@@ -14,6 +14,7 @@ import {
 import { rankCompetitors } from "@/lib/mock-data";
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
+import DomainSelect from "@/components/dashboard/DomainSelect";
 import { ChangeBadge, RankBadge } from "@/components/dashboard/Badges";
 import {
   COMMON_GRID_PROPS,
@@ -926,11 +927,9 @@ export default function RankTrackingPage() {
           </div>
           <div>
             <label className="font-sans text-xs text-ink-40">目标域名</label>
-            <input
-              type="text"
+            <DomainSelect
               value={addDomain}
-              onChange={(e) => setAddDomain(e.target.value)}
-              required
+              onChange={setAddDomain}
               placeholder="输入你的网站域名，如：example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
@@ -1033,10 +1032,9 @@ export default function RankTrackingPage() {
           </div>
           <div>
             <label className="font-sans text-xs text-ink-40">域名</label>
-            <input
-              type="text"
+            <DomainSelect
               value={rankDomain}
-              onChange={(e) => setRankDomain(e.target.value)}
+              onChange={setRankDomain}
               placeholder="example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />

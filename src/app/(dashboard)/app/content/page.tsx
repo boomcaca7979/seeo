@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/components/dashboard/Toast";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import ScoreRing from "@/components/dashboard/ScoreRing";
+import DomainSelect from "@/components/dashboard/DomainSelect";
 
 interface CheckItem {
   name: string;
@@ -133,8 +134,8 @@ function suggestionType(text: string): { label: string; cls: string } {
 
 export default function ContentPage() {
   const { show, Toast } = useToast();
-  const [url, setUrl] = useState("https://example.com");
-  const [targetKeywordsInput, setTargetKeywordsInput] = useState("seo");
+  const [url, setUrl] = useState("");
+  const [targetKeywordsInput, setTargetKeywordsInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -239,6 +240,12 @@ export default function ContentPage() {
       >
         <div className="flex-1">
           <label className="font-mono text-xs text-ink-40">页面 URL</label>
+          <DomainSelect
+            value=""
+            onChange={(d) => setUrl(`https://${d}`)}
+            placeholder="选择项目域名自动填充"
+            className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+          />
           <input
             type="text"
             value={url}

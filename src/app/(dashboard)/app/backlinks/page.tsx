@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/dashboard/Toast";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
+import DomainSelect from "@/components/dashboard/DomainSelect";
 
 interface BacklinkSummary {
   totalBacklinks: number | null;
@@ -161,11 +162,12 @@ export default function BacklinksPage() {
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
             <label className="font-sans text-xs text-ink-40">分析域名</label>
-            <input
-              type="text"
+            <DomainSelect
               value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              placeholder="输入域名，如：example.com"
+              onChange={(d) => {
+                setDomain(d);
+                try { localStorage.setItem("seeo:last-backlink-domain", d); } catch { /* ignore */ }
+              }}
               className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
