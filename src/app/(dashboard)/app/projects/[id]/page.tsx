@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServer } from "@/lib/supabase/server";
 import { isAuthEnabled } from "@/lib/auth-config";
-import { projects as mockProjects, rankRows } from "@/lib/mock-data";
+import { rankRows } from "@/lib/mock-data";
 import { matchMockProject } from "@/lib/project-match";
 import type { DatabaseProject } from "@/lib/types";
 import Sparkline from "@/components/dashboard/Sparkline";
+import { getProjectById } from "@/lib/db";
 
 // 服务端读 Supabase/Turso，避免静态预渲染
 export const dynamic = "force-dynamic";
@@ -17,17 +18,19 @@ interface PageProps {
 export default async function ProjectDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // 演示模式：直接从 mock-data 按 id 匹配
+  // 演示模式：从 Turso/SQLite 数据库按 id 查询真实项目
   if (!isAuthEnabled) {
-    const mockProject = mockProjects.find((p) => p.id === id);
-    if (!mockProject) notFound();
+    const numId = Number(id);
+    if (!Number.isInteger(numId) || numId <= 0) notFound();
+    const row = await getProjectById(numId);
+    if (!row) notFound();
     const project: DatabaseProject = {
-      id: mockProject.id,
+      id: String(row.id),
       user_id: "demo-user",
-      name: mockProject.domain,
-      domain: mockProject.domain,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      name: row.name,
+      domain: row.domain,
+      created_at: row.created_at,
+      updated_at: row.created_at,
     };
     return renderDetail(project, matchMockProject(project.domain));
   }

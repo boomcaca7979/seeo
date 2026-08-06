@@ -208,10 +208,10 @@ export default function ProjectList({
                     key={p.id}
                     className="group relative flex flex-col card-a p-5 hover:border-ink-25"
                   >
-                    {/* 删除按钮 */}
+                    {/* 删除按钮（常显，不依赖 hover） */}
                     <button
                       onClick={() => setDeleteTarget(p)}
-                      className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-ink-40 opacity-0 hover:text-neg group-hover:opacity-100"
+                      className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-ink-40 hover:bg-line-soft hover:text-neg"
                       aria-label="删除项目"
                     >
                       <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
