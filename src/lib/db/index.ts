@@ -91,7 +91,9 @@ async function migrate(db: DBAdapter): Promise<void> {
       status TEXT NOT NULL DEFAULT 'running',
       errors INTEGER NOT NULL DEFAULT 0,
       warnings INTEGER NOT NULL DEFAULT 0,
-      notices INTEGER NOT NULL DEFAULT 0
+      notices INTEGER NOT NULL DEFAULT 0,
+      comparison TEXT,
+      error TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_audits_domain
@@ -243,6 +245,13 @@ async function migrate(db: DBAdapter): Promise<void> {
   // 审计表新增 comparison 字段（ALTER TABLE 兼容已有数据）
   try {
     await db.run(`ALTER TABLE audits ADD COLUMN comparison TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+
+  // 审计表新增 error 字段（ALTER TABLE 兼容已有数据）
+  try {
+    await db.run(`ALTER TABLE audits ADD COLUMN error TEXT`);
   } catch {
     // 字段已存在，忽略
   }
@@ -933,6 +942,7 @@ export interface AuditRow {
   warnings: number;
   notices: number;
   comparison: string | null;
+  error: string | null;
 }
 
 export interface AuditIssueRow {
@@ -967,6 +977,7 @@ function rowToAudit(row: Record<string, unknown>): AuditRow {
     warnings: Number(row.warnings),
     notices: Number(row.notices),
     comparison: row.comparison ? String(row.comparison) : null,
+    error: row.error ? String(row.error) : null,
   };
 }
 
@@ -984,13 +995,15 @@ export async function finishAudit(
     notices: number;
     status?: "completed" | "failed";
     comparison?: string | null;
+    error?: string | null;
   }
 ): Promise<void> {
   const db = await getAdapter();
   await db.run(`
     UPDATE audits
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
-        comparison = COALESCE(?, comparison)
+        comparison = COALESCE(?, comparison),
+        error = COALESCE(?, error)
     WHERE id = ?
   `, [
     params.health_score,
@@ -999,6 +1012,7 @@ export async function finishAudit(
     params.notices,
     params.status ?? "completed",
     params.comparison ?? null,
+    params.error ?? null,
     id
   ]);
 }

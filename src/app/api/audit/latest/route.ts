@@ -121,6 +121,7 @@ export async function GET(req: Request) {
       comparison,
       coverage,
       history,
+      error: audit.error,
     },
   });
 }

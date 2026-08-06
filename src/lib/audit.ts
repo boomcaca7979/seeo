@@ -48,6 +48,7 @@ export interface AuditResult {
   warnings: number;
   notices: number;
   status: "completed" | "failed";
+  error?: string;
 }
 
 /** 读取 robots.txt 全文（用于 Disallow 规则 + Sitemap 检测） */
@@ -203,13 +204,15 @@ export async function runAudit(
   let baseUrl: URL;
   try {
     baseUrl = new URL(startUrl);
-  } catch {
+  } catch (err) {
+    const errMsg = (err as Error)?.message ?? String(err);
     await finishAudit(auditId, {
       health_score: 0,
       errors: 1,
       warnings: 0,
       notices: 0,
       status: "failed",
+      error: errMsg,
     });
     return {
       auditId,
@@ -221,6 +224,7 @@ export async function runAudit(
       warnings: 0,
       notices: 0,
       status: "failed",
+      error: errMsg,
     };
   }
 
@@ -425,13 +429,15 @@ export async function runAudit(
       notices,
       status: "completed",
     };
-  } catch {
+  } catch (err) {
+    const errMsg = (err as Error)?.message ?? String(err);
     await finishAudit(auditId, {
       health_score: 0,
       errors: 1,
       warnings: 0,
       notices: 0,
       status: "failed",
+      error: errMsg,
     });
     return {
       auditId,
@@ -443,6 +449,7 @@ export async function runAudit(
       warnings: 0,
       notices: 0,
       status: "failed",
+      error: errMsg,
     };
   }
 }

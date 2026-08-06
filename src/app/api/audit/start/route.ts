@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
-  // 防滥用：检查 1 小时内是否已有审计
+  // 防滥用：检查 1 小时内是否已有审计（status='failed' 的不触发冷却，允许重试）
   const latest = await getLatestAudit(domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       data: { auditId: latest.id, status: "running", pagesCrawled: latest.pages_crawled },
     }, { status: 409 });
   }
-  if (latest && latest.started_at) {
+  if (latest && latest.status !== "failed" && latest.started_at) {
     const startedAt = new Date(latest.started_at + "Z").getTime();
     if (!Number.isNaN(startedAt)) {
       const elapsed = Date.now() - startedAt;
@@ -85,6 +85,7 @@ export async function POST(req: Request) {
       errors: result.errors,
       warnings: result.warnings,
       notices: result.notices,
+      error: result.error,
     },
   });
 }
