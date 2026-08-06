@@ -43,7 +43,7 @@ export default function ScoreRing({
       </svg>
       {showLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display text-xl font-bold text-ink">
+          <span className={`font-display font-bold text-ink ${size >= 120 ? "text-3xl" : "text-xl"}`}>
             {score}
           </span>
           <span className="font-mono text-[9px] text-ink-40">/ 100</span>

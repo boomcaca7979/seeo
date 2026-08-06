@@ -5,6 +5,8 @@ import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
+import AuditReport from "@/components/reports/AuditReport";
+import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 
 // 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
 
@@ -109,6 +111,9 @@ export default function AuditPage() {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [pendingDepth, setPendingDepth] = useState<AuditDepth>("quick");
   const [activeDepth, setActiveDepth] = useState<AuditDepth>("quick");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const loadLatest = useCallback(async (d: string) => {
     setLoading(true);
@@ -184,6 +189,66 @@ export default function AuditPage() {
   const openConfirm = (depth: AuditDepth) => {
     setPendingDepth(depth);
     setConfirmOpen(true);
+  };
+
+  // ===== 导出报告 =====
+
+  const todayStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!audit) return;
+    setExporting(true);
+    try {
+      const filename = `SeeO审计报告_${audit.domain}_${todayStr()}.pdf`;
+      const blob = await generatePDF({
+        title: `审计报告 · ${audit.domain}`,
+        filename,
+        elementId: "report-content",
+      });
+      downloadPDF(blob, filename);
+      show("PDF 已下载", "success");
+    } catch (err) {
+      show(`PDF 生成失败：${(err as Error).message}`, "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleSaveToReports = async () => {
+    if (!audit) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "audit",
+          title: `审计报告 · ${audit.domain}`,
+          data_json: JSON.stringify({
+            healthScore: audit.healthScore,
+            issues: audit.issues,
+          }),
+          project_id: null,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        show("已保存到报表中心", "success");
+        setExportOpen(false);
+      } else {
+        show(json?.error ?? "保存失败", "error");
+      }
+    } catch (err) {
+      show(`保存失败：${(err as Error).message}`, "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDomainChange = async (e: React.FormEvent) => {
@@ -282,6 +347,14 @@ export default function AuditPage() {
               "深度审计"
             )}
           </button>
+          {hasResult && (
+            <button
+              onClick={() => setExportOpen(true)}
+              className="btn-secondary"
+            >
+              导出报告
+            </button>
+          )}
         </div>
       </div>
 
@@ -368,12 +441,9 @@ export default function AuditPage() {
           <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
             {hasResult ? (
               <>
-                <div className="flex items-baseline gap-1">
-                  <ScoreRing score={healthScore} size={140} thickness={10} showLabel={false} />
-                  <span className="font-mono text-xs text-ink-40">/ 100</span>
-                </div>
+                <ScoreRing score={healthScore} size={140} thickness={10} showLabel />
                 <div className="mt-3 font-display text-base font-bold text-ink">
-                  网站健康度 <span className="font-mono text-sm text-ink-40">/ 100</span>
+                  网站健康度
                 </div>
                 {/* 较上次审计变化 */}
                 {audit?.comparison ? (
@@ -827,6 +897,63 @@ export default function AuditPage() {
           )}
         </div>
       </Modal>
+
+      {/* 导出报告 Modal */}
+      <Modal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="导出审计报告"
+      >
+        <div className="space-y-3">
+          <p className="font-sans text-xs text-ink-60">
+            域名：{audit?.domain} · 健康度 {audit?.healthScore ?? 0} 分
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={exporting || saving}
+              className="btn-primary disabled:opacity-60"
+            >
+              {exporting ? "生成中…" : "下载 PDF"}
+            </button>
+            <button
+              onClick={handleSaveToReports}
+              disabled={exporting || saving}
+              className="btn-secondary disabled:opacity-60"
+            >
+              {saving ? "保存中…" : "保存到报表中心"}
+            </button>
+          </div>
+          <p className="font-sans text-[10px] text-ink-40">
+            · PDF 在浏览器端即时生成，不占存储<br />
+            · 保存到报表中心后可在报表页随时回看
+          </p>
+        </div>
+      </Modal>
+
+      {/* 隐藏的审计报告渲染容器（用于 PDF 生成） */}
+      {hasResult && audit && (
+        <div style={{ position: "fixed", left: -9999, top: 0, pointerEvents: "none", opacity: 0 }}>
+          <AuditReport
+            projectName={audit.domain}
+            domain={audit.domain}
+            healthScore={audit.healthScore ?? 0}
+            issues={audit.issues.map((i) => ({
+              type: i.checkId,
+              severity: i.severity,
+              url: i.sampleUrl,
+              detail: i.detail,
+              suggestion: i.suggestion ?? "",
+            }))}
+            coverage={audit.coverage.map((c) => ({
+              id: c.id,
+              name: c.name,
+              passed: c.passed,
+            }))}
+            generatedAt={formatTime(audit.finishedAt ?? audit.startedAt)}
+          />
+        </div>
+      )}
 
       <Toast />
     </div>

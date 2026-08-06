@@ -311,10 +311,7 @@ export default function ContentPage() {
           {/* 内容评分卡 */}
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
-              <div className="flex items-baseline gap-1">
-                <ScoreRing score={contentScore} size={140} thickness={10} showLabel={false} />
-                <span className="font-mono text-xs text-ink-40">/ 100</span>
-              </div>
+              <ScoreRing score={contentScore} size={140} thickness={10} showLabel />
               <div className="mt-3 font-display text-base font-bold text-ink">
                 内容评分
               </div>
