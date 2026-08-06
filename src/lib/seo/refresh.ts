@@ -1,0 +1,148 @@
+// ===== 刷新所有追踪关键词排名（共享逻辑） =====
+// 供 API 路由和自动化任务复用，不重复造逻辑
+
+import {
+  listTrackedKeywords,
+  upsertRankHistory,
+  updateLastRefreshed,
+  hasTodayHistory,
+  getRankHistory,
+} from "@/lib/db";
+import { serpApiProvider } from "@/lib/seo/serpapi";
+import { SeoProviderError } from "@/lib/seo/provider";
+import { consumeQuota, readCache, writeCache } from "@/lib/seo/cache";
+import { generateRankAlert } from "@/lib/seo/alerts";
+import type { RankResult } from "@/lib/seo/types";
+
+function todayStr(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+export interface RefreshResult {
+  refreshed: number;
+  alerts: number;
+  details: Array<{
+    keyword: string;
+    domain: string;
+    oldRank: number | null;
+    newRank: number | null;
+    fromCache: boolean;
+    error?: string;
+  }>;
+}
+
+/** 刷新所有追踪关键词排名，返回刷新结果摘要 */
+export async function refreshAllRanks(): Promise<RefreshResult> {
+  const list = await listTrackedKeywords();
+  const today = todayStr();
+  let refreshed = 0;
+  let alerts = 0;
+  const details: RefreshResult["details"] = [];
+
+  for (const tk of list) {
+    const params = {
+      keyword: tk.keyword,
+      domain: tk.domain,
+      location: tk.location,
+      device: tk.device,
+    };
+
+    let rankResult: RankResult | null = null;
+    let fromCache = false;
+    let consumed = false;
+    let errMsg: string | undefined;
+
+    try {
+      // 1. 先查本地 rank 缓存
+      const cached = await readCache<RankResult>("rank", params);
+      if (cached) {
+        rankResult = cached;
+        fromCache = true;
+      } else {
+        // 2. DB 中今日是否已有记录（避免同日重复扣额度）
+        const dbHasToday = await hasTodayHistory(tk.id);
+        if (dbHasToday) {
+          const history = await getRankHistory(tk.id, 1);
+          const todayRow = history.find((h) => h.date === today);
+          if (todayRow) {
+            rankResult = {
+              keyword: tk.keyword,
+              domain: tk.domain,
+              location: tk.location,
+              device: tk.device,
+              fetchedAt: todayRow.created_at,
+              rank: todayRow.position,
+              matchedUrl: todayRow.url,
+              fromCache: true,
+            };
+            fromCache = true;
+          }
+        }
+
+        // 3. 真实调用 SerpApi
+        if (!rankResult) {
+          try {
+            await consumeQuota();
+            consumed = true;
+            rankResult = await serpApiProvider.checkRank(params);
+            try {
+              await writeCache("rank", params, rankResult);
+            } catch {
+              // ignore
+            }
+          } catch (e) {
+            if (e instanceof SeoProviderError) {
+              errMsg = e.message;
+            } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
+              errMsg = "本月免费额度已用尽，下月 1 日自动重置";
+            } else {
+              errMsg = (e as Error).message;
+            }
+          }
+        }
+      }
+
+      // 4. 写入 DB
+      if (rankResult) {
+        await upsertRankHistory({
+          keyword_id: tk.id,
+          date: today,
+          position: rankResult.rank,
+          url: rankResult.matchedUrl,
+        });
+        await updateLastRefreshed(tk.id);
+
+        // 5. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
+        if (consumed) {
+          await generateRankAlert(tk, rankResult.rank, today);
+          alerts++;
+        }
+
+        refreshed++;
+      }
+
+      details.push({
+        keyword: tk.keyword,
+        domain: tk.domain,
+        oldRank: null,
+        newRank: rankResult?.rank ?? null,
+        fromCache,
+        error: errMsg,
+      });
+    } catch (e) {
+      details.push({
+        keyword: tk.keyword,
+        domain: tk.domain,
+        oldRank: null,
+        newRank: null,
+        fromCache: false,
+        error: (e as Error).message,
+      });
+    }
+  }
+
+  return { refreshed, alerts, details };
+}

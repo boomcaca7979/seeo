@@ -1,0 +1,439 @@
+@import "tailwindcss";
+
+/* ===== SeeO 设计系统 V3 (Tailwind v4 @theme) ===== */
+/* V3 新增纸面色板（墨黄终端），V2 深色 token 保留供未重构页面过渡使用 */
+@theme {
+  /* ---------- V3：纸面 / 墨黄终端 ---------- */
+  --color-paper: #f6f4ec; /* 内容区画布主底色 */
+  --color-card: #fffefa; /* 卡片底色 */
+
+  --color-ink-60: rgba(20, 18, 26, 0.62); /* 次级文字 */
+  --color-ink-40: rgba(20, 18, 26, 0.42); /* 元信息 */
+  --color-ink-25: rgba(20, 18, 26, 0.25); /* 弱提示 / hover 边框 */
+
+  --color-line: #e4e1d2; /* 卡片边框 */
+  --color-line-soft: #ece9dd; /* 内部分割线 / 表格行线 */
+
+  --color-brand: #ffd400; /* 品牌黄（== gold，点睛用） */
+  --color-brand-deep: #f5c400; /* hover */
+
+  --color-pos: #1e9e6a; /* 正向 */
+  --color-neg: #e14b4b; /* 负向 */
+  --color-warn: #c98a0a; /* 警告橙 */
+
+  /* ---------- V2 过渡期保留（未重构内页使用） ---------- */
+  --color-station: #ffd400; /* 站酷黄 - 营销页画布 */
+  --color-station-deep: #f5c400;
+  --color-ink: #14121a; /* 墨黑 - 侧边栏/主文字 */
+  --color-ink-elevated: #1d1b26; /* 墨黑-浅 - 老深色卡片 */
+  --color-gold: #ffd400; /* 亮金 - 老深色卡片高亮 */
+  --color-aurora-violet: #6c4cff;
+  --color-aurora-blue: #2f8cff;
+  --color-aurora-gold: #ffd400;
+  --color-teal: #21d19f;
+  --color-teal-yellow: #0e7c5e;
+  --color-coral: #ff5c5c;
+  --color-coral-yellow: #b23b34;
+  --color-y-text: #14121a;
+  --color-y-secondary: #6b5a00;
+  --color-y-muted: #8a7a2e;
+  --color-d-text: #f5f6fa;
+  --color-d-secondary: #9aa3b8;
+  --color-d-muted: #6b7280;
+
+  /* 字体（V2 沿用） */
+  --font-display: var(--font-space-grotesk), "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-sans: var(--font-inter), "PingFang SC", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono",
+    Menlo, monospace;
+
+  /* 动效（V2 保留，营销页使用；仪表盘 V3 不用） */
+  --animate-breathe: breathe 3s ease-in-out infinite;
+  --animate-drift-a: drift-a 6s ease-in-out infinite;
+  --animate-drift-b: drift-b 7s ease-in-out infinite;
+  --animate-drift-c: drift-c 8s ease-in-out infinite;
+  --animate-ticker: ticker 40s linear infinite;
+}
+
+/* ===== 关键帧（营销页保留） ===== */
+@keyframes breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 12px rgba(255, 212, 0, 0.35))
+      drop-shadow(0 0 28px rgba(108, 76, 255, 0.25));
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 0 24px rgba(255, 212, 0, 0.65))
+      drop-shadow(0 0 52px rgba(47, 140, 255, 0.45));
+    transform: scale(1.04);
+    opacity: 0.95;
+  }
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(6px, -5px);
+  }
+}
+
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-5px, 6px);
+  }
+}
+
+@keyframes drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(4px, 5px);
+  }
+}
+
+@keyframes ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* ===== 基础样式 ===== */
+:root {
+  --background: #ffd400;
+  --foreground: #14121a;
+}
+
+* {
+  border-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 极光渐变工具类（营销页保留） */
+.bg-aurora {
+  background-image: linear-gradient(
+    90deg,
+    #6c4cff 0%,
+    #2f8cff 50%,
+    #ffd400 100%
+  );
+}
+.text-aurora {
+  background-image: linear-gradient(
+    90deg,
+    #6c4cff 0%,
+    #2f8cff 50%,
+    #ffd400 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 滚动条隐藏（仪表盘预览用） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ===== V3 工具类：墨黄终端 ===== */
+
+/* 标准卡片 */
+.card-a {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+}
+
+/* 发丝分割线 */
+.hairline {
+  height: 1px;
+  background-color: var(--color-line-soft);
+}
+
+/* mono 微型标签 */
+.micro-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-40);
+}
+
+/* 徽章：描边 mono 小字 */
+.badge-warn,
+.badge-err,
+.badge-good,
+.badge-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  background: transparent;
+}
+.badge-warn {
+  color: var(--color-warn);
+}
+.badge-err {
+  color: var(--color-neg);
+}
+.badge-good {
+  color: var(--color-pos);
+}
+.badge-info {
+  color: var(--color-ink-40);
+}
+
+/* 主按钮：黄底墨字 */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background-color: var(--color-brand);
+  color: var(--color-ink);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.btn-primary:hover {
+  background-color: var(--color-brand-deep);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 次按钮：描边 */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background-color: var(--color-card);
+  color: var(--color-ink-60);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.btn-secondary:hover {
+  border-color: var(--color-ink-25);
+  color: var(--color-ink);
+}
+
+/* 健康分颜色辅助类 */
+.score-pos {
+  color: var(--color-pos);
+}
+
+/* V3 加载旋转（替代 animate-spin，功能性动画） */
+.loading-spin {
+  animation: v3-spin 0.8s linear infinite;
+}
+@keyframes v3-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.score-warn {
+  color: var(--color-warn);
+}
+.score-neg {
+  color: var(--color-neg);
+}
+.bg-score-pos {
+  background-color: var(--color-pos);
+}
+.bg-score-warn {
+  background-color: var(--color-warn);
+}
+.bg-score-neg {
+  background-color: var(--color-neg);
+}
+
+/* ===== 打印样式（技术审计报告，V2 沿用） ===== */
+@media print {
+  /* 隐藏侧边栏、顶栏与全局非打印区 */
+  aside,
+  header,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 重置布局：白底深色文字，节省墨水 */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #14121a !important;
+  }
+
+  /* 打印区填满纸张宽度 */
+  .print-area {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 卡片转白底深色边框 */
+  .print-header,
+  .print-card,
+  .print-table {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    color: #14121a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-title {
+    color: #14121a !important;
+  }
+  .print-mono {
+    color: #4b5563 !important;
+  }
+
+  /* 三级计数数字转深色 */
+  .print-num-error {
+    color: #b23b34 !important;
+  }
+  .print-num-warning {
+    color: #8a6a00 !important;
+  }
+  .print-num-notice {
+    color: #14121a !important;
+  }
+
+  /* 圆点保留颜色 */
+  .print-dot-error {
+    background: #b23b34 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-dot-warning {
+    background: #8a6a00 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-dot-notice {
+    background: #6b7280 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 表格 */
+  .print-thead {
+    background: #f3f4f6 !important;
+    border-bottom: 1px solid #d1d5db !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-row {
+    border-bottom: 1px solid #e5e7eb !important;
+    page-break-inside: avoid;
+  }
+  .print-cell,
+  .print-cell-title {
+    color: #14121a !important;
+  }
+
+  /* 级别徽章：按 severity 染色描边 */
+  .print-badge[data-severity="error"] {
+    background: #fee2e2 !important;
+    color: #b23b34 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-badge[data-severity="warning"] {
+    background: #fef3c7 !important;
+    color: #8a6a00 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-badge[data-severity="notice"] {
+    background: #f3f4f6 !important;
+    color: #4b5563 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-dot {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ScoreRing 轨道转浅灰，进度转深色 */
+  .print-score-block svg circle:nth-of-type(1) {
+    stroke: #e5e7eb !important;
+  }
+  .print-score-block svg circle:nth-of-type(2) {
+    stroke: #14121a !important;
+  }
+  .print-score-block svg + div,
+  .print-score-block ~ div {
+    color: #14121a !important;
+  }
+
+  /* 打印页脚显示 */
+  .print-footer {
+    display: block !important;
+    color: #6b7280 !important;
+    border-top: 1px solid #d1d5db !important;
+  }
+
+  /* 避免行内分页断裂 */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+}

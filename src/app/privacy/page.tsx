@@ -1,0 +1,37 @@
+export default function PrivacyPage() {
+  return (
+    <div className="min-h-screen bg-paper">
+      <div className="mx-auto max-w-3xl px-6 py-16">
+        <h1 className="font-mono text-3xl font-bold text-ink mb-8">隐私政策</h1>
+        <div className="space-y-6 text-ink-60 leading-relaxed">
+          <section>
+            <h2 className="font-mono text-lg font-bold text-ink mb-2">01 数据收集</h2>
+            <p>SeeO 收集以下信息以提供服务：</p>
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              <li>邮箱地址（用于账号注册和登录）</li>
+              <li>您输入的域名和关键词（用于 SEO 分析）</li>
+              <li>SerpApi 调用记录（用于用量监控）</li>
+            </ul>
+          </section>
+          <section>
+            <h2 className="font-mono text-lg font-bold text-ink mb-2">02 数据使用</h2>
+            <p>您的数据仅用于提供 SEO 分析服务，不会出售给第三方。</p>
+          </section>
+          <section>
+            <h2 className="font-mono text-lg font-bold text-ink mb-2">03 数据存储</h2>
+            <p>用户数据存储在 Supabase（认证）和 Turso（业务数据）中，均符合 SOC 2 标准。</p>
+          </section>
+          <section>
+            <h2 className="font-mono text-lg font-bold text-ink mb-2">04 Cookie</h2>
+            <p>我们使用必要的 Cookie 来维持登录状态。使用第三方分析工具时会征求您的同意。</p>
+          </section>
+          <section>
+            <h2 className="font-mono text-lg font-bold text-ink mb-2">05 联系方式</h2>
+            <p>如有隐私相关问题，请联系：privacy@seeo.local</p>
+          </section>
+          <p className="pt-8 border-t border-line text-sm text-ink-40">最后更新：2026年8月</p>
+        </div>
+      </div>
+    </div>
+  );
+}
