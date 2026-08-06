@@ -134,12 +134,12 @@ export default function AuditPage() {
     }
   }, []);
 
-  const initRef = useRef(false);
+  const lastLoadedDomain = useRef<string | null>(null);
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    if (domain.trim()) {
-      const id = window.setTimeout(() => void loadLatest(domain), 0);
+    const d = domain.trim();
+    if (d && lastLoadedDomain.current !== d) {
+      lastLoadedDomain.current = d;
+      const id = window.setTimeout(() => void loadLatest(d), 0);
       return () => window.clearTimeout(id);
     }
   }, [loadLatest, domain]);
