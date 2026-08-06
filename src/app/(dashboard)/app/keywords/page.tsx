@@ -67,7 +67,7 @@ function detectIntent(query: string): string {
 
 export default function KeywordsPage() {
   const [tab, setTab] = useState<Tab>("phrase");
-  const [searchValue, setSearchValue] = useState(keywordOverview.keyword);
+  const [searchValue, setSearchValue] = useState("");
   const [serp, setSerp] = useState<SerpState>({ loading: false, data: null, error: null });
   const [expand, setExpand] = useState<ExpandState>({ loading: false, data: null, error: null });
   const [usage, setUsage] = useState<UsageBadge | null>(null);
@@ -173,6 +173,17 @@ export default function KeywordsPage() {
     }
     setTrackingIds((prev) => ({ ...prev, [keyword]: true }));
     try {
+      // 先取用户的第一个项目作为目标域名，没项目则提示先创建
+      const projRes = await fetch("/api/projects", { cache: "no-store" });
+      const projJson = await projRes.json();
+      const userProjects: { domain?: string; name?: string }[] =
+        projJson?.data ?? [];
+      const firstDomain = userProjects[0]?.domain?.trim();
+      if (!firstDomain) {
+        show("请先在工作台创建项目，再添加追踪", "error");
+        setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
+        return;
+      }
       const res = await fetch("/api/tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,7 +191,7 @@ export default function KeywordsPage() {
           keyword,
           location,
           device,
-          domain: "semrush.com",
+          domain: firstDomain,
         }),
       });
       const json = await res.json();
@@ -243,7 +254,7 @@ export default function KeywordsPage() {
             type="text"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="输入关键词，如：seo 工具（点击分析拉取真实 SERP）"
+            placeholder="输入关键词，如：SEO工具、网站建设"
             className="w-full rounded-lg border border-line bg-card py-3 pl-11 pr-4 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>

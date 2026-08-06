@@ -66,7 +66,7 @@ export default function BacklinksPage() {
             key={m.label}
             className="card-a opacity-60 p-5"
           >
-            <div className="font-mono text-xs text-ink-40">{m.label}</div>
+            <div className="font-sans text-xs text-ink-40">{m.label}</div>
             <div className="mt-1 font-display text-2xl font-bold text-ink-40">
               {m.value}
             </div>

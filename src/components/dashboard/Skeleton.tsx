@@ -51,7 +51,7 @@ export function EmptyState({
       <div className="mt-3 font-sans text-sm font-medium text-ink">
         {title}
       </div>
-      <div className="mt-1 font-mono text-xs text-ink-60">{hint}</div>
+      <div className="mt-1 font-sans text-xs text-ink-60">{hint}</div>
     </div>
   );
 }

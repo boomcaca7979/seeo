@@ -4,6 +4,9 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import ProjectList from "@/components/dashboard/ProjectList";
 import { listProjectsWithMetrics, listProjectsWithMetricsForUser, listAlerts, countUnreadAlerts } from "@/lib/db";
 
+// 演示模式下读 Turso/SQLite，避免 Vercel 构建期静态预渲染导致 router.refresh() 拿到旧快照
+export const dynamic = "force-dynamic";
+
 export default async function WorkbenchPage() {
   // 演示模式：直接读 SQLite
   if (!isAuthEnabled) {

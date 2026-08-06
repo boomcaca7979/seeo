@@ -7,6 +7,9 @@ import { matchMockProject } from "@/lib/project-match";
 import type { DatabaseProject } from "@/lib/types";
 import Sparkline from "@/components/dashboard/Sparkline";
 
+// 服务端读 Supabase/Turso，避免静态预渲染
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }

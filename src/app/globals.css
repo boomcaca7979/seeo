@@ -183,8 +183,8 @@ body {
 /* mono 微型标签 */
 .micro-label {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--color-ink-40);
 }
@@ -201,9 +201,9 @@ body {
   border-radius: 4px;
   border: 1px solid currentColor;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   background: transparent;
 }
 .badge-warn {

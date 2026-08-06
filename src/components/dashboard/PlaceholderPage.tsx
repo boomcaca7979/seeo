@@ -39,12 +39,12 @@ export default function PlaceholderPage({
             key={m.label}
             className="card-a p-5"
           >
-            <div className="font-mono text-xs text-ink-40">{m.label}</div>
+            <div className="font-sans text-xs text-ink-40">{m.label}</div>
             <div className="mt-2 font-display text-2xl font-bold text-ink">
               {m.value}
             </div>
             <div className="mt-2 h-8 rounded-lg bg-line-soft" />
-            <div className="mt-2 font-mono text-[10px] text-ink-40">
+            <div className="mt-2 font-sans text-[10px] text-ink-40">
               {m.hint}
             </div>
           </div>
@@ -86,7 +86,7 @@ export default function PlaceholderPage({
             <div className="font-sans text-sm font-medium text-ink">
               该模块属于 {phase} 交付
             </div>
-            <div className="mt-0.5 font-mono text-xs text-ink-40">
+            <div className="mt-0.5 font-sans text-xs text-ink-40">
               框架已就绪，功能将随版本迭代开放
             </div>
           </div>

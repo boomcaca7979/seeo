@@ -481,7 +481,7 @@ export default function ReportsPage() {
 
       {/* 生成报告区 */}
       <div className="card-a mt-5 p-5">
-        <div className="font-mono text-xs text-ink-40">报告类型</div>
+        <div className="font-sans text-xs text-ink-40">报告类型</div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {reportTypes.map((t) => {
             const cfg = typeConfig[t];
@@ -540,7 +540,7 @@ export default function ReportsPage() {
             全部追踪关键词 + 近 30 天排名历史
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-mono text-[10px] text-ink-40">已追踪</div>
+            <div className="font-sans text-[10px] text-ink-40">已追踪</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
               {loading ? "—" : trackedCount.toLocaleString()}
             </div>
@@ -565,7 +565,7 @@ export default function ReportsPage() {
             最近 100 条内容检测记录
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-mono text-[10px] text-ink-40">累计检测</div>
+            <div className="font-sans text-[10px] text-ink-40">累计检测</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
               {loading ? "—" : contentCount.toLocaleString()}
             </div>
@@ -592,7 +592,7 @@ export default function ReportsPage() {
           {reportsLoading ? (
             <TableSkeleton rows={3} />
           ) : reports.length === 0 ? (
-            <div className="px-4 py-10 text-center font-mono text-xs text-ink-40">
+            <div className="px-4 py-10 text-center font-sans text-xs text-ink-40">
               暂无报告，点击上方生成
             </div>
           ) : (
@@ -600,10 +600,10 @@ export default function ReportsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft bg-line-soft/40">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">标题</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">类型</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">生成时间</th>
-                    <th className="px-4 py-3 text-right font-mono text-xs font-semibold text-ink-40">操作</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">标题</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">类型</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">生成时间</th>
+                    <th className="px-4 py-3 text-right font-sans text-xs font-semibold text-ink-40">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -668,7 +668,7 @@ export default function ReportsPage() {
       {/* 说明区 */}
       <div className="card-a mt-8 border-dashed border-line p-5">
         <h2 className="font-display text-sm font-bold text-ink">关于报告导出</h2>
-        <ul className="mt-2 space-y-1.5 font-mono text-xs text-ink-40">
+        <ul className="mt-2 space-y-1.5 font-sans text-xs text-ink-40">
           <li>· PDF 报告基于 html2pdf.js 在浏览器端生成，无需服务器渲染</li>
           <li>· CSV 报告带 UTF-8 BOM，Excel 直接打开中文不乱码</li>
           <li>· 邮件发送基于 Resend，需配置 RESEND_API_KEY 环境变量</li>
@@ -702,7 +702,7 @@ export default function ReportsPage() {
               {selectedType === "weekly" && weeklyData && <WeeklyReport {...weeklyData} />}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-4">
-              <div className="font-mono text-xs text-ink-40">
+              <div className="font-sans text-xs text-ink-40">
                 {savedReportId ? `已保存 · ID ${savedReportId}` : "未保存"}
               </div>
               <div className="flex gap-2">
@@ -734,7 +734,7 @@ export default function ReportsPage() {
           <div className="relative w-full max-w-md rounded-xl border border-line bg-card p-5">
             <h3 className="font-display text-base font-bold text-ink">发送报告邮件</h3>
             <div className="mt-4">
-              <label className="font-mono text-xs text-ink-40">收件人邮箱</label>
+              <label className="font-sans text-xs text-ink-40">收件人邮箱</label>
               <input
                 type="email"
                 value={emailToSend}

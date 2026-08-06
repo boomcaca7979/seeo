@@ -138,7 +138,7 @@ export default function ProjectList({
     <div>
       <div className="mx-auto max-w-7xl px-6 py-8 sm:px-8">
         {/* eyebrow 行 */}
-        <div className="flex items-center justify-between font-mono text-[11px] text-ink-40">
+        <div className="flex items-center justify-between font-sans text-[11px] text-ink-40">
           <span>{todayLabel || "\u00A0"}</span>
           <span>
             数据更新时间 · 演示模式
@@ -174,7 +174,7 @@ export default function ProjectList({
             <span className="font-mono text-xs text-ink-40">01</span>
             <h2 className="font-display text-base font-bold text-ink">我的项目</h2>
             <div className="hairline flex-1" />
-            <span className="font-mono text-xs text-ink-40">共 {projects.length} 个</span>
+            <span className="font-sans text-xs text-ink-40">共 {projects.length} 个</span>
           </div>
 
           {projects.length === 0 ? (
@@ -184,10 +184,10 @@ export default function ProjectList({
                   ∅
                 </div>
                 <div className="mt-3 font-sans text-sm font-medium text-ink">
-                  还没有项目
+                  暂无项目
                 </div>
-                <div className="mt-1 font-mono text-xs text-ink-40">
-                  创建第一个项目，开始追踪你的搜索数据
+                <div className="mt-1 font-sans text-xs text-ink-40">
+                  点击右上角「创建项目」开始
                 </div>
                 <button
                   onClick={() => setModalOpen(true)}
@@ -242,10 +242,10 @@ export default function ProjectList({
                       {/* 健康分 + 标签 */}
                       <div className="mt-4 flex items-end justify-between">
                         <div>
-                          <div className="font-mono text-[10px] tracking-wider uppercase text-ink-40">
+                          <div className="font-sans text-[10px] tracking-wider uppercase text-ink-40">
                             健康分
                           </div>
-                          <div className={`mt-0.5 font-mono text-2xl font-bold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
+                          <div className={`mt-0.5 font-sans text-2xl font-bold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
                             {hasScore ? score : "未审计"}
                           </div>
                         </div>
@@ -269,7 +269,7 @@ export default function ProjectList({
                       {/* 指标行：追踪关键词 / 近 7 天排名 */}
                       <div className="mt-3 flex items-center justify-between">
                         <div>
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-40">
+                          <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
                             追踪关键词
                           </div>
                           <div className="mt-0.5 font-mono text-base font-semibold text-ink">
@@ -277,7 +277,7 @@ export default function ProjectList({
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-40">
+                          <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
                             近 7 天排名
                           </div>
                           <div className="mt-0.5 flex items-center justify-end gap-1.5 font-mono text-xs">
@@ -289,7 +289,7 @@ export default function ProjectList({
 
                       {/* 底部元信息 + 右箭头 */}
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="font-mono text-[10px] text-ink-40">
+                        <span className="font-sans text-[10px] text-ink-40">
                           最近审计 {p.lastAuditTime ? formatRelativeTime(p.lastAuditTime) : "未审计"} · 预警 {p.alertCount}
                         </span>
                         <span className="font-mono text-sm text-ink-40 opacity-0 group-hover:opacity-100">
@@ -311,7 +311,7 @@ export default function ProjectList({
             <h2 className="font-display text-base font-bold text-ink">预警提醒</h2>
             <div className="hairline flex-1" />
             <span
-              className="font-mono text-[10px] font-bold tracking-wider text-brand"
+              className="font-sans text-[10px] font-bold tracking-wider text-brand"
               style={{ border: "1px solid currentColor", borderRadius: 3, padding: "2px 6px" }}
             >
               实时
@@ -341,7 +341,7 @@ export default function ProjectList({
                   <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-sans text-sm text-ink">{a.title}</div>
-                    <div className="font-mono text-[10px] text-ink-40">
+                    <div className="font-sans text-[10px] text-ink-40">
                       {a.domain ?? "—"} · {formatRelativeTime(a.created_at)}
                     </div>
                   </div>
@@ -381,7 +381,7 @@ export default function ProjectList({
       >
         <form id="new-project-form" onSubmit={handleCreate} className="space-y-4">
           <div>
-            <label className="font-mono text-xs text-ink-60">项目名称</label>
+            <label className="font-sans text-xs text-ink-60">项目名称</label>
             <input
               name="name"
               type="text"
@@ -391,7 +391,7 @@ export default function ProjectList({
             />
           </div>
           <div>
-            <label className="font-mono text-xs text-ink-60">域名</label>
+            <label className="font-sans text-xs text-ink-60">域名</label>
             <input
               name="domain"
               type="text"
@@ -399,7 +399,7 @@ export default function ProjectList({
               placeholder="example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
-            <p className="mt-1.5 font-mono text-[10px] text-ink-40">
+            <p className="mt-1.5 font-sans text-[10px] text-ink-40">
               不带 http://，直接输入域名
             </p>
           </div>
@@ -433,7 +433,7 @@ export default function ProjectList({
         <p className="font-sans text-sm text-ink-60">
           确定要删除项目「{deleteTarget?.name}」（{deleteTarget?.domain}）吗？
         </p>
-        <p className="mt-2 font-mono text-xs text-ink-40">
+        <p className="mt-2 font-sans text-xs text-ink-40">
           仅删除项目记录，历史追踪数据和审计报告保留不变。
         </p>
       </Modal>

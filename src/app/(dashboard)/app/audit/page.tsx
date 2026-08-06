@@ -72,6 +72,7 @@ interface AuditData {
   comparison: ComparisonData | null;
   coverage: CheckCoverageItem[];
   history: HistoryItem[];
+  error?: string | null;
 }
 
 type FilterType = "all" | "error" | "warning" | "notice";
@@ -97,9 +98,9 @@ type AuditDepth = "quick" | "full";
 
 export default function AuditPage() {
   const { show, Toast } = useToast();
-  const [domain, setDomain] = useState("example.com");
+  const [domain, setDomain] = useState("");
   const [audit, setAudit] = useState<AuditData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [auditing, setAuditing] = useState(false);
@@ -128,7 +129,10 @@ export default function AuditPage() {
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
-    void loadLatest(domain);
+    if (domain.trim()) {
+      const id = window.setTimeout(() => void loadLatest(domain), 0);
+      return () => window.clearTimeout(id);
+    }
   }, [loadLatest, domain]);
 
   const handleConfirmAudit = async () => {
@@ -159,7 +163,9 @@ export default function AuditPage() {
         // ignore
       }
       if (json.data?.status === "failed") {
-        show("审计失败，请稍后重试", "error");
+        const apiErr = json.data?.error || json?.error;
+        const hint = activeDepth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
+        show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
       } else {
         show(
           `审计完成：健康度 ${json.data?.healthScore ?? 0} 分，已爬 ${json.data?.pagesCrawled ?? 0} 页`,
@@ -187,6 +193,7 @@ export default function AuditPage() {
   };
 
   const hasResult = audit && audit.status === "completed";
+  const hasFailed = audit && audit.status === "failed";
   const healthScore = audit?.healthScore ?? 0;
   const issueCount = audit?.issues.length ?? 0;
 
@@ -200,7 +207,7 @@ export default function AuditPage() {
     <div className="mx-auto max-w-7xl p-6 lg:p-8 print-area">
       {/* 打印专用页眉 */}
       <div className="mb-6 hidden border-b border-line pb-3 print:block">
-        <div className="font-mono text-xs text-ink-40">SeeO · 技术审计报告</div>
+        <div className="font-sans text-xs text-ink-40">SeeO · 技术审计报告</div>
         <h1 className="mt-1 font-display text-xl font-bold text-ink">
           {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt) : formatTime(new Date().toISOString())}
         </h1>
@@ -222,12 +229,12 @@ export default function AuditPage() {
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
-            <label className="font-mono text-xs text-ink-40">审计域名</label>
+            <label className="font-sans text-xs text-ink-40">审计域名</label>
             <input
               type="text"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="example.com"
+              placeholder="输入域名，如：example.com"
               className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
@@ -279,7 +286,7 @@ export default function AuditPage() {
       </div>
 
       {/* 上次审计信息 */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-ink-40 print:hidden">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-sans text-xs text-ink-40 print:hidden">
         {audit ? (
           <>
             <span>域名：<span className="text-ink-60">{audit.domain}</span></span>
@@ -302,7 +309,7 @@ export default function AuditPage() {
       {/* 审计进度条（同步执行，显示加载态） */}
       {auditing && (
         <div className="card-a mt-4 p-5 print:hidden">
-          <div className="flex items-center justify-between font-mono text-xs text-ink-40">
+          <div className="flex items-center justify-between font-sans text-xs text-ink-40">
             <span>
               {activeDepth === "quick" ? "正在审计首页…" : "正在爬取并检测页面…"}
             </span>
@@ -316,7 +323,7 @@ export default function AuditPage() {
               style={{ width: activeDepth === "quick" ? "100%" : "50%" }}
             />
           </div>
-          <p className="mt-2 font-mono text-[10px] text-ink-40">
+          <p className="mt-2 font-sans text-[10px] text-ink-40">
             {activeDepth === "quick"
               ? "预计 3-5 秒完成，请稍候"
               : "预计 1-2 分钟完成，请勿关闭页面"}
@@ -332,8 +339,30 @@ export default function AuditPage() {
         </div>
       )}
 
+      {/* 审计失败提示 */}
+      {!loading && hasFailed && (
+        <div className="card-a mt-6 border-neg/30 bg-neg/5 p-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
+            <div>
+              <div className="font-display text-sm font-bold text-neg">审计未完成</div>
+              <p className="mt-1 font-sans text-sm text-ink-60">
+                {audit?.error
+                  ? audit.error
+                  : activeDepth === "full"
+                    ? "深度审计可能因页面过多超时，请尝试「快速审计」模式（仅审计首页）"
+                    : "爬虫未能完成抓取，请稍后重试"}
+              </p>
+              <p className="mt-1 font-sans text-xs text-ink-40">
+                域名：{audit?.domain ?? domain} · {formatTime(audit?.finishedAt ?? audit?.startedAt ?? null)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 概览区 */}
-      {!loading && (
+      {!loading && !hasFailed && (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* 健康度大环 + 较上次变化 */}
           <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
@@ -424,7 +453,7 @@ export default function AuditPage() {
       )}
 
       {/* 问题清单 */}
-      {!loading && (
+      {!loading && !hasFailed && (
         <div className="mt-10">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold text-ink">

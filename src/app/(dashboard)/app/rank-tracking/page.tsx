@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { rankLocations, rankCities, rankCompetitors } from "@/lib/mock-data";
+import { rankCompetitors } from "@/lib/mock-data";
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
 import { ChangeBadge, RankBadge } from "@/components/dashboard/Badges";
@@ -24,6 +24,18 @@ import {
   CHART_TOOLTIP_ITEM_STYLE,
 } from "@/components/dashboard/chart-theme";
 import type { RankResult } from "@/lib/seo/types";
+
+// 地区 → 城市映射
+const REGION_CITIES: Record<string, string[]> = {
+  "中国": ["北京", "上海", "广州", "深圳"],
+  "美国": ["纽约", "洛杉矶", "芝加哥"],
+  "英国": ["伦敦", "曼彻斯特"],
+  "日本": ["东京", "大阪"],
+  "香港": ["香港"],
+  "台湾": ["台北"],
+};
+
+const RANK_LOCATIONS = Object.keys(REGION_CITIES);
 
 type Device = "PC" | "移动端";
 
@@ -64,8 +76,9 @@ interface RankHistoryPoint {
 export default function RankTrackingPage() {
   const { show, Toast } = useToast();
   const [device, setDevice] = useState<Device>("PC");
-  const [country, setCountry] = useState(rankLocations[0]);
-  const [city, setCity] = useState(rankCities[0]);
+  const [country, setCountry] = useState(RANK_LOCATIONS[0]);
+  const [cities, setCities] = useState<string[]>(REGION_CITIES[RANK_LOCATIONS[0]]);
+  const [city, setCity] = useState(REGION_CITIES[RANK_LOCATIONS[0]][0]);
 
   // 真实追踪数据
   const [tracked, setTracked] = useState<TrackedKeyword[]>([]);
@@ -81,13 +94,13 @@ export default function RankTrackingPage() {
   // 添加模态框
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addKeyword, setAddKeyword] = useState("");
-  const [addDomain, setAddDomain] = useState("semrush.com");
+  const [addDomain, setAddDomain] = useState("");
   const [adding, setAdding] = useState(false);
 
   // 实时查排名模态框（保留）
   const [rankModalOpen, setRankModalOpen] = useState(false);
   const [rankKeyword, setRankKeyword] = useState("");
-  const [rankDomain, setRankDomain] = useState("semrush.com");
+  const [rankDomain, setRankDomain] = useState("");
   const [rankResult, setRankResult] = useState<RankResult | null>(null);
   const [rankLoading, setRankLoading] = useState(false);
   const [rankError, setRankError] = useState<string | null>(null);
@@ -106,6 +119,14 @@ export default function RankTrackingPage() {
   const [newGroupDesc, setNewGroupDesc] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupMenuId, setGroupMenuId] = useState<number | null>(null); // 当前展开分组菜单的关键词 id
+
+  // 地区切换联动：更新地区 + 城市 + 重置选中城市
+  const handleRegionChange = (region: string) => {
+    setCountry(region);
+    const next = REGION_CITIES[region] ?? [];
+    setCities(next);
+    setCity(next[0] ?? "");
+  };
 
   const loadList = useCallback(async () => {
     setListLoading(true);
@@ -153,13 +174,25 @@ export default function RankTrackingPage() {
     return () => window.removeEventListener("click", handler);
   }, [groupMenuId]);
 
-  // 按分组筛选
+  // 按分组 + 地区 + 设备筛选
   const filteredTracked = tracked.filter((t) => {
+    if (t.location !== country) return false;
+    if (t.device !== device) return false;
     if (groupFilter === "all") return true;
     if (groupFilter === "ungrouped") return t.groups.length === 0;
     const gid = Number(groupFilter.replace("group-", ""));
     return t.groups.some((g) => g.id === gid);
   });
+
+  // 地区/设备切换时重新拉取列表（API 不分页，前端再筛选）
+  const lastRegionKeyRef = useRef<string>(`${country}|${device}`);
+  useEffect(() => {
+    const key = `${country}|${device}`;
+    if (key === lastRegionKeyRef.current) return;
+    lastRegionKeyRef.current = key;
+    setSelectedId(null);
+    void loadList();
+  }, [country, device, loadList]);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -478,7 +511,7 @@ export default function RankTrackingPage() {
       {/* API 用量条：白卡 + 细进度条 */}
       {usage && (
         <div className="card-a mt-4 flex items-center gap-3 px-4 py-2.5">
-          <span className="font-mono text-xs font-semibold text-ink">
+          <span className="font-sans text-xs font-semibold text-ink">
             本月 API 用量 {usage.used}/{usage.limit}
           </span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
@@ -488,22 +521,22 @@ export default function RankTrackingPage() {
             />
           </div>
           {usagePercent > 70 && (
-            <span className="font-mono text-[10px] text-neg">额度紧张，建议节制</span>
+            <span className="font-sans text-[10px] text-neg">额度紧张，建议节制</span>
           )}
-          <span className="font-mono text-[10px] text-ink-40">追踪 {tracked.length}/{trackingLimit} 个词</span>
+          <span className="font-sans text-[10px] text-ink-40">追踪 {tracked.length}/{trackingLimit} 个词</span>
         </div>
       )}
 
       {/* 筛选条 */}
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="font-mono text-xs text-ink-40">地区</label>
+          <label className="font-sans text-xs text-ink-40">地区</label>
           <select
             value={country}
-            onChange={(e) => setCountry(e.target.value)}
+            onChange={(e) => handleRegionChange(e.target.value)}
             className="rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
-            {rankLocations.map((c) => (
+            {RANK_LOCATIONS.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -512,13 +545,13 @@ export default function RankTrackingPage() {
             onChange={(e) => setCity(e.target.value)}
             className="rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
-            {rankCities.map((c) => (
+            {cities.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <label className="font-mono text-xs text-ink-40">设备</label>
+          <label className="font-sans text-xs text-ink-40">设备</label>
           <div className="flex gap-2">
             {(["PC", "移动端"] as Device[]).map((d) => (
               <button
@@ -532,7 +565,7 @@ export default function RankTrackingPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <label className="font-mono text-xs text-ink-40">分组</label>
+          <label className="font-sans text-xs text-ink-40">分组</label>
           <select
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
@@ -545,7 +578,7 @@ export default function RankTrackingPage() {
             ))}
           </select>
         </div>
-        <span className="ml-auto font-mono text-xs text-ink-40">
+        <span className="ml-auto font-sans text-xs text-ink-40">
           当前：{country} · {city} · {device}
         </span>
       </div>
@@ -561,7 +594,7 @@ export default function RankTrackingPage() {
           { label: "今日下降", value: `▼ ${stats.down.toLocaleString()}`, color: "text-neg" },
         ].map((m) => (
           <div key={m.label} className="card-a p-4">
-            <div className="font-mono text-[10px] text-ink-40">{m.label}</div>
+            <div className="font-sans text-[10px] text-ink-40">{m.label}</div>
             <div className={`mt-1 font-mono text-lg font-bold ${m.color}`}>
               {m.value}
             </div>
@@ -577,7 +610,7 @@ export default function RankTrackingPage() {
               <h2 className="font-display text-base font-bold text-ink">
                 排名趋势
               </h2>
-              <p className="mt-0.5 font-mono text-xs text-ink-40">
+              <p className="mt-0.5 font-sans text-xs text-ink-40">
                 {selectedKeyword.keyword} · {selectedKeyword.domain} · 排名越靠上越好
               </p>
             </div>
@@ -590,23 +623,23 @@ export default function RankTrackingPage() {
                   <ChangeBadge value={selectedKeyword.change ?? 0} />
                 </>
               ) : (
-                <div className="font-mono text-sm text-ink-40">未进前 100</div>
+                <div className="font-sans text-sm text-ink-40">未进前 100</div>
               )}
             </div>
           </div>
           <div className="mt-4 h-64">
             {historyLoading ? (
-              <div className="flex h-full items-center justify-center font-mono text-xs text-ink-40">
+              <div className="flex h-full items-center justify-center font-sans text-xs text-ink-40">
                 加载历史数据…
               </div>
             ) : trendData.length === 0 ? (
-              <div className="flex h-full items-center justify-center font-mono text-xs text-ink-40">
+              <div className="flex h-full items-center justify-center font-sans text-xs text-ink-40">
                 暂无历史数据，点击「立即刷新排名」开始记录
               </div>
             ) : trendData.length === 1 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2">
                 <div className="font-mono text-2xl font-bold text-brand">#{trendData[0].rank}</div>
-                <div className="font-mono text-xs text-ink-40">追踪满 2 天后显示趋势</div>
+                <div className="font-sans text-xs text-ink-40">追踪满 2 天后显示趋势</div>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -655,7 +688,7 @@ export default function RankTrackingPage() {
             追踪关键词
           </h2>
           <div className="hairline flex-1" />
-          <span className="font-mono text-xs text-ink-40">
+          <span className="font-sans text-xs text-ink-40">
             {groupFilter === "all"
               ? `${tracked.length}/${trackingLimit} 个 · 还可添加 ${Math.max(0, remaining)} 个`
               : `${filteredTracked.length}/${tracked.length} 个（已筛选）`}
@@ -667,7 +700,7 @@ export default function RankTrackingPage() {
           ) : tracked.length === 0 ? (
             <EmptyState onAdd={() => setAddModalOpen(true)} />
           ) : filteredTracked.length === 0 ? (
-            <div className="px-4 py-12 text-center font-mono text-xs text-ink-40">
+            <div className="px-4 py-12 text-center font-sans text-xs text-ink-40">
               当前分组下暂无关键词
             </div>
           ) : (
@@ -675,12 +708,12 @@ export default function RankTrackingPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">关键词</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">域名</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">今日排名</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">较昨日</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">最后刷新</th>
-                    <th className="px-4 py-3 text-right font-mono text-xs font-semibold text-ink-40">操作</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">关键词</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">域名</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">今日排名</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">较昨日</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">最后刷新</th>
+                    <th className="px-4 py-3 text-right font-sans text-xs font-semibold text-ink-40">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -725,7 +758,7 @@ export default function RankTrackingPage() {
                             {r.todayPosition}
                           </span>
                         ) : (
-                          <span className="font-mono text-xs text-ink-40">未进前 100</span>
+                          <span className="font-sans text-xs text-ink-40">未进前 100</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -735,7 +768,7 @@ export default function RankTrackingPage() {
                           <span className="font-mono text-[10px] text-ink-40">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-40">
+                      <td className="px-4 py-3 font-sans text-xs text-ink-40">
                         {r.last_refreshed_at ? formatRelative(r.last_refreshed_at) : "未刷新"}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -755,7 +788,7 @@ export default function RankTrackingPage() {
                                 onClick={(e) => e.stopPropagation()}
                                 className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-lg border border-line bg-paper py-1"
                               >
-                                <div className="px-3 py-1.5 font-mono text-[10px] text-ink-40">
+                                <div className="px-3 py-1.5 font-sans text-[10px] text-ink-40">
                                   {groups.length === 0 ? "暂无分组，请先创建" : "加入分组"}
                                 </div>
                                 {groups.map((g) => {
@@ -809,10 +842,10 @@ export default function RankTrackingPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-line-soft">
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">域名</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">排名</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">变化</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">状态</th>
+                  <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">域名</th>
+                  <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">排名</th>
+                  <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">变化</th>
+                  <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">状态</th>
                 </tr>
               </thead>
               <tbody>
@@ -881,7 +914,7 @@ export default function RankTrackingPage() {
       >
         <form id="add-keyword-form" onSubmit={handleAdd} className="space-y-4">
           <div>
-            <label className="font-mono text-xs text-ink-40">关键词</label>
+            <label className="font-sans text-xs text-ink-40">关键词</label>
             <input
               type="text"
               value={addKeyword}
@@ -892,31 +925,31 @@ export default function RankTrackingPage() {
             />
           </div>
           <div>
-            <label className="font-mono text-xs text-ink-40">目标域名</label>
+            <label className="font-sans text-xs text-ink-40">目标域名</label>
             <input
               type="text"
               value={addDomain}
               onChange={(e) => setAddDomain(e.target.value)}
               required
-              placeholder="example.com"
+              placeholder="输入你的网站域名，如：example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-mono text-xs text-ink-40">地区</label>
+              <label className="font-sans text-xs text-ink-40">地区</label>
               <select
                 value={country}
-                onChange={(e) => setCountry(e.target.value)}
+                onChange={(e) => handleRegionChange(e.target.value)}
                 className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
               >
-                {rankLocations.map((c) => (
+                {RANK_LOCATIONS.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="font-mono text-xs text-ink-40">设备</label>
+              <label className="font-sans text-xs text-ink-40">设备</label>
               <select
                 value={device}
                 onChange={(e) => setDevice(e.target.value as Device)}
@@ -927,7 +960,7 @@ export default function RankTrackingPage() {
               </select>
             </div>
           </div>
-          <p className="font-mono text-[10px] text-ink-40">
+          <p className="font-sans text-[10px] text-ink-40">
             演示期限定追踪 {trackingLimit} 个关键词。每日刷新一次，同日重复刷新走缓存不重复扣额度。
           </p>
         </form>
@@ -989,7 +1022,7 @@ export default function RankTrackingPage() {
       >
         <form id="rank-check-form" onSubmit={handleCheckRank} className="space-y-4">
           <div>
-            <label className="font-mono text-xs text-ink-40">关键词</label>
+            <label className="font-sans text-xs text-ink-40">关键词</label>
             <input
               type="text"
               value={rankKeyword}
@@ -999,7 +1032,7 @@ export default function RankTrackingPage() {
             />
           </div>
           <div>
-            <label className="font-mono text-xs text-ink-40">域名</label>
+            <label className="font-sans text-xs text-ink-40">域名</label>
             <input
               type="text"
               value={rankDomain}
@@ -1007,11 +1040,11 @@ export default function RankTrackingPage() {
               placeholder="example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
-            <p className="mt-1 font-mono text-[10px] text-ink-40">
+            <p className="mt-1 font-sans text-[10px] text-ink-40">
               地区 / 设备跟随页面筛选：{country} · {device}
             </p>
           </div>
-          <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 font-mono text-[11px] text-brand">
+          <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2 font-sans text-[11px] text-brand">
             实时查询消耗 1 次 API 额度（24h 内重复查询命中缓存不重复计费）
           </div>
 
@@ -1025,14 +1058,14 @@ export default function RankTrackingPage() {
               {rankResult.rank === null ? (
                 <div className="text-center">
                   <div className="font-display text-2xl font-bold text-ink-40">未进入前 100 名</div>
-                  <div className="mt-2 font-mono text-[11px] text-ink-40">
+                  <div className="mt-2 font-sans text-[11px] text-ink-40">
                     {rankResult.domain} 在「{rankResult.keyword}」的 Google SERP 前 100 中未出现
                   </div>
                 </div>
               ) : (
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-mono text-xs text-ink-40">当前排名</span>
+                    <span className="font-sans text-xs text-ink-40">当前排名</span>
                     {rankResult.fromCache && (
                       <span className="badge-warn">缓存数据</span>
                     )}
@@ -1051,7 +1084,7 @@ export default function RankTrackingPage() {
                       {rankResult.matchedUrl}
                     </a>
                   )}
-                  <div className="mt-2 font-mono text-[10px] text-ink-40">
+                  <div className="mt-2 font-sans text-[10px] text-ink-40">
                     查询时间：{new Date(rankResult.fetchedAt).toLocaleString("zh-CN")}
                   </div>
                 </div>
@@ -1095,7 +1128,7 @@ export default function RankTrackingPage() {
       >
         <form id="create-group-form" onSubmit={handleCreateGroup} className="space-y-4">
           <div>
-            <label className="font-mono text-xs text-ink-40">分组名称</label>
+            <label className="font-sans text-xs text-ink-40">分组名称</label>
             <input
               type="text"
               value={newGroupName}
@@ -1107,7 +1140,7 @@ export default function RankTrackingPage() {
             />
           </div>
           <div>
-            <label className="font-mono text-xs text-ink-40">描述（可选）</label>
+            <label className="font-sans text-xs text-ink-40">描述（可选）</label>
             <textarea
               value={newGroupDesc}
               onChange={(e) => setNewGroupDesc(e.target.value)}
@@ -1117,7 +1150,7 @@ export default function RankTrackingPage() {
               className="mt-1.5 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
-          <p className="font-mono text-[10px] text-ink-40">
+          <p className="font-sans text-[10px] text-ink-40">
             分组创建后可在关键词表格的「+ 分组」按钮把关键词加入分组，支持一个关键词属于多个分组。
           </p>
         </form>
@@ -1162,7 +1195,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <div className="mt-3 font-sans text-sm font-medium text-ink">
         还没有追踪的关键词
       </div>
-      <div className="mt-1 font-mono text-xs text-ink-60">
+      <div className="mt-1 font-sans text-xs text-ink-60">
         添加一个关键词开始监控它的 Google 排名
       </div>
       <button
