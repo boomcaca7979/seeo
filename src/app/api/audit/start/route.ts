@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
   // 防滥用：按 depth 分别限制 1 小时冷却
   // - status='failed' 不触发冷却，允许重试
   // - quick 和 full 互不影响（latest.depth !== 本次 depth 则不冷却）
-  const latest = await getLatestAudit(domain);
+  const latest = await getLatestAudit(userId, domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({
       error: "该域名审计正在进行中，请等待完成",
@@ -76,11 +77,11 @@ export async function POST(req: Request) {
   }
 
   // 创建审计记录
-  const audit = await createAudit(domain, depth);
+  const audit = await createAudit(userId, domain, depth);
 
   // 同步执行审计（不再 fire-and-forget，serverless 兼容）
   // runAudit 内部已处理 finishAudit / addAuditIssue / 失败兜底
-  const result = await runAudit(audit.id, domain, { depth });
+  const result = await runAudit(userId, audit.id, domain, { depth });
 
   return NextResponse.json({
     data: {

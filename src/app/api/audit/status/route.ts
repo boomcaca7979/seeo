@@ -13,6 +13,7 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const idParam = searchParams.get("id");
   if (!idParam) {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
   }
 
-  const audit = await getAuditById(id);
+  const audit = await getAuditById(userId, id);
   if (!audit) {
     return NextResponse.json({ error: "审计记录不存在" }, { status: 404 });
   }

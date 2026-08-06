@@ -40,12 +40,13 @@ export async function POST(
   }
 
   // 校验关键词存在
-  const kw = await getTrackedKeywordById(keywordId);
+  const userId = auth.user?.id ?? "demo-user";
+  const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
     return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
   }
 
-  await addKeywordToGroup(groupId, keywordId);
+  await addKeywordToGroup(userId, groupId, keywordId);
   return NextResponse.json({ data: { ok: true } });
 }
 
@@ -75,7 +76,8 @@ export async function DELETE(
     return NextResponse.json({ error: "keyword_id 参数无效" }, { status: 400 });
   }
 
-  const ok = await removeKeywordFromGroup(groupId, keywordId);
+  const userId = auth.user?.id ?? "demo-user";
+  const ok = await removeKeywordFromGroup(userId, groupId, keywordId);
   if (!ok) {
     return NextResponse.json({ error: "该关键词不在此分组中" }, { status: 404 });
   }

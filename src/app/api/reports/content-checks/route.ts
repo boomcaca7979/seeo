@@ -36,7 +36,8 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const rows = await listContentChecks(100);
+  const userId = auth.user?.id ?? "demo-user";
+  const rows = await listContentChecks(userId, 100);
 
   if (rows.length === 0) {
     return NextResponse.json(

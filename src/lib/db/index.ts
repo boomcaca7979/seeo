@@ -39,6 +39,23 @@ async function getAdapter(): Promise<DBAdapter> {
 }
 
 async function migrate(db: DBAdapter): Promise<void> {
+  // 先补 user_id 列：旧库的表已存在但缺 user_id，需在 CREATE INDEX 引用前补上
+  // 新库此时表不存在，ALTER TABLE 报错被 catch 忽略，随后 CREATE TABLE 会建带 user_id 的表
+  const userIdTables = [
+    'tracked_keywords', 'rank_history', 'content_checks', 'audits',
+    'audit_issues', 'alerts', 'projects', 'automation_settings',
+    'automation_logs', 'keyword_groups', 'keyword_group_members',
+    'competitors', 'competitor_ranks', 'reports',
+    'backlink_summaries', 'backlinks',
+  ];
+  for (const table of userIdTables) {
+    try {
+      await db.run(`ALTER TABLE ${table} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'demo-user'`);
+    } catch {
+      // 表不存在或列已存在，忽略
+    }
+  }
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_keywords (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,11 +64,15 @@ async function migrate(db: DBAdapter): Promise<void> {
       device TEXT NOT NULL,
       domain TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      last_refreshed_at TEXT
+      last_refreshed_at TEXT,
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_unique
       ON tracked_keywords(keyword, location, device, domain);
+
+    CREATE INDEX IF NOT EXISTS idx_tracked_keywords_user
+      ON tracked_keywords(user_id);
 
     CREATE TABLE IF NOT EXISTS rank_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,12 +81,16 @@ async function migrate(db: DBAdapter): Promise<void> {
       position INTEGER,
       url TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
       FOREIGN KEY (keyword_id) REFERENCES tracked_keywords(id) ON DELETE CASCADE,
       UNIQUE (keyword_id, date)
     );
 
     CREATE INDEX IF NOT EXISTS idx_rank_history_keyword
       ON rank_history(keyword_id, date);
+
+    CREATE INDEX IF NOT EXISTS idx_rank_history_user
+      ON rank_history(user_id);
 
     CREATE TABLE IF NOT EXISTS content_checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,11 +100,15 @@ async function migrate(db: DBAdapter): Promise<void> {
       word_count INTEGER NOT NULL,
       density REAL NOT NULL,
       checks_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_content_checks_created
       ON content_checks(created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_content_checks_user
+      ON content_checks(user_id);
 
     CREATE TABLE IF NOT EXISTS audits (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,11 +123,15 @@ async function migrate(db: DBAdapter): Promise<void> {
       notices INTEGER NOT NULL DEFAULT 0,
       comparison TEXT,
       error TEXT,
-      depth TEXT NOT NULL DEFAULT 'quick'
+      depth TEXT NOT NULL DEFAULT 'quick',
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_audits_domain
       ON audits(domain, started_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_audits_user
+      ON audits(user_id);
 
     CREATE TABLE IF NOT EXISTS audit_issues (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,11 +141,15 @@ async function migrate(db: DBAdapter): Promise<void> {
       url TEXT NOT NULL,
       detail TEXT NOT NULL,
       suggestion TEXT,
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
       FOREIGN KEY (audit_id) REFERENCES audits(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_audit_issues_audit
       ON audit_issues(audit_id);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_issues_user
+      ON audit_issues(user_id);
 
     CREATE TABLE IF NOT EXISTS alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,7 +159,8 @@ async function migrate(db: DBAdapter): Promise<void> {
       detail TEXT,
       domain TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      read INTEGER NOT NULL DEFAULT 0
+      read INTEGER NOT NULL DEFAULT 0,
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_alerts_created
@@ -131,25 +169,37 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_alerts_read
       ON alerts(read);
 
+    CREATE INDEX IF NOT EXISTS idx_alerts_user
+      ON alerts(user_id);
+
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      domain TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      domain TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
+      UNIQUE (user_id, domain)
     );
 
     CREATE INDEX IF NOT EXISTS idx_projects_domain
       ON projects(domain);
 
+    CREATE INDEX IF NOT EXISTS idx_projects_user
+      ON projects(user_id);
+
     CREATE TABLE IF NOT EXISTS automation_settings (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       daily_refresh_enabled INTEGER NOT NULL DEFAULT 0,
       daily_refresh_time TEXT NOT NULL DEFAULT '09:00',
       weekly_report_enabled INTEGER NOT NULL DEFAULT 0,
       weekly_report_day INTEGER NOT NULL DEFAULT 1,
       weekly_report_time TEXT NOT NULL DEFAULT '09:00',
-      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL UNIQUE DEFAULT 'demo-user'
     );
+
+    CREATE INDEX IF NOT EXISTS idx_automation_settings_user
+      ON automation_settings(user_id);
 
     CREATE TABLE IF NOT EXISTS automation_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,23 +207,32 @@ async function migrate(db: DBAdapter): Promise<void> {
       status TEXT NOT NULL CHECK (status IN ('success', 'failed', 'running')),
       summary TEXT,
       details TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_automation_logs_created
       ON automation_logs(created_at DESC);
 
+    CREATE INDEX IF NOT EXISTS idx_automation_logs_user
+      ON automation_logs(user_id);
+
     CREATE TABLE IF NOT EXISTS keyword_groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       description TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
+
+    CREATE INDEX IF NOT EXISTS idx_keyword_groups_user
+      ON keyword_groups(user_id);
 
     CREATE TABLE IF NOT EXISTS keyword_group_members (
       group_id INTEGER NOT NULL,
       keyword_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
       PRIMARY KEY (group_id, keyword_id),
       FOREIGN KEY (group_id) REFERENCES keyword_groups(id) ON DELETE CASCADE,
       FOREIGN KEY (keyword_id) REFERENCES tracked_keywords(id) ON DELETE CASCADE
@@ -183,6 +242,8 @@ async function migrate(db: DBAdapter): Promise<void> {
       ON keyword_group_members(keyword_id);
     CREATE INDEX IF NOT EXISTS idx_keyword_group_members_group
       ON keyword_group_members(group_id);
+    CREATE INDEX IF NOT EXISTS idx_keyword_group_members_user
+      ON keyword_group_members(user_id);
 
     CREATE TABLE IF NOT EXISTS competitors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,11 +251,15 @@ async function migrate(db: DBAdapter): Promise<void> {
       domain TEXT NOT NULL,
       name TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
       UNIQUE(project_id, domain)
     );
 
     CREATE INDEX IF NOT EXISTS idx_competitors_project
       ON competitors(project_id);
+
+    CREATE INDEX IF NOT EXISTS idx_competitors_user
+      ON competitors(user_id);
 
     CREATE TABLE IF NOT EXISTS competitor_ranks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,6 +268,7 @@ async function migrate(db: DBAdapter): Promise<void> {
       rank INTEGER,
       target_url TEXT,
       checked_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
       FOREIGN KEY (competitor_id) REFERENCES competitors(id) ON DELETE CASCADE,
       FOREIGN KEY (keyword_id) REFERENCES tracked_keywords(id) ON DELETE CASCADE
     );
@@ -211,6 +277,8 @@ async function migrate(db: DBAdapter): Promise<void> {
       ON competitor_ranks(keyword_id, checked_at DESC);
     CREATE INDEX IF NOT EXISTS idx_competitor_ranks_competitor
       ON competitor_ranks(competitor_id, keyword_id, checked_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_competitor_ranks_user
+      ON competitor_ranks(user_id);
 
     CREATE TABLE IF NOT EXISTS reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,13 +287,16 @@ async function migrate(db: DBAdapter): Promise<void> {
       title TEXT NOT NULL,
       data_json TEXT NOT NULL,
       pdf_path TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_reports_created
       ON reports(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reports_project
       ON reports(project_id);
+    CREATE INDEX IF NOT EXISTS idx_reports_user
+      ON reports(user_id);
 
     CREATE TABLE IF NOT EXISTS api_cache (
       key TEXT PRIMARY KEY,
@@ -244,14 +315,19 @@ async function migrate(db: DBAdapter): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS backlink_summaries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      domain TEXT NOT NULL UNIQUE,
+      domain TEXT NOT NULL,
       total_backlinks INTEGER,
       referring_domains INTEGER,
       domain_rank INTEGER,
       dofollow_pct REAL,
       raw_json TEXT,
-      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+      fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
+      UNIQUE (user_id, domain)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_backlink_summaries_user
+      ON backlink_summaries(user_id);
 
     CREATE TABLE IF NOT EXISTS backlinks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -262,12 +338,95 @@ async function migrate(db: DBAdapter): Promise<void> {
       dofollow INTEGER,
       source_rank INTEGER,
       first_seen TEXT,
-      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+      fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
     CREATE INDEX IF NOT EXISTS idx_backlinks_domain
       ON backlinks(domain);
+
+    CREATE INDEX IF NOT EXISTS idx_backlinks_user
+      ON backlinks(user_id);
   `);
+
+  // projects 表升级：旧表 domain 是全局 UNIQUE，多用户下同域名冲突，重建为 (user_id, domain) 联合唯一
+  try {
+    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='projects'`) as { sql: string } | undefined;
+    if (tableDef?.sql && tableDef.sql.includes('domain TEXT NOT NULL UNIQUE')) {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS projects_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          domain TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          user_id TEXT NOT NULL DEFAULT 'demo-user',
+          UNIQUE (user_id, domain)
+        );
+        INSERT OR IGNORE INTO projects_new (id, name, domain, created_at, user_id)
+        SELECT id, name, domain, created_at, user_id FROM projects;
+        DROP TABLE projects;
+        ALTER TABLE projects_new RENAME TO projects;
+        CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
+        CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+      `);
+    }
+  } catch {
+    // 升级失败（可能已是新结构），忽略
+  }
+
+  // backlink_summaries 表升级：同 projects，domain 全局 UNIQUE 改为 (user_id, domain) 联合唯一
+  try {
+    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='backlink_summaries'`) as { sql: string } | undefined;
+    if (tableDef?.sql && tableDef.sql.includes('domain TEXT NOT NULL UNIQUE')) {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS backlink_summaries_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          domain TEXT NOT NULL,
+          total_backlinks INTEGER,
+          referring_domains INTEGER,
+          domain_rank INTEGER,
+          dofollow_pct REAL,
+          raw_json TEXT,
+          fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+          user_id TEXT NOT NULL DEFAULT 'demo-user',
+          UNIQUE (user_id, domain)
+        );
+        INSERT OR IGNORE INTO backlink_summaries_new (id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id)
+        SELECT id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id FROM backlink_summaries;
+        DROP TABLE backlink_summaries;
+        ALTER TABLE backlink_summaries_new RENAME TO backlink_summaries;
+        CREATE INDEX IF NOT EXISTS idx_backlink_summaries_user ON backlink_summaries(user_id);
+      `);
+    }
+  } catch {
+    // 升级失败（可能已是新结构），忽略
+  }
+
+  // automation_settings 表升级：旧表有 CHECK (id = 1) 单行约束，需重建为多行（按 user_id）
+  try {
+    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='automation_settings'`) as { sql: string } | undefined;
+    if (tableDef?.sql && tableDef.sql.includes('CHECK (id = 1)')) {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS automation_settings_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          daily_refresh_enabled INTEGER NOT NULL DEFAULT 0,
+          daily_refresh_time TEXT NOT NULL DEFAULT '09:00',
+          weekly_report_enabled INTEGER NOT NULL DEFAULT 0,
+          weekly_report_day INTEGER NOT NULL DEFAULT 1,
+          weekly_report_time TEXT NOT NULL DEFAULT '09:00',
+          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+          user_id TEXT NOT NULL UNIQUE DEFAULT 'demo-user'
+        );
+        INSERT OR IGNORE INTO automation_settings_new (id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id)
+        SELECT id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id FROM automation_settings;
+        DROP TABLE automation_settings;
+        ALTER TABLE automation_settings_new RENAME TO automation_settings;
+        CREATE INDEX IF NOT EXISTS idx_automation_settings_user ON automation_settings(user_id);
+      `);
+    }
+  } catch {
+    // 升级失败（可能已是新结构），忽略
+  }
 
   // 审计表新增 comparison 字段（ALTER TABLE 兼容已有数据）
   try {
@@ -331,7 +490,7 @@ async function migrateProjectsFromTrackedKeywords(db: DBAdapter): Promise<void> 
   `) as { domain: string }[];
   if (domains.length === 0) return;
   for (const { domain } of domains) {
-    await db.run(`INSERT INTO projects (name, domain) VALUES (?, ?)`, [domain, domain]);
+    await db.run(`INSERT INTO projects (name, domain, user_id) VALUES (?, ?, 'demo-user')`, [domain, domain]);
   }
 }
 
@@ -392,7 +551,7 @@ function rowToTracked(row: Record<string, unknown>): TrackedKeyword {
   };
 }
 
-export async function listTrackedKeywords(): Promise<TrackedKeywordWithGroups[]> {
+export async function listTrackedKeywords(userId: string): Promise<TrackedKeywordWithGroups[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT
@@ -405,15 +564,17 @@ export async function listTrackedKeywords(): Promise<TrackedKeywordWithGroups[]>
       ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
     LEFT JOIN rank_history yest
       ON yest.keyword_id = tk.id AND yest.date = date('now', 'localtime', '-1 day')
+    WHERE tk.user_id = ?
     ORDER BY tk.created_at ASC
-  `) as Record<string, unknown>[];
+  `, [userId]) as Record<string, unknown>[];
 
   // 一次性查所有分组关联，再按 keyword_id 聚合（避免 N+1）
   const allMembers = await db.query(`
     SELECT m.keyword_id, g.id AS group_id, g.name, g.description, g.created_at
     FROM keyword_group_members m
     JOIN keyword_groups g ON g.id = m.group_id
-  `) as Record<string, unknown>[];
+    WHERE m.user_id = ?
+  `, [userId]) as Record<string, unknown>[];
   const groupsByKw = new Map<number, KeywordGroup[]>();
   for (const m of allMembers) {
     const kid = Number(m.keyword_id);
@@ -451,7 +612,7 @@ export async function listTrackedKeywords(): Promise<TrackedKeywordWithGroups[]>
   });
 }
 
-export async function addTrackedKeyword(params: {
+export async function addTrackedKeyword(userId: string, params: {
   keyword: string;
   location: string;
   device: "PC" | "移动端";
@@ -459,28 +620,28 @@ export async function addTrackedKeyword(params: {
 }): Promise<TrackedKeyword> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO tracked_keywords (keyword, location, device, domain)
-    VALUES (@keyword, @location, @device, @domain)
-  `, [params]);
+    INSERT INTO tracked_keywords (keyword, location, device, domain, user_id)
+    VALUES (@keyword, @location, @device, @domain, @user_id)
+  `, [{ ...params, user_id: userId }]);
   const row = await db.get(`SELECT * FROM tracked_keywords WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToTracked(row);
 }
 
-export async function removeTrackedKeyword(id: number): Promise<boolean> {
+export async function removeTrackedKeyword(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
-  const info = await db.run(`DELETE FROM tracked_keywords WHERE id = ?`, [id]);
+  const info = await db.run(`DELETE FROM tracked_keywords WHERE id = ? AND user_id = ?`, [id, userId]);
   return info.changes > 0;
 }
 
-export async function getTrackedKeywordById(id: number): Promise<TrackedKeyword | null> {
+export async function getTrackedKeywordById(userId: string, id: number): Promise<TrackedKeyword | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM tracked_keywords WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM tracked_keywords WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToTracked(row) : null;
 }
 
-export async function countTrackedKeywords(): Promise<number> {
+export async function countTrackedKeywords(userId: string): Promise<number> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT COUNT(*) AS c FROM tracked_keywords`) as { c: number };
+  const row = await db.get(`SELECT COUNT(*) AS c FROM tracked_keywords WHERE user_id = ?`, [userId]) as { c: number };
   return row.c;
 }
 
@@ -495,73 +656,74 @@ function rowToKeywordGroup(row: Record<string, unknown>): KeywordGroup {
   };
 }
 
-export async function createKeywordGroup(name: string, description?: string): Promise<KeywordGroup> {
+export async function createKeywordGroup(userId: string, name: string, description?: string): Promise<KeywordGroup> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO keyword_groups (name, description)
-    VALUES (@name, @description)
-  `, [{ name, description: description ?? null }]);
+    INSERT INTO keyword_groups (name, description, user_id)
+    VALUES (@name, @description, @user_id)
+  `, [{ name, description: description ?? null, user_id: userId }]);
   const row = await db.get(`SELECT * FROM keyword_groups WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToKeywordGroup(row);
 }
 
-export async function listKeywordGroups(): Promise<KeywordGroupWithCount[]> {
+export async function listKeywordGroups(userId: string): Promise<KeywordGroupWithCount[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT g.*, COUNT(m.keyword_id) AS keyword_count
     FROM keyword_groups g
     LEFT JOIN keyword_group_members m ON m.group_id = g.id
+    WHERE g.user_id = ?
     GROUP BY g.id
     ORDER BY g.created_at ASC
-  `) as Record<string, unknown>[];
+  `, [userId]) as Record<string, unknown>[];
   return rows.map((r) => ({
     ...rowToKeywordGroup(r),
     keywordCount: Number(r.keyword_count),
   }));
 }
 
-export async function deleteKeywordGroup(id: number): Promise<boolean> {
+export async function deleteKeywordGroup(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
-  const info = await db.run(`DELETE FROM keyword_groups WHERE id = ?`, [id]);
+  const info = await db.run(`DELETE FROM keyword_groups WHERE id = ? AND user_id = ?`, [id, userId]);
   return info.changes > 0;
 }
 
-export async function addKeywordToGroup(groupId: number, keywordId: number): Promise<void> {
+export async function addKeywordToGroup(userId: string, groupId: number, keywordId: number): Promise<void> {
   const db = await getAdapter();
   await db.run(`
-    INSERT OR IGNORE INTO keyword_group_members (group_id, keyword_id)
-    VALUES (@group_id, @keyword_id)
-  `, [{ group_id: groupId, keyword_id: keywordId }]);
+    INSERT OR IGNORE INTO keyword_group_members (group_id, keyword_id, user_id)
+    VALUES (@group_id, @keyword_id, @user_id)
+  `, [{ group_id: groupId, keyword_id: keywordId, user_id: userId }]);
 }
 
-export async function removeKeywordFromGroup(groupId: number, keywordId: number): Promise<boolean> {
+export async function removeKeywordFromGroup(userId: string, groupId: number, keywordId: number): Promise<boolean> {
   const db = await getAdapter();
   const info = await db.run(`
     DELETE FROM keyword_group_members
-    WHERE group_id = ? AND keyword_id = ?
-  `, [groupId, keywordId]);
+    WHERE group_id = ? AND keyword_id = ? AND user_id = ?
+  `, [groupId, keywordId, userId]);
   return info.changes > 0;
 }
 
-export async function listKeywordsInGroup(groupId: number): Promise<TrackedKeyword[]> {
+export async function listKeywordsInGroup(userId: string, groupId: number): Promise<TrackedKeyword[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT tk.* FROM tracked_keywords tk
     JOIN keyword_group_members m ON m.keyword_id = tk.id
-    WHERE m.group_id = ?
+    WHERE m.group_id = ? AND m.user_id = ?
     ORDER BY tk.created_at ASC
-  `, [groupId]) as Record<string, unknown>[];
+  `, [groupId, userId]) as Record<string, unknown>[];
   return rows.map(rowToTracked);
 }
 
-export async function getKeywordGroups(keywordId: number): Promise<KeywordGroup[]> {
+export async function getKeywordGroups(userId: string, keywordId: number): Promise<KeywordGroup[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT g.* FROM keyword_groups g
     JOIN keyword_group_members m ON m.group_id = g.id
-    WHERE m.keyword_id = ?
+    WHERE m.keyword_id = ? AND m.user_id = ?
     ORDER BY g.created_at ASC
-  `, [keywordId]) as Record<string, unknown>[];
+  `, [keywordId, userId]) as Record<string, unknown>[];
   return rows.map(rowToKeywordGroup);
 }
 
@@ -602,45 +764,46 @@ function rowToCompetitor(row: Record<string, unknown>): Competitor {
   };
 }
 
-export async function createCompetitor(params: {
+export async function createCompetitor(userId: string, params: {
   project_id: number;
   domain: string;
   name?: string | null;
 }): Promise<Competitor> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO competitors (project_id, domain, name)
-    VALUES (@project_id, @domain, @name)
+    INSERT INTO competitors (project_id, domain, name, user_id)
+    VALUES (@project_id, @domain, @name, @user_id)
   `, [{
     project_id: params.project_id,
     domain: params.domain,
     name: params.name ?? null,
+    user_id: userId,
   }]);
   const row = await db.get(`SELECT * FROM competitors WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToCompetitor(row);
 }
 
-export async function listCompetitors(projectId: number): Promise<Competitor[]> {
+export async function listCompetitors(userId: string, projectId: number): Promise<Competitor[]> {
   const db = await getAdapter();
   const rows = await db.query(`
-    SELECT * FROM competitors WHERE project_id = ? ORDER BY created_at ASC
-  `, [projectId]) as Record<string, unknown>[];
+    SELECT * FROM competitors WHERE project_id = ? AND user_id = ? ORDER BY created_at ASC
+  `, [projectId, userId]) as Record<string, unknown>[];
   return rows.map(rowToCompetitor);
 }
 
-export async function deleteCompetitor(id: number): Promise<boolean> {
+export async function deleteCompetitor(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
-  const info = await db.run(`DELETE FROM competitors WHERE id = ?`, [id]);
+  const info = await db.run(`DELETE FROM competitors WHERE id = ? AND user_id = ?`, [id, userId]);
   return info.changes > 0;
 }
 
-export async function getCompetitorById(id: number): Promise<Competitor | null> {
+export async function getCompetitorById(userId: string, id: number): Promise<Competitor | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM competitors WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM competitors WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToCompetitor(row) : null;
 }
 
-export async function addCompetitorRank(params: {
+export async function addCompetitorRank(userId: string, params: {
   competitor_id: number;
   keyword_id: number;
   rank: number | null;
@@ -648,26 +811,26 @@ export async function addCompetitorRank(params: {
 }): Promise<void> {
   const db = await getAdapter();
   await db.run(`
-    INSERT INTO competitor_ranks (competitor_id, keyword_id, rank, target_url)
-    VALUES (@competitor_id, @keyword_id, @rank, @target_url)
-  `, [params]);
+    INSERT INTO competitor_ranks (competitor_id, keyword_id, rank, target_url, user_id)
+    VALUES (@competitor_id, @keyword_id, @rank, @target_url, @user_id)
+  `, [{ ...params, user_id: userId }]);
 }
 
 /** 获取某关键词下所有竞品的最新一条排名 */
-export async function getLatestCompetitorRanks(keywordId: number): Promise<CompetitorRankLatest[]> {
+export async function getLatestCompetitorRanks(userId: string, keywordId: number): Promise<CompetitorRankLatest[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT cr.competitor_id, c.domain, cr.rank, cr.target_url, cr.checked_at
     FROM competitor_ranks cr
     JOIN competitors c ON c.id = cr.competitor_id
-    WHERE cr.keyword_id = ?
+    WHERE cr.keyword_id = ? AND cr.user_id = ?
     AND cr.id = (
       SELECT cr2.id FROM competitor_ranks cr2
       WHERE cr2.competitor_id = cr.competitor_id AND cr2.keyword_id = cr.keyword_id
       ORDER BY cr2.checked_at DESC LIMIT 1
     )
     ORDER BY c.domain ASC
-  `, [keywordId]) as Record<string, unknown>[];
+  `, [keywordId, userId]) as Record<string, unknown>[];
   return rows.map((r) => ({
     competitor_id: Number(r.competitor_id),
     domain: String(r.domain),
@@ -679,6 +842,7 @@ export async function getLatestCompetitorRanks(keywordId: number): Promise<Compe
 
 /** 获取某竞品在某关键词下的历史排名（按时间倒序） */
 export async function getCompetitorRanksHistory(
+  userId: string,
   competitorId: number,
   keywordId: number,
   limit = 30
@@ -686,9 +850,9 @@ export async function getCompetitorRanksHistory(
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT rank, checked_at FROM competitor_ranks
-    WHERE competitor_id = ? AND keyword_id = ?
+    WHERE competitor_id = ? AND keyword_id = ? AND user_id = ?
     ORDER BY checked_at DESC LIMIT ?
-  `, [competitorId, keywordId, limit]) as Record<string, unknown>[];
+  `, [competitorId, keywordId, userId, limit]) as Record<string, unknown>[];
   return rows.map((r) => ({
     rank: r.rank === null || r.rank === undefined ? null : Number(r.rank),
     checked_at: String(r.checked_at),
@@ -697,6 +861,7 @@ export async function getCompetitorRanksHistory(
 
 /** 获取某关键词下所有竞品的所有排名记录（用于 SOV 趋势） */
 export async function getCompetitorRanksByKeyword(
+  userId: string,
   keywordId: number,
   days = 30
 ): Promise<Array<{
@@ -710,10 +875,10 @@ export async function getCompetitorRanksByKeyword(
     SELECT cr.competitor_id, c.domain, cr.rank, cr.checked_at
     FROM competitor_ranks cr
     JOIN competitors c ON c.id = cr.competitor_id
-    WHERE cr.keyword_id = ?
+    WHERE cr.keyword_id = ? AND cr.user_id = ?
     AND date(cr.checked_at) >= date('now', 'localtime', ?)
     ORDER BY cr.checked_at ASC
-  `, [keywordId, `-${days} day`]) as Record<string, unknown>[];
+  `, [keywordId, userId, `-${days} day`]) as Record<string, unknown>[];
   return rows.map((r) => ({
     competitor_id: Number(r.competitor_id),
     domain: String(r.domain),
@@ -723,7 +888,7 @@ export async function getCompetitorRanksByKeyword(
 }
 
 /** 同一天只记一条：position 为 null 表示查询了但未进前 100 */
-export async function upsertRankHistory(params: {
+export async function upsertRankHistory(userId: string, params: {
   keyword_id: number;
   date: string; // YYYY-MM-DD
   position: number | null;
@@ -731,22 +896,22 @@ export async function upsertRankHistory(params: {
 }): Promise<void> {
   const db = await getAdapter();
   await db.run(`
-    INSERT INTO rank_history (keyword_id, date, position, url)
-    VALUES (@keyword_id, @date, @position, @url)
+    INSERT INTO rank_history (keyword_id, date, position, url, user_id)
+    VALUES (@keyword_id, @date, @position, @url, @user_id)
     ON CONFLICT(keyword_id, date) DO UPDATE SET
       position = excluded.position,
       url = excluded.url
-  `, [params]);
+  `, [{ ...params, user_id: userId }]);
 }
 
-export async function getRankHistory(keywordId: number, days = 30): Promise<RankHistoryRow[]> {
+export async function getRankHistory(userId: string, keywordId: number, days = 30): Promise<RankHistoryRow[]> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT * FROM rank_history
-    WHERE keyword_id = ?
+    WHERE keyword_id = ? AND user_id = ?
     AND date >= date('now', 'localtime', ?)
     ORDER BY date ASC
-  `, [keywordId, `-${days} day`]) as Record<string, unknown>[];
+  `, [keywordId, userId, `-${days} day`]) as Record<string, unknown>[];
   return rows.map((r) => ({
     id: Number(r.id),
     keyword_id: Number(r.keyword_id),
@@ -757,19 +922,19 @@ export async function getRankHistory(keywordId: number, days = 30): Promise<Rank
   }));
 }
 
-export async function updateLastRefreshed(keywordId: number): Promise<void> {
+export async function updateLastRefreshed(userId: string, keywordId: number): Promise<void> {
   const db = await getAdapter();
-  await db.run(`UPDATE tracked_keywords SET last_refreshed_at = datetime('now') WHERE id = ?`, [keywordId]);
+  await db.run(`UPDATE tracked_keywords SET last_refreshed_at = datetime('now') WHERE id = ? AND user_id = ?`, [keywordId, userId]);
 }
 
 /** 判断今日是否已刷新过（用于避免重复扣额度） */
-export async function hasTodayHistory(keywordId: number): Promise<boolean> {
+export async function hasTodayHistory(userId: string, keywordId: number): Promise<boolean> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT 1 FROM rank_history
-    WHERE keyword_id = ? AND date = date('now', 'localtime')
+    WHERE keyword_id = ? AND date = date('now', 'localtime') AND user_id = ?
     LIMIT 1
-  `, [keywordId]) as { 1: number } | undefined;
+  `, [keywordId, userId]) as { 1: number } | undefined;
   return !!row;
 }
 
@@ -834,7 +999,7 @@ function rowToContentCheckFull(row: Record<string, unknown>): ContentCheckFull {
   };
 }
 
-export async function addContentCheck(params: {
+export async function addContentCheck(userId: string, params: {
   url: string;
   keyword: string;
   score: number;
@@ -865,13 +1030,13 @@ export async function addContentCheck(params: {
       title_suggestions, keyword_density, readability_score, readability_level,
       word_count_full, heading_structure, internal_links_count, external_links_count,
       images_count, images_without_alt, meta_title_length, meta_description_length,
-      first_100_words, top_keywords, content_score, comparison
+      first_100_words, top_keywords, content_score, comparison, user_id
     ) VALUES (
       @url, @keyword, @score, @word_count, @density, @checks_json,
       @title_suggestions, @keyword_density, @readability_score, @readability_level,
       @word_count_full, @heading_structure, @internal_links_count, @external_links_count,
       @images_count, @images_without_alt, @meta_title_length, @meta_description_length,
-      @first_100_words, @top_keywords, @content_score, @comparison
+      @first_100_words, @top_keywords, @content_score, @comparison, @user_id
     )
   `, [{
     url: params.url,
@@ -896,16 +1061,17 @@ export async function addContentCheck(params: {
     top_keywords: params.top_keywords ?? null,
     content_score: params.content_score ?? null,
     comparison: params.comparison ?? null,
+    user_id: userId,
   }]);
   const row = await db.get(`SELECT * FROM content_checks WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToContentCheckFull(row);
 }
 
-export async function listContentChecks(limit = 10): Promise<ContentCheckRow[]> {
+export async function listContentChecks(userId: string, limit = 10): Promise<ContentCheckRow[]> {
   const db = await getAdapter();
   const rows = await db.query(`
-    SELECT * FROM content_checks ORDER BY created_at DESC LIMIT ?
-  `, [limit]) as Record<string, unknown>[];
+    SELECT * FROM content_checks WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+  `, [userId, limit]) as Record<string, unknown>[];
   return rows.map((r) => ({
     id: Number(r.id),
     url: String(r.url),
@@ -918,9 +1084,9 @@ export async function listContentChecks(limit = 10): Promise<ContentCheckRow[]> 
   }));
 }
 
-export async function getContentCheckById(id: number): Promise<ContentCheckRow | null> {
+export async function getContentCheckById(userId: string, id: number): Promise<ContentCheckRow | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM content_checks WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM content_checks WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? {
     id: Number(row.id),
     url: String(row.url),
@@ -933,33 +1099,33 @@ export async function getContentCheckById(id: number): Promise<ContentCheckRow |
   } : null;
 }
 
-export async function getContentCheckFull(id: number): Promise<ContentCheckFull | null> {
+export async function getContentCheckFull(userId: string, id: number): Promise<ContentCheckFull | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM content_checks WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM content_checks WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToContentCheckFull(row) : null;
 }
 
-export async function listContentChecksFull(limit = 10, urlFilter?: string): Promise<ContentCheckFull[]> {
+export async function listContentChecksFull(userId: string, limit = 10, urlFilter?: string): Promise<ContentCheckFull[]> {
   const db = await getAdapter();
   const rows = urlFilter
-    ? await db.query(`SELECT * FROM content_checks WHERE url = ? ORDER BY created_at DESC LIMIT ?`, [urlFilter, limit]) as Record<string, unknown>[]
-    : await db.query(`SELECT * FROM content_checks ORDER BY created_at DESC LIMIT ?`, [limit]) as Record<string, unknown>[];
+    ? await db.query(`SELECT * FROM content_checks WHERE user_id = ? AND url = ? ORDER BY created_at DESC LIMIT ?`, [userId, urlFilter, limit]) as Record<string, unknown>[]
+    : await db.query(`SELECT * FROM content_checks WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, [userId, limit]) as Record<string, unknown>[];
   return rows.map(rowToContentCheckFull);
 }
 
-export async function getPreviousContentCheck(url: string, excludeId: number): Promise<ContentCheckFull | null> {
+export async function getPreviousContentCheck(userId: string, url: string, excludeId: number): Promise<ContentCheckFull | null> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT * FROM content_checks
-    WHERE url = ? AND id < ?
+    WHERE url = ? AND id < ? AND user_id = ?
     ORDER BY created_at DESC LIMIT 1
-  `, [url, excludeId]) as Record<string, unknown> | undefined;
+  `, [url, excludeId, userId]) as Record<string, unknown> | undefined;
   return row ? rowToContentCheckFull(row) : null;
 }
 
-export async function updateContentCheckComparison(id: number, comparison: string): Promise<void> {
+export async function updateContentCheckComparison(userId: string, id: number, comparison: string): Promise<void> {
   const db = await getAdapter();
-  await db.run(`UPDATE content_checks SET comparison = ? WHERE id = ?`, [comparison, id]);
+  await db.run(`UPDATE content_checks SET comparison = ? WHERE id = ? AND user_id = ?`, [comparison, id, userId]);
 }
 
 // ---------- audits ----------
@@ -990,11 +1156,11 @@ export interface AuditIssueRow {
   suggestion: string | null;
 }
 
-export async function createAudit(domain: string, depth: "quick" | "full" = "quick"): Promise<AuditRow> {
+export async function createAudit(userId: string, domain: string, depth: "quick" | "full" = "quick"): Promise<AuditRow> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO audits (domain, status, depth) VALUES (?, 'running', ?)
-  `, [domain, depth]);
+    INSERT INTO audits (domain, status, depth, user_id) VALUES (?, 'running', ?, ?)
+  `, [domain, depth, userId]);
   const row = await db.get(`SELECT * FROM audits WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToAudit(row);
 }
@@ -1017,12 +1183,13 @@ function rowToAudit(row: Record<string, unknown>): AuditRow {
   };
 }
 
-export async function updateAuditProgress(id: number, pagesCrawled: number): Promise<void> {
+export async function updateAuditProgress(userId: string, id: number, pagesCrawled: number): Promise<void> {
   const db = await getAdapter();
-  await db.run(`UPDATE audits SET pages_crawled = ? WHERE id = ?`, [pagesCrawled, id]);
+  await db.run(`UPDATE audits SET pages_crawled = ? WHERE id = ? AND user_id = ?`, [pagesCrawled, id, userId]);
 }
 
 export async function finishAudit(
+  userId: string,
   id: number,
   params: {
     health_score: number;
@@ -1040,7 +1207,7 @@ export async function finishAudit(
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
         comparison = COALESCE(?, comparison),
         error = COALESCE(?, error)
-    WHERE id = ?
+    WHERE id = ? AND user_id = ?
   `, [
     params.health_score,
     params.errors,
@@ -1049,34 +1216,35 @@ export async function finishAudit(
     params.status ?? "completed",
     params.comparison ?? null,
     params.error ?? null,
-    id
+    id,
+    userId
   ]);
 }
 
-export async function getAuditById(id: number): Promise<AuditRow | null> {
+export async function getAuditById(userId: string, id: number): Promise<AuditRow | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM audits WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM audits WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToAudit(row) : null;
 }
 
-export async function getLatestAudit(domain: string): Promise<AuditRow | null> {
+export async function getLatestAudit(userId: string, domain: string): Promise<AuditRow | null> {
   const db = await getAdapter();
   const row = await db.get(`
-    SELECT * FROM audits WHERE domain = ? ORDER BY started_at DESC LIMIT 1
-  `, [domain]) as Record<string, unknown> | undefined;
+    SELECT * FROM audits WHERE domain = ? AND user_id = ? ORDER BY started_at DESC LIMIT 1
+  `, [domain, userId]) as Record<string, unknown> | undefined;
   return row ? rowToAudit(row) : null;
 }
 
 /** 获取某域名在指定 auditId 之前最近一次审计 */
-export async function getPreviousAudit(domain: string, currentAuditId: number): Promise<AuditRow | null> {
+export async function getPreviousAudit(userId: string, domain: string, currentAuditId: number): Promise<AuditRow | null> {
   const db = await getAdapter();
   const row = await db.get(`
-    SELECT * FROM audits WHERE domain = ? AND id < ? ORDER BY started_at DESC LIMIT 1
-  `, [domain, currentAuditId]) as Record<string, unknown> | undefined;
+    SELECT * FROM audits WHERE domain = ? AND id < ? AND user_id = ? ORDER BY started_at DESC LIMIT 1
+  `, [domain, currentAuditId, userId]) as Record<string, unknown> | undefined;
   return row ? rowToAudit(row) : null;
 }
 
-export async function addAuditIssue(params: {
+export async function addAuditIssue(userId: string, params: {
   audit_id: number;
   type: string;
   severity: "error" | "warning" | "notice";
@@ -1086,18 +1254,18 @@ export async function addAuditIssue(params: {
 }): Promise<void> {
   const db = await getAdapter();
   await db.run(`
-    INSERT INTO audit_issues (audit_id, type, severity, url, detail, suggestion)
-    VALUES (@audit_id, @type, @severity, @url, @detail, @suggestion)
-  `, [{ ...params, suggestion: params.suggestion ?? null }]);
+    INSERT INTO audit_issues (audit_id, type, severity, url, detail, suggestion, user_id)
+    VALUES (@audit_id, @type, @severity, @url, @detail, @suggestion, @user_id)
+  `, [{ ...params, suggestion: params.suggestion ?? null, user_id: userId }]);
 }
 
-export async function getAuditIssues(auditId: number): Promise<AuditIssueRow[]> {
+export async function getAuditIssues(userId: string, auditId: number): Promise<AuditIssueRow[]> {
   const db = await getAdapter();
   const rows = await db.query(`
-    SELECT * FROM audit_issues WHERE audit_id = ? ORDER BY
+    SELECT * FROM audit_issues WHERE audit_id = ? AND user_id = ? ORDER BY
       CASE severity WHEN 'error' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
       type
-  `, [auditId]) as Record<string, unknown>[];
+  `, [auditId, userId]) as Record<string, unknown>[];
   return rows.map((r) => ({
     id: Number(r.id),
     audit_id: Number(r.audit_id),
@@ -1110,12 +1278,12 @@ export async function getAuditIssues(auditId: number): Promise<AuditIssueRow[]> 
 }
 
 /** 获取某域名最近 N 次审计摘要（含 comparison JSON） */
-export async function getAuditHistory(domain: string, limit = 10): Promise<AuditRow[]> {
+export async function getAuditHistory(userId: string, domain: string, limit = 10): Promise<AuditRow[]> {
   const db = await getAdapter();
   const rows = await db.query(`
-    SELECT * FROM audits WHERE domain = ? AND status = 'completed'
+    SELECT * FROM audits WHERE domain = ? AND status = 'completed' AND user_id = ?
     ORDER BY started_at DESC LIMIT ?
-  `, [domain, limit]) as Record<string, unknown>[];
+  `, [domain, userId, limit]) as Record<string, unknown>[];
   return rows.map(rowToAudit);
 }
 
@@ -1131,13 +1299,14 @@ export interface KeywordReportRow {
   history: { date: string; position: number | null; url: string | null }[];
 }
 
-export async function listTrackedKeywordsWithHistory(days = 30): Promise<KeywordReportRow[]> {
+export async function listTrackedKeywordsWithHistory(userId: string, days = 30): Promise<KeywordReportRow[]> {
   const db = await getAdapter();
   const keywords = await db.query(`
     SELECT id, keyword, location, device, domain
     FROM tracked_keywords
+    WHERE user_id = ?
     ORDER BY created_at ASC
-  `) as Record<string, unknown>[];
+  `, [userId]) as Record<string, unknown>[];
 
   const rows: KeywordReportRow[] = keywords.map((k) => ({
     id: Number(k.id),
@@ -1155,10 +1324,10 @@ export async function listTrackedKeywordsWithHistory(days = 30): Promise<Keyword
   const histRows = await db.query(`
     SELECT keyword_id, date, position, url
     FROM rank_history
-    WHERE keyword_id IN (${placeholders})
+    WHERE keyword_id IN (${placeholders}) AND user_id = ?
     AND date >= date('now', 'localtime', ?)
     ORDER BY keyword_id ASC, date ASC
-  `, [...ids, `-${days} day`]) as Record<string, unknown>[];
+  `, [...ids, userId, `-${days} day`]) as Record<string, unknown>[];
 
   const histMap = new Map<number, KeywordReportRow["history"]>();
   for (const h of histRows) {
@@ -1179,18 +1348,18 @@ export async function listTrackedKeywordsWithHistory(days = 30): Promise<Keyword
 }
 
 /** 累计检测次数（content_checks 总数） */
-export async function countContentChecks(): Promise<number> {
+export async function countContentChecks(userId: string): Promise<number> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT COUNT(*) AS c FROM content_checks`) as { c: number };
+  const row = await db.get(`SELECT COUNT(*) AS c FROM content_checks WHERE user_id = ?`, [userId]) as { c: number };
   return row.c;
 }
 
 /** 全局最近一次审计（不限域名） */
-export async function getGlobalLatestAudit(): Promise<AuditRow | null> {
+export async function getGlobalLatestAudit(userId: string): Promise<AuditRow | null> {
   const db = await getAdapter();
   const row = await db.get(`
-    SELECT * FROM audits ORDER BY started_at DESC LIMIT 1
-  `) as Record<string, unknown> | undefined;
+    SELECT * FROM audits WHERE user_id = ? ORDER BY started_at DESC LIMIT 1
+  `, [userId]) as Record<string, unknown> | undefined;
   return row ? rowToAudit(row) : null;
 }
 
@@ -1221,6 +1390,7 @@ function rowToReport(row: Record<string, unknown>): ReportRow {
 }
 
 export async function createReport(
+  userId: string,
   projectId: number | null,
   type: ReportType,
   title: string,
@@ -1228,29 +1398,29 @@ export async function createReport(
 ): Promise<number> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO reports (project_id, type, title, data_json)
-    VALUES (?, ?, ?, ?)
-  `, [projectId, type, title, dataJson]);
+    INSERT INTO reports (project_id, type, title, data_json, user_id)
+    VALUES (?, ?, ?, ?, ?)
+  `, [projectId, type, title, dataJson, userId]);
   return Number(info.lastInsertRowid);
 }
 
-export async function listReports(projectId?: number): Promise<ReportRow[]> {
+export async function listReports(userId: string, projectId?: number): Promise<ReportRow[]> {
   const db = await getAdapter();
   const rows = projectId !== undefined
-    ? await db.query(`SELECT * FROM reports WHERE project_id = ? ORDER BY created_at DESC`, [projectId]) as Record<string, unknown>[]
-    : await db.query(`SELECT * FROM reports ORDER BY created_at DESC`) as Record<string, unknown>[];
+    ? await db.query(`SELECT * FROM reports WHERE project_id = ? AND user_id = ? ORDER BY created_at DESC`, [projectId, userId]) as Record<string, unknown>[]
+    : await db.query(`SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC`, [userId]) as Record<string, unknown>[];
   return rows.map(rowToReport);
 }
 
-export async function getReport(id: number): Promise<ReportRow | null> {
+export async function getReport(userId: string, id: number): Promise<ReportRow | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM reports WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM reports WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToReport(row) : null;
 }
 
-export async function deleteReport(id: number): Promise<void> {
+export async function deleteReport(userId: string, id: number): Promise<void> {
   const db = await getAdapter();
-  await db.run(`DELETE FROM reports WHERE id = ?`, [id]);
+  await db.run(`DELETE FROM reports WHERE id = ? AND user_id = ?`, [id, userId]);
 }
 
 // ---------- alerts ----------
@@ -1282,7 +1452,7 @@ function rowToAlert(row: Record<string, unknown>): AlertRow {
   };
 }
 
-export async function createAlert(params: {
+export async function createAlert(userId: string, params: {
   type: AlertType;
   level: AlertLevel;
   title: string;
@@ -1291,59 +1461,60 @@ export async function createAlert(params: {
 }): Promise<AlertRow> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO alerts (type, level, title, detail, domain)
-    VALUES (@type, @level, @title, @detail, @domain)
+    INSERT INTO alerts (type, level, title, detail, domain, user_id)
+    VALUES (@type, @level, @title, @detail, @domain, @user_id)
   `, [{
     type: params.type,
     level: params.level,
     title: params.title,
     detail: params.detail ?? null,
     domain: params.domain ?? null,
+    user_id: userId,
   }]);
   const row = await db.get(`SELECT * FROM alerts WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToAlert(row);
 }
 
-export async function listAlerts(limit = 50): Promise<AlertRow[]> {
+export async function listAlerts(userId: string, limit = 50): Promise<AlertRow[]> {
   const db = await getAdapter();
   const rows = await db.query(`
-    SELECT * FROM alerts ORDER BY created_at DESC LIMIT ?
-  `, [limit]) as Record<string, unknown>[];
+    SELECT * FROM alerts WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+  `, [userId, limit]) as Record<string, unknown>[];
   return rows.map(rowToAlert);
 }
 
-export async function markAlertRead(id: number): Promise<boolean> {
+export async function markAlertRead(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
-  const info = await db.run(`UPDATE alerts SET read = 1 WHERE id = ?`, [id]);
+  const info = await db.run(`UPDATE alerts SET read = 1 WHERE id = ? AND user_id = ?`, [id, userId]);
   return info.changes > 0;
 }
 
-export async function markAllAlertsRead(): Promise<number> {
+export async function markAllAlertsRead(userId: string): Promise<number> {
   const db = await getAdapter();
-  const info = await db.run(`UPDATE alerts SET read = 1 WHERE read = 0`);
+  const info = await db.run(`UPDATE alerts SET read = 1 WHERE read = 0 AND user_id = ?`, [userId]);
   return info.changes;
 }
 
-export async function countUnreadAlerts(): Promise<number> {
+export async function countUnreadAlerts(userId: string): Promise<number> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT COUNT(*) AS c FROM alerts WHERE read = 0`) as { c: number };
+  const row = await db.get(`SELECT COUNT(*) AS c FROM alerts WHERE read = 0 AND user_id = ?`, [userId]) as { c: number };
   return row.c;
 }
 
-export async function countUnreadAlertsByDomain(domain: string): Promise<number> {
+export async function countUnreadAlertsByDomain(userId: string, domain: string): Promise<number> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT COUNT(*) AS c FROM alerts WHERE read = 0 AND domain = ?`, [domain]) as { c: number };
+  const row = await db.get(`SELECT COUNT(*) AS c FROM alerts WHERE read = 0 AND domain = ? AND user_id = ?`, [domain, userId]) as { c: number };
   return row.c;
 }
 
 /** 兜底去重：同 domain + 同 title + 同日期（localtime）是否已存在预警 */
-export async function hasAlertToday(domain: string, title: string): Promise<boolean> {
+export async function hasAlertToday(userId: string, domain: string, title: string): Promise<boolean> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT 1 FROM alerts
-    WHERE domain = ? AND title = ? AND date(created_at) = date('now', 'localtime')
+    WHERE domain = ? AND title = ? AND date(created_at) = date('now', 'localtime') AND user_id = ?
     LIMIT 1
-  `, [domain, title]) as { 1: number } | undefined;
+  `, [domain, title, userId]) as { 1: number } | undefined;
   return !!row;
 }
 
@@ -1374,24 +1545,24 @@ function rowToProject(row: Record<string, unknown>): ProjectRow {
   };
 }
 
-export async function listProjects(): Promise<ProjectRow[]> {
+export async function listProjects(userId: string): Promise<ProjectRow[]> {
   const db = await getAdapter();
-  const rows = await db.query(`SELECT * FROM projects ORDER BY created_at ASC`) as Record<string, unknown>[];
+  const rows = await db.query(`SELECT * FROM projects WHERE user_id = ? ORDER BY created_at ASC`, [userId]) as Record<string, unknown>[];
   return rows.map(rowToProject);
 }
 
-export async function addProject(name: string, domain: string): Promise<ProjectRow> {
+export async function addProject(userId: string, name: string, domain: string): Promise<ProjectRow> {
   const db = await getAdapter();
-  const info = await db.run(`INSERT INTO projects (name, domain) VALUES (?, ?)`, [name, domain]);
+  const info = await db.run(`INSERT INTO projects (name, domain, user_id) VALUES (?, ?, ?)`, [name, domain, userId]);
   const row = await db.get(`SELECT * FROM projects WHERE id = ?`, [info.lastInsertRowid]) as Record<string, unknown>;
   return rowToProject(row);
 }
 
-export async function removeProject(id: number): Promise<boolean> {
+export async function removeProject(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
 
   // 先确认项目存在并取 domain（用于按 domain 关联的表）
-  const project = await db.get(`SELECT domain FROM projects WHERE id = ?`, [id]) as
+  const project = await db.get(`SELECT domain FROM projects WHERE id = ? AND user_id = ?`, [id, userId]) as
     | { domain: string }
     | undefined;
   if (!project) return false;
@@ -1399,8 +1570,8 @@ export async function removeProject(id: number): Promise<boolean> {
 
   // 1. 获取该项目 domain 下的所有关键词 ID
   const keywords = await db.query(
-    `SELECT id FROM tracked_keywords WHERE domain = ?`,
-    [domain]
+    `SELECT id FROM tracked_keywords WHERE domain = ? AND user_id = ?`,
+    [domain, userId]
   ) as Array<{ id: number }>;
   const keywordIds = keywords.map((k) => k.id);
 
@@ -1408,73 +1579,73 @@ export async function removeProject(id: number): Promise<boolean> {
   if (keywordIds.length > 0) {
     const placeholders = keywordIds.map(() => "?").join(",");
     await db.run(
-      `DELETE FROM rank_history WHERE keyword_id IN (${placeholders})`,
-      keywordIds
+      `DELETE FROM rank_history WHERE keyword_id IN (${placeholders}) AND user_id = ?`,
+      [...keywordIds, userId]
     );
     await db.run(
-      `DELETE FROM competitor_ranks WHERE keyword_id IN (${placeholders})`,
-      keywordIds
+      `DELETE FROM competitor_ranks WHERE keyword_id IN (${placeholders}) AND user_id = ?`,
+      [...keywordIds, userId]
     );
     await db.run(
-      `DELETE FROM keyword_group_members WHERE keyword_id IN (${placeholders})`,
-      keywordIds
+      `DELETE FROM keyword_group_members WHERE keyword_id IN (${placeholders}) AND user_id = ?`,
+      [...keywordIds, userId]
     );
   }
 
   // 3. 删除竞品及其排名（competitors.project_id 直接关联）
   await db.run(
-    `DELETE FROM competitor_ranks WHERE competitor_id IN (SELECT id FROM competitors WHERE project_id = ?)`,
-    [id]
+    `DELETE FROM competitor_ranks WHERE competitor_id IN (SELECT id FROM competitors WHERE project_id = ? AND user_id = ?) AND user_id = ?`,
+    [id, userId, userId]
   );
-  await db.run(`DELETE FROM competitors WHERE project_id = ?`, [id]);
+  await db.run(`DELETE FROM competitors WHERE project_id = ? AND user_id = ?`, [id, userId]);
 
   // 4. 删除审计及其问题（audits 按 domain 关联）
   await db.run(
-    `DELETE FROM audit_issues WHERE audit_id IN (SELECT id FROM audits WHERE domain = ?)`,
-    [domain]
+    `DELETE FROM audit_issues WHERE audit_id IN (SELECT id FROM audits WHERE domain = ? AND user_id = ?) AND user_id = ?`,
+    [domain, userId, userId]
   );
-  await db.run(`DELETE FROM audits WHERE domain = ?`, [domain]);
+  await db.run(`DELETE FROM audits WHERE domain = ? AND user_id = ?`, [domain, userId]);
 
   // 5. 删除内容检查（content_checks 按 url LIKE domain% 关联）
-  await db.run(`DELETE FROM content_checks WHERE url LIKE ?`, [`${domain}%`]);
+  await db.run(`DELETE FROM content_checks WHERE url LIKE ? AND user_id = ?`, [`${domain}%`, userId]);
 
   // 6. 删除告警（alerts 按 domain 关联）
-  await db.run(`DELETE FROM alerts WHERE domain = ?`, [domain]);
+  await db.run(`DELETE FROM alerts WHERE domain = ? AND user_id = ?`, [domain, userId]);
 
   // 7. 删除报告（reports.project_id 直接关联）
-  await db.run(`DELETE FROM reports WHERE project_id = ?`, [id]);
+  await db.run(`DELETE FROM reports WHERE project_id = ? AND user_id = ?`, [id, userId]);
 
   // 8. 删除追踪关键词
-  await db.run(`DELETE FROM tracked_keywords WHERE domain = ?`, [domain]);
+  await db.run(`DELETE FROM tracked_keywords WHERE domain = ? AND user_id = ?`, [domain, userId]);
 
   // 9. 删除项目本身
-  await db.run(`DELETE FROM projects WHERE id = ?`, [id]);
+  await db.run(`DELETE FROM projects WHERE id = ? AND user_id = ?`, [id, userId]);
 
   return true;
 }
 
-export async function getProjectById(id: number): Promise<ProjectRow | null> {
+export async function getProjectById(userId: string, id: number): Promise<ProjectRow | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM projects WHERE id = ?`, [id]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM projects WHERE id = ? AND user_id = ?`, [id, userId]) as Record<string, unknown> | undefined;
   return row ? rowToProject(row) : null;
 }
 
-export async function getProjectByDomain(domain: string): Promise<ProjectRow | null> {
+export async function getProjectByDomain(userId: string, domain: string): Promise<ProjectRow | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM projects WHERE domain = ?`, [domain]) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM projects WHERE domain = ? AND user_id = ?`, [domain, userId]) as Record<string, unknown> | undefined;
   return row ? rowToProject(row) : null;
 }
 
 // ---------- 项目指标辅助查询 ----------
 
-export async function countTrackedKeywordsByDomain(domain: string): Promise<number> {
+export async function countTrackedKeywordsByDomain(userId: string, domain: string): Promise<number> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT COUNT(*) AS c FROM tracked_keywords WHERE domain = ?`, [domain]) as { c: number };
+  const row = await db.get(`SELECT COUNT(*) AS c FROM tracked_keywords WHERE domain = ? AND user_id = ?`, [domain, userId]) as { c: number };
   return row.c;
 }
 
 /** 获取某域名下追踪关键词近 7 天排名升降数 */
-export async function getRankStats7d(domain: string): Promise<{ up: number; down: number }> {
+export async function getRankStats7d(userId: string, domain: string): Promise<{ up: number; down: number }> {
   const db = await getAdapter();
   const rows = await db.query(`
     SELECT
@@ -1485,8 +1656,8 @@ export async function getRankStats7d(domain: string): Promise<{ up: number; down
       ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
     LEFT JOIN rank_history past
       ON past.keyword_id = tk.id AND past.date = date('now', 'localtime', '-7 day')
-    WHERE tk.domain = ?
-  `, [domain]) as Record<string, unknown>[];
+    WHERE tk.domain = ? AND tk.user_id = ?
+  `, [domain, userId]) as Record<string, unknown>[];
 
   let up = 0;
   let down = 0;
@@ -1510,6 +1681,7 @@ export async function getRankStats7d(domain: string): Promise<{ up: number; down
  * - 第 4 次：按 domain 批量统计未读 alerts
  */
 async function buildProjectsWithMetricsBase(
+  userId: string,
   projects: ProjectRow[]
 ): Promise<ProjectWithMetrics[]> {
   if (projects.length === 0) return [];
@@ -1520,8 +1692,8 @@ async function buildProjectsWithMetricsBase(
 
   // 1. 批量获取关键词计数
   const keywordRows = await db.query(
-    `SELECT domain, COUNT(*) AS c FROM tracked_keywords WHERE domain IN (${placeholders}) GROUP BY domain`,
-    domains
+    `SELECT domain, COUNT(*) AS c FROM tracked_keywords WHERE domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
+    [...domains, userId]
   ) as Array<{ domain: string; c: number }>;
   const keywordMap = new Map<string, number>();
   for (const r of keywordRows) keywordMap.set(r.domain, Number(r.c));
@@ -1530,9 +1702,9 @@ async function buildProjectsWithMetricsBase(
   const auditRows = await db.query(
     `SELECT domain, health_score, started_at, finished_at
      FROM audits
-     WHERE domain IN (${placeholders})
+     WHERE domain IN (${placeholders}) AND user_id = ?
        AND id IN (SELECT MAX(id) FROM audits a2 GROUP BY a2.domain)`,
-    domains
+    [...domains, userId]
   ) as Array<{
       domain: string;
       health_score: number | null;
@@ -1559,9 +1731,9 @@ async function buildProjectsWithMetricsBase(
        ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
      LEFT JOIN rank_history past
        ON past.keyword_id = tk.id AND past.date = date('now', 'localtime', '-7 day')
-     WHERE tk.domain IN (${placeholders})
+     WHERE tk.domain IN (${placeholders}) AND tk.user_id = ?
      GROUP BY tk.domain`,
-    domains
+    [...domains, userId]
   ) as Array<{ domain: string; up: number | null; down: number | null }>;
   const rankMap = new Map<string, { up: number; down: number }>();
   for (const r of rankRows) {
@@ -1573,8 +1745,8 @@ async function buildProjectsWithMetricsBase(
 
   // 4. 批量获取每个 domain 未读预警数
   const alertRows = await db.query(
-    `SELECT domain, COUNT(*) AS c FROM alerts WHERE read = 0 AND domain IN (${placeholders}) GROUP BY domain`,
-    domains
+    `SELECT domain, COUNT(*) AS c FROM alerts WHERE read = 0 AND domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
+    [...domains, userId]
   ) as Array<{ domain: string; c: number }>;
   const alertMap = new Map<string, number>();
   for (const r of alertRows) alertMap.set(r.domain, Number(r.c));
@@ -1596,9 +1768,9 @@ async function buildProjectsWithMetricsBase(
 
 /** 获取所有项目及其指标（一次调用，工作台用）。
  *  查询次数固定 5 次（1 次取项目 + 4 次批量指标），与项目数无关。 */
-export async function listProjectsWithMetrics(): Promise<ProjectWithMetrics[]> {
-  const projects = await listProjects();
-  return buildProjectsWithMetricsBase(projects);
+export async function listProjectsWithMetrics(userId: string): Promise<ProjectWithMetrics[]> {
+  const projects = await listProjects(userId);
+  return buildProjectsWithMetricsBase(userId, projects);
 }
 
 /**
@@ -1611,6 +1783,7 @@ export async function listProjectsWithMetrics(): Promise<ProjectWithMetrics[]> {
  * 同样使用批量查询避免 N+1（4N → 4 次）。
  */
 export async function listProjectsWithMetricsForUser(
+  userId: string,
   supabaseProjects: Array<{ id: string; name: string; domain: string; created_at: string }>
 ): Promise<ProjectWithMetrics[]> {
   // 转换为 ProjectRow[] 后复用批量构建逻辑（Supabase UUID 无法转 number，用 0 占位）
@@ -1620,20 +1793,20 @@ export async function listProjectsWithMetricsForUser(
     domain: p.domain,
     created_at: p.created_at,
   }));
-  return buildProjectsWithMetricsBase(projects);
+  return buildProjectsWithMetricsBase(userId, projects);
 }
 
 // ---------- 排名对比辅助 ----------
 
 /** 获取某关键词在指定日期之前最近的一条 rank_history */
-export async function getPreviousRankHistory(keywordId: number, beforeDate: string): Promise<RankHistoryRow | null> {
+export async function getPreviousRankHistory(userId: string, keywordId: number, beforeDate: string): Promise<RankHistoryRow | null> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT * FROM rank_history
-    WHERE keyword_id = ? AND date < ?
+    WHERE keyword_id = ? AND date < ? AND user_id = ?
     ORDER BY date DESC
     LIMIT 1
-  `, [keywordId, beforeDate]) as Record<string, unknown> | undefined;
+  `, [keywordId, beforeDate, userId]) as Record<string, unknown> | undefined;
   if (!row) return null;
   return {
     id: Number(row.id),
@@ -1689,18 +1862,15 @@ function rowToAutomationLog(row: Record<string, unknown>): AutomationLog {
   };
 }
 
-export async function getAutomationSettings(): Promise<AutomationSettings | null> {
+export async function getAutomationSettings(userId: string): Promise<AutomationSettings | null> {
   const db = await getAdapter();
-  const row = await db.get(`SELECT * FROM automation_settings WHERE id = 1`) as Record<string, unknown> | undefined;
+  const row = await db.get(`SELECT * FROM automation_settings WHERE user_id = ?`, [userId]) as Record<string, unknown> | undefined;
   return row ? rowToAutomationSettings(row) : null;
 }
 
-export async function updateAutomationSettings(settings: Partial<Omit<AutomationSettings, "id" | "updated_at">>): Promise<void> {
+export async function updateAutomationSettings(userId: string, settings: Partial<Omit<AutomationSettings, "id" | "updated_at">>): Promise<void> {
   const db = await getAdapter();
-  const current = await getAutomationSettings();
-  if (!current) {
-    await db.run(`INSERT OR IGNORE INTO automation_settings (id) VALUES (1)`);
-  }
+  const current = await getAutomationSettings(userId);
   const merged = {
     daily_refresh_enabled: settings.daily_refresh_enabled ?? current?.daily_refresh_enabled ?? 0,
     daily_refresh_time: settings.daily_refresh_time ?? current?.daily_refresh_time ?? "09:00",
@@ -1708,39 +1878,69 @@ export async function updateAutomationSettings(settings: Partial<Omit<Automation
     weekly_report_day: settings.weekly_report_day ?? current?.weekly_report_day ?? 1,
     weekly_report_time: settings.weekly_report_time ?? current?.weekly_report_time ?? "09:00",
   };
-  await db.run(`
-    UPDATE automation_settings
-    SET daily_refresh_enabled = @daily_refresh_enabled,
-        daily_refresh_time = @daily_refresh_time,
-        weekly_report_enabled = @weekly_report_enabled,
-        weekly_report_day = @weekly_report_day,
-        weekly_report_time = @weekly_report_time,
-        updated_at = datetime('now', 'localtime')
-    WHERE id = 1
-  `, [merged]);
+  if (!current) {
+    // 不存在则插入新行（user_id 唯一）
+    await db.run(`
+      INSERT INTO automation_settings (daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id)
+      VALUES (@daily_refresh_enabled, @daily_refresh_time, @weekly_report_enabled, @weekly_report_day, @weekly_report_time, datetime('now', 'localtime'), @user_id)
+    `, [{ ...merged, user_id: userId }]);
+  } else {
+    await db.run(`
+      UPDATE automation_settings
+      SET daily_refresh_enabled = @daily_refresh_enabled,
+          daily_refresh_time = @daily_refresh_time,
+          weekly_report_enabled = @weekly_report_enabled,
+          weekly_report_day = @weekly_report_day,
+          weekly_report_time = @weekly_report_time,
+          updated_at = datetime('now', 'localtime')
+      WHERE user_id = @user_id
+    `, [{ ...merged, user_id: userId }]);
+  }
 }
 
-export async function listAutomationLogs(limit = 50): Promise<AutomationLog[]> {
+export async function listAutomationLogs(userId: string, limit = 50): Promise<AutomationLog[]> {
   const db = await getAdapter();
-  const rows = await db.query(`SELECT * FROM automation_logs ORDER BY created_at DESC LIMIT ?`, [limit]) as Record<string, unknown>[];
+  const rows = await db.query(`SELECT * FROM automation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`, [userId, limit]) as Record<string, unknown>[];
   return rows.map(rowToAutomationLog);
 }
 
-export async function addAutomationLog(log: Omit<AutomationLog, "id" | "created_at">): Promise<number> {
+export async function addAutomationLog(userId: string, log: Omit<AutomationLog, "id" | "created_at">): Promise<number> {
   const db = await getAdapter();
   const info = await db.run(`
-    INSERT INTO automation_logs (type, status, summary, details)
-    VALUES (@type, @status, @summary, @details)
-  `, [log]);
+    INSERT INTO automation_logs (type, status, summary, details, user_id)
+    VALUES (@type, @status, @summary, @details, @user_id)
+  `, [{ ...log, user_id: userId }]);
   return Number(info.lastInsertRowid);
 }
 
-export async function updateAutomationLog(id: number, status: AutomationLog["status"], summary: string | null, details: string | null): Promise<void> {
+export async function updateAutomationLog(userId: string, id: number, status: AutomationLog["status"], summary: string | null, details: string | null): Promise<void> {
   const db = await getAdapter();
-  await db.run(`UPDATE automation_logs SET status = ?, summary = ?, details = ? WHERE id = ?`, [status, summary, details, id]);
+  await db.run(`UPDATE automation_logs SET status = ?, summary = ?, details = ? WHERE id = ? AND user_id = ?`, [status, summary, details, id, userId]);
 }
 
 // ---------- automation 辅助查询（weekly 报告用） ----------
+
+/**
+ * 查询所有 distinct user_id（cron 遍历用户用）。
+ * 演示模式下返回 ['demo-user']；鉴权模式下返回所有真实用户 ID（含 demo-user）。
+ * 从有数据的表 union 取，确保至少有数据的用户被处理。
+ */
+export async function listDistinctUserIds(): Promise<string[]> {
+  const db = await getAdapter();
+  const rows = await db.query(`
+    SELECT DISTINCT user_id FROM (
+      SELECT DISTINCT user_id FROM tracked_keywords
+      UNION
+      SELECT DISTINCT user_id FROM projects
+      UNION
+      SELECT DISTINCT user_id FROM automation_settings
+      UNION
+      SELECT DISTINCT user_id FROM audits
+    )
+    WHERE user_id IS NOT NULL AND user_id != ''
+  `) as Array<{ user_id: string }>;
+  return rows.map((r) => r.user_id);
+}
 
 export interface RankChangeRow {
   keyword_id: number;
@@ -1752,29 +1952,30 @@ export interface RankChangeRow {
 }
 
 /** 获取某时间点之后的排名变化（对比该时间点前最近一次记录） */
-export async function getRankChangesSince(sinceISO: string): Promise<RankChangeRow[]> {
+export async function getRankChangesSince(userId: string, sinceISO: string): Promise<RankChangeRow[]> {
   const db = await getAdapter();
   // 取最近 8 天的关键词最新 + 之前记录对比
   const sinceDate = sinceISO.slice(0, 10);
   const keywords = await db.query(`
     SELECT tk.id, tk.keyword, tk.domain
     FROM tracked_keywords tk
+    WHERE tk.user_id = ?
     ORDER BY tk.created_at ASC
-  `) as Record<string, unknown>[];
+  `, [userId]) as Record<string, unknown>[];
 
   const result: RankChangeRow[] = [];
   for (const k of keywords) {
     const kid = Number(k.id);
     const newest = await db.get(`
       SELECT position, date FROM rank_history
-      WHERE keyword_id = ? AND date >= ?
+      WHERE keyword_id = ? AND date >= ? AND user_id = ?
       ORDER BY date DESC LIMIT 1
-    `, [kid, sinceDate]) as Record<string, unknown> | undefined;
+    `, [kid, sinceDate, userId]) as Record<string, unknown> | undefined;
     const oldest = await db.get(`
       SELECT position, date FROM rank_history
-      WHERE keyword_id = ? AND date < ?
+      WHERE keyword_id = ? AND date < ? AND user_id = ?
       ORDER BY date DESC LIMIT 1
-    `, [kid, sinceDate]) as Record<string, unknown> | undefined;
+    `, [kid, sinceDate, userId]) as Record<string, unknown> | undefined;
 
     const newRank = newest && newest.position !== null && newest.position !== undefined ? Number(newest.position) : null;
     const oldRank = oldest && oldest.position !== null && oldest.position !== undefined ? Number(oldest.position) : null;
@@ -1797,23 +1998,23 @@ export async function getRankChangesSince(sinceISO: string): Promise<RankChangeR
 }
 
 /** 获取某时间点之后的审计记录 */
-export async function getAuditsSince(sinceISO: string): Promise<AuditRow[]> {
+export async function getAuditsSince(userId: string, sinceISO: string): Promise<AuditRow[]> {
   const db = await getAdapter();
   const sinceDate = sinceISO.slice(0, 10);
   const rows = await db.query(`
-    SELECT * FROM audits WHERE date(started_at) >= ? ORDER BY started_at ASC
-  `, [sinceDate]) as Record<string, unknown>[];
+    SELECT * FROM audits WHERE date(started_at) >= ? AND user_id = ? ORDER BY started_at ASC
+  `, [sinceDate, userId]) as Record<string, unknown>[];
   return rows.map(rowToAudit);
 }
 
 /** 7 天内有数据的关键词数 */
-export async function countActiveKeywords(): Promise<number> {
+export async function countActiveKeywords(userId: string): Promise<number> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT COUNT(DISTINCT keyword_id) AS c
     FROM rank_history
-    WHERE date >= date('now', 'localtime', '-7 day')
-  `) as { c: number };
+    WHERE date >= date('now', 'localtime', '-7 day') AND user_id = ?
+  `, [userId]) as { c: number };
   return row.c;
 }
 
@@ -1928,11 +2129,11 @@ export interface BacklinkRow {
 }
 
 /** 读取某域名的缓存 summary（7 天有效性由调用方判断 fetched_at） */
-export async function getBacklinkSummary(domain: string): Promise<BacklinkSummaryRow | null> {
+export async function getBacklinkSummary(userId: string, domain: string): Promise<BacklinkSummaryRow | null> {
   const db = await getAdapter();
   const row = await db.get(
-    `SELECT * FROM backlink_summaries WHERE domain = ? LIMIT 1`,
-    [domain]
+    `SELECT * FROM backlink_summaries WHERE domain = ? AND user_id = ? LIMIT 1`,
+    [domain, userId]
   ) as Record<string, unknown> | undefined;
   if (!row) return null;
   return {
@@ -1948,11 +2149,11 @@ export async function getBacklinkSummary(domain: string): Promise<BacklinkSummar
 }
 
 /** 读取某域名的缓存外链列表（按 source_rank 降序） */
-export async function listBacklinks(domain: string, limit = 100): Promise<BacklinkRow[]> {
+export async function listBacklinks(userId: string, domain: string, limit = 100): Promise<BacklinkRow[]> {
   const db = await getAdapter();
   const rows = await db.query(
-    `SELECT * FROM backlinks WHERE domain = ? ORDER BY COALESCE(source_rank, 0) DESC, id ASC LIMIT ?`,
-    [domain, limit]
+    `SELECT * FROM backlinks WHERE domain = ? AND user_id = ? ORDER BY COALESCE(source_rank, 0) DESC, id ASC LIMIT ?`,
+    [domain, userId, limit]
   ) as Record<string, unknown>[];
   return rows.map((r) => ({
     id: Number(r.id),
@@ -1990,12 +2191,12 @@ export interface SaveBacklinksInput {
  * 写入外链数据：summary 用 UPSERT，backlinks 先删该域名旧行再批量插入。
  * 命名参数约定与 addAuditIssue 一致（db.run(sql, [{...}])）。
  */
-export async function saveBacklinks(input: SaveBacklinksInput): Promise<void> {
+export async function saveBacklinks(userId: string, input: SaveBacklinksInput): Promise<void> {
   const db = await getAdapter();
   // summary UPSERT
   await db.run(
-    `INSERT INTO backlink_summaries (domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at)
-     VALUES (@domain, @total_backlinks, @referring_domains, @domain_rank, @dofollow_pct, @raw_json, datetime('now'))
+    `INSERT INTO backlink_summaries (domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id)
+     VALUES (@domain, @total_backlinks, @referring_domains, @domain_rank, @dofollow_pct, @raw_json, datetime('now'), @user_id)
      ON CONFLICT(domain) DO UPDATE SET
        total_backlinks = @total_backlinks,
        referring_domains = @referring_domains,
@@ -2010,15 +2211,16 @@ export async function saveBacklinks(input: SaveBacklinksInput): Promise<void> {
       domain_rank: input.summary.domain_rank,
       dofollow_pct: input.summary.dofollow_pct,
       raw_json: input.summary.raw_json,
+      user_id: userId,
     }]
   );
   // 删旧行
-  await db.run(`DELETE FROM backlinks WHERE domain = ?`, [input.domain]);
+  await db.run(`DELETE FROM backlinks WHERE domain = ? AND user_id = ?`, [input.domain, userId]);
   // 批量插入（每行一条 INSERT，命名参数）
   for (const r of input.rows) {
     await db.run(
-      `INSERT INTO backlinks (domain, source_url, anchor, target_url, dofollow, source_rank, first_seen, fetched_at)
-       VALUES (@domain, @source_url, @anchor, @target_url, @dofollow, @source_rank, @first_seen, datetime('now'))`,
+      `INSERT INTO backlinks (domain, source_url, anchor, target_url, dofollow, source_rank, first_seen, fetched_at, user_id)
+       VALUES (@domain, @source_url, @anchor, @target_url, @dofollow, @source_rank, @first_seen, datetime('now'), @user_id)`,
       [{
         domain: input.domain,
         source_url: r.source_url,
@@ -2027,6 +2229,7 @@ export async function saveBacklinks(input: SaveBacklinksInput): Promise<void> {
         dofollow: r.dofollow,
         source_rank: r.source_rank,
         first_seen: r.first_seen,
+        user_id: userId,
       }]
     );
   }

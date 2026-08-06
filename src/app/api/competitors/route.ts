@@ -21,6 +21,7 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const projectId = Number(searchParams.get("project_id") ?? "");
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
   }
 
-  const list = await listCompetitors(projectId);
+  const list = await listCompetitors(userId, projectId);
   const usage = await peekUsage();
   return NextResponse.json({ data: list, usage });
 }
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: { project_id?: number; domain?: string; name?: string };
   try {
     body = await req.json();
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
   }
 
   // 校验项目存在
-  const project = await getProjectById(projectId);
+  const project = await getProjectById(userId, projectId);
   if (!project) {
     return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
   }
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const created = await createCompetitor({ project_id: projectId, domain, name: name ?? null });
+    const created = await createCompetitor(userId, { project_id: projectId, domain, name: name ?? null });
     const usage = await peekUsage();
     return NextResponse.json({ data: created, usage }, { status: 201 });
   } catch (e) {
@@ -85,6 +87,7 @@ export async function DELETE(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const id = Number(searchParams.get("id") ?? "");
 
@@ -92,7 +95,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
   }
 
-  const ok = await deleteCompetitor(id);
+  const ok = await deleteCompetitor(userId, id);
   if (!ok) {
     return NextResponse.json({ error: "未找到该竞品" }, { status: 404 });
   }

@@ -14,6 +14,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -27,11 +28,11 @@ export async function POST(req: Request) {
     if (!Number.isInteger(numId) || numId <= 0) {
       return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
     }
-    await markAlertRead(numId);
+    await markAlertRead(userId, numId);
   } else {
-    await markAllAlertsRead();
+    await markAllAlertsRead(userId);
   }
 
-  const unread = await countUnreadAlerts();
+  const unread = await countUnreadAlerts(userId);
   return NextResponse.json({ data: { ok: true }, unread });
 }

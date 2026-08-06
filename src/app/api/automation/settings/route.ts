@@ -18,7 +18,8 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const settings = await getAutomationSettings();
+  const userId = auth.user?.id ?? "demo-user";
+  const settings = await getAutomationSettings(userId);
   if (!settings) {
     return NextResponse.json({ error: "配置不存在" }, { status: 404 });
   }
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -76,10 +78,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    await updateAutomationSettings(update as Parameters<typeof updateAutomationSettings>[0]);
+    await updateAutomationSettings(userId, update as Parameters<typeof updateAutomationSettings>[1]);
     // 重启定时任务
     startAutomation();
-    const settings = await getAutomationSettings();
+    const settings = await getAutomationSettings(userId);
     return NextResponse.json({ data: settings });
   } catch (err) {
     return NextResponse.json(

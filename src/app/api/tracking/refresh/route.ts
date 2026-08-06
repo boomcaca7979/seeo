@@ -44,7 +44,8 @@ export async function POST() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const list = await listTrackedKeywords();
+  const userId = auth.user?.id ?? "demo-user";
+  const list = await listTrackedKeywords(userId);
 
   if (list.length === 0) {
     const usage = await peekUsage();
@@ -78,10 +79,10 @@ export async function POST() {
         fromCache = true;
       } else {
         // 2. DB 中今日是否已有记录（避免同日重复扣额度）
-        const dbHasToday = await hasTodayHistory(tk.id);
+        const dbHasToday = await hasTodayHistory(userId, tk.id);
         if (dbHasToday) {
           // 今日已查过且缓存已过期：用 DB 里的历史记录作为结果（不再扣额度）
-          const history = await getRankHistory(tk.id, 1);
+          const history = await getRankHistory(userId, tk.id, 1);
           const todayRow = history.find((h) => h.date === today);
           if (todayRow) {
             rankResult = {
@@ -124,18 +125,18 @@ export async function POST() {
 
       // 4. 写入 DB
       if (rankResult) {
-        await upsertRankHistory({
+        await upsertRankHistory(userId, {
           keyword_id: tk.id,
           date: today,
           position: rankResult.rank,
           url: rankResult.matchedUrl,
         });
-        await updateLastRefreshed(tk.id);
+        await updateLastRefreshed(userId, tk.id);
 
         // 5. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
         //    缓存命中 / DB 今日已有记录的跳过路径一律不生成，避免同日重复
         if (consumed) {
-          generateRankAlert(tk, rankResult.rank, today);
+          generateRankAlert(userId, tk, rankResult.rank, today);
         }
       }
     } catch (e) {

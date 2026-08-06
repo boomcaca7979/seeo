@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { isAuthEnabled } from "@/lib/auth-config";
+import { createBrowser } from "@/lib/supabase/browser";
+import { useRouter } from "next/navigation";
 
 type TabKey = "account" | "plan" | "usage" | "team" | "automation";
 
@@ -100,7 +103,23 @@ const WEEK_DAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "
 
 export default function SettingsPage() {
   const { show, Toast } = useToast();
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("account");
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      const supabase = createBrowser();
+      await supabase.auth.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      show(`退出失败：${(err as Error).message}`, "error");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "account", label: "账号信息" },
@@ -183,6 +202,19 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* 退出登录（鉴权模式） */}
+              {isAuthEnabled && (
+                <div className="mt-6 border-t border-line-soft pt-5">
+                  <button
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    className="btn-secondary text-neg disabled:opacity-60"
+                  >
+                    {signingOut ? "退出中…" : "退出登录"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

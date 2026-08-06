@@ -14,7 +14,8 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const groups = await listKeywordGroups();
+  const userId = auth.user?.id ?? "demo-user";
+  const groups = await listKeywordGroups(userId);
   return NextResponse.json({ data: groups });
 }
 
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
   }
 
   const description = body.description?.trim() || undefined;
-  const created = await createKeywordGroup(name, description);
+  const userId = auth.user?.id ?? "demo-user";
+  const created = await createKeywordGroup(userId, name, description);
   return NextResponse.json({ data: created }, { status: 201 });
 }

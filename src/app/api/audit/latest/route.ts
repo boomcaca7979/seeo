@@ -70,6 +70,7 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const domain = (searchParams.get("domain") ?? "").trim().toLowerCase();
 
@@ -77,12 +78,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "缺少 domain 参数" }, { status: 400 });
   }
 
-  const audit = await getLatestAudit(domain);
+  const audit = await getLatestAudit(userId, domain);
   if (!audit) {
     return NextResponse.json({ data: null });
   }
 
-  const issues = audit.status === "completed" ? await getAuditIssues(audit.id) : [];
+  const issues = audit.status === "completed" ? await getAuditIssues(userId, audit.id) : [];
   const grouped = groupIssues(issues);
   const coverage = computeCheckCoverage(issues);
 
@@ -97,7 +98,7 @@ export async function GET(req: Request) {
   }
 
   // 历史记录（最近 10 次）
-  const historyRows = await getAuditHistory(domain, 10);
+  const historyRows = await getAuditHistory(userId, domain, 10);
   const history: HistoryItem[] = historyRows.map((h) => ({
     id: h.id,
     score: h.health_score,

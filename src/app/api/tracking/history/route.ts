@@ -33,7 +33,8 @@ export async function GET(req: Request) {
     );
   }
 
-  const history = await getRankHistory(id, days);
+  const userId = auth.user?.id ?? "demo-user";
+  const history = await getRankHistory(userId, id, days);
   const usage = await peekUsage();
   return NextResponse.json({ data: history, usage });
 }

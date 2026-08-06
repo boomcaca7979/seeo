@@ -11,10 +11,11 @@ export async function GET() {
   const start = Date.now();
   let dbStatus = "unknown";
   let serpapiUsage = "unknown";
+  const userId = "demo-user";
 
   // DB 连通性检查（只读查询）
   try {
-    await countTrackedKeywords();
+    await countTrackedKeywords(userId);
     dbStatus = "connected";
   } catch {
     dbStatus = "error";

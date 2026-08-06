@@ -48,17 +48,17 @@ function mapError(e: unknown) {
  * 执行一次竞品排名查询并写入数据库
  * 返回最新结果 + fromCache + usage
  */
-async function refreshRanks(keywordId: number) {
-  const kw = await getTrackedKeywordById(keywordId);
+async function refreshRanks(userId: string, keywordId: number) {
+  const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
     return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
   }
 
   // 通过 keyword.domain 找到所属 project
-  const project = (await getProjectByDomain(kw.domain)) ?? null;
+  const project = (await getProjectByDomain(userId, kw.domain)) ?? null;
   let competitors: Array<{ id: number; domain: string }> = [];
   if (project) {
-    competitors = (await listCompetitors(project.id)).map((c) => ({ id: c.id, domain: c.domain }));
+    competitors = (await listCompetitors(userId, project.id)).map((c) => ({ id: c.id, domain: c.domain }));
   }
 
   // 把「我自己」也作为竞争者纳入对比（domain = kw.domain）
@@ -79,7 +79,7 @@ async function refreshRanks(keywordId: number) {
     // 把竞品结果写入数据库（不写 id=0 的「我自己」）
     for (const r of results) {
       if (r.competitorId === 0) continue;
-      await addCompetitorRank({
+      await addCompetitorRank(userId, {
         competitor_id: r.competitorId,
         keyword_id: keywordId,
         rank: r.rank,
@@ -88,7 +88,7 @@ async function refreshRanks(keywordId: number) {
     }
 
     // 返回完整对比（含我自己）
-    const latestFromDb = await getLatestCompetitorRanks(keywordId);
+    const latestFromDb = await getLatestCompetitorRanks(userId, keywordId);
     const selfRank = results.find((r) => r.competitorId === 0) ?? null;
     const merged = [
       {
@@ -122,6 +122,7 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const keywordId = Number(searchParams.get("keyword_id") ?? "");
 
@@ -132,13 +133,13 @@ export async function GET(req: Request) {
     );
   }
 
-  const kw = await getTrackedKeywordById(keywordId);
+  const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
     return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
   }
 
   // 读已有最新记录
-  const latest = await getLatestCompetitorRanks(keywordId);
+  const latest = await getLatestCompetitorRanks(userId, keywordId);
   const usage = await peekUsage();
 
   // 如果有记录且未过期 24h，直接返回
@@ -150,9 +151,9 @@ export async function GET(req: Request) {
     if (ageMs < CACHE_TTL_MS) {
       // 仍然触发一次 SerpApi 查询以补上「我自己」的排名（不消耗额度，命中缓存）
       try {
-        const project = await getProjectByDomain(kw.domain);
+        const project = await getProjectByDomain(userId, kw.domain);
         const competitors = project
-          ? (await listCompetitors(project.id)).map((c) => ({ id: c.id, domain: c.domain }))
+          ? (await listCompetitors(userId, project.id)).map((c) => ({ id: c.id, domain: c.domain }))
           : [];
         const allCompetitors = [{ id: 0, domain: kw.domain }, ...competitors];
         const { results } = await checkCompetitorRanks({
@@ -190,7 +191,7 @@ export async function GET(req: Request) {
   }
 
   // 无记录或已过期：触发刷新
-  return refreshRanks(keywordId);
+  return refreshRanks(userId, keywordId);
 }
 
 export async function POST(req: Request) {
@@ -198,6 +199,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: { keyword_id?: number };
   try {
     body = await req.json();
@@ -214,5 +216,5 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  return refreshRanks(keywordId);
+  return refreshRanks(userId, keywordId);
 }

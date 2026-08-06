@@ -22,7 +22,8 @@ export async function DELETE(
     return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
   }
 
-  const ok = await deleteKeywordGroup(id);
+  const userId = auth.user?.id ?? "demo-user";
+  const ok = await deleteKeywordGroup(userId, id);
   if (!ok) {
     return NextResponse.json({ error: "未找到该分组" }, { status: 404 });
   }

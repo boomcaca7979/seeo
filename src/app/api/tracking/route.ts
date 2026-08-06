@@ -36,7 +36,8 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const list = await listTrackedKeywords();
+  const userId = auth.user?.id ?? "demo-user";
+  const list = await listTrackedKeywords(userId);
   const usage = await peekUsage();
   return NextResponse.json({
     data: list,
@@ -85,7 +86,8 @@ export async function POST(req: Request) {
   }
 
   // 上限检查
-  const count = await countTrackedKeywords();
+  const userId = auth.user?.id ?? "demo-user";
+  const count = await countTrackedKeywords(userId);
   if (count >= TRACKING_LIMIT) {
     return NextResponse.json<SeoApiError>(
       { error: `演示期限定追踪 ${TRACKING_LIMIT} 个关键词，请先删除不再追踪的词`, code: "BAD_REQUEST" },
@@ -95,8 +97,8 @@ export async function POST(req: Request) {
 
   // 重复检查
   try {
-    const created = await addTrackedKeyword({ keyword, location, device, domain });
-    const newCount = await countTrackedKeywords();
+    const created = await addTrackedKeyword(userId, { keyword, location, device, domain });
+    const newCount = await countTrackedKeywords(userId);
     return await withUsage({ created, limit: TRACKING_LIMIT, remaining: TRACKING_LIMIT - newCount });
   } catch (e) {
     const msg = (e as Error).message;
@@ -123,7 +125,8 @@ export async function DELETE(req: Request) {
       { status: 400 }
     );
   }
-  const ok = await removeTrackedKeyword(id);
+  const userId = auth.user?.id ?? "demo-user";
+  const ok = await removeTrackedKeyword(userId, id);
   if (!ok) {
     return NextResponse.json<SeoApiError>(
       { error: "未找到该追踪词", code: "BAD_REQUEST" },
@@ -131,7 +134,7 @@ export async function DELETE(req: Request) {
     );
   }
   const usage = await peekUsage();
-  const currentCount = await countTrackedKeywords();
+  const currentCount = await countTrackedKeywords(userId);
   const remaining = TRACKING_LIMIT - currentCount;
   return NextResponse.json({ data: { ok: true, remaining }, usage, limit: TRACKING_LIMIT });
 }

@@ -29,7 +29,8 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const rows = await listTrackedKeywordsWithHistory(30);
+  const userId = auth.user?.id ?? "demo-user";
+  const rows = await listTrackedKeywordsWithHistory(userId, 30);
 
   if (rows.length === 0) {
     return NextResponse.json(

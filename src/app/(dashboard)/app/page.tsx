@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function WorkbenchPage() {
   // 演示模式：直接读 SQLite
   if (!isAuthEnabled) {
-    const projects = await listProjectsWithMetrics();
-    const alerts = await listAlerts(50);
-    const unread = await countUnreadAlerts();
+    const projects = await listProjectsWithMetrics("demo-user");
+    const alerts = await listAlerts("demo-user", 50);
+    const unread = await countUnreadAlerts("demo-user");
     return (
       <ProjectList
         projects={projects}
@@ -48,9 +48,9 @@ export default async function WorkbenchPage() {
     .order("created_at", { ascending: true });
 
   // 用 domain 关联本地 SQLite/Turso 获取指标
-  const projects = await listProjectsWithMetricsForUser(userProjects ?? []);
-  const alerts = await listAlerts(50);
-  const unread = await countUnreadAlerts();
+  const projects = await listProjectsWithMetricsForUser(user.id, userProjects ?? []);
+  const alerts = await listAlerts(user.id, 50);
+  const unread = await countUnreadAlerts(user.id);
 
   return (
     <ProjectList

@@ -34,9 +34,9 @@ export interface RefreshResult {
   }>;
 }
 
-/** 刷新所有追踪关键词排名，返回刷新结果摘要 */
-export async function refreshAllRanks(): Promise<RefreshResult> {
-  const list = await listTrackedKeywords();
+/** 刷新指定用户的所有追踪关键词排名，返回刷新结果摘要 */
+export async function refreshAllRanks(userId: string): Promise<RefreshResult> {
+  const list = await listTrackedKeywords(userId);
   const today = todayStr();
   let refreshed = 0;
   let alerts = 0;
@@ -63,9 +63,9 @@ export async function refreshAllRanks(): Promise<RefreshResult> {
         fromCache = true;
       } else {
         // 2. DB 中今日是否已有记录（避免同日重复扣额度）
-        const dbHasToday = await hasTodayHistory(tk.id);
+        const dbHasToday = await hasTodayHistory(userId, tk.id);
         if (dbHasToday) {
-          const history = await getRankHistory(tk.id, 1);
+          const history = await getRankHistory(userId, tk.id, 1);
           const todayRow = history.find((h) => h.date === today);
           if (todayRow) {
             rankResult = {
@@ -107,17 +107,17 @@ export async function refreshAllRanks(): Promise<RefreshResult> {
 
       // 4. 写入 DB
       if (rankResult) {
-        await upsertRankHistory({
+        await upsertRankHistory(userId, {
           keyword_id: tk.id,
           date: today,
           position: rankResult.rank,
           url: rankResult.matchedUrl,
         });
-        await updateLastRefreshed(tk.id);
+        await updateLastRefreshed(userId, tk.id);
 
         // 5. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
         if (consumed) {
-          await generateRankAlert(tk, rankResult.rank, today);
+          await generateRankAlert(userId, tk, rankResult.rank, today);
           alerts++;
         }
 

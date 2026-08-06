@@ -27,9 +27,10 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const trackedCount = await countTrackedKeywords();
-  const contentCount = await countContentChecks();
-  const latest = await getGlobalLatestAudit();
+  const userId = auth.user?.id ?? "demo-user";
+  const trackedCount = await countTrackedKeywords(userId);
+  const contentCount = await countContentChecks(userId);
+  const latest = await getGlobalLatestAudit(userId);
 
   const latestAudit: LatestAuditInfo | null = latest
     ? {

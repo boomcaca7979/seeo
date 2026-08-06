@@ -108,8 +108,8 @@ function normalizeLink(href: string): string | null {
 }
 
 /** 将 AuditIssue 写入数据库（type=checkId, detail=message） */
-async function writeIssueToDb(auditId: number, issue: AuditIssue): Promise<void> {
-  await addAuditIssue({
+async function writeIssueToDb(userId: string, auditId: number, issue: AuditIssue): Promise<void> {
+  await addAuditIssue(userId, {
     audit_id: auditId,
     type: issue.checkId,
     severity: issue.severity,
@@ -139,18 +139,19 @@ function dbIssuesToAuditIssues(rows: Array<{
 
 /** 审计完成后生成预警（带同日去重兜底） */
 async function generateAuditAlerts(
+  userId: string,
   auditId: number,
   domain: string,
   errorCount: number,
   issues: Array<{ type: string; severity: string }>
 ): Promise<void> {
-  const prev = await getPreviousAudit(domain, auditId);
+  const prev = await getPreviousAudit(userId, domain, auditId);
 
   const has404 = issues.some((i) => i.type === "broken-links" || i.type.includes("404"));
   if (has404) {
     const title = `${domain} 检测到 404 死链`;
-    if (await hasAlertToday(domain, title)) return;
-    await createAlert({
+    if (await hasAlertToday(userId, domain, title)) return;
+    await createAlert(userId, {
       type: "new_error",
       level: "error",
       title,
@@ -162,8 +163,8 @@ async function generateAuditAlerts(
 
   if (prev && errorCount > prev.errors) {
     const title = `${domain} 审计错误数增加`;
-    if (await hasAlertToday(domain, title)) return;
-    await createAlert({
+    if (await hasAlertToday(userId, domain, title)) return;
+    await createAlert(userId, {
       type: "new_error",
       level: "warning",
       title,
@@ -174,8 +175,8 @@ async function generateAuditAlerts(
   }
 
   const title = `${domain} 审计完成`;
-  if (await hasAlertToday(domain, title)) return;
-  await createAlert({
+  if (await hasAlertToday(userId, domain, title)) return;
+  await createAlert(userId, {
     type: "audit_done",
     level: "info",
     title,
@@ -193,6 +194,7 @@ async function generateAuditAlerts(
  * - depth: 'full'：保持现有 50 页 BFS，用于本地开发
  */
 export async function runAudit(
+  userId: string,
   auditId: number,
   domain: string,
   options?: RunAuditOptions
@@ -206,7 +208,7 @@ export async function runAudit(
     baseUrl = new URL(startUrl);
   } catch (err) {
     const errMsg = (err as Error)?.message ?? String(err);
-    await finishAudit(auditId, {
+    await finishAudit(userId, auditId, {
       health_score: 0,
       errors: 1,
       warnings: 0,
@@ -278,7 +280,7 @@ export async function runAudit(
         const r = results[i];
         const url = batch[i];
         pagesCrawled++;
-        await updateAuditProgress(auditId, pagesCrawled);
+        await updateAuditProgress(userId, auditId, pagesCrawled);
 
         if (r.status === "rejected") {
           const err = r.reason;
@@ -288,7 +290,7 @@ export async function runAudit(
               const statusMatch = err.message.match(/HTTP (\d+)/);
               const statusCode = statusMatch ? Number(statusMatch[1]) : 0;
               brokenLinks.push({ url, statusCode });
-              await writeIssueToDb(auditId, {
+              await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
                 checkName: "站内死链",
                 message: err.message,
@@ -299,7 +301,7 @@ export async function runAudit(
                   : "检查服务器状态与页面可用性",
               });
             } else if (err.code === "TIMEOUT") {
-              await writeIssueToDb(auditId, {
+              await writeIssueToDb(userId, auditId, {
                 checkId: "slow-page",
                 checkName: "页面加载慢",
                 message: "抓取超时（10s）",
@@ -308,7 +310,7 @@ export async function runAudit(
                 suggestion: "优化服务器响应时间，检查后端服务状态",
               });
             } else if (err.code === "NETWORK") {
-              await writeIssueToDb(auditId, {
+              await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
                 checkName: "站内死链",
                 message: err.message,
@@ -318,7 +320,7 @@ export async function runAudit(
               });
             }
           } else {
-            await writeIssueToDb(auditId, {
+            await writeIssueToDb(userId, auditId, {
               checkId: "broken-links",
               checkName: "站内死链",
               message: (err as Error).message || "未知错误",
@@ -336,7 +338,7 @@ export async function runAudit(
         // 运行单页检查
         const pageIssues = runPerPageChecks(pageData, baseUrl.toString());
         for (const issue of pageIssues) {
-          await writeIssueToDb(auditId, issue);
+          await writeIssueToDb(userId, auditId, issue);
         }
 
         // 收集同域名链接入队（quick 模式只爬首页，跳过收集）
@@ -359,12 +361,12 @@ export async function runAudit(
       const extra: CrossPageExtra = { robotsText, brokenLinks };
       const crossIssues = runCrossPageChecks(crawledPages, baseUrl.toString(), extra);
       for (const issue of crossIssues) {
-        await writeIssueToDb(auditId, issue);
+        await writeIssueToDb(userId, auditId, issue);
       }
     }
 
     // 计算健康分（基于权重）
-    const dbIssues = await getAuditIssues(auditId);
+    const dbIssues = await getAuditIssues(userId, auditId);
     const allIssues = dbIssuesToAuditIssues(dbIssues);
     const healthScore = calculateHealthScore(allIssues);
 
@@ -373,10 +375,10 @@ export async function runAudit(
     const notices = allIssues.filter((i) => i.severity === "notice").length;
 
     // 生成历史对比
-    const prevAudit = await getPreviousAudit(domain, auditId);
+    const prevAudit = await getPreviousAudit(userId, domain, auditId);
     let comparisonJson: string | null = null;
     if (prevAudit) {
-      const prevIssues = dbIssuesToAuditIssues(await getAuditIssues(prevAudit.id));
+      const prevIssues = dbIssuesToAuditIssues(await getAuditIssues(userId, prevAudit.id));
       const comparison = compareAudits(
         {
           score: healthScore,
@@ -402,7 +404,7 @@ export async function runAudit(
       comparisonJson = JSON.stringify(comparison);
     }
 
-    await finishAudit(auditId, {
+    await finishAudit(userId, auditId, {
       health_score: healthScore,
       errors,
       warnings,
@@ -412,6 +414,7 @@ export async function runAudit(
     });
 
     await generateAuditAlerts(
+      userId,
       auditId,
       domain,
       errors,
@@ -431,7 +434,7 @@ export async function runAudit(
     };
   } catch (err) {
     const errMsg = (err as Error)?.message ?? String(err);
-    await finishAudit(auditId, {
+    await finishAudit(userId, auditId, {
       health_score: 0,
       errors: 1,
       warnings: 0,

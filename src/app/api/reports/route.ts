@@ -27,7 +27,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
   }
 
-  const reports = await listReports(projectId);
+  const userId = auth.user?.id ?? "demo-user";
+  const reports = await listReports(userId, projectId);
   return NextResponse.json({ data: reports });
 }
 
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "data_json 不能为空" }, { status: 400 });
   }
 
-  const id = await createReport(projectId, type, title, dataJson);
+  const userId = auth.user?.id ?? "demo-user";
+  const id = await createReport(userId, projectId, type, title, dataJson);
   return NextResponse.json({ data: { id } }, { status: 201 });
 }

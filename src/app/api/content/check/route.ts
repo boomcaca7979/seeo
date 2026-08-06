@@ -107,6 +107,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
     let savedId: number | null = null;
     let comparison: ContentHistoryComparison | null = null;
     try {
-      const saved = await addContentCheck({
+      const saved = await addContentCheck(userId, {
         url: result.url,
         keyword: keyword || targetKeywords[0],
         score,
@@ -170,10 +171,10 @@ export async function POST(req: Request) {
       savedId = saved.id;
 
       // 生成对比
-      const prev = await getPreviousContentCheck(result.url, saved.id);
+      const prev = await getPreviousContentCheck(userId, result.url, saved.id);
       comparison = buildComparison(analysis, saved.created_at, prev);
       if (comparison) {
-        await updateContentCheckComparison(saved.id, JSON.stringify(comparison));
+        await updateContentCheckComparison(userId, saved.id, JSON.stringify(comparison));
       }
     } catch {
       // ignore save error
@@ -231,12 +232,13 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const urlFilter = searchParams.get("url")?.trim() || undefined;
   const limitRaw = Number(searchParams.get("limit") ?? "10");
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 10;
 
-  const rows = await listContentChecksFull(limit, urlFilter);
+  const rows = await listContentChecksFull(userId, limit, urlFilter);
   const data: HistoryItem[] = rows.map((r) => ({
     id: r.id,
     url: r.url,

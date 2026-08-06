@@ -22,7 +22,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   if (!isAuthEnabled) {
     const numId = Number(id);
     if (!Number.isInteger(numId) || numId <= 0) notFound();
-    const row = await getProjectById(numId);
+    const row = await getProjectById("demo-user", numId);
     if (!row) notFound();
     const project: DatabaseProject = {
       id: String(row.id),

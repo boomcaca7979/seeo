@@ -13,8 +13,9 @@ export async function GET() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
-  const alerts = await listAlerts(50);
-  const unread = await countUnreadAlerts();
+  const userId = auth.user?.id ?? "demo-user";
+  const alerts = await listAlerts(userId, 50);
+  const unread = await countUnreadAlerts(userId);
   return NextResponse.json({
     data: alerts,
     unread,

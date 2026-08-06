@@ -89,13 +89,14 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const domain = normalizeDomain(searchParams.get("domain") ?? "");
   if (!domain) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
-  const summary = await getBacklinkSummary(domain);
+  const summary = await getBacklinkSummary(userId, domain);
   if (!summary) {
     return NextResponse.json({ data: null });
   }
@@ -107,7 +108,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ data: null });
   }
 
-  const rows = await listBacklinks(domain, 100);
+  const rows = await listBacklinks(userId, domain, 100);
   return NextResponse.json({
     data: toResponse(summary, rows, summary.fetched_at, true),
   });
@@ -118,6 +119,7 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
 
   let body: Record<string, unknown>;
   try {
@@ -140,12 +142,12 @@ export async function POST(req: Request) {
   }
 
   // 查 7 天缓存，命中直接返回
-  const cached = await getBacklinkSummary(domain);
+  const cached = await getBacklinkSummary(userId, domain);
   if (cached) {
     const fetchedAtMs = parseFetchedAt(cached.fetched_at);
     const age = Date.now() - fetchedAtMs;
     if (age <= CACHE_TTL_MS) {
-      const rows = await listBacklinks(domain, 100);
+      const rows = await listBacklinks(userId, domain, 100);
       return NextResponse.json({
         data: toResponse(cached, rows, cached.fetched_at, true),
       });
@@ -162,7 +164,7 @@ export async function POST(req: Request) {
   // 调 DataForSEO 拉取（失败不写库，可重试）
   try {
     const data = await fetchBacklinks(domain, { limit: 100 });
-    await saveBacklinks({
+    await saveBacklinks(userId, {
       domain,
       summary: {
         total_backlinks: data.summary.total_backlinks,
@@ -175,7 +177,7 @@ export async function POST(req: Request) {
     });
 
     // 读回刚写入的记录（拿 fetched_at）
-    const fresh = await getBacklinkSummary(domain);
+    const fresh = await getBacklinkSummary(userId, domain);
     const fetchedAt = fresh?.fetched_at ?? new Date().toISOString();
     return NextResponse.json({
       data: toResponse(

@@ -21,11 +21,12 @@ export async function DELETE(
     return NextResponse.json({ error: "id 无效" }, { status: 400 });
   }
 
-  const existing = await getReport(id);
+  const userId = auth.user?.id ?? "demo-user";
+  const existing = await getReport(userId, id);
   if (!existing) {
     return NextResponse.json({ error: "报告不存在" }, { status: 404 });
   }
 
-  await deleteReport(id);
+  await deleteReport(userId, id);
   return NextResponse.json({ data: { deleted: true, id } });
 }

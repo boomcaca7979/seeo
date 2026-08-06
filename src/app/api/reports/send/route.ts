@@ -45,7 +45,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const report = await getReport(reportId);
+  const userId = auth.user?.id ?? "demo-user";
+  const report = await getReport(userId, reportId);
   if (!report) {
     return NextResponse.json({ error: "报告不存在" }, { status: 404 });
   }

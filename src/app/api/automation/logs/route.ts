@@ -13,10 +13,11 @@ export async function GET(request: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(request.url);
   const limitParam = searchParams.get("limit");
   const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 200) : 50;
 
-  const logs = await listAutomationLogs(limit);
+  const logs = await listAutomationLogs(userId, limit);
   return NextResponse.json({ data: logs });
 }

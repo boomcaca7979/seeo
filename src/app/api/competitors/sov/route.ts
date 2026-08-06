@@ -23,6 +23,7 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const projectId = Number(searchParams.get("project_id") ?? "");
 
@@ -30,23 +31,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
   }
 
-  const project = await getProjectById(projectId);
+  const project = await getProjectById(userId, projectId);
   if (!project) {
     return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
   }
 
   // 获取该项目所有追踪关键词（通过 domain 关联）
-  const allTracked = await listTrackedKeywords();
+  const allTracked = await listTrackedKeywords(userId);
   const projectKeywords = allTracked.filter((k) => k.domain === project.domain);
   const totalKeywords = projectKeywords.length;
-  const competitors = await listCompetitors(projectId);
+  const competitors = await listCompetitors(userId, projectId);
 
   // 收集所有关键词的排名数据
   const allRankings: SOVInput[] = [];
   let analyzedKeywords = 0;
 
   for (const kw of projectKeywords) {
-    const latest = await getLatestCompetitorRanks(kw.id);
+    const latest = await getLatestCompetitorRanks(userId, kw.id);
     if (latest.length === 0 && kw.todayPosition === null) {
       // 该关键词既没有竞品排名记录，也没有自己的排名记录
       continue;
