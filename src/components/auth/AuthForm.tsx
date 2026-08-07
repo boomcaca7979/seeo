@@ -178,30 +178,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </p>
         </div>
 
-        {/* 返回首页 */}
-        <p className="mt-6 text-center">
-          <Link
-            href="/"
-            className="font-sans text-xs text-y-secondary hover:text-y-text"
-          >
-            ← 返回首页
-          </Link>
-        </p>
-
-        {/* 定价 / 文档 */}
-        <p className="mt-3 text-center font-sans text-xs text-y-secondary">
-          <Link href="/pricing" className="hover:text-y-text">查看定价</Link>
-          <span className="mx-2 text-y-muted">·</span>
-          <Link href="/docs" className="hover:text-y-text">查看文档</Link>
-        </p>
-
-        {/* 合规链接 */}
-        <p className="mt-4 text-center font-sans text-xs text-ink-40">
-          使用即表示同意{" "}
-          <Link href="/terms" className="text-brand hover:underline">服务条款</Link>
-          {" "}和{" "}
-          <Link href="/privacy" className="text-brand hover:underline">隐私政策</Link>
-        </p>
       </div>
 
       <Toast />

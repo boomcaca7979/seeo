@@ -1,4 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "文档 · SeeO",
+  description: "SeeO 使用文档：关键词追踪、技术审计、竞品分析、内容优化与报告导出的操作指南。",
+  alternates: { canonical: "/docs" },
+};
 
 interface DocItem {
   title: string;

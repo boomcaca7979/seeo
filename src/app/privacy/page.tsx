@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "隐私政策 · SeeO",
+  description: "SeeO 隐私政策：我们如何收集、使用与保护您的个人信息。",
+  alternates: { canonical: "/privacy" },
+};
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-paper">

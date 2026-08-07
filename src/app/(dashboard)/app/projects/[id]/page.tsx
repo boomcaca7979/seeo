@@ -144,7 +144,7 @@ function renderDetail(
             排名追踪概览
           </h2>
           <Link
-            href="/app/rank-tracking"
+            href="/app/position-tracking"
             className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
           >
             查看全部 →

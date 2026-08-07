@@ -449,6 +449,13 @@ async function migrate(db: DBAdapter): Promise<void> {
     // 字段已存在，忽略
   }
 
+  // 审计表新增 pages_detail 字段（JSON：[{url, responseTimeMs, status}]，用于响应时间分布图）
+  try {
+    await db.run(`ALTER TABLE audits ADD COLUMN pages_detail TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+
   // content_checks 表新增字段（ALTER TABLE 兼容已有数据）
   const contentCheckColumns: Array<[string, string]> = [
     ["title_suggestions", "TEXT"],
@@ -1144,6 +1151,7 @@ export interface AuditRow {
   comparison: string | null;
   error: string | null;
   depth: "quick" | "full";
+  pages_detail: string | null;
 }
 
 export interface AuditIssueRow {
@@ -1180,6 +1188,7 @@ function rowToAudit(row: Record<string, unknown>): AuditRow {
     comparison: row.comparison ? String(row.comparison) : null,
     error: row.error ? String(row.error) : null,
     depth: (row.depth === "full" ? "full" : "quick"),
+    pages_detail: row.pages_detail ? String(row.pages_detail) : null,
   };
 }
 
@@ -1199,6 +1208,7 @@ export async function finishAudit(
     status?: "completed" | "failed";
     comparison?: string | null;
     error?: string | null;
+    pages_detail?: string | null;
   }
 ): Promise<void> {
   const db = await getAdapter();
@@ -1206,7 +1216,8 @@ export async function finishAudit(
     UPDATE audits
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
         comparison = COALESCE(?, comparison),
-        error = COALESCE(?, error)
+        error = COALESCE(?, error),
+        pages_detail = COALESCE(?, pages_detail)
     WHERE id = ? AND user_id = ?
   `, [
     params.health_score,
@@ -1216,6 +1227,7 @@ export async function finishAudit(
     params.status ?? "completed",
     params.comparison ?? null,
     params.error ?? null,
+    params.pages_detail ?? null,
     id,
     userId
   ]);

@@ -1,5 +1,5 @@
 // ===== GET /api/audit/latest?domain=xx =====
-// 返回最近一次审计结果（含问题清单 + 历史对比 + 检查项覆盖）
+// 返回最近一次审计结果（含问题清单 + 历史对比 + 检查项覆盖 + 页面响应时间明细）
 
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, type AuditIssueRow } from "@/lib/db";
@@ -25,6 +25,13 @@ interface HistoryItem {
   score: number | null;
   issuesCount: number;
   checkedAt: string;
+}
+
+interface PageDetailEntry {
+  url: string;
+  responseTimeMs: number;
+  status: number;
+  ok: boolean;
 }
 
 function groupIssues(issues: AuditIssueRow[]): IssueGroup[] {
@@ -106,6 +113,16 @@ export async function GET(req: Request) {
     checkedAt: h.finished_at ?? h.started_at,
   }));
 
+  // 解析页面响应时间明细
+  let pagesDetail: PageDetailEntry[] = [];
+  if (audit.pages_detail) {
+    try {
+      pagesDetail = JSON.parse(audit.pages_detail) as PageDetailEntry[];
+    } catch {
+      pagesDetail = [];
+    }
+  }
+
   return NextResponse.json({
     data: {
       id: audit.id,
@@ -122,6 +139,7 @@ export async function GET(req: Request) {
       comparison,
       coverage,
       history,
+      pagesDetail,
       error: audit.error,
     },
   });

@@ -167,14 +167,14 @@ export default function Topbar({ displayName, email }: TopbarProps) {
     : null;
 
   return (
-    <header className="flex h-16 items-center justify-between gap-4 border-b border-line bg-paper px-5">
+    <header className="flex h-16 flex-none items-center justify-between gap-4 border-b border-line bg-card px-5">
       {/* 项目切换器：描边 chip */}
       <div className="relative" ref={projectRef}>
         <button
           onClick={() => setProjectOpen((o) => !o)}
           className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2 hover:border-ink-25"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded bg-brand font-mono text-xs font-bold text-ink">
+          <span className="flex h-6 w-6 items-center justify-center rounded bg-ink text-xs font-semibold text-card">
             {currentProject ? currentProject.name.charAt(0).toUpperCase() : "—"}
           </span>
           <span className="font-sans text-sm font-medium text-ink">
@@ -199,9 +199,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 <button
                   key={p.id}
                   onClick={() => handleSelectProject(p.id)}
-                  className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-[#FBFAF4]"
+                  className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-line-soft"
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded bg-brand font-mono text-xs font-bold text-ink">
+                  <span className="flex h-6 w-6 items-center justify-center rounded bg-ink text-xs font-semibold text-card">
                     {p.name.charAt(0).toUpperCase()}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -213,7 +213,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                     </div>
                   </div>
                   {p.id === selectedId && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-ink" />
                   )}
                 </button>
               ))
@@ -222,9 +222,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
               <Link
                 href="/app"
                 onClick={() => setProjectOpen(false)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-2 font-sans text-sm text-ink-60 hover:bg-[#FBFAF4] hover:text-ink"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft hover:text-ink"
               >
-                <span className="text-brand">+</span> 新建项目
+                <span className="text-ink">+</span> 新建项目
               </Link>
             </div>
           </div>
@@ -263,7 +263,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
               <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
             {unread > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand" />
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-neg" />
             )}
           </button>
 
@@ -271,7 +271,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden">
               {/* 头部 */}
               <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
-                <span className="font-display text-sm font-bold text-ink">预警通知</span>
+                <span className="text-sm font-bold text-ink">预警通知</span>
                 {unread > 0 && (
                   <span className="font-sans text-[10px] text-ink-40">{unread} 条未读</span>
                 )}
@@ -287,7 +287,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                   {alerts.map((a, idx) => (
                     <div
                       key={a.id}
-                      className={`flex items-start gap-2.5 px-4 py-3 hover:bg-[#FBFAF4] ${
+                      className={`flex items-start gap-2.5 px-4 py-3 hover:bg-line-soft ${
                         idx !== alerts.length - 1 ? "border-b border-line-soft" : ""
                       }`}
                     >
@@ -318,7 +318,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 <Link
                   href="/app"
                   onClick={() => setBellOpen(false)}
-                  className="font-sans text-[11px] text-brand hover:text-brand-deep"
+                  className="font-sans text-[11px] text-accent hover:underline"
                 >
                   查看全部 →
                 </Link>
@@ -331,9 +331,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg p-1 hover:bg-card"
+            className="flex items-center gap-2 rounded-lg p-1 hover:bg-line-soft"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink font-mono text-xs font-bold text-brand">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
               {displayName.charAt(0).toUpperCase()}
             </span>
           </button>
@@ -352,14 +352,14 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 <Link
                   href="/pricing"
                   onClick={() => setUserMenuOpen(false)}
-                  className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-[#FBFAF4] hover:text-ink"
+                  className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-line-soft hover:text-ink"
                 >
                   定价方案
                 </Link>
                 <Link
                   href="/docs"
                   onClick={() => setUserMenuOpen(false)}
-                  className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-[#FBFAF4] hover:text-ink"
+                  className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-line-soft hover:text-ink"
                 >
                   帮助文档
                 </Link>
@@ -367,7 +367,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
               {isAuthEnabled ? (
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2.5 font-sans text-sm text-ink-60 hover:bg-[#FBFAF4] transition-colors duration-150"
+                  className="w-full text-left px-4 py-2.5 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"
                 >
                   退出登录
                 </button>

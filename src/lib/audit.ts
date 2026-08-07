@@ -31,11 +31,20 @@ const MAX_PAGES_FULL = 50;
 const MAX_PAGES_QUICK = 1;
 const CONCURRENCY = 2;
 const ROBOTS_TIMEOUT_MS = 5000;
+const SITEMAP_TIMEOUT_MS = 5000;
+const STARTPAGE_RETRY_MS = 12_000; // 首页重试时给 Vercel 冷启动更长一点的窗口
 
 export type AuditDepth = "quick" | "full";
 
 export interface RunAuditOptions {
   depth?: AuditDepth;
+}
+
+export interface PageDetailEntry {
+  url: string;
+  responseTimeMs: number;
+  status: number;
+  ok: boolean;
 }
 
 export interface AuditResult {
@@ -49,6 +58,8 @@ export interface AuditResult {
   notices: number;
   status: "completed" | "failed";
   error?: string;
+  pagesDetail?: PageDetailEntry[];
+  homepageParsed?: boolean;
 }
 
 /** 读取 robots.txt 全文（用于 Disallow 规则 + Sitemap 检测） */
@@ -95,6 +106,63 @@ function parseRobotsRules(robotsText: string | null): string[] {
 
 function isDisallowed(pathname: string, rules: string[]): boolean {
   return rules.some((rule) => pathname.startsWith(rule));
+}
+
+/** 从 robots.txt 解析声明的 sitemap URL 列表 */
+function extractSitemapUrls(robotsText: string | null, origin: string): string[] {
+  if (!robotsText) return [];
+  const urls: string[] = [];
+  for (const raw of robotsText.split("\n")) {
+    const trimmed = raw.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith("sitemap:")) {
+      const url = trimmed.slice("sitemap:".length).trim();
+      if (url) urls.push(url);
+    }
+  }
+  // robots 没声明 sitemap，回退到 /sitemap.xml
+  if (urls.length === 0) urls.push(`${origin}/sitemap.xml`);
+  return urls;
+}
+
+/** 抓取 sitemap.xml 并解析出同域名 URL（用于首页超时降级） */
+async function fetchSitemapUrls(origin: string, robotsText: string | null): Promise<string[]> {
+  const sitemapUrls = extractSitemapUrls(robotsText, origin);
+  const collected = new Set<string>();
+  for (const sitemapUrl of sitemapUrls) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), SITEMAP_TIMEOUT_MS);
+      let text: string;
+      try {
+        const res = await fetch(sitemapUrl, {
+          signal: controller.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; SeeO-SEO-Bot/1.0; +https://seeo.app/bot)" },
+          cache: "no-store",
+        });
+        if (!res.ok) continue;
+        text = await res.text();
+      } finally {
+        clearTimeout(timer);
+      }
+      // 简单 XML 解析：<loc>https://...</loc>
+      const matches = text.matchAll(/<loc>([^<]+)<\/loc>/gi);
+      for (const m of matches) {
+        const u = m[1].trim();
+        try {
+          const parsed = new URL(u);
+          if (parsed.origin === origin) {
+            collected.add(`${parsed.protocol}//${parsed.host}${parsed.pathname}${parsed.search}`);
+          }
+        } catch {
+          // 无效 URL，跳过
+        }
+      }
+    } catch {
+      // sitemap 抓取失败，继续尝试下一个
+    }
+  }
+  return Array.from(collected);
 }
 
 /** 规范化 URL：去 hash、保留 pathname+search */
@@ -238,7 +306,10 @@ export async function runAudit(
   const queue: string[] = [baseUrl.toString()];
   const crawledPages: PageData[] = [];
   const brokenLinks: Array<{ url: string; statusCode: number }> = [];
+  const pagesDetail: PageDetailEntry[] = [];
   let pagesCrawled = 0;
+  let homepageParsed = false;
+  let homepageTimeoutRetried = false;
 
   try {
     while (queue.length > 0 && pagesCrawled < maxPages) {
@@ -265,9 +336,30 @@ export async function runAudit(
 
       if (batch.length === 0) break;
 
+      // 首页批次特殊处理：超时自动重试一次（应对 Vercel 冷启动）
+      const isFirstBatch = pagesCrawled === 0;
+      const fetchWithRetry = async (url: string) => {
+        try {
+          return { ok: true as const, result: await fetchPage(url) };
+        } catch (e) {
+          if (isFirstBatch && !homepageTimeoutRetried && e instanceof CrawlError && e.code === "TIMEOUT") {
+            homepageTimeoutRetried = true;
+            // 重试：给冷启动更长窗口（12s）
+            try {
+              return { ok: true as const, result: await fetchPage(url, STARTPAGE_RETRY_MS) };
+            } catch (e2) {
+              return { ok: false as const, error: e2 };
+            }
+          }
+          return { ok: false as const, error: e };
+        }
+      };
+
       const results = await Promise.allSettled(
         batch.map(async (url) => {
-          const result = await fetchPage(url);
+          const retryResult = await fetchWithRetry(url);
+          if (!retryResult.ok) throw retryResult.error;
+          const result = retryResult.result;
           const pageData = parsePage(result.html, result.url);
           pageData.responseTimeMs = result.responseTimeMs;
           pageData.status = result.status;
@@ -290,6 +382,7 @@ export async function runAudit(
               const statusMatch = err.message.match(/HTTP (\d+)/);
               const statusCode = statusMatch ? Number(statusMatch[1]) : 0;
               brokenLinks.push({ url, statusCode });
+              pagesDetail.push({ url, responseTimeMs: 0, status: statusCode, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
                 checkName: "站内死链",
@@ -301,15 +394,19 @@ export async function runAudit(
                   : "检查服务器状态与页面可用性",
               });
             } else if (err.code === "TIMEOUT") {
+              pagesDetail.push({ url, responseTimeMs: homepageTimeoutRetried ? STARTPAGE_RETRY_MS : 10_000, status: 0, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "slow-page",
                 checkName: "页面加载慢",
-                message: "抓取超时（10s）",
+                message: homepageTimeoutRetried
+                  ? `首页抓取超时（重试 ${STARTPAGE_RETRY_MS / 1000}s 仍失败）`
+                  : "抓取超时（10s）",
                 url,
                 severity: "warning",
                 suggestion: "优化服务器响应时间，检查后端服务状态",
               });
             } else if (err.code === "NETWORK") {
+              pagesDetail.push({ url, responseTimeMs: 0, status: 0, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
                 checkName: "站内死链",
@@ -320,6 +417,7 @@ export async function runAudit(
               });
             }
           } else {
+            pagesDetail.push({ url, responseTimeMs: 0, status: 0, ok: false });
             await writeIssueToDb(userId, auditId, {
               checkId: "broken-links",
               checkName: "站内死链",
@@ -329,11 +427,32 @@ export async function runAudit(
               suggestion: "检查 URL 是否可访问",
             });
           }
+
+          // 首页最终无法解析：尝试 sitemap 降级（仅 full 模式有意义）
+          if (isFirstBatch && !homepageParsed && depth === "full") {
+            const sitemapUrls = await fetchSitemapUrls(origin, robotsText);
+            for (const smUrl of sitemapUrls) {
+              if (visited.has(smUrl)) continue;
+              if (queue.includes(smUrl)) continue;
+              if (queue.length > 500) break;
+              queue.push(smUrl);
+            }
+          }
           continue;
         }
 
-        const { pageData } = r.value;
+        const { result, pageData } = r.value;
         crawledPages.push(pageData);
+        pagesDetail.push({
+          url,
+          responseTimeMs: result.responseTimeMs,
+          status: result.status,
+          ok: true,
+        });
+
+        if (isFirstBatch) {
+          homepageParsed = true;
+        }
 
         // 运行单页检查
         const pageIssues = runPerPageChecks(pageData, baseUrl.toString());
@@ -354,6 +473,43 @@ export async function runAudit(
           }
         }
       }
+    }
+
+    // 起始页最终未能解析：明确标记审计不可用，不给虚高分
+    if (!homepageParsed) {
+      await writeIssueToDb(userId, auditId, {
+        checkId: "startpage-unparsed",
+        checkName: "起始页未能解析",
+        message: "起始页未能解析，单页检查项未执行，本次审计结果不可用",
+        url: baseUrl.toString(),
+        severity: "error",
+        suggestion: "请稍后重试，或检查目标站点是否可访问。冷启动场景下重试一次通常可成功",
+      });
+
+      const pagesDetailJson = JSON.stringify(pagesDetail);
+      await finishAudit(userId, auditId, {
+        health_score: 0,
+        errors: 1,
+        warnings: 0,
+        notices: 0,
+        status: "completed",
+        comparison: null,
+        pages_detail: pagesDetailJson,
+      });
+
+      return {
+        auditId,
+        domain,
+        depth,
+        pagesCrawled,
+        healthScore: 0,
+        errors: 1,
+        warnings: 0,
+        notices: 0,
+        status: "completed",
+        pagesDetail,
+        homepageParsed: false,
+      };
     }
 
     // 运行跨页检查（quick 模式跳过：重复标题/描述/H1、死链、sitemap 需多页交叉）
@@ -404,6 +560,7 @@ export async function runAudit(
       comparisonJson = JSON.stringify(comparison);
     }
 
+    const pagesDetailJson = JSON.stringify(pagesDetail);
     await finishAudit(userId, auditId, {
       health_score: healthScore,
       errors,
@@ -411,6 +568,7 @@ export async function runAudit(
       notices,
       status: "completed",
       comparison: comparisonJson,
+      pages_detail: pagesDetailJson,
     });
 
     await generateAuditAlerts(
@@ -431,6 +589,8 @@ export async function runAudit(
       warnings,
       notices,
       status: "completed",
+      pagesDetail,
+      homepageParsed: true,
     };
   } catch (err) {
     const errMsg = (err as Error)?.message ?? String(err);
@@ -441,6 +601,7 @@ export async function runAudit(
       notices: 0,
       status: "failed",
       error: errMsg,
+      pages_detail: JSON.stringify(pagesDetail),
     });
     return {
       auditId,
@@ -453,6 +614,8 @@ export async function runAudit(
       notices: 0,
       status: "failed",
       error: errMsg,
+      pagesDetail,
+      homepageParsed,
     };
   }
 }

@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "服务条款 · SeeO",
+  description: "SeeO 服务条款：使用 SeeO 平台的相关条款与条件。",
+  alternates: { canonical: "/terms" },
+};
+
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-paper">

@@ -41,24 +41,6 @@ export interface RankRow {
   intent: SearchIntent;
 }
 
-export interface KeywordOverview {
-  keyword: string;
-  searchVolume: string;
-  kd: number;
-  cpc: string;
-  intent: SearchIntent;
-  trend: { month: string; value: number }[];
-  serpFeatures: string[];
-}
-
-export interface RelatedKeyword {
-  keyword: string;
-  volume: string;
-  kd: number;
-  cpc: string;
-  intent: SearchIntent;
-}
-
 export interface AuditIssue {
   type: string;
   severity: "error" | "warning" | "notice";
@@ -167,54 +149,6 @@ export const rankRows: RankRow[] = [
   { keyword: "内容优化", rank: 28, change: 0, searchVolume: "19.8K", kd: 35, intent: "信息型" },
   { keyword: "搜索意图", rank: 34, change: 8, searchVolume: "4.6K", kd: 22, intent: "信息型" },
 ];
-
-export const keywordOverview: KeywordOverview = {
-  keyword: "seo 工具",
-  searchVolume: "18.2K",
-  kd: 73,
-  cpc: "¥6.40",
-  intent: "商业调查型",
-  trend: [
-    { month: "1月", value: 14200 },
-    { month: "2月", value: 13800 },
-    { month: "3月", value: 15100 },
-    { month: "4月", value: 16900 },
-    { month: "5月", value: 17400 },
-    { month: "6月", value: 16800 },
-    { month: "7月", value: 18200 },
-    { month: "8月", value: 17800 },
-    { month: "9月", value: 18500 },
-    { month: "10月", value: 19100 },
-    { month: "11月", value: 17900 },
-    { month: "12月", value: 18200 },
-  ],
-  serpFeatures: ["精选摘要", "People Also Ask", "视频轮播", "知识面板"],
-};
-
-export const relatedKeywords: {
-  phrase: RelatedKeyword[];
-  related: RelatedKeyword[];
-  question: RelatedKeyword[];
-} = {
-  phrase: [
-    { keyword: "最好的 seo 工具", volume: "4.2K", kd: 68, cpc: "¥7.20", intent: "商业调查型" },
-    { keyword: "免费 seo 工具", volume: "9.8K", kd: 52, cpc: "¥3.10", intent: "信息型" },
-    { keyword: "seo 工具对比", volume: "2.1K", kd: 45, cpc: "¥5.40", intent: "商业调查型" },
-    { keyword: "中文 seo 工具", volume: "3.4K", kd: 49, cpc: "¥4.80", intent: "信息型" },
-  ],
-  related: [
-    { keyword: "关键词研究工具", volume: "11.2K", kd: 58, cpc: "¥6.10", intent: "信息型" },
-    { keyword: "网站分析工具", volume: "14.6K", kd: 62, cpc: "¥5.80", intent: "信息型" },
-    { keyword: "搜索引擎优化", volume: "27.8K", kd: 71, cpc: "¥7.50", intent: "信息型" },
-    { keyword: "网站流量分析", volume: "8.9K", kd: 47, cpc: "¥4.20", intent: "信息型" },
-  ],
-  question: [
-    { keyword: "怎么选 seo 工具", volume: "2.8K", kd: 33, cpc: "¥3.40", intent: "信息型" },
-    { keyword: "seo 工具有用吗", volume: "1.9K", kd: 28, cpc: "¥2.80", intent: "信息型" },
-    { keyword: "为什么用 seo 工具", volume: "1.2K", kd: 25, cpc: "¥3.10", intent: "信息型" },
-    { keyword: "哪个 seo 工具好", volume: "3.6K", kd: 41, cpc: "¥4.50", intent: "商业调查型" },
-  ],
-};
 
 export const auditIssues: AuditIssue[] = [
   { type: "404 错误页面", severity: "error", affectedPages: 3, suggestion: "添加 301 重定向到相关页面，或恢复缺失内容" },

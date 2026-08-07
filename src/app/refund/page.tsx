@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "退款政策 · SeeO",
+  description: "SeeO 退款政策：订阅服务的退款条件与流程说明。",
+  alternates: { canonical: "/refund" },
+};
+
 export default function RefundPage() {
   return (
     <div className="min-h-screen bg-paper">

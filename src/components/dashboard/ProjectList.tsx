@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
+import ChartCard from "@/components/dashboard/charts/ChartCard";
+import HealthScoreBars from "@/components/dashboard/charts/HealthScoreBars";
+import AlertAreaChart from "@/components/dashboard/charts/AlertAreaChart";
 
 interface ProjectListProps {
   projects: ProjectWithMetrics[];
@@ -85,6 +88,38 @@ export default function ProjectList({
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const todayLabel = useTodayLabel();
+
+  // 各项目健康分（仅含已审计的）
+  const healthData = useMemo(
+    () =>
+      projects
+        .filter((p) => p.healthScore !== null)
+        .map((p) => ({ name: p.name, score: p.healthScore as number })),
+    [projects]
+  );
+
+  // 近 7 天预警聚合（按 created_at 取日期，计数）
+  const alertAreaData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days: { date: string; count: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      days.push({
+        date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        count: 0,
+      });
+    }
+    alerts.forEach((a) => {
+      const d = new Date(a.created_at.endsWith("Z") ? a.created_at : a.created_at + "Z");
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const slot = days.find((s) => s.date === key);
+      if (slot) slot.count += 1;
+    });
+    return days;
+  }, [alerts]);
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -304,10 +339,38 @@ export default function ProjectList({
           )}
         </section>
 
-        {/* 02 预警提醒 */}
+        {/* 02 图表概览（健康分横条 + 预警面积图） */}
         <section className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">02</span>
+            <h2 className="font-display text-base font-bold text-ink">数据概览</h2>
+            <div className="hairline flex-1" />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <ChartCard
+              title="各项目健康分"
+              subtitle="按分数排序 · 红/黄/绿着色"
+              height={Math.max(220, healthData.length * 32 + 80)}
+              className="lg:col-span-7"
+            >
+              <HealthScoreBars data={healthData} />
+            </ChartCard>
+            <ChartCard
+              title="近 7 天预警数量"
+              subtitle={`共 ${alerts.length} 条预警`}
+              height={260}
+              className="lg:col-span-5"
+            >
+              <AlertAreaChart data={alertAreaData} />
+            </ChartCard>
+          </div>
+        </section>
+
+        {/* 03 预警提醒 */}
+        <section className="mt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-ink-40">03</span>
             <h2 className="font-display text-base font-bold text-ink">预警提醒</h2>
             <div className="hairline flex-1" />
             <span

@@ -27,7 +27,7 @@ export class CrawlError extends Error {
 }
 
 /** 抓取单个页面 */
-export async function fetchPage(rawUrl: string): Promise<CrawlResult> {
+export async function fetchPage(rawUrl: string, timeoutMs: number = TIMEOUT_MS): Promise<CrawlResult> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -36,7 +36,7 @@ export async function fetchPage(rawUrl: string): Promise<CrawlResult> {
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const start = Date.now();
 
   try {
@@ -64,7 +64,7 @@ export async function fetchPage(rawUrl: string): Promise<CrawlResult> {
   } catch (e) {
     if (e instanceof CrawlError) throw e;
     if (e instanceof DOMException && e.name === "AbortError") {
-      throw new CrawlError("TIMEOUT", `抓取超时（${TIMEOUT_MS / 1000}s）：${rawUrl}`);
+      throw new CrawlError("TIMEOUT", `抓取超时（${timeoutMs / 1000}s）：${rawUrl}`);
     }
     throw new CrawlError("NETWORK", `网络错误：${(e as Error).message}`);
   } finally {

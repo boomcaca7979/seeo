@@ -19,6 +19,9 @@ import {
   CHART_TOOLTIP_LABEL_STYLE,
   CHART_TOOLTIP_ITEM_STYLE,
 } from "@/components/dashboard/chart-theme";
+import ChartCard from "@/components/dashboard/charts/ChartCard";
+import SOVGroupBars from "@/components/dashboard/charts/SOVGroupBars";
+import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/charts/CompetitorRankBars";
 
 const SELECTED_PROJECT_KEY = "seeo:selected-project-id";
 
@@ -379,6 +382,27 @@ export default function CompetitorsPage() {
       }]
     : [];
 
+  // SOV 柱状图数据（自己 vs 竞品）
+  const sovBarData = sov
+    ? sov.sov.map((s) => ({
+        domain: s.domain,
+        isSelf: s.domain === sov.projectDomain,
+        sov: s.percentage,
+      }))
+    : [];
+
+  // 排名对比柱状图数据（基于当前 ranks.results）
+  const rankBarData: CompetitorRankRow[] = ranks && ranks.results.length > 0
+    ? [{
+        keyword: ranks.keyword,
+        ranks: ranks.results.map((r) => ({
+          domain: r.domain,
+          isSelf: r.is_self,
+          rank: r.rank,
+        })),
+      }]
+    : [];
+
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
       {/* 页头：编号 + 标题 + 发丝线 */}
@@ -721,6 +745,28 @@ export default function CompetitorsPage() {
               </div>
             )}
           </div>
+
+          {/* 图表区：SOV 柱状图 + 排名对比柱状图 */}
+          {sov && sov.sov.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
+              <ChartCard
+                title="SOV 份额对比"
+                subtitle="自己 vs 各竞品并排"
+                height={Math.max(220, sovBarData.length * 32 + 80)}
+                className="lg:col-span-6"
+              >
+                <SOVGroupBars data={sovBarData} />
+              </ChartCard>
+              <ChartCard
+                title="关键词排名对比"
+                subtitle={ranks ? `关键词：${ranks.keyword}` : "选择关键词并刷新后显示"}
+                height={Math.max(220, rankBarData.length * 40 + 80)}
+                className="lg:col-span-6"
+              >
+                <CompetitorRankBars data={rankBarData} />
+              </ChartCard>
+            </div>
+          )}
 
           {/* SOV 排名对比表 */}
           {sov && sov.sov.length > 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "react";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
@@ -8,6 +8,11 @@ import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import AuditReport from "@/components/reports/AuditReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import ChartCard from "@/components/dashboard/charts/ChartCard";
+import AuditCoverageStacked from "@/components/dashboard/charts/AuditCoverageStacked";
+import AuditPassDonut from "@/components/dashboard/charts/AuditPassDonut";
+import AuditScoreTrend from "@/components/dashboard/charts/AuditScoreTrend";
+import ResponseTimeBars from "@/components/dashboard/charts/ResponseTimeBars";
 
 // 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
 
@@ -60,6 +65,13 @@ interface HistoryItem {
   checkedAt: string;
 }
 
+interface PageDetailEntry {
+  url: string;
+  responseTimeMs: number;
+  status: number;
+  ok: boolean;
+}
+
 interface AuditData {
   id: number;
   domain: string;
@@ -75,6 +87,7 @@ interface AuditData {
   comparison: ComparisonData | null;
   coverage: CheckCoverageItem[];
   history: HistoryItem[];
+  pagesDetail?: PageDetailEntry[];
   error?: string | null;
 }
 
@@ -99,12 +112,18 @@ function formatTime(iso: string | null): string {
 
 type AuditDepth = "quick" | "full";
 
+interface ProjectItem {
+  id: number;
+  name: string;
+  domain: string;
+  healthScore: number | null;
+}
+
 export default function AuditPage() {
   const { show, Toast } = useToast();
-  const [domain, setDomain] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try { return localStorage.getItem("seeo:last-audit-domain") ?? ""; } catch { return ""; }
-  });
+  const [domain, setDomain] = useState("");
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -134,6 +153,40 @@ export default function AuditPage() {
     }
   }, []);
 
+  // 挂载时拉取项目列表：有项目 → 默认选中第一个并自动加载审计；无项目 → 域名为空
+  const didInitProjectsRef = useRef(false);
+  useEffect(() => {
+    if (didInitProjectsRef.current) return;
+    didInitProjectsRef.current = true;
+    (async () => {
+      setProjectsLoading(true);
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        const json = await res.json();
+        const list: ProjectItem[] = (json.data ?? []).map((p: ProjectItem) => ({
+          id: p.id,
+          name: p.name,
+          domain: p.domain,
+          healthScore: p.healthScore,
+        }));
+        setProjects(list);
+        if (list.length > 0) {
+          // 优先级：项目列表第一个 > localStorage（仅作次要候选）
+          // 设置 domain 后由下方的域名变化 effect 自动触发 loadLatest
+          setDomain(list[0].domain);
+        } else {
+          // 无项目：即使 localStorage 有旧值也显示空
+          setDomain("");
+        }
+      } catch {
+        setDomain("");
+      } finally {
+        setProjectsLoading(false);
+      }
+    })();
+  }, [loadLatest]);
+
+  // 域名变化时加载审计结果（仅手动输入后触发）
   const lastLoadedDomain = useRef<string | null>(null);
   useEffect(() => {
     const d = domain.trim();
@@ -272,6 +325,65 @@ export default function AuditPage() {
       : audit.issues.filter((i) => i.severity === filter)
     : [];
 
+  // ===== 图表数据聚合（前端聚合现有 audit 数据，不加新接口） =====
+  const coverage = audit?.coverage;
+  const coverageByCategory = useMemo(() => {
+    if (!coverage) return [];
+    const groups: Record<string, { passed: number; failed: number }> = {
+      critical: { passed: 0, failed: 0 },
+      warning: { passed: 0, failed: 0 },
+      info: { passed: 0, failed: 0 },
+    };
+    coverage.forEach((c) => {
+      const g = groups[c.category];
+      if (g) {
+        if (c.passed) g.passed += 1;
+        else g.failed += 1;
+      }
+    });
+    return [
+      { category: "critical", passed: groups.critical.passed, failed: groups.critical.failed },
+      { category: "warning", passed: groups.warning.passed, failed: groups.warning.failed },
+      { category: "info", passed: groups.info.passed, failed: groups.info.failed },
+    ];
+  }, [coverage]);
+
+  const passCount = coverage?.filter((c) => c.passed).length ?? 0;
+  const failCount = coverage?.filter((c) => !c.passed).length ?? 0;
+
+  const history = audit?.history;
+  const historyChart = useMemo(() => {
+    if (!history) return [];
+    return history
+      .filter((h) => h.score !== null)
+      .map((h) => ({ date: h.checkedAt, score: h.score as number }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [history]);
+
+  // 响应时间分布（按桶聚合：快<1s / 中1-3s / 慢>3s / 超时）
+  const responseTimeData = useMemo(() => {
+    const pagesDetail = audit?.pagesDetail ?? [];
+    if (!pagesDetail.length) return [];
+    const buckets = [
+      { bucket: "<1s", count: 0 },
+      { bucket: "1-3s", count: 0 },
+      { bucket: "3-10s", count: 0 },
+      { bucket: "超时", count: 0 },
+    ];
+    for (const p of pagesDetail) {
+      if (!p.ok) {
+        buckets[3].count++;
+      } else if (p.responseTimeMs < 1000) {
+        buckets[0].count++;
+      } else if (p.responseTimeMs < 3000) {
+        buckets[1].count++;
+      } else {
+        buckets[2].count++;
+      }
+    }
+    return buckets;
+  }, [audit?.pagesDetail]);
+
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8 print-area">
       {/* 打印专用页眉 */}
@@ -303,7 +415,6 @@ export default function AuditPage() {
               value={domain}
               onChange={(d) => {
                 setDomain(d);
-                try { localStorage.setItem("seeo:last-audit-domain", d); } catch { /* ignore */ }
               }}
               className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
@@ -364,25 +475,41 @@ export default function AuditPage() {
       </div>
 
       {/* 上次审计信息 */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-sans text-xs text-ink-40 print:hidden">
-        {audit ? (
-          <>
-            <span>域名：<span className="text-ink-60">{audit.domain}</span></span>
-            <span>·</span>
-            <span>上次审计：<span className="text-ink-60">{formatTime(audit.finishedAt ?? audit.startedAt)}</span></span>
-            <span>·</span>
-            <span>已爬取：<span className="text-ink-60">{audit.pagesCrawled.toLocaleString()} 个页面</span></span>
-            {audit.status === "running" && (
-              <>
-                <span>·</span>
-                <span className="text-warn">审计进行中…</span>
-              </>
-            )}
-          </>
-        ) : (
-          <span>暂无审计记录，点击右侧按钮开始首次审计</span>
-        )}
-      </div>
+      {!projectsLoading && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-sans text-xs text-ink-40 print:hidden">
+          {audit ? (
+            <>
+              <span>域名：<span className="text-ink-60">{audit.domain}</span></span>
+              <span>·</span>
+              <span>上次审计：<span className="text-ink-60">{formatTime(audit.finishedAt ?? audit.startedAt)}</span></span>
+              <span>·</span>
+              <span>已爬取：<span className="text-ink-60">{audit.pagesCrawled.toLocaleString()} 个页面</span></span>
+              {audit.status === "running" && (
+                <>
+                  <span>·</span>
+                  <span className="text-warn">审计进行中…</span>
+                </>
+              )}
+            </>
+          ) : domain.trim() ? (
+            <span>暂无审计记录，点击右侧按钮开始首次审计</span>
+          ) : null}
+        </div>
+      )}
+
+      {/* 无项目空态 */}
+      {!projectsLoading && projects.length === 0 && !domain.trim() && (
+        <div className="card-a mt-6 flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-ink-40">
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
+            </svg>
+          </div>
+          <div className="mt-3 text-sm font-medium text-ink">先去工作台创建项目，或手动输入域名</div>
+          <p className="mt-1 text-xs text-ink-40">审计域名会自动从你的项目列表中选择</p>
+        </div>
+      )}
 
       {/* 审计进度条（同步执行，显示加载态） */}
       {auditing && (
@@ -410,7 +537,7 @@ export default function AuditPage() {
       )}
 
       {/* 加载骨架 */}
-      {loading && !auditing && (
+      {(loading || projectsLoading) && !auditing && (
         <div className="mt-6 space-y-4 print:hidden">
           <TableSkeleton rows={3} />
           <TableSkeleton rows={6} />
@@ -440,7 +567,7 @@ export default function AuditPage() {
       )}
 
       {/* 概览区 */}
-      {!loading && !hasFailed && (
+      {!loading && !hasFailed && !projectsLoading && domain.trim() && (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* 健康度大环 + 较上次变化 */}
           <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
@@ -528,7 +655,61 @@ export default function AuditPage() {
       )}
 
       {/* 问题清单 */}
-      {!loading && !hasFailed && (
+      {!loading && !hasFailed && !projectsLoading && domain.trim() && (
+        <div className="mt-10">
+        {/* 图表区：4 张图 */}
+        {hasResult && (
+          <div className="mt-10">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-ink-40">05-0</span>
+              <h2 className="font-display text-lg font-bold text-ink">审计概览图表</h2>
+              <div className="hairline flex-1" />
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+              {/* 检查项类别分布 横向堆叠条 */}
+              <ChartCard
+                title="检查项分布"
+                subtitle="按类别（严重/警告/提示）显示通过/未通过数量"
+                height={240}
+                className="lg:col-span-7"
+              >
+                <AuditCoverageStacked data={coverageByCategory} />
+              </ChartCard>
+
+              {/* 通过情况 donut */}
+              <ChartCard
+                title="检查通过情况"
+                subtitle={`通过 ${passCount} 项 / 未通过 ${failCount} 项`}
+                height={240}
+                className="lg:col-span-5"
+              >
+                <AuditPassDonut passed={passCount} failed={failCount} />
+              </ChartCard>
+
+              {/* 历史分数折线 */}
+              <ChartCard
+                title="历史审计分数"
+                subtitle="近 10 次审计健康分变化"
+                height={260}
+                className="lg:col-span-7"
+              >
+                <AuditScoreTrend data={historyChart} />
+              </ChartCard>
+
+              {/* 响应时间分布柱状（深度审计页面明细） */}
+              <ChartCard
+                title="响应时间分布"
+                subtitle={activeDepth === "full" ? "深度审计页面明细" : "需深度审计后显示"}
+                height={260}
+                className="lg:col-span-5"
+              >
+                <ResponseTimeBars data={responseTimeData} />
+              </ChartCard>
+            </div>
+          </div>
+        )}
+
         <div className="mt-10">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold text-ink">
@@ -582,9 +763,8 @@ export default function AuditPage() {
                       const rowKey = issue.checkId;
                       const isExpanded = expandedRow === rowKey;
                       return (
-                        <>
+                        <Fragment key={rowKey}>
                           <tr
-                            key={rowKey}
                             className="border-b border-line-soft transition-colors hover:bg-line-soft/40 cursor-pointer"
                             onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
                           >
@@ -619,7 +799,7 @@ export default function AuditPage() {
                             </td>
                           </tr>
                           {isExpanded && (
-                            <tr key={`${rowKey}-expanded`} className="border-b border-line-soft bg-[#FBFAF4]">
+                            <tr className="border-b border-line-soft bg-[#FBFAF4]">
                               <td colSpan={5} className="px-4 py-3">
                                 <div className="flex flex-col gap-1 font-sans text-xs">
                                   <span className="text-ink-40">问题详情：{issue.detail}</span>
@@ -628,7 +808,7 @@ export default function AuditPage() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -643,6 +823,7 @@ export default function AuditPage() {
               </p>
             </div>
           )}
+        </div>
         </div>
       )}
 
