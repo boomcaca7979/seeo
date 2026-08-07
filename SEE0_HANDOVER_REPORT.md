@@ -35,6 +35,7 @@ SeeO 作为 SEO 数据分析平台，自身却存在严重的 SEO 基础缺陷�
 | G. 审计 Bug 2：首页超时误判 | 首页超时重试 + sitemap 降级 + 不可用标记 | ✅ 完成 |
 | H. 代理环境支持 | 新增 instrumentation.ts 配置 undici ProxyAgent | ✅ 完成 |
 | I. 前端警告修复 | AuditPage Fragment key + Sidebar v1.0 删除 | ✅ 完成 |
+| J. middleware → proxy 迁移 | Next.js v16 弃用 middleware 约定，迁移为 proxy（修复 Vercel 构建失败） | ✅ 完成 |
 
 ### A. SeeO 官网 SEO 基础建设
 
@@ -168,6 +169,7 @@ ResponseTimeBars 组件颜色数组从 3 色扩展到 4 色。
 | `src/app/robots.ts` | Next.js Metadata Route，生成 /robots.txt，声明 Allow/Disallow 规则和 Sitemap |
 | `src/app/sitemap.ts` | Next.js Metadata Route，生成 /sitemap.xml，列出 8 个公开页面 |
 | `src/instrumentation.ts` | Next.js Instrumentation hook，服务端启动时读 HTTP_PROXY/HTTPS_PROXY 配置 undici ProxyAgent（解决本地开发代理环境下 fetch 不可用） |
+| `src/proxy.ts` | Next.js v16 Proxy 约定文件（替代已弃用的 middleware.ts），执行 Supabase session 刷新 |
 | `public/og.jpg` | 1200×630 品牌分享图，用于 Open Graph 和 Twitter Card |
 
 ---
@@ -203,6 +205,7 @@ ResponseTimeBars 组件颜色数组从 3 色扩展到 4 色。
 | 文件 | 修改原因 | 修改内容 |
 |---|---|---|
 | `src/components/dashboard/Sidebar.tsx` | 清理无用标签 + v1.0 删除 | 移除 `{!collapsed && <span>v1.0</span>}` 块 |
+| `src/middleware.ts` → `src/proxy.ts` | Next.js v16 弃用 middleware 约定 | 文件重命名 + 导出函数 `middleware` 改为 `proxy`；Vercel 构建因 middleware 弃用告警失败，迁移后构建通过 |
 
 ---
 
