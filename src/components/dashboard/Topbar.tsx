@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 
@@ -49,7 +48,6 @@ function formatRelativeTime(isoStr: string): string {
 }
 
 export default function Topbar({ displayName, email }: TopbarProps) {
-  const router = useRouter();
   const [projectOpen, setProjectOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -159,9 +157,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
     const supabase = createBrowser();
     // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
     await supabase.auth.signOut({ scope: "global" });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    router.push("/login");
-    router.refresh();
+    // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    window.location.assign("/login");
   };
 
   const currentProject = selectedId !== null

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { useToast } from "@/components/dashboard/Toast";
@@ -145,7 +145,6 @@ interface SidebarProps {
 export default function Sidebar({ displayName, email }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
   const { show, Toast } = useToast();
 
   const handleLogout = async () => {
@@ -156,9 +155,9 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
     const supabase = createBrowser();
     // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
     await supabase.auth.signOut({ scope: "global" });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    router.push("/login");
-    router.refresh();
+    // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    window.location.assign("/login");
   };
 
   const userName = displayName ?? "本地开发";

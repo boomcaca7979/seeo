@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
-import { useRouter } from "next/navigation";
 
 type TabKey = "account" | "plan" | "usage" | "team" | "automation";
 
@@ -110,7 +109,6 @@ interface AccountInfo {
 
 export default function SettingsPage() {
   const { show, Toast } = useToast();
-  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -173,10 +171,9 @@ export default function SettingsPage() {
       const supabase = createBrowser();
       // scope=global 清除所有会话；await 完成后再导航，避免请求被中断
       await supabase.auth.signOut({ scope: "global" });
-      // 等待一个 microtask 让 cookie 写入完成
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      router.push("/login");
-      router.refresh();
+      // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      window.location.assign("/login");
     } catch (err) {
       show(`退出失败：${(err as Error).message}`, "error");
     } finally {
