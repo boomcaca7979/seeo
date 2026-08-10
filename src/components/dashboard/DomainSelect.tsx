@@ -27,12 +27,18 @@ export default function DomainSelect({ value, onChange, placeholder, className }
   const [manual, setManual] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let settled = false;
+
     (async () => {
       try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
+        const res = await fetch("/api/projects", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         const json = await res.json();
-        if (!cancelled && res.ok && Array.isArray(json.data)) {
+        if (!settled && res.ok && Array.isArray(json.data)) {
           setProjects(json.data as Project[]);
           // 无值且项目存在时，默认选中第一个
           if (!value && json.data.length > 0) {
@@ -42,14 +48,25 @@ export default function DomainSelect({ value, onChange, placeholder, className }
           if (json.data.length === 0) {
             setManual(true);
           }
+        } else if (!settled) {
+          // 非 200 或返回格式异常 → 降级为手动输入
+          setManual(true);
         }
       } catch {
-        // ignore
+        // 网络错误/超时/abort → 降级为手动输入，不要停留在 loading
+        if (!settled) setManual(true);
       } finally {
-        if (!cancelled) setLoading(false);
+        clearTimeout(timeoutId);
+        settled = true;
+        setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      settled = true;
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -85,7 +102,7 @@ export default function DomainSelect({ value, onChange, placeholder, className }
         )}
         {projects.length === 0 && (
           <p className="mt-1 font-sans text-[10px] text-ink-40">
-            可先去工作台创建项目
+            暂无项目，可直接输入域名开始
           </p>
         )}
       </div>

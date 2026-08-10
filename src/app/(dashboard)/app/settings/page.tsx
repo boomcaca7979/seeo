@@ -101,17 +101,80 @@ const usageStats = [
 
 const WEEK_DAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
+interface AccountInfo {
+  displayName: string;
+  email: string;
+  userId: string;
+  createdAt: string;
+}
+
 export default function SettingsPage() {
   const { show, Toast } = useToast();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
+  const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+
+  // 拉取当前 Supabase 会话中的真实用户信息
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      // 演示模式：保留占位（不走 Supabase）
+      if (!isAuthEnabled) {
+        if (!cancelled) {
+          setAccount({
+            displayName: "本地开发",
+            email: "dev@seeo.local",
+            userId: "demo-user-0001",
+            createdAt: "—（演示模式）",
+          });
+          setAccountLoading(false);
+        }
+        return;
+      }
+      try {
+        const supabase = createBrowser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (cancelled || !user) {
+          setAccountLoading(false);
+          return;
+        }
+        const email = user.email ?? "未知";
+        const displayName =
+          (user.user_metadata as { display_name?: string } | null)?.display_name ||
+          email.split("@")[0] ||
+          "用户";
+        const createdAt = user.created_at
+          ? new Date(user.created_at).toLocaleString("zh-CN", { hour12: false })
+          : "未知";
+        setAccount({
+          displayName,
+          email,
+          userId: user.id,
+          createdAt,
+        });
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setAccountLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
       const supabase = createBrowser();
-      await supabase.auth.signOut();
+      // scope=global 清除所有会话；await 完成后再导航，避免请求被中断
+      await supabase.auth.signOut({ scope: "global" });
+      // 等待一个 microtask 让 cookie 写入完成
+      await new Promise((resolve) => setTimeout(resolve, 0));
       router.push("/login");
       router.refresh();
     } catch (err) {
@@ -170,50 +233,58 @@ export default function SettingsPage() {
           {tab === "account" && (
             <div className="card-a p-6">
               <h2 className="font-display text-lg font-bold text-ink">账号信息</h2>
-              <div className="mt-5 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
-                {/* 头像占位 */}
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/30 bg-brand/15 font-display text-2xl font-bold text-ink">
-                  本
-                </div>
-                <div className="flex-1">
-                  <div className="font-sans text-base font-semibold text-ink">本地开发</div>
-                  <div className="mt-0.5 font-mono text-xs text-ink-40">dev@seeo.local</div>
-                </div>
-                <button
-                  onClick={() => show("当前为演示模式，编辑功能将在接入后端后开放", "info")}
-                  className="btn-secondary"
-                >
-                  编辑
-                </button>
-              </div>
-
-              {/* 字段表 */}
-              <div className="mt-6 divide-y divide-line-soft border-t border-line-soft">
-                {[
-                  { label: "显示名", value: "本地开发" },
-                  { label: "邮箱", value: "dev@seeo.local" },
-                  { label: "账号 ID", value: "demo-user-0001" },
-                  { label: "注册时间", value: "—（演示模式）" },
-                  { label: "两步验证", value: "未开启" },
-                ].map((row) => (
-                  <div key={row.label} className="flex items-center justify-between py-3">
-                    <span className="font-mono text-xs text-ink-40">{row.label}</span>
-                    <span className="font-sans text-sm text-ink">{row.value}</span>
+              {accountLoading ? (
+                <div className="mt-6 font-mono text-xs text-ink-40">加载中…</div>
+              ) : account ? (
+                <>
+                  <div className="mt-5 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+                    {/* 头像占位 */}
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/30 bg-brand/15 font-display text-2xl font-bold text-ink">
+                      {account.displayName.slice(0, 1)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-sans text-base font-semibold text-ink">{account.displayName}</div>
+                      <div className="mt-0.5 font-mono text-xs text-ink-40">{account.email}</div>
+                    </div>
+                    <button
+                      onClick={() => show("当前为演示模式，编辑功能将在接入后端后开放", "info")}
+                      className="btn-secondary"
+                    >
+                      编辑
+                    </button>
                   </div>
-                ))}
-              </div>
 
-              {/* 退出登录（鉴权模式） */}
-              {isAuthEnabled && (
-                <div className="mt-6 border-t border-line-soft pt-5">
-                  <button
-                    onClick={handleSignOut}
-                    disabled={signingOut}
-                    className="btn-secondary text-neg disabled:opacity-60"
-                  >
-                    {signingOut ? "退出中…" : "退出登录"}
-                  </button>
-                </div>
+                  {/* 字段表 */}
+                  <div className="mt-6 divide-y divide-line-soft border-t border-line-soft">
+                    {[
+                      { label: "显示名", value: account.displayName },
+                      { label: "邮箱", value: account.email },
+                      { label: "账号 ID", value: account.userId },
+                      { label: "注册时间", value: account.createdAt },
+                      { label: "两步验证", value: "未开启" },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between py-3">
+                        <span className="font-mono text-xs text-ink-40">{row.label}</span>
+                        <span className="font-sans text-sm text-ink break-all text-right">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 退出登录（鉴权模式） */}
+                  {isAuthEnabled && (
+                    <div className="mt-6 border-t border-line-soft pt-5">
+                      <button
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="btn-secondary text-neg disabled:opacity-60"
+                      >
+                        {signingOut ? "退出中…" : "退出登录"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-6 font-mono text-xs text-ink-40">无法获取账号信息</div>
               )}
             </div>
           )}
