@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "文档 · SeeO",
@@ -97,23 +98,7 @@ const faqs = [
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-paper">
-      {/* 顶部导航条 */}
-      <header className="border-b border-line bg-card">
-        <nav className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-1.5">
-            <span className="font-mono text-lg font-bold text-ink">See</span>
-            <span className="font-mono text-lg font-bold text-brand">O</span>
-          </Link>
-          <div className="flex items-center gap-4 font-mono text-xs">
-            <Link href="/pricing" className="text-ink-60 transition-colors hover:text-ink">
-              定价
-            </Link>
-            <Link href="/app" className="text-brand transition-colors hover:text-brand-deep">
-              进入工作台 →
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <Navbar />
 
       <div className="mx-auto max-w-4xl px-6 py-16">
         <span className="font-mono text-xs text-brand">DOCS</span>

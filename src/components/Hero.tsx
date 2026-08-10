@@ -64,8 +64,8 @@ export default function Hero() {
               <div className="font-mono text-[10px] text-d-muted sm:text-xs">
                 seeo.app / keyword-gravity-field
               </div>
-              <div className="font-mono text-[10px] text-teal sm:text-xs">
-                ● LIVE
+              <div className="font-mono text-[10px] text-d-muted sm:text-xs">
+                ● 示例
               </div>
             </div>
 
@@ -79,7 +79,7 @@ export default function Hero() {
                 <div>EDGES: 7</div>
               </div>
               <div className="absolute right-3 top-3 hidden font-mono text-[10px] text-d-muted sm:block">
-                <div>UPDATED: 2 min ago</div>
+                <div>示例数据 · 演示用</div>
               </div>
               <div className="absolute bottom-3 left-3 hidden font-mono text-[10px] text-d-secondary sm:block">
                 引力场示意 · 数据为示例

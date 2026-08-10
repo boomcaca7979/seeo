@@ -5,9 +5,9 @@ import { isAuthEnabled } from "@/lib/auth-config";
 
 const navItems = [
   { label: "功能", href: "#features" },
-  { label: "仪表盘", href: "#dashboard" },
-  { label: "定价", href: "#cta" },
-  { label: "文档", href: "#footer" },
+  { label: "产品", href: "#dashboard" },
+  { label: "定价", href: "/pricing" },
+  { label: "文档", href: "/docs" },
 ];
 
 export default function Navbar() {

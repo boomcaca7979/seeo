@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
@@ -13,6 +13,7 @@ interface AuthFormProps {
 
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { show, Toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +21,13 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const isSignup = mode === "signup";
+
+  // 读取 redirect 参数（安全：仅允许 /app 开头的路径）
+  const redirectTarget = searchParams.get("redirect");
+  const safeRedirect = redirectTarget && redirectTarget.startsWith("/app") ? redirectTarget : "/app";
+  // 切换登录/注册时保留 redirect 参数
+  const switchHref = isSignup ? "/login" : "/signup";
+  const switchHrefWithRedirect = redirectTarget ? `${switchHref}?redirect=${encodeURIComponent(redirectTarget)}` : switchHref;
 
   const validate = (): string | null => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -64,7 +72,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return;
       }
       // 注册成功后直接跳转（已关闭邮箱验证）
-      router.push("/app");
+      router.push(safeRedirect);
       router.refresh();
       return;
     }
@@ -79,7 +87,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       setLoading(false);
       return;
     }
-    router.push("/app");
+    router.push(safeRedirect);
     router.refresh();
   };
 
@@ -163,14 +171,14 @@ export default function AuthForm({ mode }: AuthFormProps) {
             {isSignup ? (
               <>
                 已有账号？{" "}
-                <Link href="/login" className="font-medium text-gold hover:underline">
+                <Link href={switchHrefWithRedirect} className="font-medium text-gold hover:underline">
                   直接登录
                 </Link>
               </>
             ) : (
               <>
                 还没注册？{" "}
-                <Link href="/signup" className="font-medium text-gold hover:underline">
+                <Link href={switchHrefWithRedirect} className="font-medium text-gold hover:underline">
                   创建账号
                 </Link>
               </>

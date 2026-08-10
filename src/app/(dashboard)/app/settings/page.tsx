@@ -285,7 +285,12 @@ export default function SettingsPage() {
           {/* 用量统计 */}
           {tab === "usage" && (
             <div className="card-a p-6">
-              <h2 className="font-display text-lg font-bold text-ink">用量统计</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-lg font-bold text-ink">用量统计</h2>
+                <span className="rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-40">
+                  示例数据
+                </span>
+              </div>
               <p className="mt-1 font-mono text-xs text-ink-40">
                 当前周期：专业版 · 重置日期每月 1 日
               </p>

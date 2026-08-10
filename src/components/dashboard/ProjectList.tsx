@@ -377,7 +377,7 @@ export default function ProjectList({
               className="font-sans text-[10px] font-bold tracking-wider text-brand"
               style={{ border: "1px solid currentColor", borderRadius: 3, padding: "2px 6px" }}
             >
-              实时
+              排名变化
             </span>
           </div>
 

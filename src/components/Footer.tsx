@@ -61,7 +61,7 @@ export default function Footer() {
             </p>
             <div className="mt-4 flex items-center gap-2 font-mono text-xs text-d-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-teal" />
-              全球数据服务运行中
+              基于 SerpApi / DataForSEO 数据服务
             </div>
           </div>
 

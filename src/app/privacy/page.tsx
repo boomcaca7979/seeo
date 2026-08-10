@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2 className="font-mono text-lg font-bold text-ink mb-2">03 数据存储</h2>
-            <p>用户数据存储在 Supabase（认证）和 Turso（业务数据）中，均符合 SOC 2 标准。</p>
+            <p>用户认证数据由 Supabase 托管，业务数据存储于 Turso 云数据库，两者均为第三方基础设施服务。</p>
           </section>
           <section>
             <h2 className="font-mono text-lg font-bold text-ink mb-2">04 Cookie</h2>

@@ -39,19 +39,23 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isProtected = pathname.startsWith("/app");
 
-  // 未登录访问受保护页面 → 跳登录
+  // 未登录访问受保护页面 → 跳登录（保留完整路径 + query string）
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
+    const redirectTarget = pathname + request.nextUrl.search;
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    url.search = "";
+    url.searchParams.set("redirect", redirectTarget);
     return NextResponse.redirect(url);
   }
 
-  // 已登录访问登录/注册 → 跳工作台
+  // 已登录访问登录/注册 → 若有 redirect 参数则跳回，否则跳工作台
   if (user && isAuthPage) {
+    const redirect = request.nextUrl.searchParams.get("redirect");
+    const safeRedirect = redirect && redirect.startsWith("/app") ? redirect : "/app";
     const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    url.search = "";
+    url.pathname = safeRedirect.split("?")[0];
+    url.search = safeRedirect.includes("?") ? "?" + safeRedirect.split("?")[1] : "";
     return NextResponse.redirect(url);
   }
 
