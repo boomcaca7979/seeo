@@ -154,7 +154,9 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
       return;
     }
     const supabase = createBrowser();
-    await supabase.auth.signOut();
+    // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
+    await supabase.auth.signOut({ scope: "global" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     router.push("/login");
     router.refresh();
   };
