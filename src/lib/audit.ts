@@ -22,6 +22,8 @@ import {
   runPerPageChecks,
   runCrossPageChecks,
   calculateHealthScore,
+  perPageChecks,
+  crossPageChecks,
   type AuditIssue,
   type CrossPageExtra,
 } from "@/lib/seo/audit-checks";
@@ -521,10 +523,16 @@ export async function runAudit(
       }
     }
 
-    // 计算健康分（基于权重）
+    // 计算健康分（基于实际执行的检查项权重）
     const dbIssues = await getAuditIssues(userId, auditId);
     const allIssues = dbIssuesToAuditIssues(dbIssues);
-    const healthScore = calculateHealthScore(allIssues);
+    // quick 模式只执行了单页检查；full 模式执行了单页 + 跨页检查
+    const executedCheckIds = new Set<string>(
+      depth === "full"
+        ? [...perPageChecks.map((c) => c.id), ...crossPageChecks.map((c) => c.id)]
+        : perPageChecks.map((c) => c.id)
+    );
+    const healthScore = calculateHealthScore(allIssues, executedCheckIds);
 
     const errors = allIssues.filter((i) => i.severity === "error").length;
     const warnings = allIssues.filter((i) => i.severity === "warning").length;

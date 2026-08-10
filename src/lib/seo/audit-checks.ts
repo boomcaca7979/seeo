@@ -191,14 +191,14 @@ export const perPageChecks: AuditCheck[] = [
     id: "title-length",
     name: "标题过长或过短",
     category: "warning",
-    weight: 3,
-    description: `标题长度应在 ${TITLE_MIN}-${TITLE_MAX} 字符之间`,
+    weight: 1,
+    description: `标题长度建议在 ${TITLE_MIN}-${TITLE_MAX} 字符之间（仅供参考，Google 按像素宽度截断）`,
     check: (page) => {
       if (!page.title) return null;
       const len = page.title.length;
       if (len < TITLE_MIN || len > TITLE_MAX) {
         return makeIssue(
-          { id: "title-length", name: "标题过长或过短", category: "warning", weight: 3, description: "" },
+          { id: "title-length", name: "标题过长或过短", category: "warning", weight: 1, description: "" },
           page,
           `标题长度 ${len} 字符（建议 ${TITLE_MIN}-${TITLE_MAX}）`,
           "调整标题长度至 30-60 字符，主关键词靠前"
@@ -211,14 +211,14 @@ export const perPageChecks: AuditCheck[] = [
     id: "description-length",
     name: "描述过长或过短",
     category: "warning",
-    weight: 3,
-    description: `描述长度应在 ${DESC_MIN}-${DESC_MAX} 字符之间`,
+    weight: 1,
+    description: `描述长度建议在 ${DESC_MIN}-${DESC_MAX} 字符之间（仅供参考，Google 会动态截断）`,
     check: (page) => {
       if (!page.metaDescription) return null;
       const len = page.metaDescription.length;
       if (len < DESC_MIN || len > DESC_MAX) {
         return makeIssue(
-          { id: "description-length", name: "描述过长或过短", category: "warning", weight: 3, description: "" },
+          { id: "description-length", name: "描述过长或过短", category: "warning", weight: 1, description: "" },
           page,
           `描述长度 ${len} 字符（建议 ${DESC_MIN}-${DESC_MAX}）`,
           `调整描述长度至 ${DESC_MIN}-${DESC_MAX} 字符`
@@ -265,17 +265,21 @@ export const perPageChecks: AuditCheck[] = [
   },
   {
     id: "no-robots-meta",
-    name: "robots 元标签缺失",
-    category: "info",
-    weight: 1,
-    description: "建议设置 robots meta 标签",
+    name: "robots 阻止索引",
+    category: "warning",
+    weight: 3,
+    description: "robots meta 包含 noindex/nofollow/none 等阻止搜索引擎行为的指令",
     check: (page) => {
-      if (!page.robotsMeta) {
+      if (!page.robotsMeta) return null; // 缺失 robots meta 不是问题（默认 index,follow）
+      const directives = page.robotsMeta.toLowerCase();
+      const blocking = ["noindex", "nofollow", "none", "noarchive"];
+      const hit = blocking.filter((d) => directives.includes(d));
+      if (hit.length > 0) {
         return makeIssue(
-          { id: "no-robots-meta", name: "robots 元标签缺失", category: "info", weight: 1, description: "" },
+          { id: "no-robots-meta", name: "robots 阻止索引", category: "warning", weight: 3, description: "" },
           page,
-          "页面缺少 robots meta 标签",
-          "添加 <meta name=\"robots\" content=\"index, follow\">（非强制）"
+          `robots meta 包含阻止指令：${hit.join(", ")}`,
+          "确认是否需要阻止搜索引擎索引此页面；如不需要，移除对应指令"
         );
       }
       return null;
@@ -302,10 +306,10 @@ export const perPageChecks: AuditCheck[] = [
   },
   {
     id: "no-structured-data",
-    name: "无结构化数据",
+    name: "结构化数据",
     category: "info",
     weight: 1,
-    description: "建议添加 JSON-LD 结构化数据",
+    description: "检测 JSON-LD 结构化数据是否存在且格式有效",
     check: (page) => {
       if (!page.hasStructuredData) {
         return makeIssue(
@@ -314,6 +318,48 @@ export const perPageChecks: AuditCheck[] = [
           "页面未检测到 JSON-LD 结构化数据",
           "添加 <script type=\"application/ld+json\"> 提升搜索结果展示"
         );
+      }
+      // 校验已存在的 JSON-LD 是否格式有效
+      for (const raw of page.structuredDataRaw) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return makeIssue(
+            { id: "no-structured-data", name: "结构化数据格式错误", category: "warning", weight: 1, description: "" },
+            page,
+            "JSON-LD 存在但 JSON 格式错误，无法解析",
+            "修正 <script type=\"application/ld+json\"> 内的 JSON 语法"
+          );
+        }
+        // 支持 @graph 数组结构
+        const nodes: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+        for (const node of nodes) {
+          if (node === null || typeof node !== "object") continue;
+          const obj = node as Record<string, unknown>;
+          if (obj["@graph"] && Array.isArray(obj["@graph"])) {
+            for (const g of obj["@graph"]) {
+              if (g && typeof g === "object") {
+                const gObj = g as Record<string, unknown>;
+                if (!gObj["@context"] || !gObj["@type"]) {
+                  return makeIssue(
+                    { id: "no-structured-data", name: "结构化数据不完整", category: "warning", weight: 1, description: "" },
+                    page,
+                    "JSON-LD @graph 节点缺少 @context 或 @type",
+                    "确保每个 JSON-LD 节点包含 @context 和 @type 字段"
+                  );
+                }
+              }
+            }
+          } else if (!obj["@context"] || !obj["@type"]) {
+            return makeIssue(
+              { id: "no-structured-data", name: "结构化数据不完整", category: "warning", weight: 1, description: "" },
+              page,
+              "JSON-LD 缺少 @context 或 @type 字段",
+              "确保 JSON-LD 包含 @context（如 https://schema.org）和 @type 字段"
+            );
+          }
+        }
       }
       return null;
     },
@@ -391,24 +437,6 @@ export const perPageChecks: AuditCheck[] = [
     },
   },
   {
-    id: "js-redirect",
-    name: "JS 重定向",
-    category: "warning",
-    weight: 3,
-    description: "JS 重定向影响爬虫抓取",
-    check: (page) => {
-      if (page.hasJsRedirect) {
-        return makeIssue(
-          { id: "js-redirect", name: "JS 重定向", category: "warning", weight: 3, description: "" },
-          page,
-          "页面检测到 JS 重定向（window.location）",
-          "改用服务端 301/302 重定向"
-        );
-      }
-      return null;
-    },
-  },
-  {
     id: "no-h2-h3",
     name: "无副标题结构",
     category: "info",
@@ -424,18 +452,6 @@ export const perPageChecks: AuditCheck[] = [
         );
       }
       return null;
-    },
-  },
-  {
-    id: "external-links-nofollow",
-    name: "外链无 nofollow",
-    category: "info",
-    weight: 1,
-    description: "外链建议添加 nofollow（非强制）",
-    check: (page) => {
-      const external = page.links.filter((l) => l.isExternal);
-      if (external.length === 0) return null;
-      return null; // 当前 parsePage 不解析 rel 属性，跳过误报；保留检查项以覆盖展示
     },
   },
 ];
@@ -604,18 +620,39 @@ export const checkMetaMap: Record<string, CheckMeta> = Object.fromEntries(
 /** 所有检查项权重总和 */
 export const MAX_SCORE: number = allCheckMeta.reduce((s, c) => s + c.weight, 0);
 
+/** 单页检查项权重总和 */
+export const PER_PAGE_SCORE: number = perPageChecks.reduce((s, c) => s + c.weight, 0);
+
+/** 跨页检查项权重总和 */
+export const CROSS_PAGE_SCORE: number = crossPageChecks.reduce((s, c) => s + c.weight, 0);
+
 /**
  * 基于命中的检查项计算健康分
- * 扣分 = Σ(命中检查项的权重)，每个 checkId 只扣一次
+ * 评分只能基于实际执行的检查项：
+ *   totalWeight = 已执行检查项权重总和
+ *   failedWeight = 已触发检查项权重
+ *   score = 100 - (failedWeight / totalWeight * 100)
+ * 每个 checkId 只扣一次。
+ * executedCheckIds 传入实际执行的检查项 ID 集合；未传则使用全部检查项（向后兼容）。
  */
-export function calculateHealthScore(issues: AuditIssue[]): number {
+export function calculateHealthScore(
+  issues: AuditIssue[],
+  executedCheckIds?: Set<string>
+): number {
   const hitCheckIds = new Set(issues.map((i) => i.checkId));
+  const totalWeight = executedCheckIds
+    ? Array.from(executedCheckIds).reduce(
+        (sum, id) => sum + (checkMetaMap[id]?.weight ?? 0),
+        0
+      )
+    : MAX_SCORE;
   let deduction = 0;
   for (const id of hitCheckIds) {
     const meta = checkMetaMap[id];
     if (meta) deduction += meta.weight;
   }
-  return Math.max(0, Math.round(100 - (deduction / MAX_SCORE) * 100));
+  if (totalWeight === 0) return 100;
+  return Math.max(0, Math.round(100 - (deduction / totalWeight) * 100));
 }
 
 /** 运行所有单页检查 */

@@ -26,14 +26,51 @@ export class CrawlError extends Error {
   }
 }
 
-/** 抓取单个页面 */
-export async function fetchPage(rawUrl: string, timeoutMs: number = TIMEOUT_MS): Promise<CrawlResult> {
+/** SSRF 防护：校验 URL 协议与 hostname 安全性 */
+export function validateUrlSafety(rawUrl: string): URL {
   let url: URL;
   try {
     url = new URL(rawUrl);
   } catch {
     throw new CrawlError("INVALID_URL", `URL 格式无效：${rawUrl}`);
   }
+  // 协议白名单：只允许 http/https
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new CrawlError("INVALID_URL", `不允许的协议：${url.protocol}`);
+  }
+  const hostname = url.hostname.toLowerCase();
+  // 禁止 localhost 及常见本地回环
+  if (hostname === "localhost" || hostname === "::1" || hostname === "[::1]") {
+    throw new CrawlError("INVALID_URL", `禁止访问本地地址：${hostname}`);
+  }
+  // 禁止 IPv4 回环 / 私网 / 链路本地 / 保留段
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b] = ipv4Match.map(Number) as unknown as number[];
+    const first = a;
+    const second = b;
+    if (
+      first === 127 || // 127.0.0.0/8 回环
+      first === 10 || // 10.0.0.0/8 A 类私网
+      (first === 172 && second >= 16 && second <= 31) || // 172.16.0.0/12 B 类私网
+      (first === 192 && second === 168) || // 192.168.0.0/16 C 类私网
+      (first === 169 && second === 254) || // 169.254.0.0/16 链路本地
+      first === 0 || // 0.0.0.0/8 本机网络
+      first >= 224 // 224.0.0.0/4 组播、240.0.0.0/4 保留
+    ) {
+      throw new CrawlError("INVALID_URL", `禁止访问私有/保留 IP：${hostname}`);
+    }
+  }
+  // 禁止 .local / .internal 等 mDNS / 本地域名
+  if (hostname.endsWith(".local") || hostname.endsWith(".internal") || hostname.endsWith(".localhost")) {
+    throw new CrawlError("INVALID_URL", `禁止访问本地域名：${hostname}`);
+  }
+  return url;
+}
+
+/** 抓取单个页面 */
+export async function fetchPage(rawUrl: string, timeoutMs: number = TIMEOUT_MS): Promise<CrawlResult> {
+  const url = validateUrlSafety(rawUrl);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -103,8 +140,8 @@ export interface PageData {
   twitterCard: string | null;
   favicon: string | null;
   hasStructuredData: boolean;
+  structuredDataRaw: string[];
   inlineStyleLength: number;
-  hasJsRedirect: boolean;
 }
 
 /** 用 cheerio 解析 HTML */
@@ -151,20 +188,16 @@ export function parsePage(html: string, baseUrl: string): PageData {
     $('link[rel="icon"]').attr("href")?.trim() ||
     $('link[rel="shortcut icon"]').attr("href")?.trim() ||
     null;
-  const hasStructuredData = $('script[type="application/ld+json"]').length > 0;
+  const structuredDataRaw: string[] = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    const raw = $(el).html();
+    if (raw) structuredDataRaw.push(raw.trim());
+  });
+  const hasStructuredData = structuredDataRaw.length > 0;
 
   let inlineStyleLength = 0;
   $("style").each((_, el) => {
     inlineStyleLength += $(el).html()?.length ?? 0;
-  });
-
-  let hasJsRedirect = false;
-  $("script").each((_, el) => {
-    if (hasJsRedirect) return;
-    const code = $(el).html() ?? "";
-    if (code.includes("window.location") || code.includes("window.location.href")) {
-      hasJsRedirect = true;
-    }
   });
 
   const images: { src: string; alt: string | null }[] = [];
@@ -231,8 +264,8 @@ export function parsePage(html: string, baseUrl: string): PageData {
     twitterCard,
     favicon,
     hasStructuredData,
+    structuredDataRaw,
     inlineStyleLength,
-    hasJsRedirect,
   };
 }
 

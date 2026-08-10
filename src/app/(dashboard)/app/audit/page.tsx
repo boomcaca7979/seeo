@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
@@ -120,7 +121,16 @@ interface ProjectItem {
 }
 
 export default function AuditPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-ink-40">加载中…</div>}>
+      <AuditPageInner />
+    </Suspense>
+  );
+}
+
+function AuditPageInner() {
   const { show, Toast } = useToast();
+  const searchParams = useSearchParams();
   const [domain, setDomain] = useState("");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -170,12 +180,13 @@ export default function AuditPage() {
           healthScore: p.healthScore,
         }));
         setProjects(list);
-        if (list.length > 0) {
-          // 优先级：项目列表第一个 > localStorage（仅作次要候选）
-          // 设置 domain 后由下方的域名变化 effect 自动触发 loadLatest
+        // 优先级：URL ?domain= 参数 > 项目列表第一个 > 空
+        const queryDomain = searchParams.get("domain")?.trim();
+        if (queryDomain) {
+          setDomain(queryDomain);
+        } else if (list.length > 0) {
           setDomain(list[0].domain);
         } else {
-          // 无项目：即使 localStorage 有旧值也显示空
           setDomain("");
         }
       } catch {
@@ -184,7 +195,7 @@ export default function AuditPage() {
         setProjectsLoading(false);
       }
     })();
-  }, [loadLatest]);
+  }, [loadLatest, searchParams]);
 
   // 域名变化时加载审计结果（仅手动输入后触发）
   const lastLoadedDomain = useRef<string | null>(null);
@@ -224,17 +235,56 @@ export default function AuditPage() {
       } catch {
         // ignore
       }
-      if (json.data?.status === "failed") {
-        const apiErr = json.data?.error || json?.error;
-        const hint = activeDepth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
-        show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+
+      // 异步模式：start API 返回 status=running，需要轮询直到完成
+      if (json.data?.status === "running") {
+        // 立即加载一次（显示 running 状态）
+        await loadLatest(domain);
+        // 轮询：每 3 秒查询一次，最多 100 次（5 分钟）
+        const POLL_INTERVAL = 3000;
+        const MAX_POLLS = 100;
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+          const pollRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
+          const pollJson = await pollRes.json();
+          const status = pollJson.data?.status;
+          if (status === "completed" || status === "failed") {
+            break;
+          }
+          // 仍在 running，更新进度
+          if (pollJson.data?.pagesCrawled != null) {
+            // 可选：更新 UI 显示已爬页数
+          }
+        }
+        // 加载最终结果
+        await loadLatest(domain);
+        // 重新查询最新结果判断成功/失败
+        const finalRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
+        const finalJson = await finalRes.json();
+        if (finalJson.data?.status === "failed") {
+          const apiErr = finalJson.data?.error || finalJson?.error;
+          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
+          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+        } else {
+          show(
+            `审计完成：健康度 ${finalJson.data?.healthScore ?? 0} 分，已爬 ${finalJson.data?.pagesCrawled ?? 0} 页`,
+            "success"
+          );
+        }
       } else {
-        show(
-          `审计完成：健康度 ${json.data?.healthScore ?? 0} 分，已爬 ${json.data?.pagesCrawled ?? 0} 页`,
-          "success"
-        );
+        // 兼容旧同步模式（直接返回结果）
+        if (json.data?.status === "failed") {
+          const apiErr = json.data?.error || json?.error;
+          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
+          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+        } else {
+          show(
+            `审计完成：健康度 ${json.data?.healthScore ?? 0} 分，已爬 ${json.data?.pagesCrawled ?? 0} 页`,
+            "success"
+          );
+        }
+        await loadLatest(domain);
       }
-      await loadLatest(domain);
     } catch (err) {
       show(`网络错误：${(err as Error).message}`, "error");
     } finally {

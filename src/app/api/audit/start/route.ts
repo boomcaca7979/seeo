@@ -1,15 +1,16 @@
 // ===== POST /api/audit/start =====
-// 发起一次技术审计：同步执行 BFS 爬取并返回最终结果（Vercel serverless 兼容）
-// 防滥用：同一域名 1 小时内只允许一次
+// 发起一次技术审计：异步执行（after），立即返回 auditId，前端轮询状态
+// 防滥用：同一域名 1 小时内只允许一次 + IP/用户每日限额
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAudit, getLatestAudit } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // full 模式可能 1-2 分钟，留足余量
+export const maxDuration = 300; // after 任务的最大执行时长
 
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 小时
 
@@ -19,6 +20,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const isAuthed = !!auth.user;
+
+  // Rate limit：匿名每天 3 次，登录每天 20 次
+  const rlKey = buildRateLimitKey(req, isAuthed ? userId : undefined);
+  const rl = checkAuditRateLimit(rlKey, isAuthed);
+  if (!rl.allowed) {
+    const resetHours = Math.round(rl.resetMs / (60 * 60 * 1000));
+    return NextResponse.json({
+      error: `今日审计次数已达上限，请约 ${resetHours} 小时后再试`,
+      data: { resetMs: rl.resetMs },
+    }, { status: 429 });
+  }
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -41,13 +54,12 @@ export async function POST(req: Request) {
   domain = domain.replace(/\/.*$/, "");
   domain = domain.toLowerCase().trim();
 
-  if (!domain || !/^[\w.-]+\.[a-z]{2,}$/i.test(domain)) {
+  // 域名格式校验：stricter regex，禁止以 - 开头/结尾，TLD 2-63 字符
+  if (!domain || !/^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i.test(domain)) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
   // 防滥用：按 depth 分别限制 1 小时冷却
-  // - status='failed' 不触发冷却，允许重试
-  // - quick 和 full 互不影响（latest.depth !== 本次 depth 则不冷却）
   const latest = await getLatestAudit(userId, domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({
@@ -76,25 +88,25 @@ export async function POST(req: Request) {
     }
   }
 
-  // 创建审计记录
+  // 创建审计记录（status=running）
   const audit = await createAudit(userId, domain, depth);
 
-  // 同步执行审计（不再 fire-and-forget，serverless 兼容）
+  // 异步执行审计：after() 在响应返回后继续执行，不阻塞用户
   // runAudit 内部已处理 finishAudit / addAuditIssue / 失败兜底
-  const result = await runAudit(userId, audit.id, domain, { depth });
+  after(() =>
+    runAudit(userId, audit.id, domain, { depth }).catch((err) => {
+      console.error(`[audit ${audit.id}] async failed:`, err);
+    })
+  );
 
+  // 立即返回 auditId，前端轮询 /api/audit/latest 获取进度
   return NextResponse.json({
     data: {
-      auditId: result.auditId,
-      domain: result.domain,
-      depth: result.depth,
-      status: result.status,
-      pagesCrawled: result.pagesCrawled,
-      healthScore: result.healthScore,
-      errors: result.errors,
-      warnings: result.warnings,
-      notices: result.notices,
-      error: result.error,
+      auditId: audit.id,
+      domain,
+      depth,
+      status: "running",
+      message: "审计已开始，请稍后刷新查看结果",
     },
   });
 }

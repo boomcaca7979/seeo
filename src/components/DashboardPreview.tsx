@@ -35,11 +35,11 @@ function RankTrendChart() {
   );
 }
 
-// 健康度评分环
-function HealthRing({ score }: { score: number }) {
+// 健康度评分环（示例展示）
+function HealthRing() {
   const r = 34;
   const c = 2 * Math.PI * r;
-  const offset = c - (score / 100) * c;
+  const offset = c - (75 / 100) * c;
 
   return (
     <div className="relative flex items-center justify-center">
@@ -65,8 +65,8 @@ function HealthRing({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute text-center">
-        <div className="font-display text-3xl font-bold text-d-text">{score}</div>
-        <div className="font-mono text-[10px] text-d-muted">/ 100</div>
+        <div className="font-display text-3xl font-bold text-d-text">示例</div>
+        <div className="font-mono text-[10px] text-d-muted">评分示意</div>
       </div>
     </div>
   );
@@ -152,14 +152,14 @@ export default function DashboardPreview() {
                   排名趋势
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
-                  example.com · 近 30 天 · 移动端
+                  示例项目 · 近 30 天 · 移动端
                 </p>
               </div>
               <div className="text-right">
                 <div className="font-mono text-2xl font-bold text-d-text">
-                  #3
+                  示例
                 </div>
-                <div className="font-mono text-xs text-teal">▲ 上升 11 位</div>
+                <div className="font-mono text-xs text-teal">趋势示意</div>
               </div>
             </div>
             <div className="mt-6 h-44">
@@ -178,30 +178,30 @@ export default function DashboardPreview() {
                 健康度
               </h3>
               <span className="rounded bg-teal/15 px-2 py-0.5 font-mono text-[10px] text-teal">
-                良好
+                示例
               </span>
             </div>
             <p className="mt-0.5 font-mono text-xs text-d-muted">
               技术 SEO 审计综合分
             </p>
             <div className="mt-4 flex flex-col items-center">
-              <HealthRing score={87} />
+              <HealthRing />
               <div className="mt-3 grid w-full grid-cols-3 gap-2 text-center">
                 <div>
                   <div className="font-mono text-sm font-semibold text-coral">
-                    3
+                    示例
                   </div>
                   <div className="font-mono text-[9px] text-d-muted">错误</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-gold">
-                    12
+                    示例
                   </div>
                   <div className="font-mono text-[9px] text-d-muted">警告</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-d-secondary">
-                    28
+                    示例
                   </div>
                   <div className="font-mono text-[9px] text-d-muted">提示</div>
                 </div>
@@ -217,14 +217,14 @@ export default function DashboardPreview() {
                   自然流量
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
-                  月度访问量 · 单位万
+                  月度访问量趋势 · 示例
                 </p>
               </div>
               <div className="text-right">
                 <div className="font-mono text-2xl font-bold text-d-text">
-                  14.2 万
+                  示例
                 </div>
-                <div className="font-mono text-xs text-teal">▲ 23.4%</div>
+                <div className="font-mono text-xs text-teal">趋势示意</div>
               </div>
             </div>
             <div className="mt-6 h-40">
@@ -242,10 +242,10 @@ export default function DashboardPreview() {
             <div className="rounded-2xl bg-ink p-5">
               <div className="font-mono text-[10px] text-d-muted">追踪关键词</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
-                3,284
+                示例
               </div>
               <div className="mt-1 font-mono text-xs text-teal">
-                ▲ 本周新增 47
+                趋势示意
               </div>
               <div className="mt-4 flex gap-1">
                 {[60, 75, 45, 88, 70, 92, 80].map((h, i) => (
@@ -260,10 +260,10 @@ export default function DashboardPreview() {
             <div className="rounded-2xl bg-ink p-5">
               <div className="font-mono text-[10px] text-d-muted">外链域名</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
-                1,927
+                示例
               </div>
               <div className="mt-1 font-mono text-xs text-coral">
-                ▼ 流失 8 个
+                趋势示意
               </div>
               <div className="mt-4 flex gap-1">
                 {[70, 65, 80, 72, 68, 60, 55].map((h, i) => (
@@ -276,8 +276,8 @@ export default function DashboardPreview() {
               </div>
             </div>
             <div className="col-span-2 grid grid-cols-2 gap-4">
-              <MetricPill label="TOP3 关键词" value="142" trend="up" />
-              <MetricPill label="TOP10 关键词" value="486" trend="up" />
+              <MetricPill label="TOP3 关键词" value="示例" trend="up" />
+              <MetricPill label="TOP10 关键词" value="示例" trend="up" />
             </div>
           </div>
         </div>

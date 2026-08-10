@@ -23,9 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 const SITE_URL = "https://seeo-five.vercel.app";
 
-const siteTitle = "SeeO · 看清搜索流量的走向";
+const siteTitle = "SeeO · SEO 数据分析、排名追踪与审计平台";
 const siteDescription =
-  "SeeO 是一站式 SEO 数据分析平台，把关键词、排名、外链、技术审计、竞品与内容优化放在同一张工作台上，帮你看清搜索流量的走向。";
+  "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。每日自动刷新排名数据，生成可视化审计报告，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
         url: "/og.jpg",
         width: 1200,
         height: 630,
-        alt: "SeeO · 看清搜索流量的走向",
+        alt: "SeeO · SEO 数据分析、排名追踪与审计平台",
       },
     ],
   },

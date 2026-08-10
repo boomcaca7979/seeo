@@ -1,12 +1,12 @@
 const items = [
-  { label: "关键词库", value: "28.4B" },
-  { label: "外链索引", value: "43.1T" },
-  { label: "今日追踪排名", value: "1,204,331 条" },
-  { label: "活跃项目", value: "82,914" },
-  { label: "覆盖国家", value: "189" },
-  { label: "搜索引擎", value: "Google / Bing / 百度" },
-  { label: "数据更新", value: "实时" },
-  { label: "审计页面", value: "6.7 亿" },
+  { label: "关键词研究", value: "搜索量 / 难度 / 意图" },
+  { label: "排名追踪", value: "每日自动刷新" },
+  { label: "技术审计", value: "20+ 项检查" },
+  { label: "竞品分析", value: "SOV 份额" },
+  { label: "内容优化", value: "SERP Top10 对比" },
+  { label: "外链分析", value: "DataForSEO 接入" },
+  { label: "搜索引擎", value: "Google" },
+  { label: "数据导出", value: "PDF / Excel" },
 ];
 
 export default function Ticker() {

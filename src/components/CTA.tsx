@@ -36,7 +36,7 @@ export default function CTA() {
 
           <div className="relative text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-xs text-gold">
-              7 天免费试用 · 无需信用卡
+              免费开始使用
             </span>
             <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-d-text sm:text-5xl">
               看清你的搜索流量，从今天开始
@@ -84,10 +84,10 @@ export default function CTA() {
 
             {/* 信任标识 */}
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-xs text-d-muted">
-              <span>● 数据实时同步</span>
-              <span>● 支持 Google / Bing / 百度</span>
-              <span>● 团队协作</span>
-              <span>● 可随时取消</span>
+              <span>● 每日自动刷新</span>
+              <span>● 支持 Google 搜索</span>
+              <span>● PDF 报告导出</span>
+              <span>● 免费开始</span>
             </div>
           </div>
         </div>

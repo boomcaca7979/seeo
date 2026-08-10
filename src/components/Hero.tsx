@@ -1,5 +1,6 @@
 import Link from "next/link";
 import KeywordField from "./KeywordField";
+import UrlAuditBox from "./UrlAuditBox";
 import { isAuthEnabled } from "@/lib/auth-config";
 
 export default function Hero() {
@@ -23,7 +24,7 @@ export default function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-y-muted/40 bg-station-deep/60 px-3 py-1 font-mono text-xs text-y-secondary">
             <span className="h-1.5 w-1.5 rounded-full bg-teal-yellow" />
-            实时数据 · 持续追踪
+            每日追踪 · 持续监控
           </span>
           <h1 className="mt-5 font-display text-4xl font-bold leading-tight tracking-tight text-y-text sm:text-6xl">
             看清搜索流量的走向
@@ -45,6 +46,9 @@ export default function Hero() {
               看看能做什么
             </Link>
           </div>
+
+          {/* URL 快速审计入口 */}
+          <UrlAuditBox />
         </div>
 
         {/* 深色面板 - 引力场 */}
