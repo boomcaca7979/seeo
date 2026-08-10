@@ -1,19 +1,21 @@
-import Link from "next/link";
-import type { Metadata } from "next";
-import Navbar from "@/components/Navbar";
+"use client";
 
-export const metadata: Metadata = {
-  title: "定价 · SeeO",
-  description: "SeeO 定价方案：免费版、专业版、企业版。按需选择关键词追踪、技术审计与竞品分析功能。",
-  alternates: { canonical: "/pricing" },
-};
+import Link from "next/link";
+import { useState } from "react";
+import Navbar from "@/components/Navbar";
 
 interface Plan {
   name: string;
   tagline: string;
   price: string;
   unit: string;
-  cta: { label: string; href: string; disabled?: boolean };
+  /** checkoutPlan: 调用 /api/checkout 时传给后端的 plan 标识；undefined 表示不走 checkout（如免费版/企业版） */
+  cta: {
+    label: string;
+    href?: string;
+    checkoutPlan?: "pro" | "team" | "enterprise";
+    disabled?: boolean;
+  };
   features: { text: string; included: boolean }[];
   highlighted?: boolean;
 }
@@ -42,7 +44,7 @@ const plans: Plan[] = [
     tagline: "适合专业 SEO 从业者",
     price: "¥69",
     unit: "/月",
-    cta: { label: "即将上线", href: "#", disabled: true },
+    cta: { label: "升级到 Pro", checkoutPlan: "pro" },
     highlighted: true,
     features: [
       { text: "无限关键词追踪", included: true },
@@ -79,8 +81,8 @@ const faqs = [
     a: "没有。免费版永久可用，但有关键词数量与 SerpApi 调用次数限制。",
   },
   {
-    q: "Pro 版什么时候上线？",
-    a: "Pro 版支付系统正在开发中，目前可免费使用所有已实现功能。上线后会通过邮件通知注册用户。",
+    q: "如何升级到 Pro 版？",
+    a: "点击 Pro 版的「升级到 Pro」按钮，通过 Stripe 安全支付页面完成订阅后，权限立即生效。支持随时取消。",
   },
   {
     q: "SerpApi 额度是什么？",
@@ -88,11 +90,41 @@ const faqs = [
   },
   {
     q: "数据存储在哪里？",
-    a: "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。",
+    a: "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。支付由 Stripe 处理，我们不存储信用卡信息。",
   },
 ];
 
 export default function PricingPage() {
+  const [loadingPlan, setLoadingPlan] = useState<"pro" | "team" | "enterprise" | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  async function handleCheckout(plan: "pro" | "team" | "enterprise") {
+    setErrorMsg(null);
+    setLoadingPlan(plan);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setErrorMsg(json?.error ?? "创建支付会话失败，请稍后重试");
+        return;
+      }
+      if (json?.url) {
+        // 跳转到 Stripe Checkout 托管页
+        window.location.assign(json.url);
+      } else {
+        setErrorMsg("未收到 Stripe Checkout URL");
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "网络错误，请稍后重试");
+    } finally {
+      setLoadingPlan(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-paper">
       <Navbar />
@@ -138,7 +170,19 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            {plan.cta.disabled ? (
+
+            {/* CTA 按钮：支持 Link 跳转 / Checkout API 调用 */}
+            {plan.cta.checkoutPlan ? (
+              <button
+                onClick={() => handleCheckout(plan.cta.checkoutPlan!)}
+                disabled={loadingPlan !== null}
+                className={`block w-full text-center py-3 ${
+                  plan.highlighted ? "btn-primary" : "btn-secondary"
+                } ${loadingPlan !== null ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                {loadingPlan === plan.cta.checkoutPlan ? "正在跳转支付..." : plan.cta.label}
+              </button>
+            ) : plan.cta.disabled ? (
               <>
                 <button className="w-full btn-primary py-3 opacity-50 cursor-not-allowed" disabled>
                   {plan.cta.label}
@@ -147,7 +191,7 @@ export default function PricingPage() {
               </>
             ) : (
               <Link
-                href={plan.cta.href}
+                href={plan.cta.href ?? "#"}
                 className={`block w-full text-center py-3 ${plan.highlighted ? "btn-primary" : "btn-secondary"}`}
               >
                 {plan.cta.label}
@@ -157,12 +201,21 @@ export default function PricingPage() {
         ))}
       </div>
 
+      {/* 错误提示 */}
+      {errorMsg && (
+        <div className="mx-auto max-w-3xl px-6 pb-8">
+          <div className="card-a p-4 border-neg">
+            <p className="font-sans text-sm text-neg text-center">{errorMsg}</p>
+          </div>
+        </div>
+      )}
+
       {/* 说明 */}
       <div className="mx-auto max-w-3xl px-6 pb-8">
         <div className="card-a p-4">
           <p className="font-sans text-xs text-ink-40 text-center">
             所有方案功能基于当前已实现能力。标注&ldquo;—&rdquo;的功能正在开发中，不代表已包含在当前方案内。
-            支付系统上线前，所有注册用户可免费使用现有功能。
+            支付由 Stripe 安全处理，我们不存储信用卡信息。
           </p>
         </div>
       </div>
