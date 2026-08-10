@@ -2,6 +2,7 @@ import { createServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth-config";
 import ProjectList from "@/components/dashboard/ProjectList";
+import Onboarding from "@/components/dashboard/Onboarding";
 import { listProjectsWithMetrics, listProjectsWithMetricsForUser, listAlerts, countUnreadAlerts } from "@/lib/db";
 
 // 演示模式下读 Turso/SQLite，避免 Vercel 构建期静态预渲染导致 router.refresh() 拿到旧快照
@@ -11,6 +12,10 @@ export default async function WorkbenchPage() {
   // 演示模式：直接读 SQLite
   if (!isAuthEnabled) {
     const projects = await listProjectsWithMetrics("demo-user");
+    // 无项目时显示首次使用 Onboarding，跳过 alerts/预警区块
+    if (projects.length === 0) {
+      return <Onboarding displayName="本地开发" />;
+    }
     const alerts = await listAlerts("demo-user", 50);
     const unread = await countUnreadAlerts("demo-user");
     return (
@@ -29,7 +34,7 @@ export default async function WorkbenchPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(`/login?redirect=${encodeURIComponent("/app")}`);
   }
 
   const { data: profileData } = await supabase
@@ -49,6 +54,12 @@ export default async function WorkbenchPage() {
 
   // 用 domain 关联本地 SQLite/Turso 获取指标
   const projects = await listProjectsWithMetricsForUser(user.id, userProjects ?? []);
+
+  // 无项目时显示首次使用 Onboarding
+  if (projects.length === 0) {
+    return <Onboarding displayName={displayName} />;
+  }
+
   const alerts = await listAlerts(user.id, 50);
   const unread = await countUnreadAlerts(user.id);
 

@@ -143,8 +143,10 @@ export default function ProjectList({
         return;
       }
       setModalOpen(false);
-      show("项目已创建", "success");
-      router.refresh();
+      show("项目已创建，进入审计…", "success");
+      // 优先使用服务端返回的 domain（已规范化），跳转到审计页
+      const savedDomain = (data?.data?.domain ?? domain) as string;
+      router.push(`/app/audit?domain=${encodeURIComponent(savedDomain)}`);
     } catch {
       show("网络错误，请稍后重试", "error");
     }

@@ -1,5 +1,6 @@
 import { createServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { isAuthEnabled } from "@/lib/auth-config";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import type { DatabaseProfile } from "@/lib/types";
@@ -34,7 +35,12 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    // 保留来源路径：RSC 导航时从 next-url header 读取 pathname，
+    // 初始加载时 proxy(middleware) 已处理 redirect，此处为兜底
+    const headersList = await headers();
+    const nextUrl = headersList.get("next-url");
+    const redirectPath = nextUrl || "/app";
+    redirect(`/login?redirect=${encodeURIComponent(redirectPath)}`);
   }
 
   const { data: profileData } = await supabase

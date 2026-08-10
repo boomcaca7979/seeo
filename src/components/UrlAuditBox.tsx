@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAuthEnabled } from "@/lib/auth-config";
 
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
 
@@ -50,8 +51,15 @@ export default function UrlAuditBox() {
     }
 
     setLoading(true);
-    // 跳转到审计页并带 domain 参数，由审计页触发 API 调用
-    router.push(`/app/audit?domain=${encodeURIComponent(domain)}`);
+    // 构建审计页完整路径
+    const auditPath = `/app/audit?domain=${encodeURIComponent(domain)}`;
+    if (isAuthEnabled) {
+      // auth 模式：先登录，登录后自动返回审计页
+      router.push(`/login?redirect=${encodeURIComponent(auditPath)}`);
+    } else {
+      // demo 模式：直接进入审计页
+      router.push(auditPath);
+    }
   }
 
   return (

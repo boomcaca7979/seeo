@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
@@ -80,11 +81,28 @@ const faqs = [
 ];
 
 export default function PricingPage() {
+  return (
+    <Suspense fallback={null}>
+      <PricingContent />
+    </Suspense>
+  );
+}
+
+function PricingContent() {
   const { show, Toast } = useToast();
+  const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingPlan, setLoadingPlan] = useState<"pro" | "team" | "enterprise" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Checkout 取消回流提示（仅一次，不阻断浏览）
+  const isCheckoutCancel = searchParams.get("checkout") === "cancel";
+  useEffect(() => {
+    if (isCheckoutCancel) {
+      show("支付已取消，套餐未发生变化", "info");
+    }
+  }, [isCheckoutCancel, show]);
 
   // 从 /api/plans 拉取套餐数据（统一数据源）
   useEffect(() => {

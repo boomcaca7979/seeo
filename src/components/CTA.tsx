@@ -1,17 +1,40 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth-config";
 
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
+
 export default function CTA() {
   const router = useRouter();
-  // 演示模式：直接进 /app；启用模式：进 /signup
-  const primaryHref = isAuthEnabled ? "/signup" : "/app";
+  const [domainInput, setDomainInput] = useState("");
+
+  function normalizeDomain(input: string): string {
+    let d = input.trim();
+    d = d.replace(/^https?:\/\//i, "");
+    d = d.replace(/\/.*$/, "");
+    d = d.toLowerCase().trim();
+    return d;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(primaryHref);
+    const domain = normalizeDomain(domainInput);
+    // 域名有效时带参跳转审计页，无效时走原默认入口
+    const auditPath =
+      domain && DOMAIN_REGEX.test(domain)
+        ? `/app/audit?domain=${encodeURIComponent(domain)}`
+        : isAuthEnabled
+          ? "/signup"
+          : "/app";
+
+    if (isAuthEnabled) {
+      router.push(`/login?redirect=${encodeURIComponent(auditPath)}`);
+    } else {
+      router.push(auditPath);
+    }
   };
 
   return (
@@ -52,6 +75,8 @@ export default function CTA() {
             >
               <input
                 type="text"
+                value={domainInput}
+                onChange={(e) => setDomainInput(e.target.value)}
                 placeholder="输入你的网站域名 example.com"
                 className="w-full rounded-lg border border-d-muted/30 bg-ink-elevated px-4 py-3 font-sans text-sm text-d-text placeholder:text-d-muted focus:border-gold focus:outline-none"
               />

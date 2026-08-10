@@ -15,28 +15,20 @@ const cols = [
   {
     title: "方案",
     links: [
-      { label: "入门版", href: "#cta" },
-      { label: "专业版", href: "#cta" },
-      { label: "团队版", href: "#cta" },
-      { label: "企业 / 代理商", href: "#cta" },
+      { label: "定价方案", href: "/pricing" },
     ],
   },
   {
     title: "资源",
     links: [
-      { label: "使用文档", href: "#footer" },
-      { label: "API 参考", href: "#footer" },
-      { label: "SEO 指南", href: "#footer" },
-      { label: "更新日志", href: "#footer" },
+      { label: "使用文档", href: "/docs" },
     ],
   },
   {
     title: "公司",
     links: [
-      { label: "关于我们", href: "#footer" },
-      { label: "联系方式", href: "#footer" },
-      { label: "隐私政策", href: "#footer" },
-      { label: "服务条款", href: "#footer" },
+      { label: "隐私政策", href: "/privacy" },
+      { label: "服务条款", href: "/terms" },
     ],
   },
 ];

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
@@ -112,7 +113,16 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
   const { show, Toast } = useToast();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -204,6 +214,17 @@ export default function SettingsPage() {
       setUsageLoading(false);
     }
   }, []);
+
+  // Checkout 回流处理：支付成功后显示提示并延迟刷新套餐状态（等待 webhook）
+  const isCheckoutSuccess = searchParams.get("checkout") === "success";
+  useEffect(() => {
+    if (!isCheckoutSuccess) return;
+    show("升级成功，套餐权益将在几秒内生效", "success");
+    const timer = setTimeout(() => {
+      void fetchUsage();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isCheckoutSuccess, fetchUsage, show]);
 
   useEffect(() => {
     let cancelled = false;

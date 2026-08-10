@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
@@ -313,6 +314,20 @@ function AuditPageInner() {
     if (!audit) return;
     setExporting(true);
     try {
+      // 服务端 PDF 导出权限校验（pdf_export feature gate）
+      // 用 id=0 触发 feature 检查；feature 允许时路由返回 400（id 无效），属正常
+      const verifyRes = await fetch(`/api/reports/pdf?id=0`, { cache: "no-store" });
+      if (!verifyRes.ok) {
+        const json = await verifyRes.json().catch(() => ({}));
+        // 403 = FEATURE_NOT_AVAILABLE（feature 不允许），触发升级引导
+        // 400/404 = feature 允许但 id 无效，继续生成 PDF
+        if (verifyRes.status === 403) {
+          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          show(message, "error");
+          return;
+        }
+      }
+
       const filename = `SeeO审计报告_${audit.domain}_${todayStr()}.pdf`;
       const blob = await generatePDF({
         title: `审计报告 · ${audit.domain}`,
@@ -1086,6 +1101,32 @@ function AuditPageInner() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 下一步 CTA：添加关键词追踪（仅在审计成功完成后显示） */}
+      {!loading && hasResult && audit && (
+        <div className="mt-10">
+          <div className="card-a flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
+            <div>
+              <div className="font-display text-base font-bold text-ink">
+                下一步：追踪关键词排名
+              </div>
+              <p className="mt-1 font-sans text-sm text-ink-60">
+                把审计发现的关键词加入监控，每日自动记录 Google 排名变化。
+              </p>
+            </div>
+            <Link
+              href={
+                projects.find((p) => p.domain === audit.domain)
+                  ? `/app/position-tracking?projectId=${encodeURIComponent(String(projects.find((p) => p.domain === audit.domain)!.id))}`
+                  : "/app/position-tracking"
+              }
+              className="btn-primary whitespace-nowrap"
+            >
+              添加关键词追踪 →
+            </Link>
           </div>
         </div>
       )}
