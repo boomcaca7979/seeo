@@ -75,7 +75,7 @@ export default function CTA() {
                 ·
               </span>
               <Link
-                href="#footer"
+                href="/pricing"
                 className="font-sans text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
               >
                 查看定价方案

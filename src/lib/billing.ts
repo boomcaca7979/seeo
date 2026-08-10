@@ -56,6 +56,61 @@ export interface FeatureCheckResult {
   reason?: string;
 }
 
+// ---------- 套餐展示元数据（非 DB 字段，统一来源） ----------
+// 价格、名称、tagline 等展示信息在此统一定义，Pricing/Settings 共用
+// 修改价格只需改此处，前端不再硬编码
+export interface PlanDisplayInfo {
+  name: string;
+  tagline: string;
+  price: string;
+  priceUnit: string;
+  ctaLabel: string;
+  /** 走 /api/checkout 的 plan key；undefined 表示不走 checkout */
+  checkoutPlan?: "pro" | "team" | "enterprise";
+  /** 非 checkout 的跳转地址（如 free → /app，enterprise → mailto） */
+  ctaHref?: string;
+  highlighted?: boolean;
+}
+
+export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
+  free: {
+    name: "免费版",
+    tagline: "适合个人站长和初学者",
+    price: "¥0",
+    priceUnit: "/月",
+    ctaLabel: "开始使用",
+    ctaHref: "/app",
+  },
+  pro: {
+    name: "专业版",
+    tagline: "适合专业 SEO 从业者",
+    price: "¥69",
+    priceUnit: "/月",
+    ctaLabel: "升级到 Pro",
+    checkoutPlan: "pro",
+    highlighted: true,
+  },
+  team: {
+    name: "团队版",
+    tagline: "适合小型团队与工作室",
+    price: "¥299",
+    priceUnit: "/月",
+    ctaLabel: "升级到 Team",
+    checkoutPlan: "team",
+  },
+  enterprise: {
+    name: "企业版",
+    tagline: "适合团队与代理机构",
+    price: "联系销售",
+    priceUnit: "",
+    ctaLabel: "联系我们",
+    ctaHref: "mailto:support@seeo.local",
+  },
+};
+
+/** 套餐展示顺序 */
+export const PLAN_ORDER: PlanTier[] = ["free", "pro", "team", "enterprise"];
+
 // ---------- 默认套餐限制（与 0004_plan_limits.sql 保持一致） ----------
 // 当 Supabase 不可用、未配置、或查询失败时 fallback 使用
 // 用 Number.MAX_SAFE_INTEGER 表示"无限"
@@ -298,6 +353,24 @@ export async function getAllPlanLimits(): Promise<PlanLimits[]> {
   );
   planLimitsAllCache = { value: fallback, expiresAt: Date.now() + PLAN_LIMITS_CACHE_TTL_MS };
   return fallback;
+}
+
+/** 合并后的套餐信息（limits + display），供前端展示用 */
+export interface PlanInfo extends PlanLimits {
+  display: PlanDisplayInfo;
+}
+
+/**
+ * 获取所有套餐的完整信息（limits + display），按 PLAN_ORDER 排序
+ * Pricing / Settings 页面统一数据源
+ */
+export async function getAllPlanInfo(): Promise<PlanInfo[]> {
+  const limits = await getAllPlanLimits();
+  const limitsByPlan = new Map(limits.map((l) => [l.plan, l]));
+  return PLAN_ORDER.map((plan) => {
+    const l = limitsByPlan.get(plan) ?? DEFAULT_PLAN_LIMITS[plan];
+    return { ...l, display: PLAN_DISPLAY_INFO[plan] };
+  });
 }
 
 /**

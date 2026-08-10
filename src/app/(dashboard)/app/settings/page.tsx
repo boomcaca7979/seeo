@@ -7,15 +7,49 @@ import { createBrowser } from "@/lib/supabase/browser";
 
 type TabKey = "account" | "plan" | "usage" | "team" | "automation";
 
-interface PlanTier {
-  key: string;
+// 套餐展示数据（从 /api/plans 获取，不再前端硬编码）
+interface PlanDisplayInfo {
   name: string;
+  tagline: string;
   price: string;
-  period: string;
-  highlighted?: boolean; // 推荐
-  current?: boolean;
-  limits: { label: string; value: string }[];
-  cta: string;
+  priceUnit: string;
+  ctaLabel: string;
+  checkoutPlan?: "pro" | "team" | "enterprise";
+  ctaHref?: string;
+  highlighted?: boolean;
+}
+
+interface PlanInfo {
+  plan: string;
+  display: PlanDisplayInfo;
+  max_projects: number;
+  max_tracked_keywords: number;
+  max_competitors: number;
+  audit_daily_limit: number;
+  audit_max_depth: number;
+  serpapi_monthly_limit: number;
+  content_check_monthly_limit: number;
+  can_export_pdf: boolean;
+  can_export_excel: boolean;
+  can_email_report: boolean;
+  can_team_collaboration: boolean;
+  can_white_label: boolean;
+}
+
+const UNLIMITED = Number.MAX_SAFE_INTEGER;
+
+function formatLimitValue(v: number): string {
+  if (v >= UNLIMITED) return "无限";
+  return v.toLocaleString();
+}
+
+function buildPlanLimits(p: PlanInfo): { label: string; value: string }[] {
+  return [
+    { label: "项目数", value: formatLimitValue(p.max_projects) },
+    { label: "关键词追踪", value: formatLimitValue(p.max_tracked_keywords) },
+    { label: "每日审计", value: p.audit_daily_limit >= UNLIMITED ? "无限" : `${p.audit_daily_limit} 次` },
+    { label: "报表导出", value: p.can_export_pdf ? "PDF / Excel" : "—" },
+  ];
 }
 
 interface AutomationSettingsData {
@@ -34,63 +68,6 @@ interface AutomationLogRow {
   details: string | null;
   created_at: string;
 }
-
-const plans: PlanTier[] = [
-  {
-    key: "starter",
-    name: "入门版",
-    price: "¥0",
-    period: "/月",
-    cta: "开始使用",
-    limits: [
-      { label: "项目数", value: "1 个" },
-      { label: "关键词追踪", value: "100 个" },
-      { label: "外链分析", value: "基础" },
-      { label: "报表导出", value: "— " },
-    ],
-  },
-  {
-    key: "pro",
-    name: "专业版",
-    price: "¥299",
-    period: "/月",
-    highlighted: true,
-    current: true,
-    cta: "当前套餐",
-    limits: [
-      { label: "项目数", value: "5 个" },
-      { label: "关键词追踪", value: "3,000 个" },
-      { label: "外链分析", value: "完整" },
-      { label: "报表导出", value: "PDF / Excel" },
-    ],
-  },
-  {
-    key: "team",
-    name: "团队版",
-    price: "¥899",
-    period: "/月",
-    cta: "升级",
-    limits: [
-      { label: "项目数", value: "20 个" },
-      { label: "关键词追踪", value: "15,000 个" },
-      { label: "外链分析", value: "完整" },
-      { label: "报表导出", value: "白标 PDF" },
-    ],
-  },
-  {
-    key: "enterprise",
-    name: "企业定制",
-    price: "联系销售",
-    period: "",
-    cta: "联系我们",
-    limits: [
-      { label: "项目数", value: "无限" },
-      { label: "关键词追踪", value: "无限" },
-      { label: "外链分析", value: "完整 + API" },
-      { label: "报表导出", value: "白标 + 自动化" },
-    ],
-  },
-];
 
 const WEEK_DAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
@@ -142,6 +119,8 @@ export default function SettingsPage() {
   const [accountLoading, setAccountLoading] = useState(true);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
+  const [plans, setPlans] = useState<PlanInfo[] | null>(null);
+  const [plansLoading, setPlansLoading] = useState(true);
 
   // 拉取当前 Supabase 会话中的真实用户信息
   useEffect(() => {
@@ -239,6 +218,25 @@ export default function SettingsPage() {
         // ignore
       } finally {
         if (!cancelled) setUsageLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 从 /api/plans 拉取所有套餐数据（统一数据源，不再前端硬编码）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/plans", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && Array.isArray(json.data)) {
+          setPlans(json.data as PlanInfo[]);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setPlansLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -354,61 +352,73 @@ export default function SettingsPage() {
             <div>
               <h2 className="font-display text-lg font-bold text-ink">订阅套餐</h2>
               <p className="mt-1 font-mono text-xs text-ink-40">
-                当前：专业版 · 可随时升级或降级
+                {usageData
+                  ? `当前：${PLAN_LABELS[usageData.plan] ?? usageData.plan} · 可随时升级或降级`
+                  : "加载当前套餐中…"}
               </p>
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {plans.map((p) => (
-                  <div
-                    key={p.key}
-                    className={`card-a relative flex flex-col p-5 transition-colors ${
-                      p.current
-                        ? "border-brand"
-                        : p.highlighted
-                          ? "border-brand/40"
-                          : ""
-                    }`}
-                  >
-                    {/* 推荐 / 当前套餐 标签 */}
-                    {p.highlighted && !p.current && (
-                      <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
-                        推荐
-                      </span>
-                    )}
-                    {p.current && (
-                      <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
-                        当前套餐
-                      </span>
-                    )}
+                {plansLoading ? (
+                  <div className="col-span-full font-mono text-xs text-ink-40">加载套餐中…</div>
+                ) : plans && plans.length > 0 ? (
+                  plans.map((p) => {
+                    const isCurrent = usageData?.plan === p.plan;
+                    const limits = buildPlanLimits(p);
+                    return (
+                      <div
+                        key={p.plan}
+                        className={`card-a relative flex flex-col p-5 transition-colors ${
+                          isCurrent
+                            ? "border-brand"
+                            : p.display.highlighted
+                              ? "border-brand/40"
+                              : ""
+                        }`}
+                      >
+                        {/* 推荐 / 当前套餐 标签 */}
+                        {p.display.highlighted && !isCurrent && (
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+                            推荐
+                          </span>
+                        )}
+                        {isCurrent && (
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+                            当前套餐
+                          </span>
+                        )}
 
-                    <div className="font-display text-base font-bold text-ink">{p.name}</div>
-                    <div className="mt-2 flex items-baseline gap-0.5">
-                      <span className={`font-display text-3xl font-bold ${p.highlighted || p.current ? "text-ink" : "text-ink"}`}>
-                        {p.price}
-                      </span>
-                      <span className="font-mono text-xs text-ink-40">{p.period}</span>
-                    </div>
+                        <div className="font-display text-base font-bold text-ink">{p.display.name}</div>
+                        <div className="mt-2 flex items-baseline gap-0.5">
+                          <span className="font-display text-3xl font-bold text-ink">
+                            {p.display.price}
+                          </span>
+                          <span className="font-mono text-xs text-ink-40">{p.display.priceUnit}</span>
+                        </div>
 
-                    <ul className="mt-4 flex-1 space-y-2">
-                      {p.limits.map((l) => (
-                        <li key={l.label} className="flex items-center justify-between font-mono text-xs">
-                          <span className="text-ink-40">{l.label}</span>
-                          <span className="text-ink">{l.value}</span>
-                        </li>
-                      ))}
-                    </ul>
+                        <ul className="mt-4 flex-1 space-y-2">
+                          {limits.map((l) => (
+                            <li key={l.label} className="flex items-center justify-between font-mono text-xs">
+                              <span className="text-ink-40">{l.label}</span>
+                              <span className="text-ink">{l.value}</span>
+                            </li>
+                          ))}
+                        </ul>
 
-                    <button
-                      onClick={() =>
-                        p.current
-                          ? show("当前已在使用此套餐", "info")
-                          : show("当前为演示模式，套餐变更将在接入后端后开放", "info")
-                      }
-                      className={p.current ? "btn-secondary mt-5 w-full" : "btn-primary mt-5 w-full"}
-                    >
-                      {p.cta}
-                    </button>
-                  </div>
-                ))}
+                        <button
+                          onClick={() =>
+                            isCurrent
+                              ? show("当前已在使用此套餐", "info")
+                              : show("套餐变更将通过 Stripe 安全支付页面完成", "info")
+                          }
+                          className={isCurrent ? "btn-secondary mt-5 w-full" : "btn-primary mt-5 w-full"}
+                        >
+                          {isCurrent ? "当前套餐" : p.display.ctaLabel}
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full font-mono text-xs text-ink-40">暂无套餐信息</div>
+                )}
               </div>
             </div>
           )}

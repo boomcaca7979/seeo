@@ -1,79 +1,64 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import { handleBillingError } from "@/lib/billing-error-client";
+import { useToast } from "@/components/dashboard/Toast";
 
-interface Plan {
+// 前端类型（与后端 PlanInfo 对应，只取展示所需字段）
+interface PlanDisplayInfo {
   name: string;
   tagline: string;
   price: string;
-  unit: string;
-  /** checkoutPlan: 调用 /api/checkout 时传给后端的 plan 标识；undefined 表示不走 checkout（如免费版/企业版） */
-  cta: {
-    label: string;
-    href?: string;
-    checkoutPlan?: "pro" | "team" | "enterprise";
-    disabled?: boolean;
-  };
-  features: { text: string; included: boolean }[];
+  priceUnit: string;
+  ctaLabel: string;
+  checkoutPlan?: "pro" | "team" | "enterprise";
+  ctaHref?: string;
   highlighted?: boolean;
 }
 
-const plans: Plan[] = [
-  {
-    name: "免费版",
-    tagline: "适合个人站长和初学者",
-    price: "¥0",
-    unit: "/月",
-    cta: { label: "免费开始", href: "/app" },
-    features: [
-      { text: "最多 10 个关键词追踪", included: true },
-      { text: "每日排名刷新", included: true },
-      { text: "技术审计（首页 quick 模式）", included: true },
-      { text: "关键词研究", included: true },
-      { text: "基础竞品排名对比", included: true },
-      { text: "SerpApi 每月 100 次额度", included: true },
-      { text: "深度审计（50 页 full 模式）", included: false },
-      { text: "PDF/Excel 报告导出", included: false },
-      { text: "邮件周报自动发送", included: false },
-    ],
-  },
-  {
-    name: "Pro 版",
-    tagline: "适合专业 SEO 从业者",
-    price: "¥69",
-    unit: "/月",
-    cta: { label: "升级到 Pro", checkoutPlan: "pro" },
-    highlighted: true,
-    features: [
-      { text: "无限关键词追踪", included: true },
-      { text: "每日排名刷新", included: true },
-      { text: "深度审计（50 页 full 模式）", included: true },
-      { text: "关键词研究", included: true },
-      { text: "竞品分析 + SOV 计算", included: true },
-      { text: "PDF/Excel 报告导出", included: true },
-      { text: "邮件周报自动发送", included: true },
-      { text: "多项目管理", included: true },
-      { text: "更高 SerpApi 调用额度", included: true },
-    ],
-  },
-  {
-    name: "企业版",
-    tagline: "适合团队与代理机构",
-    price: "联系销售",
-    unit: "",
-    cta: { label: "联系我们", href: "mailto:support@seeo.local" },
-    features: [
-      { text: "Pro 版全部功能", included: true },
-      { text: "团队协作与权限管理", included: false },
-      { text: "多客户项目管理", included: false },
-      { text: "API 接入", included: false },
-      { text: "专属数据额度", included: true },
-      { text: "优先支持", included: true },
-    ],
-  },
-];
+interface PlanInfo {
+  plan: string;
+  display: PlanDisplayInfo;
+  // 核心限制
+  max_projects: number;
+  max_tracked_keywords: number;
+  max_competitors: number;
+  audit_daily_limit: number;
+  audit_max_depth: number;
+  serpapi_monthly_limit: number;
+  content_check_monthly_limit: number;
+  // feature flags
+  can_export_pdf: boolean;
+  can_export_excel: boolean;
+  can_email_report: boolean;
+  can_team_collaboration: boolean;
+  can_white_label: boolean;
+}
+
+const UNLIMITED = Number.MAX_SAFE_INTEGER;
+
+function formatLimit(v: number): string {
+  if (v >= UNLIMITED) return "无限";
+  return v.toLocaleString();
+}
+
+// 将 PlanInfo 转为展示用 feature 列表
+function buildFeatureList(p: PlanInfo): { text: string; included: boolean }[] {
+  return [
+    { text: `项目数 ${formatLimit(p.max_projects)}`, included: true },
+    { text: `关键词追踪 ${formatLimit(p.max_tracked_keywords)}`, included: true },
+    { text: `每日审计 ${p.audit_daily_limit >= UNLIMITED ? "无限" : p.audit_daily_limit + " 次/天"}`, included: true },
+    { text: `内容检查 ${formatLimit(p.content_check_monthly_limit)} 次/月`, included: p.content_check_monthly_limit > 0 },
+    { text: `SerpApi ${formatLimit(p.serpapi_monthly_limit)} 次/月`, included: p.serpapi_monthly_limit > 0 },
+    { text: "PDF 报告导出", included: p.can_export_pdf },
+    { text: "Excel 报告导出", included: p.can_export_excel },
+    { text: "邮件周报", included: p.can_email_report },
+    { text: "团队协作", included: p.can_team_collaboration },
+    { text: "白标报告", included: p.can_white_label },
+  ];
+}
 
 const faqs = [
   {
@@ -81,12 +66,12 @@ const faqs = [
     a: "没有。免费版永久可用，但有关键词数量与 SerpApi 调用次数限制。",
   },
   {
-    q: "如何升级到 Pro 版？",
-    a: "点击 Pro 版的「升级到 Pro」按钮，通过 Stripe 安全支付页面完成订阅后，权限立即生效。支持随时取消。",
+    q: "如何升级套餐？",
+    a: "点击对应套餐的升级按钮，通过 Stripe 安全支付页面完成订阅后，权限立即生效。支持随时取消。",
   },
   {
     q: "SerpApi 额度是什么？",
-    a: "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 100 次，超出后相关功能暂停至下月刷新。Pro 版将提供更高额度。",
+    a: "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 50 次，超出后相关功能暂停至下月刷新。升级套餐可获得更高额度。",
   },
   {
     q: "数据存储在哪里？",
@@ -95,8 +80,32 @@ const faqs = [
 ];
 
 export default function PricingPage() {
+  const { show, Toast } = useToast();
+  const [plans, setPlans] = useState<PlanInfo[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadingPlan, setLoadingPlan] = useState<"pro" | "team" | "enterprise" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // 从 /api/plans 拉取套餐数据（统一数据源）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/plans", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && Array.isArray(json.data)) {
+          setPlans(json.data as PlanInfo[]);
+        } else if (!cancelled) {
+          setErrorMsg("加载套餐信息失败");
+        }
+      } catch {
+        if (!cancelled) setErrorMsg("网络错误，加载套餐失败");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleCheckout(plan: "pro" | "team" | "enterprise") {
     setErrorMsg(null);
@@ -109,11 +118,12 @@ export default function PricingPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setErrorMsg(json?.error ?? "创建支付会话失败，请稍后重试");
+        // billing 错误走升级引导，普通错误 toast
+        const { message } = handleBillingError(json, "创建支付会话失败，请稍后重试");
+        show(message, "error");
         return;
       }
       if (json?.url) {
-        // 跳转到 Stripe Checkout 托管页
         window.location.assign(json.url);
       } else {
         setErrorMsg("未收到 Stripe Checkout URL");
@@ -139,66 +149,77 @@ export default function PricingPage() {
       </div>
 
       {/* 定价卡 */}
-      <div className="mx-auto max-w-5xl px-6 pb-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan) => (
-          <div
-            key={plan.name}
-            className={`card-a p-8 relative ${plan.highlighted ? "border-brand" : ""}`}
-          >
-            {plan.highlighted && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="badge-warn text-xs px-3 py-1 bg-card">推荐</span>
-              </div>
-            )}
-            <div className="mb-6">
-              <h2 className="font-mono text-xl font-bold text-ink mb-1">{plan.name}</h2>
-              <p className="font-sans text-sm text-ink-40">{plan.tagline}</p>
-            </div>
-            <div className="mb-6">
-              <span className="font-mono text-3xl font-bold text-ink">{plan.price}</span>
-              {plan.unit && <span className="font-sans text-sm text-ink-40">{plan.unit}</span>}
-            </div>
-            <ul className="space-y-3 mb-8">
-              {plan.features.map((f) => (
-                <li key={f.text} className="flex items-start gap-2 font-sans text-sm text-ink-60">
-                  {f.included ? (
-                    <span className="text-pos mt-0.5">✓</span>
-                  ) : (
-                    <span className="text-ink-40 mt-0.5">—</span>
+      <div className="mx-auto max-w-6xl px-6 pb-16">
+        {loading ? (
+          <div className="text-center font-mono text-xs text-ink-40">加载中…</div>
+        ) : plans && plans.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {plans.map((p) => {
+              const features = buildFeatureList(p);
+              const isCheckout = !!p.display.checkoutPlan;
+              return (
+                <div
+                  key={p.plan}
+                  className={`card-a p-6 relative ${p.display.highlighted ? "border-brand" : ""}`}
+                >
+                  {p.display.highlighted && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="badge-warn text-xs px-3 py-1 bg-card">推荐</span>
+                    </div>
                   )}
-                  <span className={f.included ? "" : "text-ink-40"}>{f.text}</span>
-                </li>
-              ))}
-            </ul>
+                  <div className="mb-5">
+                    <h2 className="font-mono text-lg font-bold text-ink mb-1">{p.display.name}</h2>
+                    <p className="font-sans text-xs text-ink-40">{p.display.tagline}</p>
+                  </div>
+                  <div className="mb-5">
+                    <span className="font-mono text-2xl font-bold text-ink">{p.display.price}</span>
+                    {p.display.priceUnit && (
+                      <span className="font-sans text-xs text-ink-40">{p.display.priceUnit}</span>
+                    )}
+                  </div>
+                  <ul className="space-y-2 mb-6">
+                    {features.map((f) => (
+                      <li key={f.text} className="flex items-start gap-2 font-sans text-xs text-ink-60">
+                        {f.included ? (
+                          <span className="text-pos mt-0.5 flex-shrink-0">✓</span>
+                        ) : (
+                          <span className="text-ink-40 mt-0.5 flex-shrink-0">—</span>
+                        )}
+                        <span className={f.included ? "" : "text-ink-40"}>{f.text}</span>
+                      </li>
+                    ))}
+                  </ul>
 
-            {/* CTA 按钮：支持 Link 跳转 / Checkout API 调用 */}
-            {plan.cta.checkoutPlan ? (
-              <button
-                onClick={() => handleCheckout(plan.cta.checkoutPlan!)}
-                disabled={loadingPlan !== null}
-                className={`block w-full text-center py-3 ${
-                  plan.highlighted ? "btn-primary" : "btn-secondary"
-                } ${loadingPlan !== null ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {loadingPlan === plan.cta.checkoutPlan ? "正在跳转支付..." : plan.cta.label}
-              </button>
-            ) : plan.cta.disabled ? (
-              <>
-                <button className="w-full btn-primary py-3 opacity-50 cursor-not-allowed" disabled>
-                  {plan.cta.label}
-                </button>
-                <p className="mt-2 text-center font-mono text-xs text-ink-40">支付系统开发中</p>
-              </>
-            ) : (
-              <Link
-                href={plan.cta.href ?? "#"}
-                className={`block w-full text-center py-3 ${plan.highlighted ? "btn-primary" : "btn-secondary"}`}
-              >
-                {plan.cta.label}
-              </Link>
-            )}
+                  {/* CTA：checkout / link */}
+                  {isCheckout ? (
+                    <button
+                      onClick={() => handleCheckout(p.display.checkoutPlan!)}
+                      disabled={loadingPlan !== null}
+                      className={`block w-full text-center py-2.5 ${
+                        p.display.highlighted ? "btn-primary" : "btn-secondary"
+                      } ${loadingPlan !== null ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {loadingPlan === p.display.checkoutPlan ? "正在跳转支付..." : p.display.ctaLabel}
+                    </button>
+                  ) : (
+                    <Link
+                      href={p.display.ctaHref ?? "/app"}
+                      className={`block w-full text-center py-2.5 ${
+                        p.display.highlighted ? "btn-primary" : "btn-secondary"
+                      }`}
+                    >
+                      {p.display.ctaLabel}
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ))}
+        ) : (
+          <div className="text-center font-mono text-xs text-ink-40">
+            {errorMsg ?? "暂无套餐信息"}
+          </div>
+        )}
       </div>
 
       {/* 错误提示 */}
@@ -214,8 +235,7 @@ export default function PricingPage() {
       <div className="mx-auto max-w-3xl px-6 pb-8">
         <div className="card-a p-4">
           <p className="font-sans text-xs text-ink-40 text-center">
-            所有方案功能基于当前已实现能力。标注&ldquo;—&rdquo;的功能正在开发中，不代表已包含在当前方案内。
-            支付由 Stripe 安全处理，我们不存储信用卡信息。
+            套餐价格与限制统一由 billing 层管理。支付由 Stripe 安全处理，我们不存储信用卡信息。
           </p>
         </div>
       </div>
@@ -245,6 +265,8 @@ export default function PricingPage() {
           </Link>
         </div>
       </div>
+
+      <Toast />
     </div>
   );
 }
