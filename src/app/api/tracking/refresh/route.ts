@@ -11,7 +11,7 @@ import {
 } from "@/lib/db";
 import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache } from "@/lib/seo/cache";
+import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
 import { generateRankAlert } from "@/lib/seo/alerts";
 import type { RankResult } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -45,10 +45,11 @@ export async function POST() {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const list = await listTrackedKeywords(userId);
 
   if (list.length === 0) {
-    const usage = await peekUsage();
+    const usage = await peekUsage(userId, "serpapi", plan);
     return NextResponse.json({
       data: { items: [], summary: "暂无追踪词" },
       usage,
@@ -99,10 +100,10 @@ export async function POST() {
           }
         }
 
-        // 3. 真实调用 SerpApi
+        // 3. 真实调用 SerpApi（用户级额度扣减）
         if (!rankResult) {
           try {
-            await consumeQuota();
+            await consumeQuota(userId, "serpapi", plan);
             consumed = true;
             rankResult = await serpApiProvider.checkRank(params);
             // 写缓存
@@ -113,6 +114,8 @@ export async function POST() {
             }
           } catch (e) {
             if (e instanceof SeoProviderError) {
+              errMsg = e.message;
+            } else if (e instanceof QuotaExceededError) {
               errMsg = e.message;
             } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
               errMsg = "本月免费额度已用尽（80/100），下月 1 日自动重置";
@@ -157,7 +160,7 @@ export async function POST() {
     });
   }
 
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   const successCount = items.filter((i) => !i.error).length;
   const summary = `已刷新 ${successCount}/${items.length} 个词` + (items.some((i) => i.fromCache) ? "（部分命中缓存未扣额度）" : "");
 

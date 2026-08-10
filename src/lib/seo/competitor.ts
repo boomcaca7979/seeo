@@ -4,8 +4,10 @@
 
 import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, readCache, writeCache, peekUsage } from "@/lib/seo/cache";
+import { consumeQuota, readCache, writeCache, peekUsage, QuotaExceededError } from "@/lib/seo/cache";
 import type { SerpResult, ApiUsage } from "@/lib/seo/types";
+import type { PlanTier } from "@/lib/auth";
+import type { ApiType } from "@/lib/db";
 
 export interface CompetitorInput {
   id: number;
@@ -32,14 +34,18 @@ function normalizeDomain(d: string): string {
 /**
  * 查一个关键词的 SERP，解析出所有竞品排名
  * 复用 serp 命名空间缓存：与 /api/seo/serp 共享，避免重复扣额度
+ * P0 商业化改造：按 userId + plan 计量，禁止匿名消耗公共额度
  */
 export async function checkCompetitorRanks(params: {
   keyword: string;
   location: string;
   device: "PC" | "移动端";
   competitors: CompetitorInput[];
+  userId: string;
+  plan?: PlanTier;
+  apiType?: ApiType;
 }): Promise<CheckResult> {
-  const { keyword, location, device, competitors } = params;
+  const { keyword, location, device, competitors, userId, plan = "free", apiType = "serpapi" } = params;
   const cacheParams = { keyword, location, device };
 
   // 1. 先读 serp 命名空间缓存
@@ -57,12 +63,13 @@ export async function checkCompetitorRanks(params: {
   if (cached) {
     serpResult = cached;
     fromCache = true;
-    usage = await peekUsage();
+    usage = await peekUsage(userId, apiType, plan);
   } else {
-    // 2. 真实调用：先消耗额度
+    // 2. 真实调用：先消耗额度（用户级隔离）
     try {
-      usage = await consumeQuota();
+      usage = await consumeQuota(userId, apiType, plan);
     } catch (e) {
+      if (e instanceof QuotaExceededError) throw e;
       if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
         throw e;
       }

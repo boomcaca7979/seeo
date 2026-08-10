@@ -13,6 +13,7 @@ import {
 import { analyzeContent, type ContentAnalysisResult } from "@/lib/seo/content-analyzer";
 import { compareContentChecks, type ContentHistoryComparison } from "@/lib/seo/content-history";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { requireQuota, QuotaExceededError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -127,6 +128,18 @@ export async function POST(req: Request) {
   }
 
   const url = normalizeUrl(rawUrl);
+
+  // P3：内容检查配额校验（content_check_monthly_limit）
+  // free: 10/月, pro: 100/月, team: 500/月, enterprise: 无限
+  try {
+    await requireQuota(userId, "content_check");
+  } catch (e) {
+    if (e instanceof QuotaExceededError) {
+      const { status, body } = billingErrorToResponse(e);
+      return NextResponse.json(body, { status });
+    }
+    throw e;
+  }
 
   try {
     const result = await fetchPage(url);

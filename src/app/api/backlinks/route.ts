@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { getBacklinkSummary, listBacklinks, saveBacklinks } from "@/lib/db";
 import { fetchBacklinks, isDataForSeoConfigured, DataForSeoNotConfiguredError } from "@/lib/seo/dataforseo";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { consumeQuota, peekUsage, QuotaExceededError } from "@/lib/seo/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const domain = normalizeDomain(searchParams.get("domain") ?? "");
   if (!domain) {
@@ -98,19 +100,23 @@ export async function GET(req: Request) {
 
   const summary = await getBacklinkSummary(userId, domain);
   if (!summary) {
-    return NextResponse.json({ data: null });
+    const usage = await peekUsage(userId, "dataforseo", plan);
+    return NextResponse.json({ data: null, usage });
   }
 
   const fetchedAtMs = parseFetchedAt(summary.fetched_at);
   const age = Date.now() - fetchedAtMs;
   if (age > CACHE_TTL_MS) {
     // 缓存过期，视为无缓存
-    return NextResponse.json({ data: null });
+    const usage = await peekUsage(userId, "dataforseo", plan);
+    return NextResponse.json({ data: null, usage });
   }
 
   const rows = await listBacklinks(userId, domain, 100);
+  const usage = await peekUsage(userId, "dataforseo", plan);
   return NextResponse.json({
     data: toResponse(summary, rows, summary.fetched_at, true),
+    usage,
   });
 }
 
@@ -120,6 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
 
   let body: Record<string, unknown>;
   try {
@@ -141,24 +148,51 @@ export async function POST(req: Request) {
     );
   }
 
-  // 查 7 天缓存，命中直接返回
+  // 查 7 天缓存，命中直接返回（不扣额度）
   const cached = await getBacklinkSummary(userId, domain);
   if (cached) {
     const fetchedAtMs = parseFetchedAt(cached.fetched_at);
     const age = Date.now() - fetchedAtMs;
     if (age <= CACHE_TTL_MS) {
       const rows = await listBacklinks(userId, domain, 100);
+      const usage = await peekUsage(userId, "dataforseo", plan);
       return NextResponse.json({
         data: toResponse(cached, rows, cached.fetched_at, true),
+        usage,
       });
     }
     // 缓存过期但 1 小时内不重复拉取
     if (age <= COOLDOWN_MS) {
       const remainingMin = Math.max(1, Math.round((COOLDOWN_MS - age) / 60_000));
+      const usage = await peekUsage(userId, "dataforseo", plan);
       return NextResponse.json({
         error: `该域名外链数据冷却中，请约 ${remainingMin} 分钟后再试（1 小时内仅允许拉取一次）`,
+        usage,
       }, { status: 429 });
     }
+  }
+
+  // 真实调用 DataForSEO 前：用户级额度检查 + 计数
+  // free: 0/月，pro: 10/月，team: 50/月，enterprise: 无限
+  // 超限时返回 DATAFORSEO_QUOTA_EXCEEDED，不继续调用第三方 API
+  let usage;
+  try {
+    usage = await consumeQuota(userId, "dataforseo", plan);
+  } catch (e) {
+    if (e instanceof QuotaExceededError) {
+      // P3：统一为 billingErrorToResponse 格式
+      const planTier = plan;
+      const billingErr = {
+        code: "QUOTA_EXCEEDED" as const,
+        message: e.message,
+        plan: planTier,
+        limit: e.limit,
+        used: e.used,
+      };
+      return NextResponse.json(billingErr, { status: 429 });
+    }
+    const msg = (e as Error)?.message ?? String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   // 调 DataForSEO 拉取（失败不写库，可重试）
@@ -191,6 +225,7 @@ export async function POST(req: Request) {
         fetchedAt,
         false
       ),
+      usage,
     });
   } catch (err) {
     if (err instanceof DataForSeoNotConfiguredError) {

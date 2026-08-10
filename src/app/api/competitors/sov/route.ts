@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const projectId = Number(searchParams.get("project_id") ?? "");
 
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
   }
 
   const sov = calculateSOV(allRankings);
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
 
   return NextResponse.json({
     data: {

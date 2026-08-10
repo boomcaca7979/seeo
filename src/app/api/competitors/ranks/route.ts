@@ -14,9 +14,9 @@ import {
 } from "@/lib/db";
 import { checkCompetitorRanks } from "@/lib/seo/competitor";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { peekUsage } from "@/lib/seo/cache";
+import { peekUsage, QuotaExceededError } from "@/lib/seo/cache";
 import type { SeoApiError } from "@/lib/seo/types";
-import { requireAuthOrDemo } from "@/lib/auth";
+import { requireAuthOrDemo, type PlanTier } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +31,12 @@ function mapError(e: unknown) {
       e.code === "TIMEOUT" ? 504 :
       e.code === "BAD_REQUEST" ? 400 : 502;
     return NextResponse.json<SeoApiError>({ error: e.message, code: e.code }, { status });
+  }
+  if (e instanceof QuotaExceededError) {
+    return NextResponse.json<SeoApiError>(
+      { error: e.message, code: "QUOTA_EXCEEDED" },
+      { status: 429 }
+    );
   }
   if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
     return NextResponse.json<SeoApiError>(
@@ -48,7 +54,7 @@ function mapError(e: unknown) {
  * 执行一次竞品排名查询并写入数据库
  * 返回最新结果 + fromCache + usage
  */
-async function refreshRanks(userId: string, keywordId: number) {
+async function refreshRanks(userId: string, keywordId: number, plan: PlanTier = "free") {
   const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
     return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
@@ -74,6 +80,8 @@ async function refreshRanks(userId: string, keywordId: number) {
       location: kw.location,
       device: kw.device,
       competitors: allCompetitors,
+      userId,
+      plan,
     });
 
     // 把竞品结果写入数据库（不写 id=0 的「我自己」）
@@ -123,6 +131,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const keywordId = Number(searchParams.get("keyword_id") ?? "");
 
@@ -140,7 +149,7 @@ export async function GET(req: Request) {
 
   // 读已有最新记录
   const latest = await getLatestCompetitorRanks(userId, keywordId);
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
 
   // 如果有记录且未过期 24h，直接返回
   if (latest.length > 0) {
@@ -161,6 +170,8 @@ export async function GET(req: Request) {
           location: kw.location,
           device: kw.device,
           competitors: allCompetitors,
+          userId,
+          plan,
         });
         const selfRank = results.find((r) => r.competitorId === 0) ?? null;
         const merged = [
@@ -191,7 +202,7 @@ export async function GET(req: Request) {
   }
 
   // 无记录或已过期：触发刷新
-  return refreshRanks(userId, keywordId);
+  return refreshRanks(userId, keywordId, plan);
 }
 
 export async function POST(req: Request) {
@@ -200,6 +211,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   let body: { keyword_id?: number };
   try {
     body = await req.json();
@@ -216,5 +228,5 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  return refreshRanks(userId, keywordId);
+  return refreshRanks(userId, keywordId, plan);
 }

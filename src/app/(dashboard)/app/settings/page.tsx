@@ -92,12 +92,6 @@ const plans: PlanTier[] = [
   },
 ];
 
-const usageStats = [
-  { label: "项目数", used: 3, limit: 5, unit: "个" },
-  { label: "关键词追踪", used: 2640, limit: 3000, unit: "个" },
-  { label: "API 调用", used: 8200, limit: 10000, unit: "次" },
-];
-
 const WEEK_DAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 interface AccountInfo {
@@ -107,12 +101,47 @@ interface AccountInfo {
   createdAt: string;
 }
 
+interface UsageData {
+  plan: string;
+  subscriptionStatus: string;
+  usage: {
+    serpapi: { used: number; limit: number; usedPct: number };
+    dataforseo: { used: number; limit: number; usedPct: number };
+    content_check: { used: number; limit: number; usedPct: number };
+    audit: { used: number; limit: number; usedPct: number };
+  };
+  limits: {
+    max_projects: number;
+    max_tracked_keywords: number;
+  };
+  features: Record<string, boolean>;
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  free: "免费版",
+  pro: "专业版",
+  team: "团队版",
+  enterprise: "企业版",
+};
+
+const FEATURE_LABELS: Record<string, string> = {
+  pdf_export: "PDF 导出",
+  excel_export: "Excel 导出",
+  full_audit: "完整审计",
+  backlinks: "外链分析",
+  email_report: "邮件报告",
+  team_collaboration: "团队协作",
+  white_label: "白标",
+};
+
 export default function SettingsPage() {
   const { show, Toast } = useToast();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
+  const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
 
   // 拉取当前 Supabase 会话中的真实用户信息
   useEffect(() => {
@@ -180,6 +209,40 @@ export default function SettingsPage() {
       setSigningOut(false);
     }
   };
+
+  // P3：从 /api/account/usage 获取真实用量数据
+  const fetchUsage = useCallback(async () => {
+    setUsageLoading(true);
+    try {
+      const res = await fetch("/api/account/usage", { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setUsageData(json.data as UsageData);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setUsageLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/usage", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && json.data) {
+          setUsageData(json.data as UsageData);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setUsageLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "account", label: "账号信息" },
@@ -352,46 +415,7 @@ export default function SettingsPage() {
 
           {/* 用量统计 */}
           {tab === "usage" && (
-            <div className="card-a p-6">
-              <div className="flex items-center gap-2">
-                <h2 className="font-display text-lg font-bold text-ink">用量统计</h2>
-                <span className="rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-40">
-                  示例数据
-                </span>
-              </div>
-              <p className="mt-1 font-mono text-xs text-ink-40">
-                当前周期：专业版 · 重置日期每月 1 日
-              </p>
-              <div className="mt-6 space-y-5">
-                {usageStats.map((u) => {
-                  const ratio = u.used / u.limit;
-                  const isNearLimit = ratio > 0.8;
-                  return (
-                    <div key={u.label}>
-                      <div className="flex items-center justify-between">
-                        <span className="font-sans text-sm font-medium text-ink">{u.label}</span>
-                        <span className="font-mono text-xs">
-                          <span className={isNearLimit ? "text-neg" : "text-ink"}>
-                            {u.used.toLocaleString()}
-                          </span>
-                          <span className="text-ink-40"> / {u.limit.toLocaleString()} {u.unit}</span>
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-line-soft">
-                        <div
-                          className={`h-full rounded-full ${isNearLimit ? "bg-neg" : "bg-brand"}`}
-                          style={{ width: `${Math.min(ratio * 100, 100)}%` }}
-                        />
-                      </div>
-                      <div className="mt-1 font-mono text-[10px] text-ink-40">
-                        已用 {Math.round(ratio * 100)}%
-                        {isNearLimit && <span className="ml-2 text-neg">· 接近上限</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <UsageDashboard usageData={usageData} loading={usageLoading} onRefresh={fetchUsage} />
           )}
 
           {/* 团队占位 */}
@@ -820,6 +844,154 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
               "清理过期缓存"
             )}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Usage Dashboard 组件（P3：Plan Usage Card） =====
+
+function UsageDashboard({
+  usageData,
+  loading,
+  onRefresh,
+}: {
+  usageData: UsageData | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  if (loading && !usageData) {
+    return (
+      <div className="card-a p-6">
+        <div className="font-mono text-xs text-ink-40">加载中…</div>
+      </div>
+    );
+  }
+
+  if (!usageData) {
+    return (
+      <div className="card-a p-6">
+        <div className="font-mono text-xs text-ink-40">暂无用量数据</div>
+      </div>
+    );
+  }
+
+  const planLabel = PLAN_LABELS[usageData.plan] ?? usageData.plan;
+
+  // 用量项列表
+  const usageItems = [
+    { label: "SerpApi 搜索", key: "serpapi" as const, unit: "次" },
+    { label: "DataForSEO 外链", key: "dataforseo" as const, unit: "次" },
+    { label: "内容检查", key: "content_check" as const, unit: "次" },
+    { label: "今日审计", key: "audit" as const, unit: "次" },
+  ];
+
+  const isUnlimited = (limit: number) => limit >= 2147483647;
+
+  return (
+    <div className="space-y-6">
+      {/* Plan Usage Card */}
+      <div className="card-a p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-bold text-ink">套餐用量</h2>
+            <p className="mt-1 font-mono text-xs text-ink-40">
+              当前套餐：{planLabel} · 状态：{usageData.subscriptionStatus}
+            </p>
+          </div>
+          <button onClick={onRefresh} className="btn-secondary">
+            刷新
+          </button>
+        </div>
+
+        {/* 用量进度条 */}
+        <div className="mt-6 space-y-5">
+          {usageItems.map((item) => {
+            const u = usageData.usage[item.key];
+            const unlimited = isUnlimited(u.limit);
+            const ratio = unlimited ? 0 : u.used / u.limit;
+            const isNearLimit = ratio > 0.8;
+            return (
+              <div key={item.key}>
+                <div className="flex items-center justify-between">
+                  <span className="font-sans text-sm font-medium text-ink">{item.label}</span>
+                  <span className="font-mono text-xs">
+                    {unlimited ? (
+                      <span className="text-ink-40">无限</span>
+                    ) : (
+                      <>
+                        <span className={isNearLimit ? "text-neg" : "text-ink"}>
+                          {u.used.toLocaleString()}
+                        </span>
+                        <span className="text-ink-40"> / {u.limit.toLocaleString()} {item.unit}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-line-soft">
+                  <div
+                    className={`h-full rounded-full ${isNearLimit ? "bg-neg" : "bg-brand"}`}
+                    style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-ink-40">
+                  {unlimited ? "不限量" : `已用 ${Math.round(ratio * 100)}%`}
+                  {!unlimited && isNearLimit && <span className="ml-2 text-neg">· 接近上限</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 项目 / 关键词限额 */}
+        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line-soft pt-5">
+          <div>
+            <div className="font-mono text-[10px] text-ink-40">项目数上限</div>
+            <div className="mt-1 font-mono text-lg font-bold text-ink">
+              {isUnlimited(usageData.limits.max_projects) ? "无限" : usageData.limits.max_projects.toLocaleString()}
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[10px] text-ink-40">关键词追踪上限</div>
+            <div className="mt-1 font-mono text-lg font-bold text-ink">
+              {isUnlimited(usageData.limits.max_tracked_keywords) ? "无限" : usageData.limits.max_tracked_keywords.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features 开关展示 */}
+      <div className="card-a p-6">
+        <h2 className="font-display text-lg font-bold text-ink">功能权益</h2>
+        <p className="mt-1 font-mono text-xs text-ink-40">当前套餐可用功能</p>
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {Object.entries(FEATURE_LABELS).map(([key, label]) => {
+            const enabled = !!usageData.features[key];
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-lg border border-line bg-card px-4 py-3"
+              >
+                <span className="font-sans text-sm text-ink">{label}</span>
+                {enabled ? (
+                  <span className="flex items-center gap-1 font-mono text-xs text-green-600">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                      <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    已开通
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 font-mono text-xs text-ink-40">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    未开通
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

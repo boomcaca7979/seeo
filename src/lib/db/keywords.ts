@@ -181,6 +181,16 @@ export async function listKeywordGroups(userId: string): Promise<KeywordGroupWit
   }));
 }
 
+/** 统计用户关键词分组数量（P3.5：套餐上限校验） */
+export async function countKeywordGroups(userId: string): Promise<number> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `SELECT COUNT(*) AS c FROM keyword_groups WHERE user_id = ?`,
+    [userId]
+  ) as { c: number };
+  return row.c;
+}
+
 export async function deleteKeywordGroup(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
   const info = await db.run(`DELETE FROM keyword_groups WHERE id = ? AND user_id = ?`, [id, userId]);

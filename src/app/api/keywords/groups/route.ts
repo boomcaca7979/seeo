@@ -3,8 +3,9 @@
 // POST：创建分组
 
 import { NextResponse } from "next/server";
-import { listKeywordGroups, createKeywordGroup } from "@/lib/db";
+import { listKeywordGroups, countKeywordGroups, createKeywordGroup } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { PlanLimitError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,16 @@ export async function POST(req: Request) {
 
   const description = body.description?.trim() || undefined;
   const userId = auth.user?.id ?? "demo-user";
+
+  // P3.5：套餐关键词分组数量限额校验（max_keyword_groups，user-scoped）
+  const maxGroups = auth.limits.max_keyword_groups;
+  const existingCount = await countKeywordGroups(userId);
+  if (existingCount >= maxGroups) {
+    const err = new PlanLimitError("关键词分组", auth.plan, maxGroups, "KEYWORD_GROUP_LIMIT_REACHED");
+    const { status, body: errBody } = billingErrorToResponse(err);
+    return NextResponse.json(errBody, { status });
+  }
+
   const created = await createKeywordGroup(userId, name, description);
   return NextResponse.json({ data: created }, { status: 201 });
 }

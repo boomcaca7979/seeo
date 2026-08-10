@@ -314,6 +314,44 @@ async function migrate(db: DBAdapter): Promise<void> {
       "limit" INTEGER NOT NULL DEFAULT 100
     );
 
+    -- 用户级 API 用量表（P0 商业化改造）
+    -- 主键：(user_id, api_type, month)，支持 serpapi / dataforseo / content_check
+    -- 旧 api_usage 表保留不删除，仅做兼容
+    CREATE TABLE IF NOT EXISTS api_usage_per_user (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      api_type TEXT NOT NULL CHECK (api_type IN ('serpapi', 'dataforseo', 'content_check')),
+      month TEXT NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
+      "limit" INTEGER NOT NULL DEFAULT 100,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, api_type, month)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_user
+      ON api_usage_per_user(user_id);
+    CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_month
+      ON api_usage_per_user(month);
+
+    -- 审计每日用量表（P2 商业化改造）
+    -- 按 (user_id, date) 隔离，每日归零
+    CREATE TABLE IF NOT EXISTS audit_usage_per_user (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
+      "limit" INTEGER NOT NULL DEFAULT 3,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_usage_per_user_user
+      ON audit_usage_per_user(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_usage_per_user_date
+      ON audit_usage_per_user(date);
+
     CREATE TABLE IF NOT EXISTS backlink_summaries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain TEXT NOT NULL,
@@ -423,6 +461,34 @@ async function migrate(db: DBAdapter): Promise<void> {
         DROP TABLE automation_settings;
         ALTER TABLE automation_settings_new RENAME TO automation_settings;
         CREATE INDEX IF NOT EXISTS idx_automation_settings_user ON automation_settings(user_id);
+      `);
+    }
+  } catch {
+    // 升级失败（可能已是新结构），忽略
+  }
+
+  // api_usage_per_user 表升级：旧表 CHECK 约束仅含 serpapi/dataforseo，需重建以支持 content_check
+  try {
+    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='api_usage_per_user'`) as { sql: string } | undefined;
+    if (tableDef?.sql && tableDef.sql.includes("CHECK (api_type IN ('serpapi', 'dataforseo'))")) {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS api_usage_per_user_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          api_type TEXT NOT NULL CHECK (api_type IN ('serpapi', 'dataforseo', 'content_check')),
+          month TEXT NOT NULL,
+          used INTEGER NOT NULL DEFAULT 0,
+          "limit" INTEGER NOT NULL DEFAULT 100,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (user_id, api_type, month)
+        );
+        INSERT OR IGNORE INTO api_usage_per_user_new (id, user_id, api_type, month, used, "limit", created_at, updated_at)
+        SELECT id, user_id, api_type, month, used, "limit", created_at, updated_at FROM api_usage_per_user;
+        DROP TABLE api_usage_per_user;
+        ALTER TABLE api_usage_per_user_new RENAME TO api_usage_per_user;
+        CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_user ON api_usage_per_user(user_id);
+        CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_month ON api_usage_per_user(month);
       `);
     }
   } catch {

@@ -1,18 +1,28 @@
 // ===== POST /api/audit/start =====
 // 发起一次技术审计：异步执行（after），立即返回 auditId，前端轮询状态
 // 防滥用：同一域名 1 小时内只允许一次 + IP/用户每日限额
+// P2：增加 depth 权限校验（free=quick only）+ audit_daily_limit 套餐限额
 
 import { NextResponse, after } from "next/server";
-import { createAudit, getLatestAudit } from "@/lib/db";
+import { createAudit, getLatestAudit, getAuditDailyUsage, incrementAuditDailyUsage } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
+import { FeatureNotAllowedError, PlanLimitError, billingErrorToResponse } from "@/lib/guards";
+import { requireFeature } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // after 任务的最大执行时长
 
 const COOLDOWN_MS = 60 * 60 * 1000; // 1 小时
+
+function todayStr(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60_000);
+  return local.toISOString().slice(0, 10);
+}
 
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
@@ -21,8 +31,10 @@ export async function POST(req: Request) {
   }
   const userId = auth.user?.id ?? "demo-user";
   const isAuthed = !!auth.user;
+  const plan = auth.plan;
+  const auditDailyLimit = auth.limits.audit_daily_limit;
 
-  // Rate limit：匿名每天 3 次，登录每天 20 次
+  // Rate limit：匿名每天 3 次，登录每天 20 次（原有防滥用逻辑保留）
   const rlKey = buildRateLimitKey(req, isAuthed ? userId : undefined);
   const rl = checkAuditRateLimit(rlKey, isAuthed);
   if (!rl.allowed) {
@@ -32,6 +44,18 @@ export async function POST(req: Request) {
       data: { resetMs: rl.resetMs },
     }, { status: 429 });
   }
+
+  // P2：套餐级每日审计限额检查（audit_daily_limit）
+  // free=3, pro=20, team=100, enterprise=无限
+  const today = todayStr();
+  const dailyUsage = await getAuditDailyUsage(userId, today);
+  const usedToday = dailyUsage?.used ?? 0;
+  if (usedToday >= auditDailyLimit) {
+    const err = new PlanLimitError("每日审计", plan, auditDailyLimit, "AUDIT_DAILY_LIMIT_REACHED");
+    const { status, body } = billingErrorToResponse(err);
+    return NextResponse.json(body, { status });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -47,6 +71,21 @@ export async function POST(req: Request) {
   // depth 参数：'quick'（默认，只爬首页）| 'full'（50 页 BFS）
   const rawDepth = String(body.depth ?? "quick").trim().toLowerCase();
   const depth: AuditDepth = rawDepth === "full" ? "full" : "quick";
+
+  // P2：Audit 深度权限校验
+  // free: 只允许 quick（audit_max_depth=1）
+  // pro/team/enterprise: 允许 full（audit_max_depth >= 3）
+  if (depth === "full") {
+    try {
+      await requireFeature(userId, "full_audit");
+    } catch (e) {
+      if (e instanceof FeatureNotAllowedError) {
+        const { status, body: errBody } = billingErrorToResponse(e);
+        return NextResponse.json(errBody, { status });
+      }
+      throw e;
+    }
+  }
 
   // 简单规范化：去掉协议前缀，只保留 host
   let domain = rawDomain;
@@ -88,6 +127,9 @@ export async function POST(req: Request) {
     }
   }
 
+  // P2：审计用量 +1（套餐级每日限额计数）
+  await incrementAuditDailyUsage(userId, today, auditDailyLimit);
+
   // 创建审计记录（status=running）
   const audit = await createAudit(userId, domain, depth);
 
@@ -107,6 +149,7 @@ export async function POST(req: Request) {
       depth,
       status: "running",
       message: "审计已开始，请稍后刷新查看结果",
+      auditUsage: { used: usedToday + 1, limit: auditDailyLimit },
     },
   });
 }

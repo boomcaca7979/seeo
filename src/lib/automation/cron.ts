@@ -8,8 +8,19 @@ import {
   deleteExpiredCache,
   listDistinctUserIds,
 } from "@/lib/db";
-import { refreshAllRanks } from "@/lib/seo/refresh";
+import { refreshAllRanks, type CronRunContext } from "@/lib/seo/refresh";
 import { generateWeeklyReport } from "@/lib/automation/weekly";
+import { getUserPlan } from "@/lib/supabase/admin";
+import { peekUsage } from "@/lib/seo/cache";
+import type { PlanTier } from "@/lib/auth";
+
+/**
+ * 单次 Cron 执行的 SerpApi 调用全局硬上限（P3.5：系统级成本保险丝）
+ * 该上限不可替代用户级 consumeQuota，两层保护并存：
+ *   - 用户级：consumeQuota() 按 user + api_type + month 隔离
+ *   - 系统级：MAX_SERPAPI_CALLS_PER_RUN 防止单次 Cron 批量调用失控
+ */
+export const MAX_SERPAPI_CALLS_PER_RUN = 500;
 
 let tasks: ScheduledTask[] = [];
 let started = false;
@@ -77,8 +88,16 @@ export function isStarted(): boolean {
   return started;
 }
 
-/** 手动执行每日刷新（指定用户） */
-export async function runDailyRefresh(userId: string): Promise<void> {
+/**
+ * 手动执行每日刷新（指定用户）
+ * - 手动触发（POST /api/automation/run）不传 cronCtx，仅用户级 consumeQuota 生效
+ * - Cron 触发（GET /api/automation/run）传入 cronCtx，系统级保险丝同时生效
+ */
+export async function runDailyRefresh(
+  userId: string,
+  plan?: PlanTier,
+  cronCtx?: CronRunContext
+): Promise<void> {
   await addAutomationLog(userId, {
     type: "daily_refresh",
     status: "running",
@@ -87,7 +106,28 @@ export async function runDailyRefresh(userId: string): Promise<void> {
   });
 
   try {
-    const result = await refreshAllRanks(userId);
+    // 未传 plan 时尝试查询；查询失败 fallback 为 free（最保守保护）
+    const resolvedPlan: PlanTier = plan ?? (await getUserPlan(userId, "free"));
+
+    // Cron 模式：预检查用户 SerpApi 额度，已耗尽则跳过该用户（不影响其他用户）
+    if (cronCtx) {
+      try {
+        const usage = await peekUsage(userId, "serpapi", resolvedPlan);
+        if (usage.used >= usage.limit) {
+          await addAutomationLog(userId, {
+            type: "daily_refresh",
+            status: "failed",
+            summary: "跳过：本月 SerpApi 额度已用尽",
+            details: JSON.stringify({ used: usage.used, limit: usage.limit }),
+          });
+          return;
+        }
+      } catch {
+        // peekUsage 失败不阻止执行，交由 consumeQuota 兜底
+      }
+    }
+
+    const result = await refreshAllRanks(userId, resolvedPlan, cronCtx);
 
     // 清理过期缓存（失败不影响刷新结果）
     let cleanedCache = 0;

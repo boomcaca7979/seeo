@@ -1,9 +1,11 @@
 // /api/reports/send — 发送报告邮件（简化摘要，不带 PDF 附件，PDF 由客户端生成）
+// P2：增加 email_report Feature 权限校验
 
 import { NextResponse } from "next/server";
 import { getReport } from "@/lib/db";
 import { sendReportEmail, buildReportEmailHtml, isEmailConfigured } from "@/lib/email/resend";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { requireFeature, FeatureNotAllowedError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +23,19 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
+
+  // P2：邮件报告 Feature 权限校验
+  try {
+    await requireFeature(userId, "email_report");
+  } catch (e) {
+    if (e instanceof FeatureNotAllowedError) {
+      const { status, body } = billingErrorToResponse(e);
+      return NextResponse.json(body, { status });
+    }
+    throw e;
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -45,7 +60,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const userId = auth.user?.id ?? "demo-user";
   const report = await getReport(userId, reportId);
   if (!report) {
     return NextResponse.json({ error: "报告不存在" }, { status: 404 });

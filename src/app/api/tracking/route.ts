@@ -1,5 +1,6 @@
 // ===== /api/tracking =====
 // 排名追踪词的 CRUD，数据持久化到 SQLite
+// P1 改造：TRACKING_LIMIT 硬编码改为 getPlanLimits() 动态获取
 
 import { NextResponse } from "next/server";
 import {
@@ -12,11 +13,10 @@ import {
 import { peekUsage } from "@/lib/seo/cache";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { PlanLimitError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TRACKING_LIMIT = 5;
 
 function todayStr(): string {
   // 本地时区 YYYY-MM-DD
@@ -26,8 +26,8 @@ function todayStr(): string {
   return local.toISOString().slice(0, 10);
 }
 
-async function withUsage<T>(payload: T) {
-  const usage = await peekUsage();
+async function withUsage<T>(payload: T, userId: string, plan: import("@/lib/auth").PlanTier) {
+  const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({ data: payload, usage });
 }
 
@@ -37,12 +37,13 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const list = await listTrackedKeywords(userId);
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({
     data: list,
     usage,
-    limit: TRACKING_LIMIT,
+    limit: auth.limits.max_tracked_keywords,
   });
 }
 
@@ -85,21 +86,22 @@ export async function POST(req: Request) {
     );
   }
 
-  // 上限检查
+  // 上限检查（P1：从套餐限制动态获取，P3：统一为 PlanLimitError）
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
+  const trackingLimit = auth.limits.max_tracked_keywords;
   const count = await countTrackedKeywords(userId);
-  if (count >= TRACKING_LIMIT) {
-    return NextResponse.json<SeoApiError>(
-      { error: `演示期限定追踪 ${TRACKING_LIMIT} 个关键词，请先删除不再追踪的词`, code: "BAD_REQUEST" },
-      { status: 400 }
-    );
+  if (count >= trackingLimit) {
+    const err = new PlanLimitError("追踪关键词", auth.plan, trackingLimit, "KEYWORD_LIMIT_REACHED");
+    const { status, body } = billingErrorToResponse(err);
+    return NextResponse.json(body, { status });
   }
 
   // 重复检查
   try {
     const created = await addTrackedKeyword(userId, { keyword, location, device, domain });
     const newCount = await countTrackedKeywords(userId);
-    return await withUsage({ created, limit: TRACKING_LIMIT, remaining: TRACKING_LIMIT - newCount });
+    return await withUsage({ created, limit: trackingLimit, remaining: trackingLimit - newCount }, userId, plan);
   } catch (e) {
     const msg = (e as Error).message;
     if (msg.includes("UNIQUE")) {
@@ -126,6 +128,8 @@ export async function DELETE(req: Request) {
     );
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
+  const trackingLimit = auth.limits.max_tracked_keywords;
   const ok = await removeTrackedKeyword(userId, id);
   if (!ok) {
     return NextResponse.json<SeoApiError>(
@@ -133,11 +137,11 @@ export async function DELETE(req: Request) {
       { status: 404 }
     );
   }
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   const currentCount = await countTrackedKeywords(userId);
-  const remaining = TRACKING_LIMIT - currentCount;
-  return NextResponse.json({ data: { ok: true, remaining }, usage, limit: TRACKING_LIMIT });
+  const remaining = trackingLimit - currentCount;
+  return NextResponse.json({ data: { ok: true, remaining }, usage, limit: trackingLimit });
 }
 
-// 导出供其他模块使用
-export { TRACKING_LIMIT, todayStr, getTrackedKeywordById };
+// 导出供其他模块使用（TRACKING_LIMIT 已移除，改用 getPlanLimits 动态获取）
+export { todayStr, getTrackedKeywordById };

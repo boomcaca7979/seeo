@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache } from "@/lib/seo/cache";
+import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
 import type { RankResult, SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -26,7 +26,13 @@ function mapError(e: unknown) {
   }
   if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
     return NextResponse.json<SeoApiError>(
-      { error: "本月免费额度已用尽（80/100），下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
+      { error: "本月免费额度已用尽，下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
+      { status: 429 }
+    );
+  }
+  if (e instanceof QuotaExceededError) {
+    return NextResponse.json<SeoApiError>(
+      { error: e.message, code: "QUOTA_EXCEEDED" },
       { status: 429 }
     );
   }
@@ -41,6 +47,8 @@ export async function GET(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const keyword = (searchParams.get("keyword") ?? "").trim();
   const domain = (searchParams.get("domain") ?? "").trim();
@@ -57,7 +65,7 @@ export async function GET(req: Request) {
   try {
     const cached = await readCache<RankResult>("rank", params);
     if (cached) {
-      const usage = await peekUsage();
+      const usage = await peekUsage(userId, "serpapi", plan);
       return NextResponse.json({
         data: { ...cached, fromCache: true },
         usage,
@@ -67,10 +75,10 @@ export async function GET(req: Request) {
     // ignore
   }
 
-  // 2. 消耗额度
+  // 2. 消耗额度（用户级隔离）
   let usage;
   try {
-    usage = await consumeQuota();
+    usage = await consumeQuota(userId, "serpapi", plan);
   } catch (e) {
     return mapError(e);
   }

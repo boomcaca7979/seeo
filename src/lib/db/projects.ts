@@ -344,6 +344,16 @@ export async function listCompetitors(userId: string, projectId: number): Promis
   return rows.map(rowToCompetitor);
 }
 
+/** 统计某项目下竞品数量（P3.5：套餐上限校验） */
+export async function countCompetitors(userId: string, projectId: number): Promise<number> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `SELECT COUNT(*) AS c FROM competitors WHERE project_id = ? AND user_id = ?`,
+    [projectId, userId]
+  ) as { c: number };
+  return row.c;
+}
+
 export async function deleteCompetitor(userId: string, id: number): Promise<boolean> {
   const db = await getAdapter();
   const info = await db.run(`DELETE FROM competitors WHERE id = ? AND user_id = ?`, [id, userId]);

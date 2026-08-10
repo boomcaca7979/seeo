@@ -84,3 +84,111 @@ export async function resetApiUsage(month: string): Promise<void> {
       used = 0
   `, [month]);
 }
+
+// ========== 用户级用量（P0 商业化改造） ==========
+
+export type ApiType = "serpapi" | "dataforseo" | "content_check";
+
+export interface ApiUsagePerUserRow {
+  user_id: string;
+  api_type: ApiType;
+  month: string;
+  used: number;
+  limit: number;
+}
+
+/** 读取某用户某 API 某月用量 */
+export async function getUserApiUsage(
+  userId: string,
+  apiType: ApiType,
+  month: string
+): Promise<{ used: number; limit: number } | null> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `SELECT used, "limit" FROM api_usage_per_user WHERE user_id = ? AND api_type = ? AND month = ?`,
+    [userId, apiType, month]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
+
+/** 用户级用量 +N（UPSERT，首次自动创建，默认 limit 由调用方传入） */
+export async function incrementUserApiUsage(
+  userId: string,
+  apiType: ApiType,
+  month: string,
+  defaultLimit: number
+): Promise<{ used: number; limit: number }> {
+  const db = await getAdapter();
+  await db.run(`
+    INSERT INTO api_usage_per_user (user_id, api_type, month, used, "limit", created_at, updated_at)
+    VALUES (?, ?, ?, 1, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, api_type, month) DO UPDATE SET
+      used = used + 1,
+      updated_at = datetime('now')
+  `, [userId, apiType, month, defaultLimit]);
+  const row = await db.get(
+    `SELECT used, "limit" FROM api_usage_per_user WHERE user_id = ? AND api_type = ? AND month = ?`,
+    [userId, apiType, month]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : { used: 1, limit: defaultLimit };
+}
+
+/** 设置某用户某 API 某月用量上限（用于套餐变更时） */
+export async function setUserApiLimit(
+  userId: string,
+  apiType: ApiType,
+  month: string,
+  limit: number
+): Promise<void> {
+  const db = await getAdapter();
+  await db.run(`
+    INSERT INTO api_usage_per_user (user_id, api_type, month, used, "limit", created_at, updated_at)
+    VALUES (?, ?, ?, 0, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, api_type, month) DO UPDATE SET
+      "limit" = excluded."limit",
+      updated_at = datetime('now')
+  `, [userId, apiType, month, limit]);
+}
+
+// ========== 审计每日用量（P2 商业化改造） ==========
+
+export interface AuditUsagePerUserRow {
+  user_id: string;
+  date: string;
+  used: number;
+  limit: number;
+}
+
+/** 读取某用户某日审计用量 */
+export async function getAuditDailyUsage(
+  userId: string,
+  date: string
+): Promise<{ used: number; limit: number } | null> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `SELECT used, "limit" FROM audit_usage_per_user WHERE user_id = ? AND date = ?`,
+    [userId, date]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
+
+/** 审计用量 +1（UPSERT，首次自动创建，默认 limit 由调用方传入） */
+export async function incrementAuditDailyUsage(
+  userId: string,
+  date: string,
+  defaultLimit: number
+): Promise<{ used: number; limit: number }> {
+  const db = await getAdapter();
+  await db.run(`
+    INSERT INTO audit_usage_per_user (user_id, date, used, "limit", created_at, updated_at)
+    VALUES (?, ?, 1, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, date) DO UPDATE SET
+      used = used + 1,
+      updated_at = datetime('now')
+  `, [userId, date, defaultLimit]);
+  const row = await db.get(
+    `SELECT used, "limit" FROM audit_usage_per_user WHERE user_id = ? AND date = ?`,
+    [userId, date]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : { used: 1, limit: defaultLimit };
+}

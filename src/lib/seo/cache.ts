@@ -1,7 +1,7 @@
 // ===== 缓存层 + 月度用量保护 =====
-// 主存储：SQLite api_cache / api_usage 表（部署友好）
+// 主存储：SQLite api_cache / api_usage_per_user 表（部署友好）
 // Fallback：data/cache/*.json + data/cache/usage.json（仅读，兼容本地历史数据）
-// 用量计数按自然月归零，超过 80 次拒绝调用
+// 用量计数按自然月归零，按用户+API类型隔离
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -9,25 +9,36 @@ import type { ApiUsage } from "./types";
 import {
   getCache as dbGetCache,
   setCache as dbSetCache,
-  getApiUsage as dbGetApiUsage,
-  incrementApiUsage as dbIncrementApiUsage,
+  getUserApiUsage,
+  incrementUserApiUsage,
+  type ApiType,
 } from "@/lib/db";
+import type { PlanTier } from "@/lib/auth";
 
 const CACHE_DIR = path.join(process.cwd(), "data", "cache");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
-const USAGE_LIMIT = 100;
-const USAGE_SOFT_LIMIT = 80; // 超过 80 拒绝新调用，但允许读缓存
-const USAGE_FILE = "usage.json";
+
+// 各套餐的 API 月度限额配置
+// free: 50 次 SerpApi / 0 次 DataForSEO
+// pro: 1000 次 SerpApi / 10 次 DataForSEO
+// team: 5000 次 SerpApi / 50 次 DataForSEO
+// enterprise: 无限（用 Number.MAX_SAFE_INTEGER 表示）
+const PLAN_LIMITS: Record<PlanTier, Record<ApiType, number>> = {
+  free: { serpapi: 50, dataforseo: 0, content_check: 10 },
+  pro: { serpapi: 1000, dataforseo: 10, content_check: 100 },
+  team: { serpapi: 5000, dataforseo: 50, content_check: 500 },
+  enterprise: { serpapi: Number.MAX_SAFE_INTEGER, dataforseo: Number.MAX_SAFE_INTEGER, content_check: Number.MAX_SAFE_INTEGER },
+};
+
+/** 获取某套餐某 API 的月度限额 */
+export function getPlanLimit(plan: PlanTier, apiType: ApiType): number {
+  return PLAN_LIMITS[plan]?.[apiType] ?? PLAN_LIMITS.free[apiType];
+}
 
 interface CacheEntry<T> {
   data: T;
   savedAt: number; // epoch ms
   params: Record<string, string>;
-}
-
-interface UsageFile {
-  month: string; // YYYY-MM
-  used: number;
 }
 
 function currentMonth(): string {
@@ -50,64 +61,77 @@ async function ensureDir(): Promise<void> {
   await fs.mkdir(CACHE_DIR, { recursive: true });
 }
 
-// ---------- 用量 ----------
+// ---------- 用户级用量（P0 商业化改造） ----------
 
-/** 读取文件用量（fallback） */
-async function readFileUsage(): Promise<UsageFile | null> {
+/**
+ * 真实调用外部 API 前检查 + 计数 +1（按用户 + API 类型隔离）
+ * 超过套餐限额时抛出 QuotaExceededError
+ */
+export async function consumeQuota(
+  userId: string,
+  apiType: ApiType,
+  plan: PlanTier = "free"
+): Promise<ApiUsage> {
+  const month = currentMonth();
+  const limit = getPlanLimit(plan, apiType);
+
+  // 读取当前用户用量
+  const existing = await getUserApiUsage(userId, apiType, month);
+  const used = existing?.used ?? 0;
+
+  if (used >= limit) {
+    throw new QuotaExceededError(used, limit, apiType, month);
+  }
+
+  // 写入 DB（主存储，用户级）
   try {
-    const file = path.join(CACHE_DIR, USAGE_FILE);
-    const raw = await fs.readFile(file, "utf-8");
-    const obj = JSON.parse(raw) as UsageFile;
-    return obj;
+    const updated = await incrementUserApiUsage(userId, apiType, month, limit);
+    return { used: updated.used, limit: updated.limit, month };
   } catch {
-    return null;
+    // DB 不可用时，仅依赖内存计数（不阻塞调用）
+    return { used: used + 1, limit, month };
   }
 }
 
-/** 综合读取用量：优先 DB，fallback 到文件 */
-async function readUsage(): Promise<UsageFile> {
+/**
+ * 不消耗额度，仅返回当前用户某 API 的用量
+ */
+export async function peekUsage(
+  userId: string = "demo-user",
+  apiType: ApiType = "serpapi",
+  plan: PlanTier = "free"
+): Promise<ApiUsage> {
   const month = currentMonth();
-  // 1. 先读 DB
+  const limit = getPlanLimit(plan, apiType);
   try {
-    const dbUsage = await dbGetApiUsage(month);
-    if (dbUsage) {
-      return { month, used: dbUsage.used };
+    const existing = await getUserApiUsage(userId, apiType, month);
+    if (existing) {
+      return { used: existing.used, limit, month };
     }
   } catch {
-    // DB 未初始化或不可用，fallback
+    // DB 未初始化或不可用
   }
-  // 2. Fallback 文件
-  const fileUsage = await readFileUsage();
-  if (fileUsage && fileUsage.month === month) {
-    return fileUsage;
-  }
-  return { month, used: 0 };
+  return { used: 0, limit, month };
 }
 
-/** 真实调用 SerpApi 前检查 + 计数 +1 */
-export async function consumeQuota(): Promise<ApiUsage> {
-  const month = currentMonth();
-  const u = await readUsage();
-  if (u.used >= USAGE_SOFT_LIMIT) {
-    throw new Error("QUOTA_EXCEEDED");
-  }
-  // 写入 DB（主存储）
-  try {
-    const updated = await dbIncrementApiUsage(month);
-    return { used: updated.used, limit: USAGE_LIMIT, month };
-  } catch {
-    // DB 不可用时，仅依赖内存计数（不再写文件，per 铁律 2.5）
-    return { used: u.used + 1, limit: USAGE_LIMIT, month };
+/** 配额超限错误 */
+export class QuotaExceededError extends Error {
+  readonly code = "QUOTA_EXCEEDED";
+  readonly used: number;
+  readonly limit: number;
+  readonly apiType: ApiType;
+  readonly month: string;
+
+  constructor(used: number, limit: number, apiType: ApiType, month: string) {
+    const apiLabel = apiType === "dataforseo" ? "DataForSEO" : "SerpApi";
+    super(`本月${apiLabel}额度已用尽（${used}/${limit}），下月 1 日自动重置`);
+    this.name = "QuotaExceededError";
+    this.used = used;
+    this.limit = limit;
+    this.apiType = apiType;
+    this.month = month;
   }
 }
-
-/** 不消耗额度，仅返回当前用量 */
-export async function peekUsage(): Promise<ApiUsage> {
-  const u = await readUsage();
-  return { used: u.used, limit: USAGE_LIMIT, month: u.month };
-}
-
-export const USAGE_LIMIT_VALUE = USAGE_SOFT_LIMIT;
 
 // ---------- 缓存 ----------
 

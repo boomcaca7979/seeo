@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache } from "@/lib/seo/cache";
+import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
 import type { SeoApiError, SerpResult } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -40,6 +40,12 @@ function mapError(e: unknown) {
       { status: 429 }
     );
   }
+  if (e instanceof QuotaExceededError) {
+    return NextResponse.json<SeoApiError>(
+      { error: e.message, code: "QUOTA_EXCEEDED" },
+      { status: 429 }
+    );
+  }
   return NextResponse.json<SeoApiError>(
     { error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" },
     { status: 500 }
@@ -51,6 +57,8 @@ export async function POST(req: Request) {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   let body: { seed?: string; location?: string; device?: string };
   try {
     body = await req.json();
@@ -71,7 +79,7 @@ export async function POST(req: Request) {
   try {
     const cached = await readCache<SerpResult>("serp", params);
     if (cached) {
-      const usage = await peekUsage();
+      const usage = await peekUsage(userId, "serpapi", plan);
       const resp: ExpandResponse = {
         seed,
         related: cached.relatedSearches.map((r) => r.query),
@@ -86,10 +94,10 @@ export async function POST(req: Request) {
     // 缓存读取失败不阻塞主流程
   }
 
-  // 2. 真实调用：先消耗额度
+  // 2. 真实调用：先消耗额度（用户级隔离）
   let usage;
   try {
-    usage = await consumeQuota();
+    usage = await consumeQuota(userId, "serpapi", plan);
   } catch (e) {
     return mapError(e);
   }

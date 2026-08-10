@@ -1,9 +1,11 @@
 // ===== GET /api/reports/rankings =====
 // 导出全部追踪关键词 + 最近 30 天排名历史为 CSV（带 BOM，Excel 友好）
+// P2：增加 excel_export Feature 权限校验
 
 import { NextResponse } from "next/server";
 import { listTrackedKeywordsWithHistory } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { requireFeature, FeatureNotAllowedError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +32,18 @@ export async function GET() {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+
+  // P2：Excel 导出权限校验
+  try {
+    await requireFeature(userId, "excel_export");
+  } catch (e) {
+    if (e instanceof FeatureNotAllowedError) {
+      const { status, body } = billingErrorToResponse(e);
+      return NextResponse.json(body, { status });
+    }
+    throw e;
+  }
+
   const rows = await listTrackedKeywordsWithHistory(userId, 30);
 
   if (rows.length === 0) {

@@ -2,6 +2,7 @@
 // 项目 CRUD
 // 演示模式：数据持久化到 SQLite（user_id='demo-user'）
 // 鉴权模式：双写 Supabase projects 表（RLS 按 user_id 过滤）+ SQLite projects 表（存 domain 用于指标关联）
+// P2：增加 max_projects 套餐限额校验
 
 import { NextResponse } from "next/server";
 import {
@@ -10,10 +11,12 @@ import {
   addProject,
   removeProject,
   getProjectByDomain,
+  listProjects,
 } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createServer } from "@/lib/supabase/server";
+import { PlanLimitError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +81,16 @@ export async function POST(req: Request) {
   const existing = await getProjectByDomain(userId, domain);
   if (existing) {
     return NextResponse.json({ error: "该域名已存在项目" }, { status: 400 });
+  }
+
+  // P2：套餐项目数量限额校验（max_projects）
+  // free=1, pro=5, team=20, enterprise=无限
+  const maxProjects = auth.limits.max_projects;
+  const existingProjects = await listProjects(userId);
+  if (existingProjects.length >= maxProjects) {
+    const err = new PlanLimitError("项目", auth.plan, maxProjects, "PROJECT_LIMIT_REACHED");
+    const { status, body: errBody } = billingErrorToResponse(err);
+    return NextResponse.json(errBody, { status });
   }
 
   // 鉴权模式：先写 Supabase，再写 SQLite

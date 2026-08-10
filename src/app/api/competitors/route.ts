@@ -6,12 +6,14 @@
 import { NextResponse } from "next/server";
 import {
   listCompetitors,
+  countCompetitors,
   createCompetitor,
   deleteCompetitor,
   getProjectById,
 } from "@/lib/db";
 import { peekUsage } from "@/lib/seo/cache";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { PlanLimitError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +24,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const projectId = Number(searchParams.get("project_id") ?? "");
 
@@ -30,7 +33,7 @@ export async function GET(req: Request) {
   }
 
   const list = await listCompetitors(userId, projectId);
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({ data: list, usage });
 }
 
@@ -40,6 +43,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   let body: { project_id?: number; domain?: string; name?: string };
   try {
     body = await req.json();
@@ -69,9 +73,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "不能添加自己为竞品" }, { status: 400 });
   }
 
+  // P3.5：套餐竞品数量限额校验（max_competitors，project-scoped）
+  const maxCompetitors = auth.limits.max_competitors;
+  const existingCount = await countCompetitors(userId, projectId);
+  if (existingCount >= maxCompetitors) {
+    const err = new PlanLimitError("竞品", auth.plan, maxCompetitors, "COMPETITOR_LIMIT_REACHED");
+    const { status, body } = billingErrorToResponse(err);
+    return NextResponse.json(body, { status });
+  }
+
   try {
     const created = await createCompetitor(userId, { project_id: projectId, domain, name: name ?? null });
-    const usage = await peekUsage();
+    const usage = await peekUsage(userId, "serpapi", plan);
     return NextResponse.json({ data: created, usage }, { status: 201 });
   } catch (e) {
     const msg = (e as Error).message;
@@ -88,6 +101,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const { searchParams } = new URL(req.url);
   const id = Number(searchParams.get("id") ?? "");
 
@@ -99,6 +113,6 @@ export async function DELETE(req: Request) {
   if (!ok) {
     return NextResponse.json({ error: "未找到该竞品" }, { status: 404 });
   }
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({ data: { ok: true }, usage });
 }

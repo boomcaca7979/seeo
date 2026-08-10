@@ -349,6 +349,29 @@ export default function ReportsPage() {
 
   const handleDownloadPdf = async () => {
     try {
+      // P3：先调服务端验证 PDF 导出权限
+      // 若已保存报告，用 savedReportId 验证归属；否则用当前预览数据验证
+      const verifyId = savedReportId ?? 0;
+      if (verifyId > 0) {
+        const verifyRes = await fetch(`/api/reports/pdf?id=${verifyId}`, { cache: "no-store" });
+        if (!verifyRes.ok) {
+          const json = await verifyRes.json().catch(() => ({}));
+          const msg = json?.message ?? json?.error ?? "PDF 导出权限不足";
+          show(msg, "error");
+          return;
+        }
+      } else {
+        // 未保存的报告，仍需验证 pdf_export feature
+        const verifyRes = await fetch(`/api/reports/pdf?id=0`, { cache: "no-store" });
+        if (!verifyRes.ok && verifyRes.status !== 404) {
+          // 404 是正常的（id=0 不存在），但 403 表示 feature 不允许
+          const json = await verifyRes.json().catch(() => ({}));
+          const msg = json?.message ?? json?.error ?? "PDF 导出权限不足";
+          show(msg, "error");
+          return;
+        }
+      }
+
       const filename = `seeo-${selectedType}-${Date.now()}.pdf`;
       const blob = await generatePDF({
         title: `${typeConfig[selectedType].label}报告`,

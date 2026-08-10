@@ -34,7 +34,8 @@ export async function GET(req: Request) {
   }
 
   const userId = auth.user?.id ?? "demo-user";
+  const plan = auth.plan;
   const history = await getRankHistory(userId, id, days);
-  const usage = await peekUsage();
+  const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({ data: history, usage });
 }

@@ -10,15 +10,31 @@ import {
 } from "@/lib/db";
 import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, readCache, writeCache } from "@/lib/seo/cache";
+import { consumeQuota, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
 import { generateRankAlert } from "@/lib/seo/alerts";
 import type { RankResult } from "@/lib/seo/types";
+import type { PlanTier } from "@/lib/auth";
 
 function todayStr(): string {
   const d = new Date();
   const off = d.getTimezoneOffset();
   const local = new Date(d.getTime() - off * 60_000);
   return local.toISOString().slice(0, 10);
+}
+
+/**
+ * Cron 运行级共享上下文（P3.5：系统级 SerpApi 成本保险丝）
+ * - serpApiCalls：本次 Cron 已消耗的 SerpApi 调用数
+ * - maxSerpApiCalls：单次 Cron 的 SerpApi 调用硬上限
+ * - stoppedByCostLimit：是否因触及系统级上限而停止
+ *
+ * 注意：该上下文仅由 Cron 入口传入，手动触发（POST /api/automation/run）不传入。
+ * 用户级 consumeQuota 始终生效，与系统级保险丝互不替代。
+ */
+export interface CronRunContext {
+  serpApiCalls: number;
+  maxSerpApiCalls: number;
+  stoppedByCostLimit: boolean;
 }
 
 export interface RefreshResult {
@@ -35,7 +51,11 @@ export interface RefreshResult {
 }
 
 /** 刷新指定用户的所有追踪关键词排名，返回刷新结果摘要 */
-export async function refreshAllRanks(userId: string): Promise<RefreshResult> {
+export async function refreshAllRanks(
+  userId: string,
+  plan: PlanTier = "free",
+  cronCtx?: CronRunContext
+): Promise<RefreshResult> {
   const list = await listTrackedKeywords(userId);
   const today = todayStr();
   let refreshed = 0;
@@ -43,6 +63,12 @@ export async function refreshAllRanks(userId: string): Promise<RefreshResult> {
   const details: RefreshResult["details"] = [];
 
   for (const tk of list) {
+    // 系统级保险丝：触及 Cron 总调用上限时停止处理后续关键词
+    if (cronCtx && cronCtx.serpApiCalls >= cronCtx.maxSerpApiCalls) {
+      cronCtx.stoppedByCostLimit = true;
+      break;
+    }
+
     const params = {
       keyword: tk.keyword,
       domain: tk.domain,
@@ -82,11 +108,18 @@ export async function refreshAllRanks(userId: string): Promise<RefreshResult> {
           }
         }
 
-        // 3. 真实调用 SerpApi
+        // 3. 真实调用 SerpApi（用户级额度扣减）
         if (!rankResult) {
+          // 系统级保险丝：再次检查（可能在循环中途触及上限）
+          if (cronCtx && cronCtx.serpApiCalls >= cronCtx.maxSerpApiCalls) {
+            cronCtx.stoppedByCostLimit = true;
+            break;
+          }
           try {
-            await consumeQuota();
+            await consumeQuota(userId, "serpapi", plan);
             consumed = true;
+            // 用户级扣费成功后，系统级计数 +1
+            if (cronCtx) cronCtx.serpApiCalls++;
             rankResult = await serpApiProvider.checkRank(params);
             try {
               await writeCache("rank", params, rankResult);
@@ -95,6 +128,8 @@ export async function refreshAllRanks(userId: string): Promise<RefreshResult> {
             }
           } catch (e) {
             if (e instanceof SeoProviderError) {
+              errMsg = e.message;
+            } else if (e instanceof QuotaExceededError) {
               errMsg = e.message;
             } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
               errMsg = "本月免费额度已用尽，下月 1 日自动重置";
