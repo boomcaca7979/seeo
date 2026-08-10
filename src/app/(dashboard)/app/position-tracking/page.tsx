@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import Modal from "@/components/dashboard/Modal";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import { ChangeBadge, RankBadge } from "@/components/dashboard/Badges";
@@ -165,7 +166,7 @@ export default function PositionTrackingPage() {
         body: JSON.stringify({ name, description: newGroupDesc.trim() || undefined }),
       });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "创建失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "创建失败"); show(message, "error"); return; }
       show(`已创建分组：${name}`, "success");
       setCreateGroupModalOpen(false);
       setNewGroupName("");
@@ -186,7 +187,7 @@ export default function PositionTrackingPage() {
         body: JSON.stringify({ keyword_id: keywordId }),
       });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "加入分组失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "加入分组失败"); show(message, "error"); return; }
       show("已加入分组", "success");
       setGroupMenuId(null);
       await loadList();
@@ -204,7 +205,7 @@ export default function PositionTrackingPage() {
         body: JSON.stringify({ keyword_id: keywordId }),
       });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "移出分组失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "移出分组失败"); show(message, "error"); return; }
       show("已移出分组", "success");
       await loadList();
     } catch (err) {
@@ -309,7 +310,7 @@ export default function PositionTrackingPage() {
         body: JSON.stringify({ keyword: kw, location: country, device, domain: dm }),
       });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "添加失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "添加失败"); show(message, "error"); return; }
       show(`已添加追踪：${kw}`, "success");
       setAddModalOpen(false);
       setAddKeyword("");
@@ -326,7 +327,7 @@ export default function PositionTrackingPage() {
     try {
       const res = await fetch(`/api/tracking?id=${id}`, { method: "DELETE" });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "删除失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "删除失败"); show(message, "error"); return; }
       show("已删除追踪词", "success");
       if (json.usage) setUsage(json.usage);
       await loadList();
@@ -341,7 +342,7 @@ export default function PositionTrackingPage() {
     try {
       const res = await fetch("/api/tracking/refresh", { method: "POST" });
       const json = await res.json();
-      if (!res.ok) { show(json?.error ?? "刷新失败", "error"); return; }
+      if (!res.ok) { const { message } = handleBillingError(json, "刷新失败"); show(message, "error"); return; }
       const summary = json.data?.summary ?? "刷新完成";
       const usedText = json.usage ? `，本月用量 ${json.usage.used}/${json.usage.limit}` : "";
       show(`${summary}${usedText}`, "success");

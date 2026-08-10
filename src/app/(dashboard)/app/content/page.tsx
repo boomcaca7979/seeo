@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import DomainSelect from "@/components/dashboard/DomainSelect";
@@ -191,9 +192,9 @@ export default function ContentPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "检测失败";
-        setError(msg);
-        show(msg, "error");
+        const { message } = handleBillingError(json, "检测失败");
+        setError(message);
+        show(message, "error");
         return;
       }
       setResult(json.data);

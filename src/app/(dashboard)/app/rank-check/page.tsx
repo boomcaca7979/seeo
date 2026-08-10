@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import type { RankResult } from "@/lib/seo/types";
 
@@ -59,9 +60,9 @@ export default function RankCheckPage() {
       );
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "查询失败";
-        setError(msg);
-        show(msg, "error");
+        const { message } = handleBillingError(json, "查询失败");
+        setError(message);
+        show(message, "error");
         return;
       }
       setResult(json.data);

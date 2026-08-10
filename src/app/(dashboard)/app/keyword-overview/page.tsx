@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import RelatedKeywordBars from "@/components/dashboard/charts/RelatedKeywordBars";
@@ -49,9 +50,9 @@ export default function KeywordOverviewPage() {
       );
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "查询失败";
-        setSerp({ loading: false, data: null, error: msg, keyword: kw });
-        show(msg, "error");
+        const { message } = handleBillingError(json, "查询失败");
+        setSerp({ loading: false, data: null, error: message, keyword: kw });
+        show(message, "error");
         return;
       }
       setSerp({ loading: false, data: json.data, error: null, keyword: kw });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 
@@ -114,9 +115,9 @@ export default function BacklinksPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "拉取失败";
-        setError(msg);
-        show(msg, "error");
+        const { message } = handleBillingError(json, "拉取失败");
+        setError(message);
+        show(message, "error");
         return;
       }
       try {

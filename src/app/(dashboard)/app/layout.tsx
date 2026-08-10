@@ -1,8 +1,7 @@
 import { createServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { isAuthEnabled } from "@/lib/auth-config";
-import Sidebar from "@/components/dashboard/Sidebar";
-import Topbar from "@/components/dashboard/Topbar";
+import DashboardShell from "@/components/dashboard/DashboardShell";
 import type { DatabaseProfile } from "@/lib/types";
 import { startAutomation, isStarted } from "@/lib/automation/cron";
 
@@ -23,13 +22,9 @@ export default async function DashboardLayout({
   // 演示模式：固定本地用户，不查 Supabase
   if (!isAuthEnabled) {
     return (
-      <div className="flex h-screen overflow-hidden bg-paper text-ink">
-        <Sidebar displayName="本地开发" email="dev@seeo.local" />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar displayName="本地开发" email="dev@seeo.local" />
-          <main className="flex-1 overflow-y-auto bg-paper text-ink">{children}</main>
-        </div>
-      </div>
+      <DashboardShell displayName="本地开发" email="dev@seeo.local">
+        {children}
+      </DashboardShell>
     );
   }
 
@@ -54,12 +49,8 @@ export default async function DashboardLayout({
   const email = user.email ?? "";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper text-ink">
-      <Sidebar displayName={displayName} email={email} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar displayName={displayName} email={email} />
-        <main className="flex-1 overflow-y-auto bg-paper text-ink">{children}</main>
-      </div>
-    </div>
+    <DashboardShell displayName={displayName} email={email}>
+      {children}
+    </DashboardShell>
   );
 }

@@ -10,6 +10,20 @@ interface TopbarProps {
   email: string;
 }
 
+const PLAN_LABELS: Record<string, string> = {
+  free: "免费版",
+  pro: "专业版",
+  team: "团队版",
+  enterprise: "企业版",
+};
+
+const PLAN_BADGE_STYLES: Record<string, string> = {
+  free: "bg-line-soft text-ink-60",
+  pro: "bg-brand/10 text-brand",
+  team: "bg-brand/10 text-brand",
+  enterprise: "bg-ink text-card",
+};
+
 interface AlertItem {
   id: number;
   level: "error" | "warning" | "info";
@@ -55,9 +69,27 @@ export default function Topbar({ displayName, email }: TopbarProps) {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string>("free");
   const bellRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // 拉取当前用户套餐（用于 plan badge 展示）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/usage", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && json?.data?.plan) {
+          setCurrentPlan(json.data.plan as string);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // 拉取真实项目列表 + 从 localStorage 恢复选中项
   useEffect(() => {
@@ -333,6 +365,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-2 rounded-lg p-1 hover:bg-line-soft"
           >
+            <span className={`rounded px-2 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+              {PLAN_LABELS[currentPlan] ?? currentPlan}
+            </span>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
               {displayName.charAt(0).toUpperCase()}
             </span>
@@ -347,6 +382,14 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 <p className="font-mono text-[10px] text-ink-40 truncate">
                   {email}
                 </p>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+                    {PLAN_LABELS[currentPlan] ?? currentPlan}
+                  </span>
+                  {currentPlan === "free" && (
+                    <span className="font-mono text-[10px] text-ink-40">点击下方升级</span>
+                  )}
+                </div>
               </div>
               <div className="border-b border-line-soft py-1">
                 <Link

@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { useToast } from "@/components/dashboard/Toast";
+
+const PLAN_LABELS: Record<string, string> = {
+  free: "免费版",
+  pro: "专业版",
+  team: "团队版",
+  enterprise: "企业版",
+};
 
 type NavItem = {
   label: string;
@@ -144,8 +151,26 @@ interface SidebarProps {
 
 export default function Sidebar({ displayName, email }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string>("free");
   const pathname = usePathname();
   const { show, Toast } = useToast();
+
+  // 拉取当前用户套餐（用于显示套餐标识和升级 CTA）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/usage", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && res.ok && json?.data?.plan) {
+          setCurrentPlan(json.data.plan as string);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogout = async () => {
     if (!isAuthEnabled) {
@@ -163,6 +188,8 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
   const userName = displayName ?? "本地开发";
   const userEmail = email ?? "dev@seeo.local";
   const avatarLetter = userName.charAt(0).toUpperCase();
+  const planLabel = PLAN_LABELS[currentPlan] ?? currentPlan;
+  const showUpgradeCta = currentPlan === "free";
 
   return (
     <aside
@@ -211,6 +238,39 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* 套餐标识 + 升级 CTA（仅 free 用户显示升级按钮） */}
+      {!collapsed && (
+        <div className="flex-none px-3 pb-2">
+          <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[10px] text-ink-40">当前套餐</span>
+              <span className="font-sans text-xs font-medium text-ink">{planLabel}</span>
+            </div>
+            {showUpgradeCta && (
+              <Link
+                href="/pricing"
+                className="mt-2 block w-full rounded-md bg-ink py-1.5 text-center font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
+              >
+                升级套餐 →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+      {collapsed && showUpgradeCta && (
+        <div className="flex-none px-2 pb-1">
+          <Link
+            href="/pricing"
+            title="升级套餐"
+            className="flex h-7 w-full items-center justify-center rounded bg-ink text-card"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+              <path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </Link>
+        </div>
+      )}
 
       {/* 底部用户区：始终固定底部 */}
       <div className="flex-none border-t border-line px-3 py-3">

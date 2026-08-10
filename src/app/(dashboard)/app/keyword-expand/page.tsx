@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
 
 interface UsageBadge {
@@ -67,9 +68,9 @@ export default function KeywordExpandPage() {
         );
         const json = await res.json();
         if (!res.ok) {
-          const msg = json?.error ?? "查询失败";
-          setSerp({ loading: false, data: null, error: msg, keyword: kw });
-          show(msg, "error");
+          const { message } = handleBillingError(json, "查询失败");
+          setSerp({ loading: false, data: null, error: message, keyword: kw });
+          show(message, "error");
           return;
         }
         setSerp({ loading: false, data: json.data, error: null, keyword: kw });
@@ -90,7 +91,8 @@ export default function KeywordExpandPage() {
         });
         const json = await res.json();
         if (!res.ok) {
-          setExpand({ loading: false, data: null, error: json?.error ?? "拓词失败" });
+          const { message } = handleBillingError(json, "拓词失败");
+          setExpand({ loading: false, data: null, error: message });
           return;
         }
         setExpand({ loading: false, data: json.data, error: null });
@@ -126,7 +128,8 @@ export default function KeywordExpandPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        show(json?.error ?? "添加失败", "error");
+        const { message } = handleBillingError(json, "添加失败");
+        show(message, "error");
         setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
         return;
       }

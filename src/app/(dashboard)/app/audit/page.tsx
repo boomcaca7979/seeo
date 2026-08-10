@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense }
 import { useSearchParams } from "next/navigation";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import Modal from "@/components/dashboard/Modal";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import AuditReport from "@/components/reports/AuditReport";
@@ -226,8 +227,8 @@ function AuditPageInner() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "审计失败";
-        show(msg, "error");
+        const { message } = handleBillingError(json, "审计失败");
+        show(message, "error");
         return;
       }
       try {
@@ -349,7 +350,8 @@ function AuditPageInner() {
         show("已保存到报表中心", "success");
         setExportOpen(false);
       } else {
-        show(json?.error ?? "保存失败", "error");
+        const { message } = handleBillingError(json, "保存失败");
+        show(message, "error");
       }
     } catch (err) {
       show(`保存失败：${(err as Error).message}`, "error");

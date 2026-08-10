@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import HealthScoreBars from "@/components/dashboard/charts/HealthScoreBars";
 import AlertAreaChart from "@/components/dashboard/charts/AlertAreaChart";
@@ -136,7 +137,8 @@ export default function ProjectList({
       });
       const data = await res.json();
       if (!res.ok) {
-        show(data.error || "创建失败", "error");
+        const { message } = handleBillingError(data, "创建失败");
+        show(message, "error");
         setCreating(false);
         return;
       }

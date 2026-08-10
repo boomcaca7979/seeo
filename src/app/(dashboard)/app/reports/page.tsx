@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import RankingReport from "@/components/reports/RankingReport";
 import AuditReport from "@/components/reports/AuditReport";
@@ -201,8 +202,8 @@ export default function ReportsPage() {
       const res = await fetch(`/api/reports/${type}`, { cache: "no-store" });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        const msg = json?.error ?? "导出失败";
-        show(msg, "error");
+        const { message } = handleBillingError(json, "导出失败");
+        show(message, "error");
         return;
       }
       const blob = await res.blob();
@@ -356,8 +357,8 @@ export default function ReportsPage() {
         const verifyRes = await fetch(`/api/reports/pdf?id=${verifyId}`, { cache: "no-store" });
         if (!verifyRes.ok) {
           const json = await verifyRes.json().catch(() => ({}));
-          const msg = json?.message ?? json?.error ?? "PDF 导出权限不足";
-          show(msg, "error");
+          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          show(message, "error");
           return;
         }
       } else {
@@ -366,8 +367,8 @@ export default function ReportsPage() {
         if (!verifyRes.ok && verifyRes.status !== 404) {
           // 404 是正常的（id=0 不存在），但 403 表示 feature 不允许
           const json = await verifyRes.json().catch(() => ({}));
-          const msg = json?.message ?? json?.error ?? "PDF 导出权限不足";
-          show(msg, "error");
+          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          show(message, "error");
           return;
         }
       }
@@ -417,7 +418,8 @@ export default function ReportsPage() {
         show("已保存到报告中心", "success");
         await loadReports();
       } else {
-        show(json?.error ?? "保存失败", "error");
+        const { message } = handleBillingError(json, "保存失败");
+        show(message, "error");
       }
     } catch (err) {
       show(`保存失败：${(err as Error).message}`, "error");
@@ -458,7 +460,8 @@ export default function ReportsPage() {
         setEmailModalOpen(false);
         setEmailToSend("");
       } else {
-        show(json?.error ?? "发送失败", "error");
+        const { message } = handleBillingError(json, "发送失败");
+        show(message, "error");
       }
     } catch (err) {
       show(`发送失败：${(err as Error).message}`, "error");

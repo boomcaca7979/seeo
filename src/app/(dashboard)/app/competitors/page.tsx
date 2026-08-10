@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
+import { handleBillingError } from "@/lib/billing-error-client";
 import {
   COMMON_GRID_PROPS,
   COMMON_XAXIS_PROPS,
@@ -265,7 +266,8 @@ export default function CompetitorsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        show(json?.error ?? "添加失败", "error");
+        const { message } = handleBillingError(json, "添加失败");
+        show(message, "error");
         return;
       }
       show(`已添加竞品：${dm}`, "success");
@@ -286,7 +288,8 @@ export default function CompetitorsPage() {
       const res = await fetch(`/api/competitors?id=${id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) {
-        show(json?.error ?? "删除失败", "error");
+        const { message } = handleBillingError(json, "删除失败");
+        show(message, "error");
         return;
       }
       show("已删除竞品", "success");
@@ -319,8 +322,8 @@ export default function CompetitorsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const msg = json?.error ?? "刷新失败";
-        show(msg, "error");
+        const { message } = handleBillingError(json, "刷新失败");
+        show(message, "error");
         setRanks({ ...ranks, results: [] } as RanksData | null);
         return;
       }
