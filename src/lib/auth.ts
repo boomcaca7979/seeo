@@ -8,7 +8,7 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import { getPlanLimits, type PlanLimits } from "@/lib/billing";
 
 /** 套餐等级 */
-export type PlanTier = "free" | "pro" | "team" | "enterprise";
+export type PlanTier = "free" | "lite" | "pro";
 
 /** 订阅状态 */
 export type SubscriptionStatus =

@@ -8,10 +8,9 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import { useToast } from "@/components/dashboard/Toast";
 
 const PLAN_LABELS: Record<string, string> = {
-  free: "免费版",
-  pro: "专业版",
-  team: "团队版",
-  enterprise: "企业版",
+  free: "Free",
+  lite: "Lite",
+  pro: "Pro",
 };
 
 type NavItem = {
@@ -189,7 +188,8 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
   const userEmail = email ?? "dev@seeo.local";
   const avatarLetter = userName.charAt(0).toUpperCase();
   const planLabel = PLAN_LABELS[currentPlan] ?? currentPlan;
-  const showUpgradeCta = currentPlan === "free";
+  // free / lite 显示升级 CTA；pro 不显示
+  const showUpgradeCta = currentPlan === "free" || currentPlan === "lite";
 
   return (
     <aside

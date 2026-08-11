@@ -30,8 +30,8 @@ export function getAdminClient(): SupabaseClient | null {
  */
 export async function getUserPlan(
   userId: string,
-  fallback: "free" | "pro" | "team" | "enterprise" = "free"
-): Promise<"free" | "pro" | "team" | "enterprise"> {
+  fallback: "free" | "lite" | "pro" = "free"
+): Promise<"free" | "lite" | "pro"> {
   const admin = getAdminClient();
   if (!admin) return fallback;
   try {
@@ -40,8 +40,8 @@ export async function getUserPlan(
       .select("plan")
       .eq("id", userId)
       .single();
-    if (data?.plan && ["free", "pro", "team", "enterprise"].includes(data.plan)) {
-      return data.plan as "free" | "pro" | "team" | "enterprise";
+    if (data?.plan && ["free", "lite", "pro"].includes(data.plan)) {
+      return data.plan as "free" | "lite" | "pro";
     }
     return fallback;
   } catch {

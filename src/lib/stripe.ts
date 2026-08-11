@@ -28,13 +28,8 @@ export function getStripe(): Stripe | null {
  * 套餐 → Stripe Price ID 映射（仅服务端使用）
  * price_id 不来自客户端，防止用户篡改
  */
-export function getStripePriceId(plan: "pro" | "team" | "enterprise"): string | null {
-  const envKey =
-    plan === "pro"
-      ? "STRIPE_PRICE_PRO"
-      : plan === "team"
-        ? "STRIPE_PRICE_TEAM"
-        : "STRIPE_PRICE_ENTERPRISE";
+export function getStripePriceId(plan: "lite" | "pro"): string | null {
+  const envKey = plan === "lite" ? "STRIPE_PRICE_LITE" : "STRIPE_PRICE_PRO";
   return process.env[envKey] ?? null;
 }
 

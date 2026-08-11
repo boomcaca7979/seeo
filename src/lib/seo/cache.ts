@@ -20,14 +20,12 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 // 各套餐的 API 月度限额配置
 // free: 50 次 SerpApi / 0 次 DataForSEO
-// pro: 1000 次 SerpApi / 10 次 DataForSEO
-// team: 5000 次 SerpApi / 50 次 DataForSEO
-// enterprise: 无限（用 Number.MAX_SAFE_INTEGER 表示）
+// lite: 300 次 SerpApi / 5 次 DataForSEO
+// pro: 2000 次 SerpApi / 30 次 DataForSEO
 const PLAN_LIMITS: Record<PlanTier, Record<ApiType, number>> = {
   free: { serpapi: 50, dataforseo: 0, content_check: 10 },
-  pro: { serpapi: 1000, dataforseo: 10, content_check: 100 },
-  team: { serpapi: 5000, dataforseo: 50, content_check: 500 },
-  enterprise: { serpapi: Number.MAX_SAFE_INTEGER, dataforseo: Number.MAX_SAFE_INTEGER, content_check: Number.MAX_SAFE_INTEGER },
+  lite: { serpapi: 300, dataforseo: 5, content_check: 50 },
+  pro: { serpapi: 2000, dataforseo: 30, content_check: 300 },
 };
 
 /** 获取某套餐某 API 的月度限额 */

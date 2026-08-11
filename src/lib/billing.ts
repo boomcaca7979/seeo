@@ -20,8 +20,6 @@ export type Feature =
   | "excel_export"
   | "full_audit"
   | "backlinks"
-  | "team_collaboration"
-  | "white_label"
   | "email_report";
 
 /** 套餐限制（与 plan_limits 表字段一一对应） */
@@ -43,6 +41,9 @@ export interface PlanLimits {
   can_team_collaboration: boolean;
   max_seats: number;
 }
+
+// 注：can_white_label / can_team_collaboration / max_seats 字段保留以兼容已有数据库 schema，
+// 新 pricing 模型下不再作为 Feature 门控条件
 
 /** getUserPlan 返回结构 */
 export interface UserPlanResult {
@@ -66,8 +67,8 @@ export interface PlanDisplayInfo {
   priceUnit: string;
   ctaLabel: string;
   /** 走 /api/checkout 的 plan key；undefined 表示不走 checkout */
-  checkoutPlan?: "pro" | "team" | "enterprise";
-  /** 非 checkout 的跳转地址（如 free → /app，enterprise → mailto） */
+  checkoutPlan?: "lite" | "pro";
+  /** 非 checkout 的跳转地址（如 free → /app） */
   ctaHref?: string;
   highlighted?: boolean;
 }
@@ -76,40 +77,32 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
   free: {
     name: "免费版",
     tagline: "适合个人站长和初学者",
-    price: "¥0",
+    price: "$0",
     priceUnit: "/月",
     ctaLabel: "开始使用",
     ctaHref: "/app",
   },
+  lite: {
+    name: "Lite 版",
+    tagline: "适合个人 SEO 入门",
+    price: "$9.9",
+    priceUnit: "/月",
+    ctaLabel: "升级到 Lite",
+    checkoutPlan: "lite",
+  },
   pro: {
     name: "专业版",
     tagline: "适合专业 SEO 从业者",
-    price: "¥69",
+    price: "$29.9",
     priceUnit: "/月",
     ctaLabel: "升级到 Pro",
     checkoutPlan: "pro",
     highlighted: true,
   },
-  team: {
-    name: "团队版",
-    tagline: "适合小型团队与工作室",
-    price: "¥299",
-    priceUnit: "/月",
-    ctaLabel: "升级到 Team",
-    checkoutPlan: "team",
-  },
-  enterprise: {
-    name: "企业版",
-    tagline: "适合团队与代理机构",
-    price: "联系销售",
-    priceUnit: "",
-    ctaLabel: "联系我们",
-    ctaHref: "mailto:support@seeo.local",
-  },
 };
 
 /** 套餐展示顺序 */
-export const PLAN_ORDER: PlanTier[] = ["free", "pro", "team", "enterprise"];
+export const PLAN_ORDER: PlanTier[] = ["free", "lite", "pro"];
 
 // ---------- 默认套餐限制（与 0004_plan_limits.sql 保持一致） ----------
 // 当 Supabase 不可用、未配置、或查询失败时 fallback 使用
@@ -134,59 +127,41 @@ export const DEFAULT_PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     can_team_collaboration: false,
     max_seats: 1,
   },
+  lite: {
+    plan: "lite",
+    max_projects: 3,
+    max_tracked_keywords: 30,
+    max_competitors: 10,
+    max_keyword_groups: 10,
+    serpapi_monthly_limit: 300,
+    dataforseo_monthly_limit: 5,
+    content_check_monthly_limit: 50,
+    audit_daily_limit: 10,
+    audit_max_depth: 2,
+    can_export_pdf: false,
+    can_export_excel: false,
+    can_white_label: false,
+    can_email_report: false,
+    can_team_collaboration: false,
+    max_seats: 1,
+  },
   pro: {
     plan: "pro",
-    max_projects: 5,
-    max_tracked_keywords: 50,
-    max_competitors: 20,
-    max_keyword_groups: 20,
-    serpapi_monthly_limit: 1000,
-    dataforseo_monthly_limit: 10,
-    content_check_monthly_limit: 100,
-    audit_daily_limit: 20,
-    audit_max_depth: 3,
+    max_projects: 10,
+    max_tracked_keywords: 200,
+    max_competitors: 50,
+    max_keyword_groups: 50,
+    serpapi_monthly_limit: 2000,
+    dataforseo_monthly_limit: 30,
+    content_check_monthly_limit: 300,
+    audit_daily_limit: 50,
+    audit_max_depth: 5,
     can_export_pdf: true,
     can_export_excel: true,
     can_white_label: false,
     can_email_report: true,
     can_team_collaboration: false,
     max_seats: 1,
-  },
-  team: {
-    plan: "team",
-    max_projects: 20,
-    max_tracked_keywords: 500,
-    max_competitors: 100,
-    max_keyword_groups: 100,
-    serpapi_monthly_limit: 5000,
-    dataforseo_monthly_limit: 50,
-    content_check_monthly_limit: 500,
-    audit_daily_limit: 100,
-    audit_max_depth: 5,
-    can_export_pdf: true,
-    can_export_excel: true,
-    can_white_label: false,
-    can_email_report: true,
-    can_team_collaboration: true,
-    max_seats: 5,
-  },
-  enterprise: {
-    plan: "enterprise",
-    max_projects: Number.MAX_SAFE_INTEGER,
-    max_tracked_keywords: Number.MAX_SAFE_INTEGER,
-    max_competitors: 1000,
-    max_keyword_groups: 1000,
-    serpapi_monthly_limit: Number.MAX_SAFE_INTEGER,
-    dataforseo_monthly_limit: Number.MAX_SAFE_INTEGER,
-    content_check_monthly_limit: Number.MAX_SAFE_INTEGER,
-    audit_daily_limit: Number.MAX_SAFE_INTEGER,
-    audit_max_depth: 10,
-    can_export_pdf: true,
-    can_export_excel: true,
-    can_white_label: true,
-    can_email_report: true,
-    can_team_collaboration: true,
-    max_seats: 50,
   },
 };
 
@@ -195,29 +170,25 @@ export const DEFAULT_PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 /**
  * 各 Feature 所需的最低套餐或对应权限字段
  * free: 全部禁止
- * pro: 允许 pdf_export / excel_export / email_report / full_audit
- * team: 在 pro 基础上 + team_collaboration
- * enterprise: 全部允许（含 white_label）
+ * lite: 解锁基础额度（无 PDF/Excel 导出、无邮件报告）
+ * pro: 允许 pdf_export / excel_export / email_report / full_audit / backlinks
  */
 const FEATURE_PLAN_GATE: Record<Feature, {
   minPlan: PlanTier;
   flagField?: keyof PlanLimits;
   reason: string;
 }> = {
-  pdf_export: { minPlan: "pro", flagField: "can_export_pdf", reason: "PDF 导出为 Pro 及以上套餐功能" },
-  excel_export: { minPlan: "pro", flagField: "can_export_excel", reason: "Excel 导出为 Pro 及以上套餐功能" },
-  email_report: { minPlan: "pro", flagField: "can_email_report", reason: "邮件报告为 Pro 及以上套餐功能" },
-  full_audit: { minPlan: "pro", flagField: "audit_max_depth", reason: "完整深度审计为 Pro 及以上套餐功能" },
-  backlinks: { minPlan: "pro", flagField: "dataforseo_monthly_limit", reason: "外链查询为 Pro 及以上套餐功能" },
-  team_collaboration: { minPlan: "team", flagField: "can_team_collaboration", reason: "团队协作为 Team 及以上套餐功能" },
-  white_label: { minPlan: "enterprise", flagField: "can_white_label", reason: "白标为 Enterprise 套餐功能" },
+  pdf_export: { minPlan: "pro", flagField: "can_export_pdf", reason: "PDF 导出为 Pro 套餐功能" },
+  excel_export: { minPlan: "pro", flagField: "can_export_excel", reason: "Excel 导出为 Pro 套餐功能" },
+  email_report: { minPlan: "pro", flagField: "can_email_report", reason: "邮件报告为 Pro 套餐功能" },
+  full_audit: { minPlan: "pro", flagField: "audit_max_depth", reason: "完整深度审计为 Pro 套餐功能" },
+  backlinks: { minPlan: "pro", flagField: "dataforseo_monthly_limit", reason: "外链查询为 Pro 套餐功能" },
 };
 
 const PLAN_RANK: Record<PlanTier, number> = {
   free: 0,
-  pro: 1,
-  team: 2,
-  enterprise: 3,
+  lite: 1,
+  pro: 2,
 };
 
 // ---------- 内存缓存 ----------
@@ -348,7 +319,7 @@ export async function getAllPlanLimits(): Promise<PlanLimits[]> {
   }
 
   // 3. Fallback 到默认值
-  const fallback = ["free", "pro", "team", "enterprise"].map(
+  const fallback = ["free", "lite", "pro"].map(
     (p) => DEFAULT_PLAN_LIMITS[p as PlanTier]
   );
   planLimitsAllCache = { value: fallback, expiresAt: Date.now() + PLAN_LIMITS_CACHE_TTL_MS };
@@ -419,8 +390,6 @@ export async function getFeaturesForPlan(plan: PlanTier): Promise<Record<Feature
     excel_export: limits.can_export_excel,
     full_audit: limits.audit_max_depth >= 3,
     backlinks: limits.dataforseo_monthly_limit > 0,
-    team_collaboration: limits.can_team_collaboration,
-    white_label: limits.can_white_label,
     email_report: limits.can_email_report,
   };
 }

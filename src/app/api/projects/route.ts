@@ -84,7 +84,7 @@ export async function POST(req: Request) {
   }
 
   // P2：套餐项目数量限额校验（max_projects）
-  // free=1, pro=5, team=20, enterprise=无限
+  // free=1, lite=3, pro=10（详见 billing.ts DEFAULT_PLAN_LIMITS）
   const maxProjects = auth.limits.max_projects;
   const existingProjects = await listProjects(userId);
   if (existingProjects.length >= maxProjects) {

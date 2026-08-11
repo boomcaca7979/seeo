@@ -19,12 +19,11 @@ export interface UpgradeModalState {
 
 const PLAN_LABELS: Record<string, string> = {
   free: "免费版",
+  lite: "Lite 版",
   pro: "专业版",
-  team: "团队版",
-  enterprise: "企业版",
 };
 
-const PLAN_ORDER: string[] = ["free", "pro", "team", "enterprise"];
+const PLAN_ORDER: string[] = ["free", "lite", "pro"];
 
 const FEATURE_LABELS: Record<string, string> = {
   pdf_export: "PDF 导出",
@@ -32,13 +31,11 @@ const FEATURE_LABELS: Record<string, string> = {
   full_audit: "完整审计",
   backlinks: "外链分析",
   email_report: "邮件报告",
-  team_collaboration: "团队协作",
-  white_label: "白标",
 };
 
-function getNextPlan(currentPlan: string): string {
+function getNextPlan(currentPlan: string): string | null {
   const idx = PLAN_ORDER.indexOf(currentPlan);
-  if (idx === -1 || idx >= PLAN_ORDER.length - 1) return "pro";
+  if (idx === -1 || idx >= PLAN_ORDER.length - 1) return null;
   return PLAN_ORDER[idx + 1];
 }
 
@@ -50,9 +47,10 @@ interface UpgradeModalProps {
 export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
   const { open, currentPlan, requiredPlan, reason, feature, limit, used } = state;
   const recommendPlan = requiredPlan ?? getNextPlan(currentPlan);
-  const recommendLabel = PLAN_LABELS[recommendPlan] ?? recommendPlan;
+  const recommendLabel = recommendPlan ? (PLAN_LABELS[recommendPlan] ?? recommendPlan) : null;
   const currentLabel = PLAN_LABELS[currentPlan] ?? currentPlan;
   const featureLabel = feature ? FEATURE_LABELS[feature] ?? feature : null;
+  const isTopPlan = !recommendPlan;
 
   // ESC 关闭
   useEffect(() => {
@@ -78,7 +76,9 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
         {/* 标题 */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="font-display text-lg font-bold text-ink">升级套餐</h3>
+            <h3 className="font-display text-lg font-bold text-ink">
+              {isTopPlan ? "已达最高套餐" : "升级套餐"}
+            </h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
               当前：{currentLabel}
             </p>
@@ -115,21 +115,23 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
           )}
         </div>
 
-        {/* 推荐套餐 */}
-        <div className="mb-5 rounded-lg border border-brand bg-brand/5 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-mono text-xs text-brand">推荐升级</div>
-              <div className="mt-1 font-display text-xl font-bold text-ink">
-                {recommendLabel}
+        {/* 推荐套餐（仅在存在可升级套餐时显示） */}
+        {recommendLabel && (
+          <div className="mb-5 rounded-lg border border-brand bg-brand/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-mono text-xs text-brand">推荐升级</div>
+                <div className="mt-1 font-display text-xl font-bold text-ink">
+                  {recommendLabel}
+                </div>
               </div>
+              <span className="badge-warn px-2.5 py-1 text-xs">推荐</span>
             </div>
-            <span className="badge-warn px-2.5 py-1 text-xs">推荐</span>
+            <p className="mt-2 font-sans text-xs text-ink-60">
+              升级后立即解锁更多功能与更高额度
+            </p>
           </div>
-          <p className="mt-2 font-sans text-xs text-ink-60">
-            升级后立即解锁更多功能与更高额度
-          </p>
-        </div>
+        )}
 
         {/* CTA */}
         <div className="flex gap-3">
@@ -144,7 +146,7 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
             onClick={onClose}
             className="flex-1 btn-primary py-2.5 text-center text-sm"
           >
-            查看定价方案
+            {isTopPlan ? "查看套餐详情" : "查看定价方案"}
           </Link>
         </div>
       </div>

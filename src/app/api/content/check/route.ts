@@ -130,7 +130,7 @@ export async function POST(req: Request) {
   const url = normalizeUrl(rawUrl);
 
   // P3：内容检查配额校验（content_check_monthly_limit）
-  // free: 10/月, pro: 100/月, team: 500/月, enterprise: 无限
+  // free: 10/月, lite: 50/月, pro: 300/月（详见 billing.ts DEFAULT_PLAN_LIMITS）
   try {
     await requireQuota(userId, "content_check");
   } catch (e) {

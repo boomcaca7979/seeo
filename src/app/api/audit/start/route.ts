@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   }
 
   // P2：套餐级每日审计限额检查（audit_daily_limit）
-  // free=3, pro=20, team=100, enterprise=无限
+  // free=3, lite=10, pro=50（详见 billing.ts DEFAULT_PLAN_LIMITS）
   const today = todayStr();
   const dailyUsage = await getAuditDailyUsage(userId, today);
   const usedToday = dailyUsage?.used ?? 0;
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
 
   // P2：Audit 深度权限校验
   // free: 只允许 quick（audit_max_depth=1）
-  // pro/team/enterprise: 允许 full（audit_max_depth >= 3）
+  // pro: 允许 full（audit_max_depth >= 3）
   if (depth === "full") {
     try {
       await requireFeature(userId, "full_audit");

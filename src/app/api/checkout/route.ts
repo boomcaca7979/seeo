@@ -1,5 +1,5 @@
 // ===== /api/checkout =====
-// POST { plan: "pro" | "team" }：创建 Stripe Checkout Session（subscription 模式）
+// POST { plan: "lite" | "pro" }：创建 Stripe Checkout Session（subscription 模式）
 // 安全要点：
 //   - 必须登录（requireAuthOrDemo）
 //   - price_id 不来自客户端，由服务端根据 plan 映射
@@ -13,10 +13,10 @@ import { createServer } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type CheckoutPlan = "pro" | "team" | "enterprise";
+type CheckoutPlan = "lite" | "pro";
 
 function isValidPlan(plan: unknown): plan is CheckoutPlan {
-  return plan === "pro" || plan === "team" || plan === "enterprise";
+  return plan === "lite" || plan === "pro";
 }
 
 export async function POST(req: Request) {
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   const { plan } = body;
   if (!isValidPlan(plan)) {
     return NextResponse.json(
-      { error: 'plan 必须是 "pro" 或 "team" 或 "enterprise"' },
+      { error: "plan 必须是 lite 或 pro" },
       { status: 400 }
     );
   }

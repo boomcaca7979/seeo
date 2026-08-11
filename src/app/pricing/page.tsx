@@ -14,7 +14,7 @@ interface PlanDisplayInfo {
   price: string;
   priceUnit: string;
   ctaLabel: string;
-  checkoutPlan?: "pro" | "team" | "enterprise";
+  checkoutPlan?: "lite" | "pro";
   ctaHref?: string;
   highlighted?: boolean;
 }
@@ -34,8 +34,6 @@ interface PlanInfo {
   can_export_pdf: boolean;
   can_export_excel: boolean;
   can_email_report: boolean;
-  can_team_collaboration: boolean;
-  can_white_label: boolean;
 }
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
@@ -46,18 +44,17 @@ function formatLimit(v: number): string {
 }
 
 // 将 PlanInfo 转为展示用 feature 列表
+// 仅展示当前系统真实可用能力，与 billing.ts FEATURE_PLAN_GATE 对齐
 function buildFeatureList(p: PlanInfo): { text: string; included: boolean }[] {
   return [
     { text: `项目数 ${formatLimit(p.max_projects)}`, included: true },
-    { text: `关键词追踪 ${formatLimit(p.max_tracked_keywords)}`, included: true },
+    { text: `关键词追踪 ${formatLimit(p.max_tracked_keywords)}`, included: p.max_tracked_keywords > 0 },
     { text: `每日审计 ${p.audit_daily_limit >= UNLIMITED ? "无限" : p.audit_daily_limit + " 次/天"}`, included: true },
     { text: `内容检查 ${formatLimit(p.content_check_monthly_limit)} 次/月`, included: p.content_check_monthly_limit > 0 },
     { text: `SerpApi ${formatLimit(p.serpapi_monthly_limit)} 次/月`, included: p.serpapi_monthly_limit > 0 },
     { text: "PDF 报告导出", included: p.can_export_pdf },
     { text: "Excel 报告导出", included: p.can_export_excel },
     { text: "邮件周报", included: p.can_email_report },
-    { text: "团队协作", included: p.can_team_collaboration },
-    { text: "白标报告", included: p.can_white_label },
   ];
 }
 
@@ -93,7 +90,7 @@ function PricingContent() {
   const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingPlan, setLoadingPlan] = useState<"pro" | "team" | "enterprise" | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<"lite" | "pro" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Checkout 取消回流提示（仅一次，不阻断浏览）
@@ -125,7 +122,7 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, []);
 
-  async function handleCheckout(plan: "pro" | "team" | "enterprise") {
+  async function handleCheckout(plan: "lite" | "pro") {
     setErrorMsg(null);
     setLoadingPlan(plan);
     try {
@@ -171,7 +168,7 @@ function PricingContent() {
         {loading ? (
           <div className="text-center font-mono text-xs text-ink-40">加载中…</div>
         ) : plans && plans.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {plans.map((p) => {
               const features = buildFeatureList(p);
               const isCheckout = !!p.display.checkoutPlan;

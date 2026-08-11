@@ -40,7 +40,7 @@ function extractPlanFromMetadata(
   metadata: Stripe.Metadata | null | undefined
 ): PlanTier | null {
   const plan = metadata?.plan;
-  if (plan === "free" || plan === "pro" || plan === "team" || plan === "enterprise") {
+  if (plan === "free" || plan === "lite" || plan === "pro") {
     return plan;
   }
   return null;

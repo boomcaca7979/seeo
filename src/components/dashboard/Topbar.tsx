@@ -11,17 +11,15 @@ interface TopbarProps {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  free: "免费版",
-  pro: "专业版",
-  team: "团队版",
-  enterprise: "企业版",
+  free: "Free",
+  lite: "Lite",
+  pro: "Pro",
 };
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
   free: "bg-line-soft text-ink-60",
-  pro: "bg-brand/10 text-brand",
-  team: "bg-brand/10 text-brand",
-  enterprise: "bg-ink text-card",
+  lite: "bg-brand/10 text-brand",
+  pro: "bg-ink text-card",
 };
 
 interface AlertItem {
@@ -386,7 +384,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                   <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
                     {PLAN_LABELS[currentPlan] ?? currentPlan}
                   </span>
-                  {currentPlan === "free" && (
+                  {(currentPlan === "free" || currentPlan === "lite") && (
                     <span className="font-mono text-[10px] text-ink-40">点击下方升级</span>
                   )}
                 </div>

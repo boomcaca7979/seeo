@@ -8,6 +8,7 @@ import { getBacklinkSummary, listBacklinks, saveBacklinks } from "@/lib/db";
 import { fetchBacklinks, isDataForSeoConfigured, DataForSeoNotConfiguredError } from "@/lib/seo/dataforseo";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { consumeQuota, peekUsage, QuotaExceededError } from "@/lib/seo/cache";
+import { requireFeature, FeatureNotAllowedError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,18 @@ export async function GET(req: Request) {
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
+
+  // P5：backlinks Feature 权限校验（Pro 专属，free/lite 拒绝）
+  try {
+    await requireFeature(userId, "backlinks");
+  } catch (e) {
+    if (e instanceof FeatureNotAllowedError) {
+      const { status, body } = billingErrorToResponse(e);
+      return NextResponse.json(body, { status });
+    }
+    throw e;
+  }
+
   const { searchParams } = new URL(req.url);
   const domain = normalizeDomain(searchParams.get("domain") ?? "");
   if (!domain) {
@@ -140,6 +153,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
+  // P5：backlinks Feature 权限校验（Pro 专属，free/lite 拒绝）
+  // 必须在 consumeQuota 之前，否则 Lite 用户会因 dataforseo_monthly_limit=5 而绕过 Feature Gate
+  try {
+    await requireFeature(userId, "backlinks");
+  } catch (e) {
+    if (e instanceof FeatureNotAllowedError) {
+      const { status, body } = billingErrorToResponse(e);
+      return NextResponse.json(body, { status });
+    }
+    throw e;
+  }
+
   // 未配置凭证
   if (!isDataForSeoConfigured()) {
     return NextResponse.json(
@@ -173,7 +198,7 @@ export async function POST(req: Request) {
   }
 
   // 真实调用 DataForSEO 前：用户级额度检查 + 计数
-  // free: 0/月，pro: 10/月，team: 50/月，enterprise: 无限
+  // free: 0/月，lite: 5/月，pro: 30/月（详见 billing.ts DEFAULT_PLAN_LIMITS）
   // 超限时返回 DATAFORSEO_QUOTA_EXCEEDED，不继续调用第三方 API
   let usage;
   try {

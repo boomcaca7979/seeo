@@ -6,7 +6,7 @@ import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
 
-type TabKey = "account" | "plan" | "usage" | "team" | "automation";
+type TabKey = "account" | "plan" | "usage" | "automation";
 
 // 套餐展示数据（从 /api/plans 获取，不再前端硬编码）
 interface PlanDisplayInfo {
@@ -15,7 +15,7 @@ interface PlanDisplayInfo {
   price: string;
   priceUnit: string;
   ctaLabel: string;
-  checkoutPlan?: "pro" | "team" | "enterprise";
+  checkoutPlan?: "lite" | "pro";
   ctaHref?: string;
   highlighted?: boolean;
 }
@@ -33,8 +33,6 @@ interface PlanInfo {
   can_export_pdf: boolean;
   can_export_excel: boolean;
   can_email_report: boolean;
-  can_team_collaboration: boolean;
-  can_white_label: boolean;
 }
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
@@ -96,10 +94,9 @@ interface UsageData {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  free: "免费版",
-  pro: "专业版",
-  team: "团队版",
-  enterprise: "企业版",
+  free: "Free",
+  lite: "Lite",
+  pro: "Pro",
 };
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -108,8 +105,6 @@ const FEATURE_LABELS: Record<string, string> = {
   full_audit: "完整审计",
   backlinks: "外链分析",
   email_report: "邮件报告",
-  team_collaboration: "团队协作",
-  white_label: "白标",
 };
 
 export default function SettingsPage() {
@@ -267,7 +262,6 @@ function SettingsContent() {
     { key: "account", label: "账号信息" },
     { key: "plan", label: "订阅套餐" },
     { key: "usage", label: "用量统计" },
-    { key: "team", label: "团队" },
     { key: "automation", label: "自动化" },
   ];
 
@@ -282,7 +276,7 @@ function SettingsContent() {
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60">
-        管理账号、订阅、用量与团队。
+        管理账号、订阅与用量。
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -377,7 +371,7 @@ function SettingsContent() {
                   ? `当前：${PLAN_LABELS[usageData.plan] ?? usageData.plan} · 可随时升级或降级`
                   : "加载当前套餐中…"}
               </p>
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {plansLoading ? (
                   <div className="col-span-full font-mono text-xs text-ink-40">加载套餐中…</div>
                 ) : plans && plans.length > 0 ? (
@@ -447,30 +441,6 @@ function SettingsContent() {
           {/* 用量统计 */}
           {tab === "usage" && (
             <UsageDashboard usageData={usageData} loading={usageLoading} onRefresh={fetchUsage} />
-          )}
-
-          {/* 团队占位 */}
-          {tab === "team" && (
-            <div className="card-a p-8">
-              <h2 className="font-display text-lg font-bold text-ink">团队</h2>
-              <div className="mt-6 flex flex-col items-center justify-center py-10 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-line-soft font-mono text-3xl text-ink-40">
-                  👥
-                </div>
-                <div className="mt-4 font-sans text-sm font-medium text-ink-60">
-                  团队功能即将上线
-                </div>
-                <p className="mt-1 max-w-sm font-mono text-xs text-ink-40">
-                  上线后可邀请成员、分配角色权限、共享项目数据。当前演示模式下此区域为占位说明。
-                </p>
-                <button
-                  onClick={() => show("团队功能即将上线，敬请期待", "info")}
-                  className="btn-secondary mt-5"
-                >
-                  通知我上线
-                </button>
-              </div>
-            </div>
           )}
 
           {/* 自动化 */}
