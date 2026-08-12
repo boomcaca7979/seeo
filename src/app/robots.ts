@@ -5,7 +5,7 @@
 
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://seeo-five.vercel.app";
+const SITE_URL = "https://www.seeo.asia";
 
 export default function robots(): MetadataRoute.Robots {
   return {

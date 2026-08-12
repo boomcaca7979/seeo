@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-const SITE_URL = "https://seeo-five.vercel.app";
+const SITE_URL = "https://www.seeo.asia";
 
 const siteTitle = "SeeO · SEO 数据分析、排名追踪与审计平台";
 const siteDescription =
