@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
@@ -36,6 +36,8 @@ interface PlanInfo {
   can_email_report: boolean;
 }
 
+type PaymentChannel = "alipay" | "wxpay";
+
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
 function formatLimit(v: number): string {
@@ -44,7 +46,6 @@ function formatLimit(v: number): string {
 }
 
 // 将 PlanInfo 转为展示用 feature 列表
-// 仅展示当前系统真实可用能力，与 billing.ts FEATURE_PLAN_GATE 对齐
 function buildFeatureList(p: PlanInfo): { text: string; included: boolean }[] {
   return [
     { text: `项目数 ${formatLimit(p.max_projects)}`, included: true },
@@ -65,7 +66,15 @@ const faqs = [
   },
   {
     q: "如何升级套餐？",
-    a: "点击对应套餐的升级按钮，通过 Stripe 安全支付页面完成订阅后，权限立即生效。支持随时取消。",
+    a: "点击对应套餐的升级按钮，选择支付宝或微信支付，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。",
+  },
+  {
+    q: "支持哪些支付方式？",
+    a: "目前支持支付宝和微信支付两种方式，由耀立支付提供聚合支付技术服务。",
+  },
+  {
+    q: "会员到期后会怎样？",
+    a: "到期后套餐将自动恢复为免费版，已创建的数据（项目、关键词、报告等）不会丢失，但功能与额度将按免费版限制。可以随时重新购买。",
   },
   {
     q: "SerpApi 额度是什么？",
@@ -73,7 +82,7 @@ const faqs = [
   },
   {
     q: "数据存储在哪里？",
-    a: "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。支付由 Stripe 处理，我们不存储信用卡信息。",
+    a: "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。",
   },
 ];
 
@@ -86,15 +95,19 @@ export default function PricingPage() {
 }
 
 function PricingContent() {
+  const router = useRouter();
   const { show, Toast } = useToast();
   const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingPlan, setLoadingPlan] = useState<"lite" | "pro" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Checkout 取消回流提示（仅一次，不阻断浏览）
-  const isCheckoutCancel = searchParams.get("checkout") === "cancel";
+  // 支付方式选择弹窗
+  const [selectedPlan, setSelectedPlan] = useState<"lite" | "pro" | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  // Checkout 取消回流提示
+  const isCheckoutCancel = searchParams.get("payment") === "cancel";
   useEffect(() => {
     if (isCheckoutCancel) {
       show("支付已取消，套餐未发生变化", "info");
@@ -122,31 +135,47 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, []);
 
-  async function handleCheckout(plan: "lite" | "pro") {
+  // 创建耀立支付订单
+  async function handleCreatePayment(plan: "lite" | "pro", channel: PaymentChannel) {
+    setCreating(true);
     setErrorMsg(null);
-    setLoadingPlan(plan);
     try {
-      const res = await fetch("/api/checkout", {
+      const res = await fetch("/api/payment/yaolipay/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, payment_channel: channel }),
       });
       const json = await res.json();
       if (!res.ok) {
-        // billing 错误走升级引导，普通错误 toast
-        const { message } = handleBillingError(json, "创建支付会话失败，请稍后重试");
+        const { message } = handleBillingError(json, "创建订单失败，请稍后重试");
         show(message, "error");
         return;
       }
-      if (json?.url) {
-        window.location.assign(json.url);
-      } else {
-        setErrorMsg("未收到 Stripe Checkout URL");
+
+      const data = json.data;
+      if (!data) {
+        setErrorMsg("未收到支付信息");
+        return;
       }
+
+      // 根据 pay_type 决定展示方式
+      const payType = data.pay_type as string | null;
+      const payInfo = data.pay_info as string | null;
+      const outTradeNo = data.out_trade_no as string;
+
+      // 跳转到支付结果页，由该页处理支付展示与轮询
+      const params = new URLSearchParams({
+        order: outTradeNo,
+        pay_type: payType ?? "",
+        channel,
+      });
+      // 把 pay_info 编码后传过去（可能较长）
+      if (payInfo) params.set("pay_info", payInfo);
+      router.push(`/payment/result?${params.toString()}`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "网络错误，请稍后重试");
     } finally {
-      setLoadingPlan(null);
+      setCreating(false);
     }
   }
 
@@ -159,7 +188,7 @@ function PricingContent() {
         <span className="font-mono text-xs text-brand">PRICING</span>
         <h1 className="mt-3 font-mono text-3xl font-bold text-ink">选择适合你的方案</h1>
         <p className="mt-3 font-sans text-sm text-ink-60 max-w-xl mx-auto">
-          从免费开始，随时升级。所有方案均包含核心 SEO 功能。
+          从免费开始，随时升级。一次性购买 30 天会员，支持支付宝 / 微信支付。
         </p>
       </div>
 
@@ -205,16 +234,15 @@ function PricingContent() {
                     ))}
                   </ul>
 
-                  {/* CTA：checkout / link */}
+                  {/* CTA：打开支付方式选择弹窗 */}
                   {isCheckout ? (
                     <button
-                      onClick={() => handleCheckout(p.display.checkoutPlan!)}
-                      disabled={loadingPlan !== null}
+                      onClick={() => setSelectedPlan(p.display.checkoutPlan!)}
                       className={`block w-full text-center py-2.5 ${
                         p.display.highlighted ? "btn-primary" : "btn-secondary"
-                      } ${loadingPlan !== null ? "opacity-50 cursor-not-allowed" : ""}`}
+                      }`}
                     >
-                      {loadingPlan === p.display.checkoutPlan ? "正在跳转支付..." : p.display.ctaLabel}
+                      {p.display.ctaLabel}
                     </button>
                   ) : (
                     <Link
@@ -250,7 +278,7 @@ function PricingContent() {
       <div className="mx-auto max-w-3xl px-6 pb-8">
         <div className="card-a p-4">
           <p className="font-sans text-xs text-ink-40 text-center">
-            套餐价格与限制统一由 billing 层管理。支付由 Stripe 安全处理，我们不存储信用卡信息。
+            套餐价格与限制统一由 billing 层管理。支付由耀立支付聚合支付服务处理，支持支付宝与微信支付。
           </p>
         </div>
       </div>
@@ -281,7 +309,99 @@ function PricingContent() {
         </div>
       </div>
 
+      {/* 支付方式选择弹窗 */}
+      {selectedPlan && (
+        <PaymentChannelModal
+          plan={selectedPlan}
+          loading={creating}
+          onClose={() => setSelectedPlan(null)}
+          onSelect={(channel) => handleCreatePayment(selectedPlan, channel)}
+        />
+      )}
+
       <Toast />
+    </div>
+  );
+}
+
+// ===== 支付方式选择弹窗 =====
+function PaymentChannelModal({
+  plan,
+  loading,
+  onClose,
+  onSelect,
+}: {
+  plan: "lite" | "pro";
+  loading: boolean;
+  onClose: () => void;
+  onSelect: (channel: PaymentChannel) => void;
+}) {
+  const planLabel = plan === "lite" ? "Lite 版" : "专业版";
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-line bg-card p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5 flex items-start justify-between">
+          <div>
+            <h3 className="font-display text-lg font-bold text-ink">选择支付方式</h3>
+            <p className="mt-1 font-mono text-xs text-ink-40">
+              {planLabel} · 30 天会员
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
+            aria-label="关闭"
+            disabled={loading}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={() => onSelect("alipay")}
+            disabled={loading}
+            className="flex w-full items-center gap-3 rounded-lg border border-line p-4 text-left transition-colors hover:border-brand hover:bg-brand/5 disabled:opacity-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded bg-[#1677FF] text-white">
+              <span className="font-mono text-xs">支</span>
+            </div>
+            <div>
+              <div className="font-display text-sm font-bold text-ink">支付宝</div>
+              <div className="font-sans text-xs text-ink-40">跳转支付宝完成支付</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => onSelect("wxpay")}
+            disabled={loading}
+            className="flex w-full items-center gap-3 rounded-lg border border-line p-4 text-left transition-colors hover:border-brand hover:bg-brand/5 disabled:opacity-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded bg-[#09BB07] text-white">
+              <span className="font-mono text-xs">微</span>
+            </div>
+            <div>
+              <div className="font-display text-sm font-bold text-ink">微信支付</div>
+              <div className="font-sans text-xs text-ink-40">扫码或跳转微信完成支付</div>
+            </div>
+          </button>
+        </div>
+
+        {loading && (
+          <div className="mt-4 text-center font-mono text-xs text-ink-40">
+            正在创建订单…
+          </div>
+        )}
+      </div>
     </div>
   );
 }

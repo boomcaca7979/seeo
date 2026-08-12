@@ -5,7 +5,11 @@
 // 数据来源：
 //   - 套餐限制：优先查 Supabase plan_limits 表（0004_plan_limits.sql）
 //   - 不可用时 fallback 到 DEFAULT_PLAN_LIMITS（与迁移 SQL 保持一致）
-//   - 用户套餐：profiles.plan / subscription_status
+//   - 用户套餐：profiles.plan / subscription_status / current_period_end
+//
+// 支付模式：耀立支付 V2 一次性购买 30 天会员（非自动续费）
+//   - 支付成功后 profiles.plan 升级、subscription_status=active、current_period_end=+30天
+//   - 到期由 cron /api/cron/membership-expire 自动降级 plan=free、subscription_status=expired
 
 import { createServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -48,7 +52,10 @@ export interface PlanLimits {
 /** getUserPlan 返回结构 */
 export interface UserPlanResult {
   plan: PlanTier;
+  /** 逻辑上有效的 plan：若订阅已过期，则为 "free" */
+  effectivePlan: PlanTier;
   subscriptionStatus: SubscriptionStatus;
+  currentPeriodEnd: string | null;
 }
 
 /** checkFeature 返回结构 */
@@ -66,35 +73,57 @@ export interface PlanDisplayInfo {
   price: string;
   priceUnit: string;
   ctaLabel: string;
-  /** 走 /api/checkout 的 plan key；undefined 表示不走 checkout */
+  /** 走 /api/payment/yaolipay/create 的 plan key；undefined 表示不走支付 */
   checkoutPlan?: "lite" | "pro";
-  /** 非 checkout 的跳转地址（如 free → /app） */
+  /** 非支付的跳转地址（如 free → /app） */
   ctaHref?: string;
   highlighted?: boolean;
+}
+
+// ---------- 一次性购买 30 天会员的服务端权威价格表 ----------
+// 客户端不可传金额；订单服务 / create API 从此表读取
+// 金额以人民币分（CNY cents）为单位，避免浮点误差
+export interface PlanPricing {
+  /** 人民币分（如 990 = ¥9.90） */
+  amountCents: number;
+  /** 币种，固定 CNY */
+  currency: "CNY";
+  /** 周期天数（一次性购买 N 天会员） */
+  periodDays: number;
+}
+
+export const PLAN_PRICING: Record<"lite" | "pro", PlanPricing> = {
+  lite: { amountCents: 990, currency: "CNY", periodDays: 30 },
+  pro: { amountCents: 2990, currency: "CNY", periodDays: 30 },
+};
+
+/** 将分转成元字符串（保留 2 位小数），用于传给耀立接口的 money 参数 */
+export function formatAmountYuan(amountCents: number): string {
+  return (amountCents / 100).toFixed(2);
 }
 
 export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
   free: {
     name: "免费版",
     tagline: "适合个人站长和初学者",
-    price: "$0",
-    priceUnit: "/月",
+    price: "¥0",
+    priceUnit: "",
     ctaLabel: "开始使用",
     ctaHref: "/app",
   },
   lite: {
     name: "Lite 版",
     tagline: "适合个人 SEO 入门",
-    price: "$9.9",
-    priceUnit: "/月",
+    price: "¥9.9",
+    priceUnit: "/30天",
     ctaLabel: "升级到 Lite",
     checkoutPlan: "lite",
   },
   pro: {
     name: "专业版",
     tagline: "适合专业 SEO 从业者",
-    price: "$29.9",
-    priceUnit: "/月",
+    price: "¥29.9",
+    priceUnit: "/30天",
     ctaLabel: "升级到 Pro",
     checkoutPlan: "pro",
     highlighted: true,
@@ -204,14 +233,41 @@ function isCacheValid(entry: { expiresAt: number } | null): boolean {
 // ---------- 公共 API ----------
 
 /**
+ * 判断用户当前订阅是否仍然有效
+ * 规则：subscription_status=active/trialing 且 current_period_end 未过期
+ */
+export function isSubscriptionActive(
+  status: SubscriptionStatus,
+  currentPeriodEnd: string | null
+): boolean {
+  if (status !== "active" && status !== "trialing") return false;
+  if (!currentPeriodEnd) return true; // 无到期时间视为有效（兼容老数据）
+  try {
+    return new Date(currentPeriodEnd).getTime() > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 获取某用户的套餐与订阅状态
  * - 鉴权模式：查 profiles 表
  * - 演示模式 / 查询失败：返回 free + inactive
+ *
+ * 重要：effectivePlan 字段反映"当前实际可用套餐"
+ *   - plan：数据库存储的套餐（可能已过期但仍保留）
+ *   - effectivePlan：若订阅已过期则降为 "free"
+ * Feature/Quota/PlanLimit 校验应使用 effectivePlan
  */
 export async function getUserPlan(userId: string): Promise<UserPlanResult> {
   // 演示模式：直接返回默认值
   if (!isAuthEnabled) {
-    return { plan: "free", subscriptionStatus: "inactive" };
+    return {
+      plan: "free",
+      effectivePlan: "free",
+      subscriptionStatus: "inactive",
+      currentPeriodEnd: null,
+    };
   }
 
   // 优先用 admin client（绕过 RLS，cron 等无 session 场景可用）
@@ -220,14 +276,17 @@ export async function getUserPlan(userId: string): Promise<UserPlanResult> {
     try {
       const { data } = await admin
         .from("profiles")
-        .select("plan, subscription_status")
+        .select("plan, subscription_status, current_period_end")
         .eq("id", userId)
         .single();
       if (data) {
-        return {
-          plan: (data.plan as PlanTier) ?? "free",
-          subscriptionStatus: (data.subscription_status as SubscriptionStatus) ?? "inactive",
-        };
+        const plan = (data.plan as PlanTier) ?? "free";
+        const subscriptionStatus = (data.subscription_status as SubscriptionStatus) ?? "inactive";
+        const currentPeriodEnd = (data.current_period_end as string | null) ?? null;
+        const effectivePlan = isSubscriptionActive(subscriptionStatus, currentPeriodEnd)
+          ? plan
+          : "free";
+        return { plan, effectivePlan, subscriptionStatus, currentPeriodEnd };
       }
     } catch {
       // admin 查询失败，fallback 到 user client
@@ -239,19 +298,27 @@ export async function getUserPlan(userId: string): Promise<UserPlanResult> {
     const supabase = await createServer();
     const { data } = await supabase
       .from("profiles")
-      .select("plan, subscription_status")
+      .select("plan, subscription_status, current_period_end")
       .eq("id", userId)
       .single();
     if (data) {
-      return {
-        plan: (data.plan as PlanTier) ?? "free",
-        subscriptionStatus: (data.subscription_status as SubscriptionStatus) ?? "inactive",
-      };
+      const plan = (data.plan as PlanTier) ?? "free";
+      const subscriptionStatus = (data.subscription_status as SubscriptionStatus) ?? "inactive";
+      const currentPeriodEnd = (data.current_period_end as string | null) ?? null;
+      const effectivePlan = isSubscriptionActive(subscriptionStatus, currentPeriodEnd)
+        ? plan
+        : "free";
+      return { plan, effectivePlan, subscriptionStatus, currentPeriodEnd };
     }
   } catch {
     // 查询失败，返回默认值
   }
-  return { plan: "free", subscriptionStatus: "inactive" };
+  return {
+    plan: "free",
+    effectivePlan: "free",
+    subscriptionStatus: "inactive",
+    currentPeriodEnd: null,
+  };
 }
 
 /**
@@ -347,19 +414,19 @@ export async function getAllPlanInfo(): Promise<PlanInfo[]> {
 /**
  * 检查用户是否拥有某 Feature 权限
  * 规则：
- *   - 用户套餐等级 >= Feature 所需最低套餐
+ *   - 用户套餐等级（effectivePlan，过期会降为 free） >= Feature 所需最低套餐
  *   - 且对应 boolean flag 为 true（或数值字段 > 0）
  */
 export async function checkFeature(
   userId: string,
   feature: Feature
 ): Promise<FeatureCheckResult> {
-  const { plan } = await getUserPlan(userId);
-  const limits = await getPlanLimits(plan);
+  const { effectivePlan } = await getUserPlan(userId);
+  const limits = await getPlanLimits(effectivePlan);
   const gate = FEATURE_PLAN_GATE[feature];
 
   // 1. 套餐等级检查
-  if (PLAN_RANK[plan] < PLAN_RANK[gate.minPlan]) {
+  if (PLAN_RANK[effectivePlan] < PLAN_RANK[gate.minPlan]) {
     return { allowed: false, reason: gate.reason };
   }
 

@@ -57,10 +57,10 @@ export async function requireFeature(
   userId: string,
   feature: Feature
 ): Promise<void> {
-  const { plan } = await getUserPlan(userId);
+  const { effectivePlan } = await getUserPlan(userId);
   const result = await checkFeature(userId, feature);
   if (!result.allowed) {
-    throw new FeatureNotAllowedError(feature, plan, result.reason);
+    throw new FeatureNotAllowedError(feature, effectivePlan, result.reason);
   }
 }
 
@@ -95,9 +95,9 @@ export async function requireQuota(
   userId: string,
   apiType: ApiType
 ): Promise<ApiUsage> {
-  const { plan } = await getUserPlan(userId);
+  const { effectivePlan } = await getUserPlan(userId);
   try {
-    return await consumeQuota(userId, apiType, plan);
+    return await consumeQuota(userId, apiType, effectivePlan);
   } catch (e) {
     // 将 cache.ts 的 QuotaExceededError 转换为 billing-errors 的统一格式
     if (e instanceof Error && e.name === "QuotaExceededError") {
@@ -107,7 +107,7 @@ export async function requireQuota(
         cacheErr.limit,
         cacheErr.apiType,
         cacheErr.month,
-        plan
+        effectivePlan
       );
     }
     throw e;
@@ -122,8 +122,8 @@ export async function peekQuota(
   userId: string,
   apiType: ApiType
 ): Promise<ApiUsage> {
-  const { plan } = await getUserPlan(userId);
-  return peekUsage(userId, apiType, plan);
+  const { effectivePlan } = await getUserPlan(userId);
+  return peekUsage(userId, apiType, effectivePlan);
 }
 
 /**
@@ -143,21 +143,22 @@ export async function requirePlanLimit(
   limitField: keyof PlanLimits,
   code?: string
 ): Promise<void> {
-  const { plan } = await getUserPlan(userId);
-  const limits = await getPlanLimits(plan);
+  const { effectivePlan } = await getUserPlan(userId);
+  const limits = await getPlanLimits(effectivePlan);
   const limit = limits[limitField];
   if (typeof limit === "number" && currentCount >= limit) {
-    throw new PlanLimitError(resource, plan, limit, code);
+    throw new PlanLimitError(resource, effectivePlan, limit, code);
   }
 }
 
 /**
  * 一次性获取用户套餐 + 限制（供 API 路由快速访问）
+ * 使用 effectivePlan（已过期会降为 free）
  */
 export async function getUserBillingContext(
   userId: string
 ): Promise<{ plan: PlanTier; limits: PlanLimits }> {
-  const { plan } = await getUserPlan(userId);
-  const limits = await getPlanLimits(plan);
-  return { plan, limits };
+  const { effectivePlan } = await getUserPlan(userId);
+  const limits = await getPlanLimits(effectivePlan);
+  return { plan: effectivePlan, limits };
 }

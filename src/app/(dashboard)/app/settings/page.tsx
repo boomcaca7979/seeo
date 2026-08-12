@@ -210,8 +210,8 @@ function SettingsContent() {
     }
   }, []);
 
-  // Checkout 回流处理：支付成功后显示提示并延迟刷新套餐状态（等待 webhook）
-  const isCheckoutSuccess = searchParams.get("checkout") === "success";
+  // 支付回流处理：支付成功后显示提示并延迟刷新套餐状态（等待 notify 回调）
+  const isCheckoutSuccess = searchParams.get("payment") === "success";
   useEffect(() => {
     if (!isCheckoutSuccess) return;
     show("升级成功，套餐权益将在几秒内生效", "success");
@@ -422,7 +422,7 @@ function SettingsContent() {
                           onClick={() =>
                             isCurrent
                               ? show("当前已在使用此套餐", "info")
-                              : show("套餐变更将通过 Stripe 安全支付页面完成", "info")
+                              : show("套餐变更将通过支付页面完成，支持支付宝 / 微信支付", "info")
                           }
                           className={isCurrent ? "btn-secondary mt-5 w-full" : "btn-primary mt-5 w-full"}
                         >

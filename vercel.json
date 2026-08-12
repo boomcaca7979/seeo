@@ -3,6 +3,10 @@
     {
       "path": "/api/automation/run",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/membership-expire",
+      "schedule": "0 * * * *"
     }
   ]
 }
