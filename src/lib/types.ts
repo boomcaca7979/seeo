@@ -13,4 +13,9 @@ export interface DatabaseProfile {
   display_name: string | null;
   avatar_url: string | null;
   created_at: string;
+  plan?: string;
+  subscription_status?: string;
+  subscription_id?: string | null;
+  current_period_end?: string | null;
+  trial_ends_at?: string | null;
 }
