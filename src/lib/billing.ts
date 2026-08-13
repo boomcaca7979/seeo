@@ -93,7 +93,7 @@ export interface PlanPricing {
 }
 
 export const PLAN_PRICING: Record<"lite" | "pro", PlanPricing> = {
-  lite: { amountCents: 1, currency: "CNY", periodDays: 30 },
+  lite: { amountCents: 990, currency: "CNY", periodDays: 30 },
   pro: { amountCents: 2990, currency: "CNY", periodDays: 30 },
 };
 
