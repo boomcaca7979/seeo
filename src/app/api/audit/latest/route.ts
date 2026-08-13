@@ -2,7 +2,7 @@
 // 返回最近一次审计结果（含问题清单 + 历史对比 + 检查项覆盖 + 页面响应时间明细）
 
 import { NextResponse } from "next/server";
-import { getLatestAudit, getAuditIssues, getAuditHistory, type AuditIssueRow } from "@/lib/db";
+import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
 import { allCheckMeta, checkMetaMap, type CheckMeta } from "@/lib/seo/audit-checks";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -84,6 +84,10 @@ export async function GET(req: Request) {
   if (!domain) {
     return NextResponse.json({ error: "缺少 domain 参数" }, { status: 400 });
   }
+
+  // 回收因 after() 被服务器回收而永久停留在 running 的审计行，
+  // 使重新进入页面时不再误显“审计进行中”，并允许用户重跑。
+  await reapStaleRunningAudit(userId, domain);
 
   const audit = await getLatestAudit(userId, domain);
   if (!audit) {

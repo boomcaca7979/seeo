@@ -4,7 +4,7 @@
 // P2：增加 depth 权限校验（free=quick only）+ audit_daily_limit 套餐限额
 
 import { NextResponse, after } from "next/server";
-import { createAudit, getLatestAudit, tryIncrementAuditDailyUsage } from "@/lib/db";
+import { createAudit, getLatestAudit, reapStaleRunningAudit, tryIncrementAuditDailyUsage } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
@@ -92,6 +92,8 @@ export async function POST(req: Request) {
   }
 
   // 防滥用：按 depth 分别限制 1 小时冷却
+  // 先回收因 after() 被服务器回收而永久停留在 running 的审计行，避免 409 拦截阻止用户重跑
+  await reapStaleRunningAudit(userId, domain);
   const latest = await getLatestAudit(userId, domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({

@@ -257,9 +257,9 @@ function AuditPageInner() {
           if (status === "completed" || status === "failed") {
             break;
           }
-          // 仍在 running，更新进度
-          if (pollJson.data?.pagesCrawled != null) {
-            // 可选：更新 UI 显示已爬页数
+          // data=null：审计记录丢失（createAudit 失败或被清理），不再轮询
+          if (pollJson.data === null) {
+            break;
           }
         }
         // 加载最终结果
@@ -267,27 +267,36 @@ function AuditPageInner() {
         // 重新查询最新结果判断成功/失败
         const finalRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
         const finalJson = await finalRes.json();
-        if (finalJson.data?.status === "failed") {
-          const apiErr = finalJson.data?.error || finalJson?.error;
-          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
-          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
-        } else {
+        const finalStatus = finalJson.data?.status;
+        if (finalStatus === "completed") {
           show(
             `审计完成：健康度 ${finalJson.data?.healthScore ?? 0} 分，已爬 ${finalJson.data?.pagesCrawled ?? 0} 页`,
             "success"
           );
+        } else if (finalStatus === "failed") {
+          const apiErr = finalJson.data?.error || finalJson?.error;
+          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
+          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+        } else if (finalStatus === "running") {
+          // 轮询超时，审计仍在运行（after() 执行较慢或被限流）
+          show("审计仍在进行中，请稍后刷新页面查看结果", "info");
+        } else {
+          // data=null：审计记录丢失
+          show("审计记录未找到，请稍后重试", "error");
         }
       } else {
         // 兼容旧同步模式（直接返回结果）
-        if (json.data?.status === "failed") {
-          const apiErr = json.data?.error || json?.error;
-          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
-          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
-        } else {
+        if (json.data?.status === "completed") {
           show(
             `审计完成：健康度 ${json.data?.healthScore ?? 0} 分，已爬 ${json.data?.pagesCrawled ?? 0} 页`,
             "success"
           );
+        } else if (json.data?.status === "failed") {
+          const apiErr = json.data?.error || json?.error;
+          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
+          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+        } else {
+          show("审计状态异常，请稍后重试", "error");
         }
         await loadLatest(domain);
       }

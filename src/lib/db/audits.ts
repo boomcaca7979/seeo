@@ -77,13 +77,15 @@ export async function finishAudit(
   }
 ): Promise<void> {
   const db = await getAdapter();
+  // WHERE 含 status = 'running'：runAudit 收尾时 audit 必为 running（不受影响）；
+  // reapStaleRunningAudit 回收时只覆盖仍 running 的行，已 completed 的不会被误改为 failed。
   await db.run(`
     UPDATE audits
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
         comparison = COALESCE(?, comparison),
         error = COALESCE(?, error),
         pages_detail = COALESCE(?, pages_detail)
-    WHERE id = ? AND user_id = ?
+    WHERE id = ? AND user_id = ? AND status = 'running'
   `, [
     params.health_score,
     params.errors,
@@ -110,6 +112,38 @@ export async function getLatestAudit(userId: string, domain: string): Promise<Au
     SELECT * FROM audits WHERE domain = ? AND user_id = ? ORDER BY started_at DESC LIMIT 1
   `, [domain, userId]) as Record<string, unknown> | undefined;
   return row ? rowToAudit(row) : null;
+}
+
+/**
+ * 若最近一次审计仍为 running 且已超过阈值，标记为 failed。
+ *
+ * 背景：/api/audit/start 用 after() 异步执行 runAudit。runAudit 内部总会调用
+ * finishAudit(completed|failed) 收尾，但当 Vercel 在响应后回收函数实例（如套餐
+ * maxDuration 限制）时，after() 可能根本未执行，导致审计行永久停留在 running。
+ * 这会让前端在重新进入 /app/audit 时一直显示“审计进行中”，且 start 的 running
+ * 拦截（409）阻止用户重跑——表现为“审计结果跨页面丢失”。
+ *
+ * 阈值 15 分钟：quick 审计 3-5s、full 审计 <3min，前端轮询窗口 5min，15min 远超
+ * 这些，不会误杀仍在真实运行的审计；即便误杀，后续 finishAudit 仍会覆盖。
+ */
+const STALE_RUNNING_MS = 15 * 60 * 1000;
+
+export async function reapStaleRunningAudit(userId: string, domain: string): Promise<void> {
+  const latest = await getLatestAudit(userId, domain);
+  if (!latest || latest.status !== "running") return;
+  const startedAt = new Date(
+    latest.started_at.endsWith("Z") ? latest.started_at : latest.started_at + "Z"
+  ).getTime();
+  if (Number.isNaN(startedAt)) return;
+  if (Date.now() - startedAt < STALE_RUNNING_MS) return;
+  await finishAudit(userId, latest.id, {
+    health_score: 0,
+    errors: 0,
+    warnings: 0,
+    notices: 0,
+    status: "failed",
+    error: "审计超时未完成（后台任务可能被服务器回收，请重新运行）",
+  });
 }
 
 /** 获取某域名在指定 auditId 之前最近一次审计 */
