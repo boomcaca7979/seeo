@@ -86,8 +86,9 @@ export async function POST(req: Request) {
   domain = domain.replace(/\/.*$/, "");
   domain = domain.toLowerCase().trim();
 
-  // 域名格式校验：stricter regex，禁止以 - 开头/结尾，TLD 2-63 字符
-  if (!domain || !/^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i.test(domain)) {
+  // 域名格式校验：支持多段子域（如 www.example.com），与 /api/projects 正则对齐
+  // 禁止以 - 开头/结尾，TLD 2-63 字符
+  if (!domain || !/^(?=.{1,253}$)(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$/i.test(domain)) {
     return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
   }
 
