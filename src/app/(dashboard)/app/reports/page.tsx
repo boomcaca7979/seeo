@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
+import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import RankingReport from "@/components/reports/RankingReport";
 import AuditReport from "@/components/reports/AuditReport";
 import ContentReport from "@/components/reports/ContentReport";
@@ -113,6 +115,10 @@ const typeConfig: Record<ReportType, { label: string; badge: string; desc: strin
 
 export default function ReportsPage() {
   const { show, Toast } = useToast();
+  const { features, loading: entitlementsLoading } = useEntitlements();
+  const canExportPdf = entitlementsLoading ? false : features.pdf_export;
+  const canEmailReport = entitlementsLoading ? false : features.email_report;
+  const canExportExcel = entitlementsLoading ? false : features.excel_export;
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<"rankings" | "content" | null>(null);
@@ -572,13 +578,22 @@ export default function ReportsPage() {
             </div>
           </div>
           <div className="mt-5 flex-1" />
-          <button
-            onClick={() => handleDownloadCsv("rankings")}
-            disabled={downloading === "rankings" || trackedCount === 0}
-            className="btn-secondary disabled:opacity-50"
-          >
-            {downloading === "rankings" ? "生成中…" : "下载 CSV"}
-          </button>
+          {canExportExcel ? (
+            <button
+              onClick={() => handleDownloadCsv("rankings")}
+              disabled={downloading === "rankings" || trackedCount === 0}
+              className="btn-secondary disabled:opacity-50"
+            >
+              {downloading === "rankings" ? "生成中…" : "下载 CSV"}
+            </button>
+          ) : (
+            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
+              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              升级解锁 CSV 导出
+            </Link>
+          )}
         </div>
 
         <div className="card-a flex flex-col p-5">
@@ -597,13 +612,22 @@ export default function ReportsPage() {
             </div>
           </div>
           <div className="mt-5 flex-1" />
-          <button
-            onClick={() => handleDownloadCsv("content")}
-            disabled={downloading === "content" || contentCount === 0}
-            className="btn-secondary disabled:opacity-50"
-          >
-            {downloading === "content" ? "生成中…" : "下载 CSV"}
-          </button>
+          {canExportExcel ? (
+            <button
+              onClick={() => handleDownloadCsv("content")}
+              disabled={downloading === "content" || contentCount === 0}
+              className="btn-secondary disabled:opacity-50"
+            >
+              {downloading === "content" ? "生成中…" : "下载 CSV"}
+            </button>
+          ) : (
+            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
+              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              升级解锁 CSV 导出
+            </Link>
+          )}
         </div>
       </div>
 
@@ -731,22 +755,40 @@ export default function ReportsPage() {
               <div className="font-sans text-xs text-ink-40">
                 {savedReportId ? `已保存 · ID ${savedReportId}` : "未保存"}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!savedReportId && (
                   <button onClick={handleSaveReport} className="btn-secondary">
                     保存到报告中心
                   </button>
                 )}
-                <button onClick={handleDownloadPdf} className="btn-primary">
-                  下载 PDF
-                </button>
-                <button
-                  onClick={() => setEmailModalOpen(true)}
-                  disabled={!savedReportId}
-                  className="btn-secondary disabled:opacity-50"
-                >
-                  发送邮件
-                </button>
+                {canExportPdf ? (
+                  <button onClick={handleDownloadPdf} className="btn-primary">
+                    下载 PDF
+                  </button>
+                ) : (
+                  <Link href="/pricing" className="btn-primary inline-flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                      <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    升级解锁 PDF 导出
+                  </Link>
+                )}
+                {canEmailReport ? (
+                  <button
+                    onClick={() => setEmailModalOpen(true)}
+                    disabled={!savedReportId}
+                    className="btn-secondary disabled:opacity-50"
+                  >
+                    发送邮件
+                  </button>
+                ) : (
+                  <Link href="/pricing" className="btn-secondary inline-flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                      <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    升级解锁邮件发送
+                  </Link>
+                )}
               </div>
             </div>
           </div>

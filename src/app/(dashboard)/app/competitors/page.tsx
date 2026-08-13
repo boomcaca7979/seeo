@@ -25,6 +25,8 @@ import SOVGroupBars from "@/components/dashboard/charts/SOVGroupBars";
 import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/charts/CompetitorRankBars";
 
 const SELECTED_PROJECT_KEY = "seeo:selected-project-id";
+// Topbar 切换项目时派发的自定义事件（同 tab 通知）
+const PROJECT_CHANGED_EVENT = "seeo:project-changed";
 
 interface Competitor {
   id: number;
@@ -137,15 +139,38 @@ export default function CompetitorsPage() {
   // 用量
   const [usage, setUsage] = useState<UsageInfo | null>(null);
 
-  // 读取 localStorage 选中的项目（推迟到下一帧避免 effect 同步路径 setState）
+  // 读取 localStorage 选中的项目 + 监听 Topbar 项目切换事件
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
-    const id = stored ? Number(stored) : NaN;
-    if (Number.isInteger(id) && id > 0) {
-      const tid = window.setTimeout(() => setProjectId(id), 0);
-      return () => window.clearTimeout(tid);
-    }
+
+    const applyStored = () => {
+      const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
+      const id = stored ? Number(stored) : NaN;
+      if (Number.isInteger(id) && id > 0) {
+        setProjectId((prev) => (prev === id ? prev : id));
+      }
+    };
+
+    // 首次挂载：读取 localStorage（推迟到下一帧避免 effect 同步路径 setState）
+    const tid = window.setTimeout(applyStored, 0);
+
+    // 监听 Topbar 切换项目的自定义事件（同 tab 通知）
+    const onProjectChanged = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: number }>).detail;
+      if (detail && Number.isInteger(detail.id) && detail.id > 0) {
+        setProjectId((prev) => (prev === detail.id ? prev : detail.id));
+      }
+    };
+    window.addEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+
+    // 跨 tab 切换时 storage 事件也能触发
+    window.addEventListener("storage", applyStored);
+
+    return () => {
+      window.clearTimeout(tid);
+      window.removeEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+      window.removeEventListener("storage", applyStored);
+    };
   }, []);
 
   // 拉取竞品列表
@@ -208,11 +233,40 @@ export default function CompetitorsPage() {
   useEffect(() => {
     if (projectId === null) return;
     const tid = window.setTimeout(() => {
+      // 切换项目时重置关联状态，避免旧项目数据残留
+      setProjectDomain("");
+      setCompetitors([]);
+      setKeywords([]);
+      setSelectedKeywordId(null);
+      setRanks(null);
+      setSov(null);
       void loadCompetitors(projectId);
       void loadSov(projectId);
     }, 0);
     return () => window.clearTimeout(tid);
   }, [projectId, loadCompetitors, loadSov]);
+
+  // 项目变化时直接拉取项目域名（不再依赖竞品列表推断）
+  useEffect(() => {
+    if (projectId === null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        const json = await res.json();
+        if (cancelled) return;
+        if (res.ok) {
+          const proj = (json.data ?? []).find(
+            (p: { id: number; domain: string }) => p.id === projectId
+          );
+          if (proj) setProjectDomain(proj.domain);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   // projectDomain 变化时拉取关键词
   useEffect(() => {
@@ -222,24 +276,6 @@ export default function CompetitorsPage() {
     }, 0);
     return () => window.clearTimeout(tid);
   }, [projectDomain, loadKeywords]);
-
-  // 从竞品列表推断项目域名（第一次加载时）
-  useEffect(() => {
-    if (projectDomain || competitors.length === 0 || keywords.length > 0) return;
-    // 通过 /api/projects 拿到当前项目域名
-    (async () => {
-      try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const json = await res.json();
-        if (res.ok) {
-          const proj = (json.data ?? []).find((p: { id: number; domain: string }) => p.id === projectId);
-          if (proj) setProjectDomain(proj.domain);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [competitors, keywords, projectDomain, projectId]);
 
   // 添加竞品
   const handleAddCompetitor = async (e: React.FormEvent) => {
@@ -375,7 +411,7 @@ export default function CompetitorsPage() {
   }, [selectedKeywordId]);
 
   const usagePercent = usage ? (usage.used / usage.limit) * 100 : 0;
-  const quotaExceeded = usage ? usage.used >= 80 : false;
+  const quotaExceeded = usage ? usage.used >= usage.limit : false;
 
   // SOV 趋势图数据（基于当前 sov 结果，单点占位；历史数据需多次刷新积累）
   const sovTrendData = sov && sov.sov.length > 0

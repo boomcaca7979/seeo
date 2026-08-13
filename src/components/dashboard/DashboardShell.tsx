@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import { useUpgradeModalProvider } from "@/components/billing/UpgradeModal";
+import { EntitlementsProvider, useEntitlements } from "@/components/billing/EntitlementsContext";
 
 interface DashboardShellProps {
   displayName: string;
@@ -12,26 +12,18 @@ interface DashboardShellProps {
 }
 
 export default function DashboardShell({ displayName, email, children }: DashboardShellProps) {
-  const [currentPlan, setCurrentPlan] = useState<string>("free");
+  return (
+    <EntitlementsProvider>
+      <DashboardShellInner displayName={displayName} email={email}>
+        {children}
+      </DashboardShellInner>
+    </EntitlementsProvider>
+  );
+}
 
-  // 拉取当前用户套餐（用于 UpgradeModal 展示）
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/account/usage", { cache: "no-store" });
-        const json = await res.json();
-        if (!cancelled && res.ok && json?.data?.plan) {
-          setCurrentPlan(json.data.plan as string);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const { modal } = useUpgradeModalProvider(currentPlan);
+function DashboardShellInner({ displayName, email, children }: DashboardShellProps) {
+  const { plan } = useEntitlements();
+  const { modal } = useUpgradeModalProvider(plan);
 
   return (
     <div className="flex h-screen overflow-hidden bg-paper text-ink">

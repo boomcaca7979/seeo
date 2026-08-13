@@ -68,6 +68,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ data: { type, status: "done" } });
   } catch (err) {
+    // 运行时 quota 超限（consumeQuota 抛出）需返回 billing error 格式
+    if (err instanceof QuotaExceededError) {
+      const { status, body } = billingErrorToResponse(err);
+      return NextResponse.json(body, { status });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "执行失败" },
       { status: 500 }

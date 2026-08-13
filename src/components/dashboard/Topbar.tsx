@@ -44,6 +44,8 @@ const alertDotColor: Record<string, string> = {
 };
 
 const SELECTED_PROJECT_KEY = "seeo:selected-project-id";
+// 自定义事件：Topbar 切换项目时通知同 tab 的其他页面（storage 事件仅跨 tab 触发）
+const PROJECT_CHANGED_EVENT = "seeo:project-changed";
 
 function formatRelativeTime(isoStr: string): string {
   const then = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
@@ -109,14 +111,21 @@ export default function Topbar({ displayName, email }: TopbarProps) {
         const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
         const storedId = stored ? Number(stored) : NaN;
         const exists = Number.isInteger(storedId) && list.some((p) => p.id === storedId);
+        let initialId: number | null = null;
         if (exists) {
+          initialId = storedId;
           setSelectedId(storedId);
         } else if (list.length > 0) {
           // 默认选第一个
+          initialId = list[0].id;
           setSelectedId(list[0].id);
           window.localStorage.setItem(SELECTED_PROJECT_KEY, String(list[0].id));
         } else {
           setSelectedId(null);
+        }
+        // 通知同 tab 的页面（如 competitors）初始项目已就绪
+        if (initialId !== null) {
+          window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId } }));
         }
       } catch {
         // ignore
@@ -176,6 +185,8 @@ export default function Topbar({ displayName, email }: TopbarProps) {
   const handleSelectProject = (id: number) => {
     setSelectedId(id);
     window.localStorage.setItem(SELECTED_PROJECT_KEY, String(id));
+    // 通知同 tab 页面项目已切换
+    window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id } }));
     setProjectOpen(false);
   };
 

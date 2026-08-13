@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
+import { handleBillingError } from "@/lib/billing-error-client";
 
 type TabKey = "account" | "plan" | "usage" | "automation";
 
@@ -525,8 +526,9 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         showToast("自动化配置已保存", "success");
         await fetchSettings();
       } else {
-        const json = await res.json();
-        showToast(json.error || "保存失败", "error");
+        const json = await res.json().catch(() => ({}));
+        const { message } = handleBillingError(json, "保存失败");
+        showToast(message, "error");
       }
     } catch {
       showToast("网络错误，保存失败", "error");
@@ -547,8 +549,9 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         showToast("每日刷新已执行", "success");
         await fetchLogs();
       } else {
-        const json = await res.json();
-        showToast(json.error || "执行失败", "error");
+        const json = await res.json().catch(() => ({}));
+        const { message } = handleBillingError(json, "执行失败");
+        showToast(message, "error");
       }
     } catch {
       showToast("网络错误，执行失败", "error");
@@ -569,8 +572,9 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         showToast("每周报告已生成", "success");
         await fetchLogs();
       } else {
-        const json = await res.json();
-        showToast(json.error || "执行失败", "error");
+        const json = await res.json().catch(() => ({}));
+        const { message } = handleBillingError(json, "执行失败");
+        showToast(message, "error");
       }
     } catch {
       showToast("网络错误，执行失败", "error");
@@ -803,7 +807,8 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
         setTotal(json.data.remaining as number);
         showToast(`已清理 ${deleted} 条过期缓存`, "success");
       } else {
-        showToast(json.error || "清理失败", "error");
+        const { message } = handleBillingError(json, "清理失败");
+        showToast(message, "error");
       }
     } catch {
       showToast("网络错误，清理失败", "error");

@@ -4,7 +4,7 @@
 // P2：增加 depth 权限校验（free=quick only）+ audit_daily_limit 套餐限额
 
 import { NextResponse, after } from "next/server";
-import { createAudit, getLatestAudit, getAuditDailyUsage, incrementAuditDailyUsage } from "@/lib/db";
+import { createAudit, getLatestAudit, tryIncrementAuditDailyUsage } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
@@ -46,15 +46,8 @@ export async function POST(req: Request) {
   }
 
   // P2：套餐级每日审计限额检查（audit_daily_limit）
-  // free=3, lite=10, pro=50（详见 billing.ts DEFAULT_PLAN_LIMITS）
+  // 使用原子 tryIncrementAuditDailyUsage 消除 TOCTOU 竞态
   const today = todayStr();
-  const dailyUsage = await getAuditDailyUsage(userId, today);
-  const usedToday = dailyUsage?.used ?? 0;
-  if (usedToday >= auditDailyLimit) {
-    const err = new PlanLimitError("每日审计", plan, auditDailyLimit, "AUDIT_DAILY_LIMIT_REACHED");
-    const { status, body } = billingErrorToResponse(err);
-    return NextResponse.json(body, { status });
-  }
 
   let body: Record<string, unknown>;
   try {
@@ -127,8 +120,13 @@ export async function POST(req: Request) {
     }
   }
 
-  // P2：审计用量 +1（套餐级每日限额计数）
-  await incrementAuditDailyUsage(userId, today, auditDailyLimit);
+  // P2：原子消耗审计每日用量（UPSERT + WHERE used < limit，消除 TOCTOU 竞态）
+  const auditResult = await tryIncrementAuditDailyUsage(userId, today, auditDailyLimit);
+  if (!auditResult.ok) {
+    const err = new PlanLimitError("每日审计", plan, auditDailyLimit, "AUDIT_DAILY_LIMIT_REACHED");
+    const { status, body: errBody } = billingErrorToResponse(err);
+    return NextResponse.json(errBody, { status });
+  }
 
   // 创建审计记录（status=running）
   const audit = await createAudit(userId, domain, depth);
@@ -149,7 +147,7 @@ export async function POST(req: Request) {
       depth,
       status: "running",
       message: "审计已开始，请稍后刷新查看结果",
-      auditUsage: { used: usedToday + 1, limit: auditDailyLimit },
+      auditUsage: { used: auditResult.used, limit: auditResult.limit },
     },
   });
 }

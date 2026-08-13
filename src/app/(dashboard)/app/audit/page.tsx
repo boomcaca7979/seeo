@@ -16,6 +16,7 @@ import AuditCoverageStacked from "@/components/dashboard/charts/AuditCoverageSta
 import AuditPassDonut from "@/components/dashboard/charts/AuditPassDonut";
 import AuditScoreTrend from "@/components/dashboard/charts/AuditScoreTrend";
 import ResponseTimeBars from "@/components/dashboard/charts/ResponseTimeBars";
+import { useEntitlements } from "@/components/billing/EntitlementsContext";
 
 // 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
 
@@ -132,6 +133,9 @@ export default function AuditPage() {
 
 function AuditPageInner() {
   const { show, Toast } = useToast();
+  const { features, loading: entitlementsLoading } = useEntitlements();
+  const canFullAudit = entitlementsLoading ? false : features.full_audit;
+  const canExportPdf = entitlementsLoading ? false : features.pdf_export;
   const searchParams = useSearchParams();
   const [domain, setDomain] = useState("");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
@@ -510,26 +514,39 @@ function AuditPageInner() {
               "快速审计"
             )}
           </button>
-          <button
-            onClick={() => openConfirm("full")}
-            disabled={auditing || starting}
-            title="耗时较长，建议本地使用"
-            className="btn-secondary disabled:opacity-60"
-          >
-            {auditing && activeDepth === "full" ? (
-              <>
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 loading-spin">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
-                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                深度审计中…
-              </>
-            ) : starting && pendingDepth === "full" ? (
-              "启动中…"
-            ) : (
-              "深度审计"
-            )}
-          </button>
+          {canFullAudit ? (
+            <button
+              onClick={() => openConfirm("full")}
+              disabled={auditing || starting}
+              title="耗时较长，建议本地使用"
+              className="btn-secondary disabled:opacity-60"
+            >
+              {auditing && activeDepth === "full" ? (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 loading-spin">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  深度审计中…
+                </>
+              ) : starting && pendingDepth === "full" ? (
+                "启动中…"
+              ) : (
+                "深度审计"
+              )}
+            </button>
+          ) : (
+            <Link
+              href="/pricing"
+              title="深度审计为 Pro 套餐功能"
+              className="btn-secondary inline-flex items-center gap-1.5"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              升级解锁深度审计
+            </Link>
+          )}
           {hasResult && (
             <button
               onClick={() => setExportOpen(true)}
@@ -1188,13 +1205,22 @@ function AuditPageInner() {
             域名：{audit?.domain} · 健康度 {audit?.healthScore ?? 0} 分
           </p>
           <div className="flex flex-col gap-2">
-            <button
-              onClick={handleDownloadPdf}
-              disabled={exporting || saving}
-              className="btn-primary disabled:opacity-60"
-            >
-              {exporting ? "生成中…" : "下载 PDF"}
-            </button>
+            {canExportPdf ? (
+              <button
+                onClick={handleDownloadPdf}
+                disabled={exporting || saving}
+                className="btn-primary disabled:opacity-60"
+              >
+                {exporting ? "生成中…" : "下载 PDF"}
+              </button>
+            ) : (
+              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+                  <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                升级解锁 PDF 导出
+              </Link>
+            )}
             <button
               onClick={handleSaveToReports}
               disabled={exporting || saving}

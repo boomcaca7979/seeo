@@ -247,23 +247,4 @@ export async function tryIncrementAuditDailyUsage(
   };
 }
 
-/** 审计用量 +1（UPSERT，首次自动创建，默认 limit 由调用方传入） */
-export async function incrementAuditDailyUsage(
-  userId: string,
-  date: string,
-  defaultLimit: number
-): Promise<{ used: number; limit: number }> {
-  const db = await getAdapter();
-  await db.run(`
-    INSERT INTO audit_usage_per_user (user_id, date, used, "limit", created_at, updated_at)
-    VALUES (?, ?, 1, ?, datetime('now'), datetime('now'))
-    ON CONFLICT(user_id, date) DO UPDATE SET
-      used = used + 1,
-      updated_at = datetime('now')
-  `, [userId, date, defaultLimit]);
-  const row = await db.get(
-    `SELECT used, "limit" FROM audit_usage_per_user WHERE user_id = ? AND date = ?`,
-    [userId, date]
-  ) as { used: number; limit: number } | undefined;
-  return row ? { used: Number(row.used), limit: Number(row.limit) } : { used: 1, limit: defaultLimit };
-}
+
