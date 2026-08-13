@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const projectId = Number(searchParams.get("project_id") ?? "");
 
-  if (!Number.isInteger(projectId) || projectId <= 0) {
+  if (!Number.isInteger(projectId) || projectId < 0) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
   }
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const domain = String(body.domain ?? "").trim().replace(/^https?:\/\//, "").replace(/^www\./, "");
   const name = body.name?.trim() || undefined;
 
-  if (!Number.isInteger(projectId) || projectId <= 0) {
+  if (!Number.isInteger(projectId) || projectId < 0) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
   }
   if (!domain) {

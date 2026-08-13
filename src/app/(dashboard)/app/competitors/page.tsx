@@ -146,7 +146,7 @@ export default function CompetitorsPage() {
     const applyStored = () => {
       const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
       const id = stored ? Number(stored) : NaN;
-      if (Number.isInteger(id) && id > 0) {
+      if (Number.isInteger(id) && id >= 0) {
         setProjectId((prev) => (prev === id ? prev : id));
       }
     };
@@ -157,7 +157,7 @@ export default function CompetitorsPage() {
     // 监听 Topbar 切换项目的自定义事件（同 tab 通知）
     const onProjectChanged = (e: Event) => {
       const detail = (e as CustomEvent<{ id: number }>).detail;
-      if (detail && Number.isInteger(detail.id) && detail.id > 0) {
+      if (detail && Number.isInteger(detail.id) && detail.id >= 0) {
         setProjectId((prev) => (prev === detail.id ? prev : detail.id));
       }
     };

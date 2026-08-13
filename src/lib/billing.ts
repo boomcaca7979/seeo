@@ -452,13 +452,29 @@ export async function checkFeature(
  */
 export async function getFeaturesForPlan(plan: PlanTier): Promise<Record<Feature, boolean>> {
   const limits = await getPlanLimits(plan);
-  return {
-    pdf_export: limits.can_export_pdf,
-    excel_export: limits.can_export_excel,
-    full_audit: limits.audit_max_depth >= 3,
-    backlinks: limits.dataforseo_monthly_limit > 0,
-    email_report: limits.can_email_report,
-  };
+  const result = {} as Record<Feature, boolean>;
+  for (const feature of Object.keys(FEATURE_PLAN_GATE) as Feature[]) {
+    const gate = FEATURE_PLAN_GATE[feature];
+    // 1. 套餐等级检查（与 checkFeature 保持一致）
+    if (PLAN_RANK[plan] < PLAN_RANK[gate.minPlan]) {
+      result[feature] = false;
+      continue;
+    }
+    // 2. Boolean/数值 flag 检查
+    if (gate.flagField) {
+      const flagValue = limits[gate.flagField];
+      if (typeof flagValue === "boolean") {
+        result[feature] = flagValue;
+      } else if (typeof flagValue === "number") {
+        result[feature] = flagValue > 0;
+      } else {
+        result[feature] = false;
+      }
+    } else {
+      result[feature] = true;
+    }
+  }
+  return result;
 }
 
 /** 数据库行 → PlanLimits 对象 */
