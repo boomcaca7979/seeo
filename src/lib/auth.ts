@@ -5,7 +5,7 @@
 
 import { createServer } from "@/lib/supabase/server";
 import { isAuthEnabled } from "@/lib/auth-config";
-import { getPlanLimits, type PlanLimits } from "@/lib/billing";
+import { getPlanLimits, getUserPlan, type PlanLimits } from "@/lib/billing";
 
 /** 套餐等级 */
 export type PlanTier = "free" | "lite" | "pro";
@@ -63,24 +63,12 @@ export async function requireAuth(): Promise<AuthResult> {
       };
     }
 
-    // 查询 profiles 表获取套餐信息
-    let plan: PlanTier = "free";
-    let subscriptionStatus: SubscriptionStatus = "inactive";
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("plan, subscription_status")
-        .eq("id", user.id)
-        .single();
-      if (profile) {
-        plan = (profile.plan as PlanTier) ?? "free";
-        subscriptionStatus = (profile.subscription_status as SubscriptionStatus) ?? "inactive";
-      }
-    } catch {
-      // profile 不存在或查询失败，使用默认值 free
-    }
+    // 查询 profiles 表获取套餐信息（使用 billing.ts 的 effectivePlan 逻辑）
+    const userPlan = await getUserPlan(user.id);
+    const plan = userPlan.effectivePlan;
+    const subscriptionStatus = userPlan.subscriptionStatus;
 
-    // P1：一次性查询套餐限制，避免 API 重复查询
+    // P1：一次性查询套餐限制，使用 effectivePlan（已过期会降为 free）
     const limits = await getPlanLimits(plan);
 
     return {

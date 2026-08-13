@@ -111,6 +111,46 @@ export async function getUserApiUsage(
   return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
 }
 
+/**
+ * 原子性消耗用户级用量（UPSERT + WHERE used < limit）。
+ * 返回 { ok: true, used, limit } 表示成功消耗；
+ * 返回 { ok: false, used, limit } 表示已达上限（未消耗）。
+ * 消除 TOCTOU 竞态：检查与递增在同一条 SQL 中完成。
+ */
+export async function tryIncrementUserApiUsage(
+  userId: string,
+  apiType: ApiType,
+  month: string,
+  defaultLimit: number
+): Promise<{ ok: boolean; used: number; limit: number }> {
+  const db = await getAdapter();
+  // 原子操作：仅当 used < limit 时才递增，RETURNING 返回递增后的行
+  const row = await db.get(
+    `INSERT INTO api_usage_per_user (user_id, api_type, month, used, "limit", created_at, updated_at)
+    VALUES (?, ?, ?, 1, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, api_type, month) DO UPDATE SET
+      used = used + 1,
+      updated_at = datetime('now')
+    WHERE api_usage_per_user.used < ?
+    RETURNING used, "limit"`,
+    [userId, apiType, month, defaultLimit, defaultLimit]
+  ) as { used: number; limit: number } | undefined;
+
+  if (row) {
+    return { ok: true, used: Number(row.used), limit: Number(row.limit) };
+  }
+  // 没返回行说明已存在且 used >= limit，读取当前值
+  const existing = await db.get(
+    `SELECT used, "limit" FROM api_usage_per_user WHERE user_id = ? AND api_type = ? AND month = ?`,
+    [userId, apiType, month]
+  ) as { used: number; limit: number } | undefined;
+  return {
+    ok: false,
+    used: existing ? Number(existing.used) : 0,
+    limit: existing ? Number(existing.limit) : defaultLimit,
+  };
+}
+
 /** 用户级用量 +N（UPSERT，首次自动创建，默认 limit 由调用方传入） */
 export async function incrementUserApiUsage(
   userId: string,
@@ -170,6 +210,41 @@ export async function getAuditDailyUsage(
     [userId, date]
   ) as { used: number; limit: number } | undefined;
   return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
+
+/**
+ * 原子性消耗审计每日用量（UPSERT + WHERE used < limit）。
+ * 消除 TOCTOU 竞态。
+ */
+export async function tryIncrementAuditDailyUsage(
+  userId: string,
+  date: string,
+  defaultLimit: number
+): Promise<{ ok: boolean; used: number; limit: number }> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `INSERT INTO audit_usage_per_user (user_id, date, used, "limit", created_at, updated_at)
+    VALUES (?, ?, 1, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, date) DO UPDATE SET
+      used = used + 1,
+      updated_at = datetime('now')
+    WHERE audit_usage_per_user.used < ?
+    RETURNING used, "limit"`,
+    [userId, date, defaultLimit, defaultLimit]
+  ) as { used: number; limit: number } | undefined;
+
+  if (row) {
+    return { ok: true, used: Number(row.used), limit: Number(row.limit) };
+  }
+  const existing = await db.get(
+    `SELECT used, "limit" FROM audit_usage_per_user WHERE user_id = ? AND date = ?`,
+    [userId, date]
+  ) as { used: number; limit: number } | undefined;
+  return {
+    ok: false,
+    used: existing ? Number(existing.used) : 0,
+    limit: existing ? Number(existing.limit) : defaultLimit,
+  };
 }
 
 /** 审计用量 +1（UPSERT，首次自动创建，默认 limit 由调用方传入） */

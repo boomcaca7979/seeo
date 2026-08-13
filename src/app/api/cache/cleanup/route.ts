@@ -23,6 +23,13 @@ export async function POST() {
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
+  // 全局缓存清理属于运维操作，限制为 Pro 套餐用户
+  if (auth.plan !== "pro") {
+    return NextResponse.json(
+      { error: "需要 Pro 套餐权限才能执行缓存清理" },
+      { status: 403 }
+    );
+  }
   const deleted = await deleteExpiredCache();
   const remaining = await countCacheEntries();
   return NextResponse.json({

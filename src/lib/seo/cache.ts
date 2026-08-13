@@ -10,27 +10,29 @@ import {
   getCache as dbGetCache,
   setCache as dbSetCache,
   getUserApiUsage,
-  incrementUserApiUsage,
+  tryIncrementUserApiUsage,
   type ApiType,
 } from "@/lib/db";
 import type { PlanTier } from "@/lib/auth";
+import { getPlanLimits } from "@/lib/billing";
 
 const CACHE_DIR = path.join(process.cwd(), "data", "cache");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
-// 各套餐的 API 月度限额配置
-// free: 50 次 SerpApi / 0 次 DataForSEO
-// lite: 300 次 SerpApi / 5 次 DataForSEO
-// pro: 2000 次 SerpApi / 30 次 DataForSEO
-const PLAN_LIMITS: Record<PlanTier, Record<ApiType, number>> = {
-  free: { serpapi: 50, dataforseo: 0, content_check: 10 },
-  lite: { serpapi: 300, dataforseo: 5, content_check: 50 },
-  pro: { serpapi: 2000, dataforseo: 30, content_check: 300 },
-};
-
-/** 获取某套餐某 API 的月度限额 */
-export function getPlanLimit(plan: PlanTier, apiType: ApiType): number {
-  return PLAN_LIMITS[plan]?.[apiType] ?? PLAN_LIMITS.free[apiType];
+/**
+ * 获取某套餐某 API 的月度限额
+ * 统一从 billing.ts 的权威来源读取（优先 Supabase plan_limits 表，fallback DEFAULT_PLAN_LIMITS）
+ */
+export async function getPlanLimit(plan: PlanTier, apiType: ApiType): Promise<number> {
+  const limits = await getPlanLimits(plan);
+  const fieldMap: Record<ApiType, keyof typeof limits> = {
+    serpapi: "serpapi_monthly_limit",
+    dataforseo: "dataforseo_monthly_limit",
+    content_check: "content_check_monthly_limit",
+  };
+  const field = fieldMap[apiType];
+  const val = limits[field];
+  return typeof val === "number" ? val : 0;
 }
 
 interface CacheEntry<T> {
@@ -64,6 +66,8 @@ async function ensureDir(): Promise<void> {
 /**
  * 真实调用外部 API 前检查 + 计数 +1（按用户 + API 类型隔离）
  * 超过套餐限额时抛出 QuotaExceededError
+ *
+ * 原子化：检查与递增在同一条 SQL 中完成，消除 TOCTOU 竞态
  */
 export async function consumeQuota(
   userId: string,
@@ -71,22 +75,25 @@ export async function consumeQuota(
   plan: PlanTier = "free"
 ): Promise<ApiUsage> {
   const month = currentMonth();
-  const limit = getPlanLimit(plan, apiType);
+  const limit = await getPlanLimit(plan, apiType);
 
-  // 读取当前用户用量
-  const existing = await getUserApiUsage(userId, apiType, month);
-  const used = existing?.used ?? 0;
-
-  if (used >= limit) {
-    throw new QuotaExceededError(used, limit, apiType, month);
-  }
-
-  // 写入 DB（主存储，用户级）
+  // 原子化消耗：DB 层 UPSERT + WHERE used < limit + RETURNING
   try {
-    const updated = await incrementUserApiUsage(userId, apiType, month, limit);
-    return { used: updated.used, limit: updated.limit, month };
-  } catch {
-    // DB 不可用时，仅依赖内存计数（不阻塞调用）
+    const result = await tryIncrementUserApiUsage(userId, apiType, month, limit);
+    if (result.ok) {
+      return { used: result.used, limit: result.limit, month };
+    }
+    // 已达上限
+    throw new QuotaExceededError(result.used, result.limit, apiType, month);
+  } catch (e) {
+    // QuotaExceededError 直接抛出
+    if (e instanceof QuotaExceededError) throw e;
+    // DB 不可用时的 fallback：读当前用量做应用层检查（非原子，仅兜底）
+    const existing = await getUserApiUsage(userId, apiType, month);
+    const used = existing?.used ?? 0;
+    if (used >= limit) {
+      throw new QuotaExceededError(used, limit, apiType, month);
+    }
     return { used: used + 1, limit, month };
   }
 }
@@ -100,7 +107,7 @@ export async function peekUsage(
   plan: PlanTier = "free"
 ): Promise<ApiUsage> {
   const month = currentMonth();
-  const limit = getPlanLimit(plan, apiType);
+  const limit = await getPlanLimit(plan, apiType);
   try {
     const existing = await getUserApiUsage(userId, apiType, month);
     if (existing) {

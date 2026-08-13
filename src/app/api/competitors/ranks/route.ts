@@ -40,7 +40,7 @@ function mapError(e: unknown) {
   }
   if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
     return NextResponse.json<SeoApiError>(
-      { error: "本月免费额度已用尽（80/100），下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
+      { error: "本月额度已用尽，下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
       { status: 429 }
     );
   }

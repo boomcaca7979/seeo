@@ -25,8 +25,10 @@ export function getAdminClient(): SupabaseClient | null {
 }
 
 /**
- * 查询某用户的套餐等级。
- * Admin 客户端可用时返回真实 plan；不可用或查询失败时返回 fallback（默认 free）。
+ * 查询某用户的有效套餐等级（effectivePlan）。
+ * 查询 profiles.plan + subscription_status + current_period_end，
+ * 若订阅已过期则降为 "free"。
+ * Admin 客户端不可用或查询失败时返回 fallback（默认 free）。
  */
 export async function getUserPlan(
   userId: string,
@@ -37,11 +39,18 @@ export async function getUserPlan(
   try {
     const { data } = await admin
       .from("profiles")
-      .select("plan")
+      .select("plan, subscription_status, current_period_end")
       .eq("id", userId)
       .single();
     if (data?.plan && ["free", "lite", "pro"].includes(data.plan)) {
-      return data.plan as "free" | "lite" | "pro";
+      const plan = data.plan as "free" | "lite" | "pro";
+      // 过期订阅降级为 free（effectivePlan）
+      const status = (data.subscription_status as string | null) ?? "inactive";
+      const periodEnd = data.current_period_end as string | null;
+      const isActive =
+        (status === "active" || status === "trialing") &&
+        (!periodEnd || new Date(periodEnd).getTime() > Date.now());
+      return isActive ? plan : "free";
     }
     return fallback;
   } catch {

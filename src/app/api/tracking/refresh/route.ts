@@ -118,7 +118,7 @@ export async function POST() {
             } else if (e instanceof QuotaExceededError) {
               errMsg = e.message;
             } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-              errMsg = "本月免费额度已用尽（80/100），下月 1 日自动重置";
+              errMsg = "本月额度已用尽，下月 1 日自动重置";
             } else {
               errMsg = (e as Error).message;
             }
