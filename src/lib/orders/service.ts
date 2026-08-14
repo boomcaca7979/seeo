@@ -96,12 +96,14 @@ export async function createPendingOrder(args: {
 
     if (error || !data) {
       console.error("[Orders] 创建 pending 订单失败:", error?.message);
+      console.log("[Orders] ERROR_DETAIL:", JSON.stringify({ code: error?.code, message: error?.message, details: error?.details, hint: error?.hint }));
       return { order: null as unknown as OrderRecord, error: error?.message ?? "数据库插入返回空数据" };
     }
 
     return { order: data as unknown as OrderRecord };
   } catch (err) {
     console.error("[Orders] 创建 pending 订单异常:", err);
+    console.log("[Orders] EXCEPTION_DETAIL:", err instanceof Error ? err.message : String(err));
     return { order: null as unknown as OrderRecord, error: err instanceof Error ? err.message : "数据库写入异常" };
   }
 }
