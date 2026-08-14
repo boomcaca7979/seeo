@@ -69,7 +69,7 @@ async function callYaolipayApi<T>(
     const { verifyWithPublicKey } = await import("./sign");
     const ok = verifyWithPublicKey(signString, responseObj.sign as string, config.publicKey);
     if (!ok) {
-      console.error("[Yaolipay] 响应验签失败", { path, response: json });
+      console.error("[Yaolipay] 响应验签失败", { path, code: responseObj.code, msg: responseObj.msg });
       throw new Error("耀立接口响应验签失败");
     }
   }

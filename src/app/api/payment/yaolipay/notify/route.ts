@@ -18,7 +18,7 @@
 
 import { getYaolipayConfig } from "@/lib/yaolipay/config";
 import { verifyNotifySign } from "@/lib/yaolipay/client";
-import { completeOrder, getOrderByOutTradeNo } from "@/lib/orders/service";
+import { completeOrder, getOrderByOutTradeNo, amountsMatch } from "@/lib/orders/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,9 +122,9 @@ export async function GET(req: Request) {
     return new Response("success", { status: 200 });
   }
 
-  // 8. 校验订单金额
+  // 8. 校验订单金额（整数 cents 比较，避免浮点精度问题）
   const notifyMoney = parseFloat(params.money);
-  if (!Number.isFinite(notifyMoney) || Math.abs(order.amount - notifyMoney) >= 0.01) {
+  if (!Number.isFinite(notifyMoney) || !amountsMatch(order.amount, notifyMoney)) {
     console.error("[Yaolipay Notify] 金额不匹配", {
       out_trade_no: params.out_trade_no,
       expected: order.amount,

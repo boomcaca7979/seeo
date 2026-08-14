@@ -151,10 +151,10 @@ export async function getOrderByOutTradeNoForUser(
 }
 
 /**
- * 比较金额是否一致（允许 0.01 元误差，避免浮点问题）
+ * 比较金额是否一致（整数 cents 比较，避免浮点精度问题）
  */
 export function amountsMatch(a: number, b: number): boolean {
-  return Math.abs(a - b) < 0.01;
+  return Math.round(a * 100) === Math.round(b * 100);
 }
 
 /**
@@ -414,6 +414,49 @@ export async function handleRefundSuccess(args: {
   }
 
   return { ok: true };
+}
+
+/**
+ * 重试会员开通（针对 paid 但 period_end 为 null 的订单）
+ *
+ * 场景：completeOrder 中 extend_membership RPC 失败，
+ * 订单已标记 paid 但会员未实际开通（period_end 为 null）。
+ * query 路由在轮询时发现此状态自动重试。
+ *
+ * @returns true 表示重试成功（period_end 已更新）
+ */
+export async function retryMembershipActivation(order: OrderRecord): Promise<boolean> {
+  const admin = getAdminClient();
+  if (!admin) return false;
+
+  const pricing = PLAN_PRICING[order.plan];
+  if (!pricing) return false;
+
+  try {
+    const { data: rpcResult, error: rpcError } = await admin.rpc(
+      "extend_membership",
+      {
+        p_user_id: order.user_id,
+        p_plan: order.plan as PlanTier,
+        p_period_days: pricing.periodDays,
+      }
+    );
+
+    if (rpcError || !rpcResult) {
+      console.error("[Orders] retryMembershipActivation RPC 失败:", rpcError?.message);
+      return false;
+    }
+
+    const newPeriodEnd = new Date(rpcResult as string).toISOString();
+    await admin
+      .from("orders")
+      .update({ period_end: newPeriodEnd })
+      .eq("out_trade_no", order.out_trade_no);
+    return true;
+  } catch (err) {
+    console.error("[Orders] retryMembershipActivation 异常:", err);
+    return false;
+  }
 }
 
 /**
