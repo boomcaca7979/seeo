@@ -102,6 +102,77 @@ export function formatAmountYuan(amountCents: number): string {
   return (amountCents / 100).toFixed(2);
 }
 
+// ---------- Preview 测试价格开关（严格隔离） ----------
+//
+// 设计目标：
+//   - Production 永远使用 PLAN_PRICING 正常价格
+//   - 仅当 VERCEL_ENV === "preview" 且显式配置测试开关时，才返回测试价格
+//   - 任何条件不满足，一律回退到正常价格
+//   - Production 误配置测试开关时，由 create API 层拒绝创建订单（503）
+//
+// 安全保证：
+//   - 客户端无法控制（无 NEXT_PUBLIC_ 前缀）
+//   - 金额完全由服务端常量 + 环境变量决定
+//   - notify/refund 使用 order.amount（数据库存储值），不受环境变量影响
+//   - development/local 环境不自动启用测试价格
+
+/** 测试价格唯一允许的值（1 cent = ¥0.01） */
+const TEST_PAYMENT_AMOUNT_CENTS_ALLOWED = "1";
+
+/** 判断当前环境是否为 Vercel Preview */
+function isVercelPreviewEnv(): boolean {
+  return process.env.VERCEL_ENV === "preview";
+}
+
+/** 判断是否启用了测试支付开关 */
+function isTestPaymentModeEnabled(): boolean {
+  return process.env.PAYMENT_TEST_MODE === "true";
+}
+
+/** 判断测试金额配置是否合法 */
+function isTestPaymentAmountValid(): boolean {
+  return process.env.PAYMENT_TEST_AMOUNT_CENTS === TEST_PAYMENT_AMOUNT_CENTS_ALLOWED;
+}
+
+/**
+ * 判断是否处于"误配置"状态：
+ * 启用了测试支付开关（PAYMENT_TEST_MODE=true），但当前环境不是 Vercel Preview。
+ *
+ * 此状态下 create API 应直接返回 503，拒绝创建任何订单，
+ * 防止 Production 误配置导致错误价格订单。
+ *
+ * 注意：此函数仅用于 create API 的前置拦截，不影响 getEffectivePaymentAmountCents 的返回值。
+ */
+export function isTestPaymentMisconfigured(): boolean {
+  return isTestPaymentModeEnabled() && !isVercelPreviewEnv();
+}
+
+/**
+ * 获取生效的支付金额（人民币分）
+ *
+ * 严格隔离逻辑：
+ *   1. 仅当 VERCEL_ENV === "preview" 时才考虑测试价格
+ *   2. 仅当 PAYMENT_TEST_MODE === "true" 时才考虑测试价格
+ *   3. 仅当 PAYMENT_TEST_AMOUNT_CENTS === "1" 时才考虑测试价格
+ *   4. 三个条件全满足 → 返回 1（¥0.01）
+ *   5. 任何一个不满足 → 返回 PLAN_PRICING[plan].amountCents
+ *
+ * 注意：
+ *   - Production 误配置时，此函数仍返回正常价格（双重保险）
+ *   - 误配置的拦截由 isTestPaymentMisconfigured() + create API 负责
+ *   - 此函数不修改 PLAN_PRICING 本身
+ */
+export function getEffectivePaymentAmountCents(plan: "lite" | "pro"): number {
+  if (
+    isVercelPreviewEnv() &&
+    isTestPaymentModeEnabled() &&
+    isTestPaymentAmountValid()
+  ) {
+    return 1;
+  }
+  return PLAN_PRICING[plan].amountCents;
+}
+
 export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
   free: {
     name: "免费版",

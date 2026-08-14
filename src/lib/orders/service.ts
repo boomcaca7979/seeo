@@ -4,7 +4,7 @@
 // notify / query 都调用同一个 completeOrder，避免逻辑差异
 
 import { getAdminClient } from "@/lib/supabase/admin";
-import { PLAN_PRICING, formatAmountYuan } from "@/lib/billing";
+import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents } from "@/lib/billing";
 import type { PlanTier } from "@/lib/auth";
 import type { PaymentChannel, OrderStatus } from "@/lib/yaolipay/types";
 
@@ -71,7 +71,9 @@ export async function createPendingOrder(args: {
   }
 
   const outTradeNo = generateOutTradeNo();
-  const amountYuan = parseFloat(formatAmountYuan(pricing.amountCents));
+  // 使用生效金额（Preview 测试模式返回 1 cent，否则返回 PLAN_PRICING 正常价格）
+  // amount 写入 orders 表后，notify/refund 均以 order.amount 为准，不受环境变量影响
+  const amountYuan = parseFloat(formatAmountYuan(getEffectivePaymentAmountCents(args.plan)));
 
   try {
     const { data, error } = await admin

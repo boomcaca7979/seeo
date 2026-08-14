@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { getYaolipayConfig, getReturnUrl, isValidPaymentChannel } from "@/lib/yaolipay/config";
 import { createOrder } from "@/lib/yaolipay/client";
-import { formatAmountYuan, PLAN_PRICING } from "@/lib/billing";
+import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured } from "@/lib/billing";
 import { createPendingOrder } from "@/lib/orders/service";
 import type { PaymentChannel } from "@/lib/yaolipay/types";
 
@@ -60,6 +60,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // 测试支付开关误配置保护：
+  // 若 PAYMENT_TEST_MODE=true 但当前环境不是 Vercel Preview，
+  // 直接拒绝创建订单，防止 Production 误配置导致错误价格订单。
+  if (isTestPaymentMisconfigured()) {
+    return NextResponse.json(
+      { error: "测试支付开关在非 Preview 环境启用，已拒绝创建订单" },
+      { status: 503 }
+    );
+  }
+
   // 解析请求体
   let body: { plan?: unknown; payment_channel?: unknown };
   try {
@@ -83,6 +93,8 @@ export async function POST(req: Request) {
   }
 
   // 从服务端价格表获取金额（不信任客户端）
+  // Preview 测试模式：getEffectivePaymentAmountCents 可能返回 1（¥0.01）
+  // 正常模式/Production：始终返回 PLAN_PRICING[plan].amountCents
   const pricing = PLAN_PRICING[plan];
   if (!pricing) {
     return NextResponse.json(
@@ -90,7 +102,8 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
-  const moneyStr = formatAmountYuan(pricing.amountCents);
+  const effectiveAmountCents = getEffectivePaymentAmountCents(plan);
+  const moneyStr = formatAmountYuan(effectiveAmountCents);
   const clientIp = getClientIp(req);
   const returnUrl = getReturnUrl();
 
