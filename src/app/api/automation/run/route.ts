@@ -3,9 +3,9 @@
 // GET：Vercel Cron 触发（需 CRON_SECRET 验证，遍历所有用户执行）
 //
 // P0 稳定性修复：
-//   - POST 也传入 cronCtx，系统级 SerpApi 保险丝对手动触发生效（MAX_SERPAPI_CALLS_MANUAL=20）
+//   - POST 也传入 cronCtx，双重保险丝对手动触发生效（cost=20, runtime=90s）
 //   - GET 加 maxDuration=300 + MAX_CRON_RUNTIME_MS 时间限制（三重保险丝）
-//   - 用户循环中检查时间限制，接近上限时停止处理后续用户
+//   - runtime fuse 穿透到 refreshAllRanks/refreshRanksBatch/refreshSingleKeyword 三层
 
 import { NextResponse } from "next/server";
 import {
@@ -13,7 +13,12 @@ import {
   runWeeklyReport,
   MAX_SERPAPI_CALLS_PER_RUN,
 } from "@/lib/automation/cron";
-import { MAX_SERPAPI_CALLS_MANUAL, type CronRunContext } from "@/lib/seo/refresh";
+import {
+  MAX_SERPAPI_CALLS_MANUAL,
+  MAX_MANUAL_RUNTIME_MS,
+  hasCronRuntimeExpired,
+  type CronRunContext,
+} from "@/lib/seo/refresh";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { listDistinctUserIds } from "@/lib/db";
 import { peekQuota, QuotaExceededError, billingErrorToResponse } from "@/lib/guards";
@@ -71,20 +76,26 @@ export async function POST(request: Request) {
 
   try {
     if (type === "daily_refresh") {
-      // P0 修复：手动触发也传入 cronCtx，系统级保险丝对手动触发生效
-      // maxSerpApiCalls = MAX_SERPAPI_CALLS_MANUAL（20），远小于 Cron 的 500
+      // P0 修复：手动触发也传入 cronCtx，双重保险丝对手动触发生效
+      // maxSerpApiCalls = MAX_SERPAPI_CALLS_MANUAL（20），maxRuntimeMs = 90s
       const manualCtx: CronRunContext = {
         serpApiCalls: 0,
         maxSerpApiCalls: MAX_SERPAPI_CALLS_MANUAL,
         stoppedByCostLimit: false,
+        startTime: Date.now(),
+        maxRuntimeMs: MAX_MANUAL_RUNTIME_MS,
+        stoppedByTimeLimit: false,
       };
       await runDailyRefresh(userId, plan, manualCtx);
       return NextResponse.json({
         data: {
           type,
-          status: manualCtx.stoppedByCostLimit ? "stopped_by_limit" : "done",
+          status: (manualCtx.stoppedByCostLimit || manualCtx.stoppedByTimeLimit)
+            ? "stopped_by_limit"
+            : "done",
           serpApiCalls: manualCtx.serpApiCalls,
           stoppedByCostLimit: manualCtx.stoppedByCostLimit,
+          stoppedByTimeLimit: manualCtx.stoppedByTimeLimit,
         },
       });
     } else {
@@ -105,10 +116,10 @@ export async function POST(request: Request) {
 }
 
 // Vercel Cron 调用入口（每日 09:00 UTC）
-// P0 保护：三重保险丝
+// P0 保护：三重保险丝 + runtime fuse 穿透
 //   1. MAX_USERS_PER_RUN = 200（用户数硬上限）
 //   2. MAX_SERPAPI_CALLS_PER_RUN = 500（SerpApi 调用硬上限）
-//   3. MAX_CRON_RUNTIME_MS = 240s（运行时间硬上限）
+//   3. MAX_CRON_RUNTIME_MS = 240s（运行时间硬上限，穿透到 batch/chunk/keyword 层级）
 // 任一触及即停止处理后续用户，已完成结果保留
 export async function GET(request: Request) {
   // 验证请求来自 Vercel Cron（fail-closed：secret 为空时拒绝）
@@ -118,9 +129,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // P0：Cron 的 maxDuration 保险丝（300s，实际 workload 目标 < 240s）
-  const startTime = Date.now();
-
   try {
     const allUserIds = await listDistinctUserIds();
     if (allUserIds.length === 0) allUserIds.push("demo-user");
@@ -129,32 +137,34 @@ export async function GET(request: Request) {
     const userIds = allUserIds.slice(0, MAX_USERS_PER_RUN);
     const skippedUsers = allUserIds.length - userIds.length;
 
-    // 保险丝 2：系统级 SerpApi 成本保险丝
+    // 双重保险丝：系统级 SerpApi 成本 + 运行时间
     const cronCtx: CronRunContext = {
       serpApiCalls: 0,
       maxSerpApiCalls: MAX_SERPAPI_CALLS_PER_RUN,
       stoppedByCostLimit: false,
+      startTime: Date.now(),
+      maxRuntimeMs: MAX_CRON_RUNTIME_MS,
+      stoppedByTimeLimit: false,
     };
 
     const errors: Array<{ userId: string; error: string }> = [];
     let processedUsers = 0;
-    let stoppedByTimeLimit = false;
 
     for (const userId of userIds) {
       // 保险丝 2：系统级 SerpApi 上限已触及
       if (cronCtx.stoppedByCostLimit) break;
 
-      // 保险丝 3：运行时间硬上限已触及
-      const elapsed = Date.now() - startTime;
-      if (elapsed >= MAX_CRON_RUNTIME_MS) {
-        stoppedByTimeLimit = true;
+      // 保险丝 3：运行时间上限已触及（可能在用户内部 batch 中已设置）
+      if (cronCtx.stoppedByTimeLimit) break;
+      if (hasCronRuntimeExpired(cronCtx)) {
+        cronCtx.stoppedByTimeLimit = true;
         break;
       }
 
       try {
         // 不传 plan，runDailyRefresh 内部会通过 admin client 查询；
         // admin client 不可用时 fallback 为 free（最保守）
-        // 传入 cronCtx：启用系统级保险丝 + 用户额度预检
+        // 传入 cronCtx：启用双重保险丝 + 用户额度预检
         await runDailyRefresh(userId, undefined, cronCtx);
         processedUsers++;
       } catch (err) {
@@ -170,8 +180,8 @@ export async function GET(request: Request) {
         skippedUsers,
         serpApiCalls: cronCtx.serpApiCalls,
         stoppedByCostLimit: cronCtx.stoppedByCostLimit,
-        stoppedByTimeLimit,
-        runtimeMs: Date.now() - startTime,
+        stoppedByTimeLimit: cronCtx.stoppedByTimeLimit,
+        runtimeMs: Date.now() - cronCtx.startTime,
         errors,
       },
     });

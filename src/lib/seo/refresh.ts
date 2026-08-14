@@ -6,6 +6,7 @@
 //   - 并发受控（CONCURRENCY），禁止 Promise.all(200)
 //   - 单项失败不阻塞整批（Promise.allSettled）
 //   - 系统级 SerpApi 保险丝对手动触发也生效
+//   - 运行时间保险丝穿透到 batch/chunk/keyword 层级
 
 import {
   listTrackedKeywords,
@@ -30,18 +31,30 @@ function todayStr(): string {
 }
 
 /**
- * Cron 运行级共享上下文（P3.5：系统级 SerpApi 成本保险丝）
+ * Cron 运行级共享上下文（双重保险丝：cost + runtime）
  * - serpApiCalls：本次运行已消耗的 SerpApi 调用数
  * - maxSerpApiCalls：本次运行的 SerpApi 调用硬上限
  * - stoppedByCostLimit：是否因触及系统级上限而停止
+ * - startTime：本次运行的开始时间戳（ms）
+ * - maxRuntimeMs：本次运行的运行时间硬上限（ms）
+ * - stoppedByTimeLimit：是否因触及运行时间上限而停止
  *
- * P0 修复：手动触发（POST /api/automation/run）也传入 cronCtx，
- * 系统级保险丝对手动触发同样生效（maxSerpApiCalls 较小）。
+ * P0 修复：
+ *   - 手动触发（POST）也传入 cronCtx，双重保险丝对手动触发生效
+ *   - 运行时间保险丝穿透到 refreshAllRanks / refreshRanksBatch / refreshSingleKeyword 三层
  */
 export interface CronRunContext {
   serpApiCalls: number;
   maxSerpApiCalls: number;
   stoppedByCostLimit: boolean;
+  startTime: number;
+  maxRuntimeMs: number;
+  stoppedByTimeLimit: boolean;
+}
+
+/** 检查 Cron 运行时间是否已超过上限 */
+export function hasCronRuntimeExpired(ctx: CronRunContext): boolean {
+  return Date.now() - ctx.startTime >= ctx.maxRuntimeMs;
 }
 
 export interface RefreshResult {
@@ -85,6 +98,13 @@ export const CONCURRENCY = 3;
  * 20 次 × 10s / 3 并发 ≈ 70s，在 maxDuration=300s 内安全完成。
  */
 export const MAX_SERPAPI_CALLS_MANUAL = 20;
+
+/**
+ * 手动触发的运行时间硬上限（ms）。
+ * 与 tracking/refresh 的 maxDuration=90s 一致，
+ * 20 次 SerpApi 最坏 70s + buffer = 90s。
+ */
+export const MAX_MANUAL_RUNTIME_MS = 90_000;
 
 /**
  * 刷新单个关键词的完整流程（缓存→DB 今日记录→SerpApi→写 DB→预警）。
@@ -154,6 +174,22 @@ async function refreshSingleKeyword(
             error: "系统级 SerpApi 上限已触及，跳过",
           };
         }
+        // 运行时间保险丝：达到时间上限后不再发起 SerpApi 请求
+        if (cronCtx && hasCronRuntimeExpired(cronCtx)) {
+          cronCtx.stoppedByTimeLimit = true;
+          return {
+            id: tk.id,
+            keyword: tk.keyword,
+            domain: tk.domain,
+            location: tk.location,
+            device: tk.device,
+            position: null,
+            url: null,
+            fromCache: false,
+            skipped: true,
+            error: "运行时间已达上限，跳过",
+          };
+        }
         try {
           await consumeQuota(userId, "serpapi", plan);
           consumed = true;
@@ -218,7 +254,10 @@ async function refreshSingleKeyword(
  * 并发度受 CONCURRENCY 控制：将批次切成 CONCURRENCY 大小的子块，
  * 每个子块用 Promise.allSettled 并发，子块之间串行。
  *
- * 系统级保险丝在子块之间检查，触及上限时停止处理后续子块。
+ * 双重保险丝在子块之间检查：
+ *   - cost fuse: serpApiCalls >= maxSerpApiCalls
+ *   - runtime fuse: Date.now() - startTime >= maxRuntimeMs
+ * 任一触及即停止处理后续子块。
  */
 export async function refreshRanksBatch(
   userId: string,
@@ -231,8 +270,13 @@ export async function refreshRanksBatch(
 
   // 将批次切成 CONCURRENCY 大小的子块
   for (let i = 0; i < batch.length; i += CONCURRENCY) {
-    // 系统级保险丝：子块之间检查，触及上限时停止
+    // 双重保险丝：子块之间检查，触及任一上限时停止
     if (cronCtx && cronCtx.stoppedByCostLimit) break;
+    if (cronCtx && cronCtx.stoppedByTimeLimit) break;
+    if (cronCtx && hasCronRuntimeExpired(cronCtx)) {
+      cronCtx.stoppedByTimeLimit = true;
+      break;
+    }
     if (cronCtx && cronCtx.serpApiCalls >= cronCtx.maxSerpApiCalls) {
       cronCtx.stoppedByCostLimit = true;
       break;
@@ -274,7 +318,7 @@ export async function refreshRanksBatch(
  * 刷新指定用户的所有追踪关键词排名，返回刷新结果摘要。
  *
  * P0 修复：内部分批 + 并发，单批 MAX_KEYWORDS_PER_REQUEST，
- * 并发度 CONCURRENCY，系统级保险丝全程生效。
+ * 并发度 CONCURRENCY，双重保险丝（cost + runtime）全程生效。
  */
 export async function refreshAllRanks(
   userId: string,
@@ -289,8 +333,13 @@ export async function refreshAllRanks(
   const details: RefreshResult["details"] = [];
 
   for (let i = 0; i < list.length; i += MAX_KEYWORDS_PER_REQUEST) {
-    // 系统级保险丝：批次之间检查
+    // 双重保险丝：批次之间检查，触及任一上限时停止
     if (cronCtx && cronCtx.stoppedByCostLimit) break;
+    if (cronCtx && cronCtx.stoppedByTimeLimit) break;
+    if (cronCtx && hasCronRuntimeExpired(cronCtx)) {
+      cronCtx.stoppedByTimeLimit = true;
+      break;
+    }
 
     const batch = list.slice(i, i + MAX_KEYWORDS_PER_REQUEST);
     const items = await refreshRanksBatch(userId, plan, batch, cronCtx);

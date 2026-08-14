@@ -90,9 +90,9 @@ export function isStarted(): boolean {
 
 /**
  * 手动执行每日刷新（指定用户）
- * - 手动触发（POST /api/automation/run）传入 cronCtx（maxSerpApiCalls=MAX_SERPAPI_CALLS_MANUAL）
- * - Cron 触发（GET /api/automation/run）传入 cronCtx（maxSerpApiCalls=MAX_SERPAPI_CALLS_PER_RUN）
- * - 两条路径均受系统级 SerpApi 保险丝保护
+ * - 手动触发（POST /api/automation/run）传入 cronCtx（cost=MAX_SERPAPI_CALLS_MANUAL, runtime=MAX_MANUAL_RUNTIME_MS）
+ * - Cron 触发（GET /api/automation/run）传入 cronCtx（cost=MAX_SERPAPI_CALLS_PER_RUN, runtime=MAX_CRON_RUNTIME_MS）
+ * - 两条路径均受双重保险丝保护（cost + runtime），runtime fuse 穿透到 batch/chunk/keyword 层级
  */
 export async function runDailyRefresh(
   userId: string,
