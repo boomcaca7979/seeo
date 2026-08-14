@@ -63,13 +63,13 @@ export async function createPendingOrder(args: {
   const admin = getAdminClient();
   if (!admin) {
     console.error("[Orders] getAdminClient 返回 null，SUPABASE_SERVICE_ROLE_KEY 可能缺失");
-    return null;
+    return { order: null as unknown as OrderRecord, error: "admin client 不可用（SUPABASE_SERVICE_ROLE_KEY 缺失）" };
   }
 
   const pricing = PLAN_PRICING[args.plan];
   if (!pricing) {
     console.error("[Orders] PLAN_PRICING 未配置:", args.plan);
-    return null;
+    return { order: null as unknown as OrderRecord, error: "套餐价格未配置" };
   }
 
   const outTradeNo = generateOutTradeNo();
@@ -96,13 +96,13 @@ export async function createPendingOrder(args: {
 
     if (error || !data) {
       console.error("[Orders] 创建 pending 订单失败:", error?.message);
-      return null;
+      return { order: null as unknown as OrderRecord, error: error?.message ?? "数据库插入返回空数据" };
     }
 
     return { order: data as unknown as OrderRecord };
   } catch (err) {
     console.error("[Orders] 创建 pending 订单异常:", err);
-    return null;
+    return { order: null as unknown as OrderRecord, error: err instanceof Error ? err.message : "数据库写入异常" };
   }
 }
 

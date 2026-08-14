@@ -117,14 +117,15 @@ export async function POST(req: Request) {
     paymentChannel: payment_channel as PaymentChannel,
     clientIp,
   });
-  if (!pendingResult) {
-    console.error("[Payment Create] createPendingOrder 返回 null", {
+  if (!pendingResult || !pendingResult.order) {
+    console.error("[Payment Create] createPendingOrder 失败:", {
       userId,
       plan,
       channel: payment_channel,
+      error: pendingResult?.error,
     });
     return NextResponse.json(
-      { error: "创建本地订单失败" },
+      { error: "创建本地订单失败", detail: pendingResult?.error ?? "未知错误" },
       { status: 500 }
     );
   }
