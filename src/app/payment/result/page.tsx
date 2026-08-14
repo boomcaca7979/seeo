@@ -48,7 +48,10 @@ function PaymentResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const outTradeNo = searchParams.get("order") ?? "";
+  // 兼容两种来源：
+  //   - SeeO 内部跳转：?order=S2026...&pay_type=jump&channel=alipay&pay_info=...
+  //   - 耀立支付完成回跳：?pid=...&out_trade_no=S2026...&trade_no=...&sign=...
+  const outTradeNo = searchParams.get("order") ?? searchParams.get("out_trade_no") ?? "";
   const payType = searchParams.get("pay_type") ?? "";
   const channel = searchParams.get("channel") ?? "";
   const payInfo = searchParams.get("pay_info") ?? "";
