@@ -338,15 +338,29 @@ export default function PositionTrackingPage() {
 
   const handleRefresh = async () => {
     if (tracked.length === 0) { show("暂无追踪词，请先添加", "info"); return; }
+    // 防重复触发：refreshing 期间按钮已 disabled，这里二次兜底
+    if (refreshing) return;
     setRefreshing(true);
     try {
-      const res = await fetch("/api/tracking/refresh", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) { const { message } = handleBillingError(json, "刷新失败"); show(message, "error"); return; }
-      const summary = json.data?.summary ?? "刷新完成";
-      const usedText = json.usage ? `，本月用量 ${json.usage.used}/${json.usage.limit}` : "";
-      show(`${summary}${usedText}`, "success");
-      if (json.usage) setUsage(json.usage);
+      // P0：分批续请求，单次 HTTP 最多 20 个词，前端循环直到 hasMore=false
+      let offset = 0;
+      let totalSuccess = 0;
+      let totalProcessed = 0;
+      let hasMore = true;
+      let lastUsage: UsageInfo | null = null;
+      while (hasMore) {
+        const res = await fetch(`/api/tracking/refresh?offset=${offset}`, { method: "POST" });
+        const json = await res.json();
+        if (!res.ok) { const { message } = handleBillingError(json, "刷新失败"); show(message, "error"); return; }
+        const items: Array<{ error?: string }> = json.data?.items ?? [];
+        totalSuccess += items.filter((i) => !i.error).length;
+        totalProcessed += items.length;
+        if (json.usage) { setUsage(json.usage); lastUsage = json.usage; }
+        hasMore = json.data?.hasMore ?? false;
+        offset = json.data?.nextOffset ?? offset + items.length;
+      }
+      const usedText = lastUsage ? `，本月用量 ${lastUsage.used}/${lastUsage.limit}` : "";
+      show(`已刷新 ${totalSuccess}/${totalProcessed} 个词${usedText}`, "success");
       await loadList();
       if (selectedId) await loadHistory(selectedId);
     } catch (err) {

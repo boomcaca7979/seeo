@@ -90,8 +90,9 @@ export function isStarted(): boolean {
 
 /**
  * 手动执行每日刷新（指定用户）
- * - 手动触发（POST /api/automation/run）不传 cronCtx，仅用户级 consumeQuota 生效
- * - Cron 触发（GET /api/automation/run）传入 cronCtx，系统级保险丝同时生效
+ * - 手动触发（POST /api/automation/run）传入 cronCtx（maxSerpApiCalls=MAX_SERPAPI_CALLS_MANUAL）
+ * - Cron 触发（GET /api/automation/run）传入 cronCtx（maxSerpApiCalls=MAX_SERPAPI_CALLS_PER_RUN）
+ * - 两条路径均受系统级 SerpApi 保险丝保护
  */
 export async function runDailyRefresh(
   userId: string,

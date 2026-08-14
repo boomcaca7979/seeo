@@ -1,45 +1,27 @@
 // ===== /api/tracking/refresh =====
-// 遍历所有追踪词刷新今日排名；同一天重复刷新走缓存不重复扣额度
+// 刷新追踪词排名（P0 稳定性修复：批次 + 并发 + maxDuration）
+//
+// 单次请求最多处理 MAX_KEYWORDS_PER_REQUEST 个关键词（默认 20），
+// 并发度 CONCURRENCY（默认 3），最坏 runtime ≈ ceil(20/3) × 10s ≈ 70s。
+// 前端可通过 hasMore 字段判断是否需要继续请求下一批（传 offset 参数）。
 
 import { NextResponse } from "next/server";
+import { listTrackedKeywords } from "@/lib/db";
+import { peekUsage } from "@/lib/seo/cache";
 import {
-  listTrackedKeywords,
-  upsertRankHistory,
-  updateLastRefreshed,
-  hasTodayHistory,
-  getRankHistory,
-} from "@/lib/db";
-import { serpApiProvider } from "@/lib/seo/serpapi";
-import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
-import { generateRankAlert } from "@/lib/seo/alerts";
-import type { RankResult } from "@/lib/seo/types";
+  refreshRanksBatch,
+  MAX_KEYWORDS_PER_REQUEST,
+  type RefreshItem,
+} from "@/lib/seo/refresh";
 import { requireAuthOrDemo } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface RefreshItem {
-  id: number;
-  keyword: string;
-  domain: string;
-  location: string;
-  device: "PC" | "移动端";
-  position: number | null;
-  url: string | null;
-  fromCache: boolean;
-  skipped: boolean; // 今日已刷新过且缓存仍在 → 跳过不计费
-  error?: string;
-}
+// P0 保险丝：单次请求最长 90s（最坏 70s + buffer）
+export const maxDuration = 90;
 
-function todayStr(): string {
-  const d = new Date();
-  const off = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - off * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-
-export async function POST() {
+export async function POST(request: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
@@ -51,121 +33,34 @@ export async function POST() {
   if (list.length === 0) {
     const usage = await peekUsage(userId, "serpapi", plan);
     return NextResponse.json({
-      data: { items: [], summary: "暂无追踪词" },
+      data: { items: [], summary: "暂无追踪词", remaining: 0, hasMore: false },
       usage,
     });
   }
 
-  const items: RefreshItem[] = [];
-  const today = todayStr();
+  // P0：支持 offset 参数，前端续批时传 offset 跳过已处理词
+  const url = new URL(request.url);
+  const offsetRaw = Number(url.searchParams.get("offset") ?? "0");
+  const offset = Number.isFinite(offsetRaw) && offsetRaw > 0
+    ? Math.min(Math.floor(offsetRaw), list.length)
+    : 0;
 
-  for (const tk of list) {
-    const params = {
-      keyword: tk.keyword,
-      domain: tk.domain,
-      location: tk.location,
-      device: tk.device,
-    };
+  // P0：单次请求只处理 MAX_KEYWORDS_PER_REQUEST 个关键词
+  const batch = list.slice(offset, offset + MAX_KEYWORDS_PER_REQUEST);
+  const remaining = list.length - (offset + batch.length);
 
-    // 1. 先查本地 rank 缓存（24h TTL，与 serp 路由共用 cache.ts）
-    let rankResult: RankResult | null = null;
-    let fromCache = false;
-    let consumed = false;
-    let errMsg: string | undefined;
-
-    try {
-      const cached = await readCache<RankResult>("rank", params);
-      if (cached) {
-        rankResult = cached;
-        fromCache = true;
-      } else {
-        // 2. DB 中今日是否已有记录（避免同日重复扣额度）
-        const dbHasToday = await hasTodayHistory(userId, tk.id);
-        if (dbHasToday) {
-          // 今日已查过且缓存已过期：用 DB 里的历史记录作为结果（不再扣额度）
-          const history = await getRankHistory(userId, tk.id, 1);
-          const todayRow = history.find((h) => h.date === today);
-          if (todayRow) {
-            rankResult = {
-              keyword: tk.keyword,
-              domain: tk.domain,
-              location: tk.location,
-              device: tk.device,
-              fetchedAt: todayRow.created_at,
-              rank: todayRow.position,
-              matchedUrl: todayRow.url,
-              fromCache: true,
-            };
-            fromCache = true;
-          }
-        }
-
-        // 3. 真实调用 SerpApi（用户级额度扣减）
-        if (!rankResult) {
-          try {
-            await consumeQuota(userId, "serpapi", plan);
-            consumed = true;
-            rankResult = await serpApiProvider.checkRank(params);
-            // 写缓存
-            try {
-              await writeCache("rank", params, rankResult);
-            } catch {
-              // ignore
-            }
-          } catch (e) {
-            if (e instanceof SeoProviderError) {
-              errMsg = e.message;
-            } else if (e instanceof QuotaExceededError) {
-              errMsg = e.message;
-            } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-              errMsg = "本月额度已用尽，下月 1 日自动重置";
-            } else {
-              errMsg = (e as Error).message;
-            }
-          }
-        }
-      }
-
-      // 4. 写入 DB
-      if (rankResult) {
-        await upsertRankHistory(userId, {
-          keyword_id: tk.id,
-          date: today,
-          position: rankResult.rank,
-          url: rankResult.matchedUrl,
-        });
-        await updateLastRefreshed(userId, tk.id);
-
-        // 5. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
-        //    缓存命中 / DB 今日已有记录的跳过路径一律不生成，避免同日重复
-        if (consumed) {
-          generateRankAlert(userId, tk, rankResult.rank, today);
-        }
-      }
-    } catch (e) {
-      errMsg = (e as Error).message;
-    }
-
-    items.push({
-      id: tk.id,
-      keyword: tk.keyword,
-      domain: tk.domain,
-      location: tk.location,
-      device: tk.device,
-      position: rankResult?.rank ?? null,
-      url: rankResult?.matchedUrl ?? null,
-      fromCache,
-      skipped: !consumed,
-      error: errMsg,
-    });
-  }
+  const items: RefreshItem[] = await refreshRanksBatch(userId, plan, batch);
 
   const usage = await peekUsage(userId, "serpapi", plan);
   const successCount = items.filter((i) => !i.error).length;
-  const summary = `已刷新 ${successCount}/${items.length} 个词` + (items.some((i) => i.fromCache) ? "（部分命中缓存未扣额度）" : "");
+  const hasMore = remaining > 0;
+  const nextOffset = offset + batch.length;
+  const summary = `已刷新 ${successCount}/${items.length} 个词`
+    + (items.some((i) => i.fromCache) ? "（部分命中缓存未扣额度）" : "")
+    + (hasMore ? `，剩余 ${remaining} 个词可继续刷新` : "");
 
   return NextResponse.json({
-    data: { items, summary },
+    data: { items, summary, remaining, hasMore, nextOffset },
     usage,
   });
 }
