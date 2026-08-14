@@ -20,11 +20,11 @@ let cached: YaolipayConfig | null | undefined;
  */
 export function getYaolipayConfig(): YaolipayConfig | null {
   if (cached !== undefined) return cached;
-  const pidStr = process.env.YAOLIPAY_PID;
-  const privateKey = process.env.YAOLIPAY_PRIVATE_KEY;
-  const publicKey = process.env.YAOLIPAY_PUBLIC_KEY;
-  const apiBase = process.env.YAOLIPAY_API_BASE ?? "https://www.yaolipay.com";
-  const notifyUrl = process.env.YAOLIPAY_NOTIFY_URL ?? "";
+  const pidStr = (process.env.YAOLIPAY_PID ?? "").trim();
+  const privateKey = (process.env.YAOLIPAY_PRIVATE_KEY ?? "").trim();
+  const publicKey = (process.env.YAOLIPAY_PUBLIC_KEY ?? "").trim();
+  const apiBase = (process.env.YAOLIPAY_API_BASE ?? "https://www.yaolipay.com").trim();
+  const notifyUrl = (process.env.YAOLIPAY_NOTIFY_URL ?? "").trim();
 
   if (!pidStr || !privateKey || !publicKey || !notifyUrl) {
     cached = null;
