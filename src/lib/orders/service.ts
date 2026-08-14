@@ -62,11 +62,13 @@ export async function createPendingOrder(args: {
 }): Promise<{ order: OrderRecord; error?: string } | null> {
   const admin = getAdminClient();
   if (!admin) {
+    console.error("[Orders] getAdminClient 返回 null，SUPABASE_SERVICE_ROLE_KEY 可能缺失");
     return null;
   }
 
   const pricing = PLAN_PRICING[args.plan];
   if (!pricing) {
+    console.error("[Orders] PLAN_PRICING 未配置:", args.plan);
     return null;
   }
 
