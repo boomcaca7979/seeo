@@ -92,3 +92,59 @@ export function breadcrumbSchema(
     })),
   };
 }
+
+/** AboutPage：品牌实体页（/about） */
+export function aboutPageSchema(input: {
+  name: string;
+  description: string;
+  url: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    name: input.name,
+    description: input.description,
+    url: `${SITE_URL}${input.url}`,
+    mainEntity: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: SITE_URL,
+    },
+  };
+}
+
+/** WebPage：功能能力页（/features/*） */
+export function webPageSchema(input: {
+  name: string;
+  description: string;
+  url: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: input.name,
+    description: input.description,
+    url: `${SITE_URL}${input.url}`,
+    isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+  };
+}
+
+/**
+ * FAQPage：仅当页面实际渲染相同 FAQ 内容时使用。
+ * faqs 数据源必须与页面渲染共用同一常量，保证 HTML 内容 = JSON-LD。
+ */
+export function faqPageSchema(
+  url: string,
+  faqs: Array<{ q: string; a: string }>
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    url: `${SITE_URL}${url}`,
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+}

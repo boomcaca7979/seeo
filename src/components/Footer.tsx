@@ -4,12 +4,10 @@ const cols = [
   {
     title: "产品",
     links: [
-      { label: "关键词研究", href: "#features" },
-      { label: "排名追踪", href: "#features" },
-      { label: "技术审计", href: "#features" },
-      { label: "外链分析", href: "#features" },
-      { label: "竞品分析", href: "#features" },
-      { label: "内容优化", href: "#features" },
+      { label: "技术 SEO 审计", href: "/features/seo-audit" },
+      { label: "关键词排名追踪", href: "/features/rank-tracking" },
+      { label: "外链分析", href: "/features/backlink-analysis" },
+      { label: "全部功能", href: "#features" },
     ],
   },
   {
@@ -27,6 +25,7 @@ const cols = [
   {
     title: "公司",
     links: [
+      { label: "关于 SeeO", href: "/about" },
       { label: "隐私政策", href: "/privacy" },
       { label: "服务条款", href: "/terms" },
       { label: "退款政策", href: "/refund" },

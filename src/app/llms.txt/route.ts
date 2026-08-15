@@ -11,31 +11,39 @@ export function GET() {
 
 SeeO is an SEO software platform for keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.
 
-## Product
+## Overview
 
-SeeO is a web-based SEO analytics platform. Users add projects (websites), track keyword rankings, run technical SEO audits, analyze competitors, optimize content, and review backlink data. Data is provided through SerpApi and DataForSEO services.
+SeeO is a web-based SEO analytics platform. Users add projects (websites), track keyword rankings, run technical SEO audits, analyze competitors, optimize content, and review backlink data. SeeO does not build its own search index; SERP data comes from SerpApi and backlink data from DataForSEO. Technical audits use SeeO's own crawler.
 
-## Capabilities
+SeeO does NOT provide: AI citation tracking, LLM rank tracking, GEO scoring, or team collaboration. Only Google search data is supported.
 
-- Technical SEO Audit: crawl-based site audit with health scoring
-- Keyword Research: keyword overview and keyword expansion tools
-- Rank Tracking: daily keyword position tracking with history
-- Competitor Analysis: competitor ranking comparison and share of voice
-- Content Optimization: content quality checks against SEO checklist
-- Backlinks: backlink profile overview
-- Reporting: PDF and Excel report export, email reports
-- Automation: scheduled daily refresh and alerts
-- Project Management: multi-project management with usage limits
+## Core Capabilities
+
+- Technical SEO Audit: ${SITE_URL}/features/seo-audit
+  Crawl-based site audit, 20+ technical checks, health score (0-100), prioritized fixes. Quick mode: 1 page; full mode: up to 50 pages.
+- Keyword Rank Tracking: ${SITE_URL}/features/rank-tracking
+  Daily-refreshed Google rankings per keyword x domain x location x device, history trends, volatility alerts. Data from SerpApi.
+- Backlink Analysis: ${SITE_URL}/features/backlink-analysis
+  Total backlinks, referring domains, Domain Rank, dofollow ratio, anchors. Data from DataForSEO. Pro plan only, 7-day cache.
+- Keyword Research: keyword overview and expansion with volume, difficulty, intent (in-app)
+- Competitor Analysis: ranking comparison and share of voice (in-app)
+- Content Optimization: content checks against SERP Top 10 (in-app)
+- Reporting: PDF / Excel export, email reports (in-app)
+- Automation: scheduled daily refresh and alerts (in-app)
 
 ## Pricing
 
-Pricing plans (Free, Lite, Pro) are listed at ${SITE_URL}/pricing
+Free, Lite, and Pro plans: ${SITE_URL}/pricing
 
 ## Public Pages
 
 - Home: ${SITE_URL}/
 - Pricing: ${SITE_URL}/pricing
 - Docs: ${SITE_URL}/docs
+- About: ${SITE_URL}/about
+- SEO Audit: ${SITE_URL}/features/seo-audit
+- Rank Tracking: ${SITE_URL}/features/rank-tracking
+- Backlink Analysis: ${SITE_URL}/features/backlink-analysis
 - Login: ${SITE_URL}/login
 - Signup: ${SITE_URL}/signup
 - Privacy Policy: ${SITE_URL}/privacy

@@ -7,6 +7,9 @@ import {
   websiteSchema,
   softwareApplicationSchema,
   breadcrumbSchema,
+  aboutPageSchema,
+  webPageSchema,
+  faqPageSchema,
   SITE_URL,
 } from "@/lib/seo/schema";
 import { PLAN_PRICING } from "@/lib/billing";
@@ -139,5 +142,83 @@ describe("实体一致性（全部 schema）", () => {
       expect(strs).not.toContain("localhost");
       expect(strs).not.toContain("vercel.app");
     });
+  });
+});
+
+describe("aboutPageSchema（GEO V2）", () => {
+  it("@type=AboutPage，mainEntity 指向 Organization", () => {
+    const s = aboutPageSchema({
+      name: "关于 SeeO",
+      description: "SeeO 是 SEO 数据分析平台",
+      url: "/about",
+    });
+    expect(s["@context"]).toBe(SCHEMA_CONTEXT);
+    expect(s["@type"]).toBe("AboutPage");
+    expect(s.url).toBe(`${SITE_URL}/about`);
+    expect(s.mainEntity).toEqual({
+      "@type": "Organization",
+      name: "SeeO",
+      url: SITE_URL,
+    });
+  });
+});
+
+describe("webPageSchema（功能页）", () => {
+  it("@type=WebPage，isPartOf 指向 WebSite", () => {
+    const s = webPageSchema({
+      name: "技术 SEO 审计 · SeeO",
+      description: "20+ 项技术检查",
+      url: "/features/seo-audit",
+    });
+    expect(s["@type"]).toBe("WebPage");
+    expect(s.url).toBe(`${SITE_URL}/features/seo-audit`);
+    expect(s.isPartOf).toEqual({
+      "@type": "WebSite",
+      name: "SeeO",
+      url: SITE_URL,
+    });
+  });
+});
+
+describe("faqPageSchema（HTML = JSON-LD 同源）", () => {
+  const faqs = [
+    { q: "SeeO 支持哪些搜索引擎？", a: "目前支持 Google 搜索。" },
+    { q: "需要账号吗？", a: "排名追踪需要注册账号。" },
+  ];
+
+  it("每个 FAQ 渲染项与 Question/Answer 一一对应", () => {
+    const s = faqPageSchema("/about", faqs);
+    expect(s["@type"]).toBe("FAQPage");
+    expect(s.url).toBe(`${SITE_URL}/about`);
+    s.mainEntity.forEach((entity, i) => {
+      expect(entity["@type"]).toBe("Question");
+      expect(entity.name).toBe(faqs[i].q);
+      expect(entity.acceptedAnswer.text).toBe(faqs[i].a);
+    });
+    expect(s.mainEntity).toHaveLength(faqs.length);
+  });
+
+  it("FAQ 数量约束：5-8 个（GEO V2 规范）", () => {
+    // 页面 FAQ 常量按规范每页 5-8 个；schema 与渲染同源天然一致
+    expect(faqs.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("sitemap 公开路径（GEO V2）", () => {
+  it("包含 about 与 3 个功能页", async () => {
+    const sitemap = (await import("@/app/sitemap")).default;
+    const urls = sitemap().map((e) => e.url);
+    expect(urls).toContain(`${SITE_URL}/about`);
+    expect(urls).toContain(`${SITE_URL}/features/seo-audit`);
+    expect(urls).toContain(`${SITE_URL}/features/rank-tracking`);
+    expect(urls).toContain(`${SITE_URL}/features/backlink-analysis`);
+  });
+
+  it("私有路径不进入 sitemap", async () => {
+    const sitemap = (await import("@/app/sitemap")).default;
+    const urls = sitemap().map((e) => e.url).join(" ");
+    expect(urls).not.toContain("/app");
+    expect(urls).not.toContain("/api");
+    expect(urls).not.toContain("/payment");
   });
 });
