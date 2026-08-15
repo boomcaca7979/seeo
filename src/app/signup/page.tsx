@@ -12,14 +12,18 @@ export const metadata: Metadata = {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-station" />}>
+    <>
+      {/* JsonLd 必须在 Suspense 外：AuthForm 的 useSearchParams 会触发 CSR bailout，
+          Suspense 子树不进入静态 SSR 输出 */}
       <JsonLd
         schema={breadcrumbSchema([
           { name: "Home", url: "/" },
           { name: "Sign Up", url: "/signup" },
         ])}
       />
-      <AuthForm mode="signup" />
-    </Suspense>
+      <Suspense fallback={<div className="min-h-screen bg-station" />}>
+        <AuthForm mode="signup" />
+      </Suspense>
+    </>
   );
 }
