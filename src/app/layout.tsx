@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { CookieBanner } from "@/components/cookie-banner";
+import JsonLd from "@/components/JsonLd";
+import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -81,6 +83,9 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-station text-y-text font-sans">
+        {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
+        <JsonLd schema={organizationSchema()} />
+        <JsonLd schema={websiteSchema()} />
         {children}
         <CookieBanner />
       </body>

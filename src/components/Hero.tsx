@@ -62,7 +62,7 @@ export default function Hero() {
                 <span className="h-2.5 w-2.5 rounded-full bg-teal/70" />
               </div>
               <div className="font-mono text-[10px] text-d-muted sm:text-xs">
-                seeo.app / keyword-gravity-field
+                seeo.asia / keyword-gravity-field
               </div>
               <div className="font-mono text-[10px] text-d-muted sm:text-xs">
                 ● 示例

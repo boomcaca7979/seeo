@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "登录 · SeeO",
@@ -11,6 +13,12 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-station" />}>
+      <JsonLd
+        schema={breadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Login", url: "/login" },
+        ])}
+      />
       <AuthForm mode="login" />
     </Suspense>
   );

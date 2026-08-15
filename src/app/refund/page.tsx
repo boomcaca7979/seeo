@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "退款政策 · SeeO",
@@ -9,6 +11,12 @@ export const metadata: Metadata = {
 export default function RefundPage() {
   return (
     <div className="min-h-screen bg-paper">
+      <JsonLd
+        schema={breadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Refund Policy", url: "/refund" },
+        ])}
+      />
       <div className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="font-mono text-3xl font-bold text-ink mb-8">退款政策</h1>
         <div className="space-y-6 text-ink-60 leading-relaxed">

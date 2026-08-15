@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "文档 · SeeO",
@@ -98,6 +100,12 @@ const faqs = [
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-paper">
+      <JsonLd
+        schema={breadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Docs", url: "/docs" },
+        ])}
+      />
       <Navbar />
 
       <div className="mx-auto max-w-4xl px-6 py-16">
