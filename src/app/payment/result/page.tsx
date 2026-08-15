@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { resolvePaymentPageStatus } from "@/lib/payment/result-status";
 
 // ===== 支付结果页 =====
 // 支持：支付处理中（pending）、支付成功（paid）、支付失败（failed）
@@ -103,29 +104,21 @@ function PaymentResultContent() {
         if (cancelled) return;
 
         const data = json.data;
+
         if (data?.order) {
           setOrder(data.order as OrderData);
         }
 
-        const paymentStatus = data?.payment_status as string | undefined;
+        // 状态判定统一走纯函数：
+        // paid/failed/refunded 唯一依据是服务端 payment_status，浏览器参数不参与
+        const nextStatus = resolvePaymentPageStatus({
+          hasOrderNo: true,
+          serverPaymentStatus: data?.payment_status as string | undefined,
+        });
 
-        if (paymentStatus === "paid") {
+        if (nextStatus === "paid" || nextStatus === "failed" || nextStatus === "refunded") {
           if (!cancelled) {
-            setStatus("paid");
-            setPolling(false);
-          }
-          return;
-        }
-        if (paymentStatus === "failed") {
-          if (!cancelled) {
-            setStatus("failed");
-            setPolling(false);
-          }
-          return;
-        }
-        if (paymentStatus === "refunded") {
-          if (!cancelled) {
-            setStatus("refunded");
+            setStatus(nextStatus);
             setPolling(false);
           }
           return;

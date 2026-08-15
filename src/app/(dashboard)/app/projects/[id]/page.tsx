@@ -114,8 +114,12 @@ function renderDetail(
       </div>
       <p className="mt-1.5 font-mono text-xs text-ink-40">{project.domain}</p>
 
-      {/* 核心指标卡片 */}
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 核心指标卡片（流量/关键词/外链/健康度为示意数据） */}
+      <div className="mt-8 flex items-center gap-2">
+        <span className="font-mono text-xs text-ink-40">核心指标</span>
+        <span className="badge-warn">示意数据</span>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((m) => (
           <div key={m.label} className="card-a p-5">
             <div className="font-mono text-xs text-ink-40">{m.label}</div>
@@ -140,9 +144,13 @@ function renderDetail(
       {/* 排名追踪概览 */}
       <div className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink">
-            排名追踪概览
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-lg font-bold text-ink">
+              排名追踪概览
+            </h2>
+            {/* 表格行数据为示意数据 */}
+            <span className="badge-warn">示意数据</span>
+          </div>
           <Link
             href="/app/position-tracking"
             className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
