@@ -139,7 +139,7 @@ async function fetchSitemapUrls(origin: string, robotsText: string | null): Prom
       try {
         const res = await fetch(sitemapUrl, {
           signal: controller.signal,
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; SeeO-SEO-Bot/1.0; +https://seeo.app/bot)" },
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; SeeO-SEO-Bot/1.0; +https://www.seeo.asia/bot)" },
           cache: "no-store",
         });
         if (!res.ok) continue;

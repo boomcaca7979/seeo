@@ -1,7 +1,9 @@
 // ===== GET /api/cron/membership-expire =====
 // 会员到期自动降级定时任务
-// 每小时执行一次，检查所有 current_period_end < now 且 subscription_status=active 的用户
+// 每日 UTC 00:00 执行（vercel.json: "0 0 * * *"）
+// 检查所有 current_period_end < now 且 subscription_status=active/trialing 的用户
 // 将 plan 降为 free、subscription_status 置为 expired
+// 注：运行时 getUserPlan 也会动态判断过期，cron 仅同步 profiles 字段
 //
 // 安全：必须验证 CRON_SECRET（fail-closed）
 // 不允许任何人随意调用此接口

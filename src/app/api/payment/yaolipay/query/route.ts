@@ -14,6 +14,7 @@ import { queryOrder } from "@/lib/yaolipay/client";
 import {
   getOrderByOutTradeNoForUser,
   completeOrder,
+  retryMembershipActivation,
 } from "@/lib/orders/service";
 
 export const runtime = "nodejs";
@@ -45,7 +46,20 @@ export async function POST(req: Request) {
   }
 
   // 2. 如果已经是终态（paid/refunded/failed），直接返回
+  //    但对 paid 且 period_end 为 null 的订单，尝试重试 extend_membership
+  //    （completeOrder 中 RPC 失败的恢复路径）
   if (order.payment_status !== "pending") {
+    if (order.payment_status === "paid" && !order.period_end) {
+      const recovered = await retryMembershipActivation(order);
+      if (recovered) {
+        const refreshed = await getOrderByOutTradeNoForUser(outTradeNo, userId);
+        if (refreshed) {
+          return NextResponse.json({
+            data: { order: refreshed, payment_status: "paid", sync: true },
+          });
+        }
+      }
+    }
     return NextResponse.json({
       data: {
         order,

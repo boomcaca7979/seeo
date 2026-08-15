@@ -62,12 +62,14 @@ export async function createPendingOrder(args: {
 }): Promise<{ order: OrderRecord; error?: string } | null> {
   const admin = getAdminClient();
   if (!admin) {
-    return null;
+    console.error("[Orders] getAdminClient 返回 null，SUPABASE_SERVICE_ROLE_KEY 可能缺失");
+    return { order: null as unknown as OrderRecord, error: "admin client 不可用（SUPABASE_SERVICE_ROLE_KEY 缺失）" };
   }
 
   const pricing = PLAN_PRICING[args.plan];
   if (!pricing) {
-    return null;
+    console.error("[Orders] PLAN_PRICING 未配置:", args.plan);
+    return { order: null as unknown as OrderRecord, error: "套餐价格未配置" };
   }
 
   const outTradeNo = generateOutTradeNo();
@@ -94,13 +96,15 @@ export async function createPendingOrder(args: {
 
     if (error || !data) {
       console.error("[Orders] 创建 pending 订单失败:", error?.message);
-      return null;
+      console.log("[Orders] ERROR_DETAIL:", JSON.stringify({ code: error?.code, message: error?.message, details: error?.details, hint: error?.hint }));
+      return { order: null as unknown as OrderRecord, error: error?.message ?? "数据库插入返回空数据" };
     }
 
     return { order: data as unknown as OrderRecord };
   } catch (err) {
     console.error("[Orders] 创建 pending 订单异常:", err);
-    return null;
+    console.log("[Orders] EXCEPTION_DETAIL:", err instanceof Error ? err.message : String(err));
+    return { order: null as unknown as OrderRecord, error: err instanceof Error ? err.message : "数据库写入异常" };
   }
 }
 
@@ -147,10 +151,10 @@ export async function getOrderByOutTradeNoForUser(
 }
 
 /**
- * 比较金额是否一致（允许 0.01 元误差，避免浮点问题）
+ * 比较金额是否一致（整数 cents 比较，避免浮点精度问题）
  */
 export function amountsMatch(a: number, b: number): boolean {
-  return Math.abs(a - b) < 0.01;
+  return Math.round(a * 100) === Math.round(b * 100);
 }
 
 /**
@@ -410,6 +414,49 @@ export async function handleRefundSuccess(args: {
   }
 
   return { ok: true };
+}
+
+/**
+ * 重试会员开通（针对 paid 但 period_end 为 null 的订单）
+ *
+ * 场景：completeOrder 中 extend_membership RPC 失败，
+ * 订单已标记 paid 但会员未实际开通（period_end 为 null）。
+ * query 路由在轮询时发现此状态自动重试。
+ *
+ * @returns true 表示重试成功（period_end 已更新）
+ */
+export async function retryMembershipActivation(order: OrderRecord): Promise<boolean> {
+  const admin = getAdminClient();
+  if (!admin) return false;
+
+  const pricing = PLAN_PRICING[order.plan];
+  if (!pricing) return false;
+
+  try {
+    const { data: rpcResult, error: rpcError } = await admin.rpc(
+      "extend_membership",
+      {
+        p_user_id: order.user_id,
+        p_plan: order.plan as PlanTier,
+        p_period_days: pricing.periodDays,
+      }
+    );
+
+    if (rpcError || !rpcResult) {
+      console.error("[Orders] retryMembershipActivation RPC 失败:", rpcError?.message);
+      return false;
+    }
+
+    const newPeriodEnd = new Date(rpcResult as string).toISOString();
+    await admin
+      .from("orders")
+      .update({ period_end: newPeriodEnd })
+      .eq("out_trade_no", order.out_trade_no);
+    return true;
+  } catch (err) {
+    console.error("[Orders] retryMembershipActivation 异常:", err);
+    return false;
+  }
 }
 
 /**

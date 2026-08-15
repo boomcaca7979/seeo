@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { resolvePaymentPageStatus } from "@/lib/payment/result-status";
 
 // ===== 支付结果页 =====
 // 支持：支付处理中（pending）、支付成功（paid）、支付失败（failed）
@@ -48,7 +49,10 @@ function PaymentResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const outTradeNo = searchParams.get("order") ?? "";
+  // 兼容两种来源：
+  //   - SeeO 内部跳转：?order=S2026...&pay_type=jump&channel=alipay&pay_info=...
+  //   - 耀立支付完成回跳：?pid=...&out_trade_no=S2026...&trade_no=...&sign=...
+  const outTradeNo = searchParams.get("order") ?? searchParams.get("out_trade_no") ?? "";
   const payType = searchParams.get("pay_type") ?? "";
   const channel = searchParams.get("channel") ?? "";
   const payInfo = searchParams.get("pay_info") ?? "";
@@ -100,29 +104,21 @@ function PaymentResultContent() {
         if (cancelled) return;
 
         const data = json.data;
+
         if (data?.order) {
           setOrder(data.order as OrderData);
         }
 
-        const paymentStatus = data?.payment_status as string | undefined;
+        // 状态判定统一走纯函数：
+        // paid/failed/refunded 唯一依据是服务端 payment_status，浏览器参数不参与
+        const nextStatus = resolvePaymentPageStatus({
+          hasOrderNo: true,
+          serverPaymentStatus: data?.payment_status as string | undefined,
+        });
 
-        if (paymentStatus === "paid") {
+        if (nextStatus === "paid" || nextStatus === "failed" || nextStatus === "refunded") {
           if (!cancelled) {
-            setStatus("paid");
-            setPolling(false);
-          }
-          return;
-        }
-        if (paymentStatus === "failed") {
-          if (!cancelled) {
-            setStatus("failed");
-            setPolling(false);
-          }
-          return;
-        }
-        if (paymentStatus === "refunded") {
-          if (!cancelled) {
-            setStatus("refunded");
+            setStatus(nextStatus);
             setPolling(false);
           }
           return;

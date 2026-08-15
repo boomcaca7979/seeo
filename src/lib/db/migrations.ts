@@ -575,5 +575,6 @@ export function closeDb(): void {
   }
 }
 
-// 触发初始化（首次 import 时即建表）
-void ensureDir();
+// 注意：不在模块顶层调用 ensureDir()
+// local SQLite 分支内部会在首次调用 getAdapter() 时按需创建 data 目录
+// Turso 环境不需要本地目录，顶层副作用会导致 Vercel Serverless 只读文件系统 ENOENT

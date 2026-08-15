@@ -20,11 +20,11 @@ let cached: YaolipayConfig | null | undefined;
  */
 export function getYaolipayConfig(): YaolipayConfig | null {
   if (cached !== undefined) return cached;
-  const pidStr = process.env.YAOLIPAY_PID;
-  const privateKey = process.env.YAOLIPAY_PRIVATE_KEY;
-  const publicKey = process.env.YAOLIPAY_PUBLIC_KEY;
-  const apiBase = process.env.YAOLIPAY_API_BASE ?? "https://www.yaolipay.com";
-  const notifyUrl = process.env.YAOLIPAY_NOTIFY_URL ?? "";
+  const pidStr = (process.env.YAOLIPAY_PID ?? "").trim();
+  const privateKey = (process.env.YAOLIPAY_PRIVATE_KEY ?? "").trim();
+  const publicKey = (process.env.YAOLIPAY_PUBLIC_KEY ?? "").trim();
+  const apiBase = (process.env.YAOLIPAY_API_BASE ?? "https://www.yaolipay.com").trim();
+  const notifyUrl = (process.env.YAOLIPAY_NOTIFY_URL ?? "").trim();
 
   if (!pidStr || !privateKey || !publicKey || !notifyUrl) {
     cached = null;
@@ -43,12 +43,30 @@ export function getYaolipayConfig(): YaolipayConfig | null {
 
 /**
  * 构造 return_url（支付成功后的页面跳转地址）
- * 复用 NEXT_PUBLIC_APP_URL，避免重复配置
+ *
+ * 优先级：
+ *   1. NEXT_PUBLIC_APP_URL（手动配置，Production 推荐用 https://www.seeo.asia）
+ *   2. VERCEL_URL（Vercel 自动注入，Preview/Production 都有，格式 seeo-xxx.vercel.app）
+ *   3. 都缺失时返回相对路径（本地开发环境）
+ *
+ * 必须返回完整 URL（带 https://），否则耀立支付页会把相对路径当成自己域名下的路径，
+ * 导致支付完成后跳转到 https://www.yaolipay.com/payment/result → 404
  */
 export function getReturnUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const path = "/payment/result";
-  return appUrl ? `${appUrl}${path}` : path;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+  if (appUrl) {
+    return `${appUrl.replace(/\/$/, "")}${path}`;
+  }
+  const vercelUrl = (process.env.VERCEL_URL ?? "").trim();
+  if (vercelUrl) {
+    // VERCEL_URL 格式可能是 "seeo-xxx.vercel.app" 或 "seeo-xxx.vercel.app:443"
+    // 确保带 https:// 前缀
+    const withProto = vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
+    return `${withProto.replace(/\/$/, "").replace(/:443$/, "")}${path}`;
+  }
+  // 本地开发：返回相对路径（浏览器同源跳转）
+  return path;
 }
 
 /** 默认使用 web 方式调用（自动返回二维码/跳转 URL） */

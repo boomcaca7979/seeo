@@ -5,7 +5,7 @@ import * as cheerio from "cheerio";
 
 const TIMEOUT_MS = 10_000;
 const USER_AGENT =
-  "Mozilla/5.0 (compatible; SeeO-SEO-Bot/1.0; +https://seeo.app/bot)";
+  "Mozilla/5.0 (compatible; SeeO-SEO-Bot/1.0; +https://www.seeo.asia/bot)";
 
 export interface CrawlResult {
   url: string; // 最终 URL（跟踪重定向后）

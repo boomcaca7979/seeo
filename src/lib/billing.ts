@@ -121,17 +121,17 @@ const TEST_PAYMENT_AMOUNT_CENTS_ALLOWED = "1";
 
 /** 判断当前环境是否为 Vercel Preview */
 function isVercelPreviewEnv(): boolean {
-  return process.env.VERCEL_ENV === "preview";
+  return (process.env.VERCEL_ENV ?? "").trim() === "preview";
 }
 
 /** 判断是否启用了测试支付开关 */
 function isTestPaymentModeEnabled(): boolean {
-  return process.env.PAYMENT_TEST_MODE === "true";
+  return (process.env.PAYMENT_TEST_MODE ?? "").trim() === "true";
 }
 
 /** 判断测试金额配置是否合法 */
 function isTestPaymentAmountValid(): boolean {
-  return process.env.PAYMENT_TEST_AMOUNT_CENTS === TEST_PAYMENT_AMOUNT_CENTS_ALLOWED;
+  return (process.env.PAYMENT_TEST_AMOUNT_CENTS ?? "").trim() === TEST_PAYMENT_AMOUNT_CENTS_ALLOWED;
 }
 
 /**
