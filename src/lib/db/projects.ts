@@ -11,7 +11,15 @@ export interface ProjectRow {
   created_at: string;
 }
 
-export interface ProjectWithMetrics extends ProjectRow {
+/**
+ * 项目 + 指标（列表/工作台用）。
+ * id 统一为 string：
+ *   - 鉴权模式：Supabase projects.id（UUID，原样保留）
+ *   - 演示模式：SQLite INTEGER id 转字符串
+ * 保证 列表 key / 详情页 URL / DELETE API 全链路使用真实 ID。
+ */
+export interface ProjectWithMetrics extends Omit<ProjectRow, "id"> {
+  id: string;
   trackedKeywordCount: number;
   healthScore: number | null;
   lastAuditTime: string | null;
@@ -19,6 +27,9 @@ export interface ProjectWithMetrics extends ProjectRow {
   rankDown7d: number;
   alertCount: number;
 }
+
+/** 指标构建入参：id 为 string（SQLite 整数或 Supabase UUID） */
+type ProjectWithMetricsInput = Omit<ProjectRow, "id"> & { id: string };
 
 function rowToProject(row: Record<string, unknown>): ProjectRow {
   return {
@@ -166,7 +177,7 @@ export async function getRankStats7d(userId: string, domain: string): Promise<{ 
  */
 async function buildProjectsWithMetricsBase(
   userId: string,
-  projects: ProjectRow[]
+  projects: ProjectWithMetricsInput[]
 ): Promise<ProjectWithMetrics[]> {
   if (projects.length === 0) return [];
   const db = await getAdapter();
@@ -254,7 +265,11 @@ async function buildProjectsWithMetricsBase(
  *  查询次数固定 5 次（1 次取项目 + 4 次批量指标），与项目数无关。 */
 export async function listProjectsWithMetrics(userId: string): Promise<ProjectWithMetrics[]> {
   const projects = await listProjects(userId);
-  return buildProjectsWithMetricsBase(userId, projects);
+  // SQLite INTEGER id → string，统一 ProjectWithMetrics.id 类型
+  return buildProjectsWithMetricsBase(
+    userId,
+    projects.map((p) => ({ ...p, id: String(p.id) }))
+  );
 }
 
 /**
@@ -262,22 +277,15 @@ export async function listProjectsWithMetrics(userId: string): Promise<ProjectWi
  * 通过 Supabase 的 projects 表（RLS 自动按 user_id 过滤）查询项目，
  * 再用 domain 关联本地 SQLite/Turso 获取指标（审计/排名/告警）。
  *
- * 注意：Supabase projects.id 是 UUID 字符串，与本地 INTEGER id 不同。
- * 这里用 domain 作为关联键，返回的 id 仍为 Supabase UUID（字符串转 number 失败时用 0 占位）。
+ * 注意：Supabase projects.id 是 UUID 字符串，原样保留到返回值，
+ * 供项目列表 key / 详情页 URL / DELETE API 使用。
  * 同样使用批量查询避免 N+1（4N → 4 次）。
  */
 export async function listProjectsWithMetricsForUser(
   userId: string,
   supabaseProjects: Array<{ id: string; name: string; domain: string; created_at: string }>
 ): Promise<ProjectWithMetrics[]> {
-  // 转换为 ProjectRow[] 后复用批量构建逻辑（Supabase UUID 无法转 number，用 0 占位）
-  const projects: ProjectRow[] = supabaseProjects.map((p) => ({
-    id: 0,
-    name: p.name,
-    domain: p.domain,
-    created_at: p.created_at,
-  }));
-  return buildProjectsWithMetricsBase(userId, projects);
+  return buildProjectsWithMetricsBase(userId, supabaseProjects);
 }
 
 // ---------- competitors ----------

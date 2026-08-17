@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { isAuthEnabled } from "@/lib/auth-config";
 import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
@@ -180,7 +181,7 @@ export default function ProjectList({
         <div className="flex items-center justify-between font-sans text-[11px] text-ink-40">
           <span>{todayLabel || "\u00A0"}</span>
           <span>
-            数据更新时间 · 演示模式
+            {isAuthEnabled ? "数据更新时间" : "数据更新时间 · 演示模式"}
           </span>
         </div>
 

@@ -128,16 +128,22 @@ export async function DELETE(req: Request) {
   if (isAuthEnabled) {
     const supabase = await createServer();
     // 先查 domain（用于删除 SQLite 侧关联数据）
+    // 三层保护：Server Auth + 显式 user_id 条件 + Supabase RLS
     const { data: project } = await supabase
       .from("projects")
       .select("domain")
       .eq("id", idParam)
+      .eq("user_id", userId)
       .single();
     if (!project) {
       return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
     }
-    // 删 Supabase
-    const { error: delErr } = await supabase.from("projects").delete().eq("id", idParam);
+    // 删 Supabase（同样带 user_id 条件，不依赖 RLS 单独兜底）
+    const { error: delErr } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", idParam)
+      .eq("user_id", userId);
     if (delErr) {
       return NextResponse.json({ error: "删除项目失败" }, { status: 500 });
     }

@@ -23,13 +23,11 @@ import {
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import SOVGroupBars from "@/components/dashboard/charts/SOVGroupBars";
 import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/charts/CompetitorRankBars";
-
-const SELECTED_PROJECT_KEY = "seeo:selected-project-id";
-// Topbar 切换项目时派发的自定义事件（同 tab 通知）
-const PROJECT_CHANGED_EVENT = "seeo:project-changed";
+import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT } from "@/lib/project-selector";
 
 interface Competitor {
   id: number;
+  /** SQLite 竞品记录内部整数 id（非前端项目 UUID） */
   project_id: number;
   domain: string;
   name: string | null;
@@ -113,7 +111,7 @@ function sovBarColor(pct: number): string {
 export default function CompetitorsPage() {
   const { show, Toast } = useToast();
 
-  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [projectDomain, setProjectDomain] = useState<string>("");
 
   // 竞品列表
@@ -144,20 +142,20 @@ export default function CompetitorsPage() {
     if (typeof window === "undefined") return;
 
     const applyStored = () => {
+      // 项目 id 统一 string（鉴权模式 UUID / 演示模式整数），不做 Number() 转换
       const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
-      const id = stored ? Number(stored) : NaN;
-      if (Number.isInteger(id) && id >= 0) {
-        setProjectId((prev) => (prev === id ? prev : id));
+      if (stored) {
+        setProjectId((prev) => (prev === stored ? prev : stored));
       }
     };
 
     // 首次挂载：读取 localStorage（推迟到下一帧避免 effect 同步路径 setState）
     const tid = window.setTimeout(applyStored, 0);
 
-    // 监听 Topbar 切换项目的自定义事件（同 tab 通知）
+    // 监听 Topbar 切换项目的自定义事件（同 tab 通知，payload id 为 string）
     const onProjectChanged = (e: Event) => {
-      const detail = (e as CustomEvent<{ id: number }>).detail;
-      if (detail && Number.isInteger(detail.id) && detail.id >= 0) {
+      const detail = (e as CustomEvent<{ id: string }>).detail;
+      if (detail && typeof detail.id === "string" && detail.id) {
         setProjectId((prev) => (prev === detail.id ? prev : detail.id));
       }
     };
@@ -173,8 +171,8 @@ export default function CompetitorsPage() {
     };
   }, []);
 
-  // 拉取竞品列表
-  const loadCompetitors = useCallback(async (pid: number) => {
+  // 拉取竞品列表（pid 为前端项目 id string：UUID 或演示模式整数）
+  const loadCompetitors = useCallback(async (pid: string) => {
     setCompLoading(true);
     try {
       const res = await fetch(`/api/competitors?project_id=${pid}`, { cache: "no-store" });
@@ -212,8 +210,8 @@ export default function CompetitorsPage() {
     }
   }, [projectDomain, selectedKeywordId]);
 
-  // 拉取 SOV
-  const loadSov = useCallback(async (pid: number) => {
+  // 拉取 SOV（pid 为前端项目 id string）
+  const loadSov = useCallback(async (pid: string) => {
     setSovLoading(true);
     try {
       const res = await fetch(`/api/competitors/sov?project_id=${pid}`, { cache: "no-store" });
@@ -257,7 +255,7 @@ export default function CompetitorsPage() {
         if (cancelled) return;
         if (res.ok) {
           const proj = (json.data ?? []).find(
-            (p: { id: number; domain: string }) => p.id === projectId
+            (p: { id: string; domain: string }) => p.id === projectId
           );
           if (proj) setProjectDomain(proj.domain);
         }

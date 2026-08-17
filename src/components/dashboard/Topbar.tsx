@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
+import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
 
 interface TopbarProps {
   displayName: string;
@@ -31,7 +32,8 @@ interface AlertItem {
 }
 
 interface ProjectItem {
-  id: number;
+  /** 项目 id：鉴权模式为 Supabase UUID string，演示模式为 SQLite 整数（string） */
+  id: string;
   name: string;
   domain: string;
   healthScore: number | null;
@@ -43,9 +45,8 @@ const alertDotColor: Record<string, string> = {
   info: "bg-ink-40",
 };
 
-const SELECTED_PROJECT_KEY = "seeo:selected-project-id";
-// 自定义事件：Topbar 切换项目时通知同 tab 的其他页面（storage 事件仅跨 tab 触发）
-const PROJECT_CHANGED_EVENT = "seeo:project-changed";
+// SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
+
 
 function formatRelativeTime(isoStr: string): string {
   const then = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
@@ -64,7 +65,7 @@ function formatRelativeTime(isoStr: string): string {
 export default function Topbar({ displayName, email }: TopbarProps) {
   const [projectOpen, setProjectOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unread, setUnread] = useState(0);
@@ -107,19 +108,18 @@ export default function Topbar({ displayName, email }: TopbarProps) {
         }));
         setProjects(list);
 
-        // 恢复 localStorage 选中项
+        // 恢复 localStorage 选中项（string id；旧版本遗留数字 id / 已删项目会校验失败 → fallback 第一个）
         const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
-        const storedId = stored ? Number(stored) : NaN;
-        const exists = Number.isInteger(storedId) && list.some((p) => p.id === storedId);
-        let initialId: number | null = null;
-        if (exists) {
+        const storedId = validStoredProjectId(stored, list.map((p) => p.id));
+        let initialId: string | null = null;
+        if (storedId !== null) {
           initialId = storedId;
           setSelectedId(storedId);
         } else if (list.length > 0) {
           // 默认选第一个
           initialId = list[0].id;
           setSelectedId(list[0].id);
-          window.localStorage.setItem(SELECTED_PROJECT_KEY, String(list[0].id));
+          window.localStorage.setItem(SELECTED_PROJECT_KEY, list[0].id);
         } else {
           setSelectedId(null);
         }
@@ -182,9 +182,9 @@ export default function Topbar({ displayName, email }: TopbarProps) {
     }
   };
 
-  const handleSelectProject = (id: number) => {
+  const handleSelectProject = (id: string) => {
     setSelectedId(id);
-    window.localStorage.setItem(SELECTED_PROJECT_KEY, String(id));
+    window.localStorage.setItem(SELECTED_PROJECT_KEY, id);
     // 通知同 tab 页面项目已切换
     window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id } }));
     setProjectOpen(false);

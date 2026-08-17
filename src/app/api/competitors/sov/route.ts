@@ -14,6 +14,7 @@ import {
 import { calculateSOV, type SOVInput } from "@/lib/seo/sov";
 import { peekUsage } from "@/lib/seo/cache";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { resolveSqliteProjectId } from "@/lib/project-ref";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,10 +27,14 @@ export async function GET(req: Request) {
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
   const { searchParams } = new URL(req.url);
-  const projectId = Number(searchParams.get("project_id") ?? "");
-
-  if (!Number.isInteger(projectId) || projectId < 0) {
+  // project_id 接受前端项目引用：演示模式为整数字符串，鉴权模式为 Supabase UUID
+  const projectRef = (searchParams.get("project_id") ?? "").trim();
+  if (!projectRef) {
     return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
+  }
+  const projectId = await resolveSqliteProjectId(userId, projectRef);
+  if (projectId === null) {
+    return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
   }
 
   const project = await getProjectById(userId, projectId);

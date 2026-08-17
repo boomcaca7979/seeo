@@ -35,7 +35,7 @@ interface ExpandState {
 const KEYWORD_LOCATIONS = ["中国", "美国", "英国", "日本", "香港", "台湾"];
 type Device = "PC" | "移动端";
 
-function detectIntent(query: string): string {
+export function detectIntent(query: string): string {
   if (/什么|怎么|为什么|如何|是不是|哪些/.test(query)) return "信息型";
   if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(query)) return "商业型";
   return "导航型";
@@ -144,10 +144,10 @@ export default function KeywordExpandPage() {
   const hasResult = !!serp.data || !!expand.data;
   const expandTotal = (expand.data?.related.length ?? 0) + (expand.data?.paa.length ?? 0);
 
-  // 相关词表格（真实，来自 SERP）
-  const relatedRows = (serp.data?.relatedSearches ?? []).map((r, i) => ({
+  // 相关词表格（关键词来自 SERP；意图为 detectIntent 基于关键词文本的规则估算）
+  const relatedRows = (serp.data?.relatedSearches ?? []).map((r) => ({
     keyword: r.query,
-    intent: i % 3 === 0 ? "信息型" : i % 3 === 1 ? "商业调查型" : "交易型",
+    intent: detectIntent(r.query),
   }));
 
   return (
@@ -289,7 +289,7 @@ export default function KeywordExpandPage() {
                   <thead>
                     <tr className="border-b border-line-soft bg-line-soft/50">
                       <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">关键词</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">意图</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">意图（估算）</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-ink-40">操作</th>
                     </tr>
                   </thead>

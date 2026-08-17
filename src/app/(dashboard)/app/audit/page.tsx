@@ -117,7 +117,8 @@ function formatTime(iso: string | null): string {
 type AuditDepth = "quick" | "full";
 
 interface ProjectItem {
-  id: number;
+  /** 项目 id：鉴权模式为 Supabase UUID string，演示模式为 SQLite 整数（string） */
+  id: string;
   name: string;
   domain: string;
   healthScore: number | null;
