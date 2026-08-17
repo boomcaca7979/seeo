@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { isAuthEnabled } from "@/lib/auth-config";
 
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
 
 export default function UrlAuditBox() {
+  const t = useTranslations("hero.auditBox");
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,11 @@ export default function UrlAuditBox() {
 
     const domain = normalizeDomain(url);
     if (!domain) {
-      setError("请输入网站域名");
+      setError(t("errEmpty"));
       return;
     }
     if (!DOMAIN_REGEX.test(domain)) {
-      setError("域名格式无效，如 example.com");
+      setError(t("errInvalid"));
       return;
     }
     // SSRF 基础校验：禁止 localhost / 私网 IP
@@ -46,7 +48,7 @@ export default function UrlAuditBox() {
       /^172\.(1[6-9]|2[0-9]|3[01])\./.test(lower) ||
       /^169\.254\./.test(lower)
     ) {
-      setError("不支持审计本地或私有网络地址");
+      setError(t("errPrivate"));
       return;
     }
 
@@ -72,23 +74,23 @@ export default function UrlAuditBox() {
             setUrl(e.target.value);
             if (error) setError(null);
           }}
-          placeholder="输入你的网站域名，如 example.com"
+          placeholder={t("placeholder")}
           className="flex-1 rounded-lg border border-ink/40 bg-station-deep/60 px-4 py-3 text-sm text-y-text placeholder:text-y-muted/60 focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal/40"
-          aria-label="网站域名"
+          aria-label={t("label")}
         />
         <button
           type="submit"
           disabled={loading}
           className="rounded-lg bg-ink px-6 py-3 text-sm font-semibold text-d-text transition-opacity hover:opacity-90 disabled:opacity-50 sm:whitespace-nowrap"
         >
-          {loading ? "跳转中…" : "开始 SEO 审计"}
+          {loading ? t("submitting") : t("submit")}
         </button>
       </form>
       {error && (
         <p className="mt-2 text-left font-mono text-xs text-coral">{error}</p>
       )}
       <p className="mt-2 text-left font-mono text-[10px] text-y-muted/60">
-        输入域名即可快速审计，无需注册
+        {t("hint")}
       </p>
     </div>
   );

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import KeywordField from "./KeywordField";
 import UrlAuditBox from "./UrlAuditBox";
 import { isAuthEnabled } from "@/lib/auth-config";
 
 export default function Hero() {
+  const t = useTranslations("hero");
   // 演示模式：主按钮直接进 /app；启用模式：进 /signup
   const primaryHref = isAuthEnabled ? "/signup" : "/app";
 
@@ -24,26 +26,26 @@ export default function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-y-muted/40 bg-station-deep/60 px-3 py-1 font-mono text-xs text-y-secondary">
             <span className="h-1.5 w-1.5 rounded-full bg-teal-yellow" />
-            每日追踪 · 持续监控
+            {t("badge")}
           </span>
           <h1 className="mt-5 font-display text-4xl font-bold leading-tight tracking-tight text-y-text sm:text-6xl">
-            看清搜索流量的走向
+            {t("title")}
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-y-secondary sm:text-lg">
-            把关键词、排名、外链、技术审计、竞品和内容优化放在同一张工作台上。SeeO 帮你从一堆搜索数据里，看出下一步该做什么。
+            {t("subtitle")}
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href={primaryHref}
               className="w-full rounded-lg bg-ink px-6 py-3 text-center text-sm font-semibold text-d-text transition-opacity hover:opacity-90 sm:w-auto"
             >
-              开始分析你的网站
+              {t("primaryCta")}
             </Link>
             <Link
               href="#features"
               className="w-full rounded-lg border border-ink/40 bg-transparent px-6 py-3 text-center text-sm font-semibold text-y-text transition-colors hover:bg-ink/5 sm:w-auto"
             >
-              看看能做什么
+              {t("secondaryCta")}
             </Link>
           </div>
 
@@ -65,7 +67,7 @@ export default function Hero() {
                 seeo.asia / keyword-gravity-field
               </div>
               <div className="font-mono text-[10px] text-d-muted sm:text-xs">
-                ● 示例
+                ● {t("panel.sample")}
               </div>
             </div>
 
@@ -79,10 +81,10 @@ export default function Hero() {
                 <div>EDGES: 7</div>
               </div>
               <div className="absolute right-3 top-3 hidden font-mono text-[10px] text-d-muted sm:block">
-                <div>示例数据 · 演示用</div>
+                <div>{t("panel.sampleNote")}</div>
               </div>
               <div className="absolute bottom-3 left-3 hidden font-mono text-[10px] text-d-secondary sm:block">
-                引力场示意 · 数据为示例
+                {t("panel.caption")}
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 // ===== 首页（/ 英文 · /zh 中文）=====
-// 原 src/app/page.tsx 组合内联至此（旧文件在 multiple root layouts 重构中移除，
-// 内容零变化）；英文文案替换在 Phase 1 进行。
+// 原 src/app/page.tsx 组合内联至此（旧文件在 multiple root layouts 重构中移除）。
+// 文案全部走 messages（en.json / zh.json），本文件只负责组合与 locale 接线。
 
 import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
@@ -32,10 +32,11 @@ export async function generateMetadata({
 export default async function LocaleHomePage({ params }: LocaleHomePageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const loc = isLocale(locale) ? locale : "en";
   return (
     <>
-      {/* 首页产品实体：SoftwareApplication（价格来自 PLAN_PRICING 单一来源） */}
-      <JsonLd schema={softwareApplicationSchema()} />
+      {/* 首页产品实体：SoftwareApplication（价格来自 PLAN_PRICING 单一来源，语言随 locale） */}
+      <JsonLd schema={softwareApplicationSchema(loc)} />
       <Navbar />
       <main className="flex-1">
         <Hero />

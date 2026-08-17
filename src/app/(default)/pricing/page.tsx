@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Navbar from "@/components/Navbar";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
@@ -41,52 +42,6 @@ type PaymentChannel = "alipay" | "wxpay";
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
-function formatLimit(v: number): string {
-  if (v >= UNLIMITED) return "无限";
-  return v.toLocaleString();
-}
-
-// 将 PlanInfo 转为展示用 feature 列表
-function buildFeatureList(p: PlanInfo): { text: string; included: boolean }[] {
-  return [
-    { text: `项目数 ${formatLimit(p.max_projects)}`, included: true },
-    { text: `关键词追踪 ${formatLimit(p.max_tracked_keywords)}`, included: p.max_tracked_keywords > 0 },
-    { text: `每日审计 ${p.audit_daily_limit >= UNLIMITED ? "无限" : p.audit_daily_limit + " 次/天"}`, included: true },
-    { text: `内容检查 ${formatLimit(p.content_check_monthly_limit)} 次/月`, included: p.content_check_monthly_limit > 0 },
-    { text: `SerpApi ${formatLimit(p.serpapi_monthly_limit)} 次/月`, included: p.serpapi_monthly_limit > 0 },
-    { text: "PDF 报告导出", included: p.can_export_pdf },
-    { text: "Excel 报告导出", included: p.can_export_excel },
-    { text: "邮件周报", included: p.can_email_report },
-  ];
-}
-
-const faqs = [
-  {
-    q: "免费版有使用期限吗？",
-    a: "没有。免费版永久可用，但有关键词数量与 SerpApi 调用次数限制。",
-  },
-  {
-    q: "如何升级套餐？",
-    a: "点击对应套餐的升级按钮，选择支付宝或微信支付，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。",
-  },
-  {
-    q: "支持哪些支付方式？",
-    a: "目前支持支付宝和微信支付两种方式，由耀立支付提供聚合支付技术服务。",
-  },
-  {
-    q: "会员到期后会怎样？",
-    a: "到期后套餐将自动恢复为免费版，已创建的数据（项目、关键词、报告等）不会丢失，但功能与额度将按免费版限制。可以随时重新购买。",
-  },
-  {
-    q: "SerpApi 额度是什么？",
-    a: "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 50 次，超出后相关功能暂停至下月刷新。升级套餐可获得更高额度。",
-  },
-  {
-    q: "数据存储在哪里？",
-    a: "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。",
-  },
-];
-
 export default function PricingPage() {
   return (
     <Suspense fallback={null}>
@@ -96,6 +51,31 @@ export default function PricingPage() {
 }
 
 function PricingContent() {
+  const t = useTranslations();
+  const tp = useTranslations("plans");
+
+  // 将 PlanInfo 转为展示用 feature 列表（文案走 messages，额度为 /api/plans 真实数据）
+  const buildFeatureList = (p: PlanInfo): { text: string; included: boolean }[] => {
+    const fmt = (v: number) =>
+      v >= UNLIMITED ? tp("unlimited") : v.toLocaleString();
+    return [
+      { text: tp("features.projects", { count: fmt(p.max_projects) }), included: true },
+      { text: tp("features.keywords", { count: fmt(p.max_tracked_keywords) }), included: p.max_tracked_keywords > 0 },
+      {
+        text:
+          p.audit_daily_limit >= UNLIMITED
+            ? tp("features.auditsUnlimited")
+            : tp("features.audits", { count: p.audit_daily_limit }),
+        included: true,
+      },
+      { text: tp("features.contentChecks", { count: fmt(p.content_check_monthly_limit) }), included: p.content_check_monthly_limit > 0 },
+      { text: tp("features.serpapi", { count: fmt(p.serpapi_monthly_limit) }), included: p.serpapi_monthly_limit > 0 },
+      { text: tp("features.pdf"), included: p.can_export_pdf },
+      { text: tp("features.excel"), included: p.can_export_excel },
+      { text: tp("features.email"), included: p.can_email_report },
+    ];
+  };
+
   const router = useRouter();
   const { show, Toast } = useToast();
   const searchParams = useSearchParams();
@@ -137,9 +117,9 @@ function PricingContent() {
   const isCheckoutCancel = searchParams.get("payment") === "cancel";
   useEffect(() => {
     if (isCheckoutCancel) {
-      show("支付已取消，套餐未发生变化", "info");
+      show(t("pricing.cancelToast"), "info");
     }
-  }, [isCheckoutCancel, show]);
+  }, [isCheckoutCancel, show, t]);
 
   // 从 /api/plans 拉取套餐数据（统一数据源）
   useEffect(() => {
@@ -151,16 +131,16 @@ function PricingContent() {
         if (!cancelled && res.ok && Array.isArray(json.data)) {
           setPlans(json.data as PlanInfo[]);
         } else if (!cancelled) {
-          setErrorMsg("加载套餐信息失败");
+          setErrorMsg(t("pricing.loadFailed"));
         }
       } catch {
-        if (!cancelled) setErrorMsg("网络错误，加载套餐失败");
+        if (!cancelled) setErrorMsg(t("pricing.networkError"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   // 创建耀立支付订单
   async function handleCreatePayment(plan: "lite" | "pro", channel: PaymentChannel) {
@@ -174,14 +154,14 @@ function PricingContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "创建订单失败，请稍后重试");
+        const { message } = handleBillingError(json, t("pricing.createFailed"));
         show(message, "error");
         return;
       }
 
       const data = json.data;
       if (!data) {
-        setErrorMsg("未收到支付信息");
+        setErrorMsg(t("pricing.noPayInfo"));
         return;
       }
 
@@ -200,7 +180,7 @@ function PricingContent() {
       if (payInfo) params.set("pay_info", payInfo);
       router.push(`/payment/result?${params.toString()}`);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "网络错误，请稍后重试");
+      setErrorMsg(err instanceof Error ? err.message : t("pricing.networkRetry"));
     } finally {
       setCreating(false);
     }
@@ -212,25 +192,45 @@ function PricingContent() {
 
       {/* 页头 */}
       <div className="mx-auto max-w-5xl px-6 pt-16 pb-8 text-center">
-        <span className="font-mono text-xs text-brand">PRICING</span>
-        <h1 className="mt-3 font-mono text-3xl font-bold text-ink">选择适合你的方案</h1>
+        <span className="font-mono text-xs text-brand">{t("pricing.eyebrow")}</span>
+        <h1 className="mt-3 font-mono text-3xl font-bold text-ink">{t("pricing.title")}</h1>
         <p className="mt-3 font-sans text-sm text-ink-60 max-w-xl mx-auto">
-          从免费开始，随时升级。一次性购买 30 天会员，支持支付宝 / 微信支付。
+          {t("pricing.subtitle")}
         </p>
       </div>
 
       {/* 定价卡 */}
       <div className="mx-auto max-w-6xl px-6 pb-16">
         {loading ? (
-          <div className="text-center font-mono text-xs text-ink-40">加载中…</div>
+          <div className="text-center font-mono text-xs text-ink-40">{t("pricing.loading")}</div>
         ) : plans && plans.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {plans.map((p) => {
               const features = buildFeatureList(p);
+              // 套餐名/tagline/CTA 文案按 locale 从 messages 输出；
+              // 价格与额度为 /api/plans（billing 层）真实数据
+              const planKey = p.plan as "free" | "lite" | "pro";
+              const displayName = tp(`${planKey}.name` as "free.name" | "lite.name" | "pro.name");
+              const displayTagline = tp(`${planKey}.tagline` as "free.tagline" | "lite.tagline" | "pro.tagline");
+              const base = {
+                ctaLabel:
+                  planKey === "lite"
+                    ? tp("cta.upgradeLite")
+                    : planKey === "pro"
+                      ? tp("cta.upgradePro")
+                      : tp("cta.start"),
+                checkoutPlan: p.display.checkoutPlan,
+                ctaHref: p.display.ctaHref,
+                highlighted: p.display.highlighted,
+              };
               const card = getPlanCardState(
                 currentPlan,
-                p.plan as "free" | "lite" | "pro",
-                p.display
+                planKey,
+                base,
+                {
+                  renew: tp("cta.renew"),
+                  noDowngrade: tp("cta.noDowngrade"),
+                }
               );
               return (
                 <div
@@ -246,19 +246,19 @@ function PricingContent() {
                           card.badge === "current" ? "badge-pos" : "badge-warn"
                         }`}
                       >
-                        {card.badge === "current" ? "当前套餐" : "推荐"}
+                        {card.badge === "current"
+                          ? tp("badge.current")
+                          : tp("badge.recommended")}
                       </span>
                     </div>
                   )}
                   <div className="mb-5">
-                    <h2 className="font-mono text-lg font-bold text-ink mb-1">{p.display.name}</h2>
-                    <p className="font-sans text-xs text-ink-40">{p.display.tagline}</p>
+                    <h2 className="font-mono text-lg font-bold text-ink mb-1">{displayName}</h2>
+                    <p className="font-sans text-xs text-ink-40">{displayTagline}</p>
                   </div>
                   <div className="mb-5">
                     <span className="font-mono text-2xl font-bold text-ink">{p.display.price}</span>
-                    {p.display.priceUnit && (
-                      <span className="font-sans text-xs text-ink-40">{p.display.priceUnit}</span>
-                    )}
+                    <span className="font-sans text-xs text-ink-40">{tp("priceUnit")}</span>
                   </div>
                   <ul className="space-y-2 mb-6">
                     {features.map((f) => (
@@ -300,7 +300,7 @@ function PricingContent() {
           </div>
         ) : (
           <div className="text-center font-mono text-xs text-ink-40">
-            {errorMsg ?? "暂无套餐信息"}
+            {errorMsg ?? t("pricing.noPlans")}
           </div>
         )}
       </div>
@@ -318,7 +318,7 @@ function PricingContent() {
       <div className="mx-auto max-w-3xl px-6 pb-8">
         <div className="card-a p-4">
           <p className="font-sans text-xs text-ink-40 text-center">
-            套餐价格与限制统一由 billing 层管理。支付由耀立支付聚合支付服务处理，支持支付宝与微信支付。
+            {t("pricing.note")}
           </p>
         </div>
       </div>
@@ -326,12 +326,12 @@ function PricingContent() {
       {/* FAQ */}
       <div className="mx-auto max-w-3xl px-6 pb-16">
         <div className="flex items-center gap-3 mb-6">
-          <span className="font-mono text-xs text-brand">FAQ</span>
-          <h2 className="font-mono text-xl font-bold text-ink">常见问题</h2>
+          <span className="font-mono text-xs text-brand">{t("pricing.faqEyebrow")}</span>
+          <h2 className="font-mono text-xl font-bold text-ink">{t("pricing.faqTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
         <div className="space-y-4">
-          {faqs.map((item) => (
+          {(t.raw("pricing.faqs") as Array<{ q: string; a: string }>).map((item) => (
             <div key={item.q} className="card-a p-4">
               <h3 className="font-sans text-sm font-medium text-ink mb-1">{item.q}</h3>
               <p className="font-sans text-sm text-ink-60">{item.a}</p>
@@ -344,7 +344,7 @@ function PricingContent() {
       <div className="border-t border-line">
         <div className="mx-auto max-w-5xl px-6 py-6 text-center">
           <Link href="/" className="font-mono text-xs text-ink-40 transition-colors hover:text-ink">
-            ← 返回首页
+            {t("pricing.backHome")}
           </Link>
         </div>
       </div>
@@ -376,7 +376,9 @@ function PaymentChannelModal({
   onClose: () => void;
   onSelect: (channel: PaymentChannel) => void;
 }) {
-  const planLabel = plan === "lite" ? "Lite 版" : "专业版";
+  const t = useTranslations("paymentModal");
+  const tp = useTranslations("plans");
+  const planLabel = plan === "lite" ? tp("lite.name") : tp("pro.name");
 
   return (
     <div
@@ -389,15 +391,15 @@ function PaymentChannelModal({
       >
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <h3 className="font-display text-lg font-bold text-ink">选择支付方式</h3>
+            <h3 className="font-display text-lg font-bold text-ink">{t("title")}</h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              {planLabel} · 30 天会员
+              {t("subtitle", { plan: planLabel })}
             </p>
           </div>
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
-            aria-label="关闭"
+            aria-label={t("close")}
             disabled={loading}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
@@ -416,8 +418,8 @@ function PaymentChannelModal({
               <span className="font-mono text-xs">支</span>
             </div>
             <div>
-              <div className="font-display text-sm font-bold text-ink">支付宝</div>
-              <div className="font-sans text-xs text-ink-40">跳转支付宝完成支付</div>
+              <div className="font-display text-sm font-bold text-ink">{t("alipay")}</div>
+              <div className="font-sans text-xs text-ink-40">{t("alipayDesc")}</div>
             </div>
           </button>
 
@@ -430,15 +432,15 @@ function PaymentChannelModal({
               <span className="font-mono text-xs">微</span>
             </div>
             <div>
-              <div className="font-display text-sm font-bold text-ink">微信支付</div>
-              <div className="font-sans text-xs text-ink-40">扫码或跳转微信完成支付</div>
+              <div className="font-display text-sm font-bold text-ink">{t("wxpay")}</div>
+              <div className="font-sans text-xs text-ink-40">{t("wxpayDesc")}</div>
             </div>
           </button>
         </div>
 
         {loading && (
           <div className="mt-4 text-center font-mono text-xs text-ink-40">
-            正在创建订单…
+            {t("creating")}
           </div>
         )}
       </div>

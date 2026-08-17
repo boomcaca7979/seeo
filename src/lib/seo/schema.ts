@@ -12,6 +12,28 @@ import { PLAN_PRICING } from "@/lib/billing";
 export const SITE_URL = "https://www.seeo.asia";
 export const SITE_NAME = "SeeO";
 
+// SoftwareApplication 按 locale 输出的文案（en 面向英文 SaaS 市场，zh 保持原中文）
+const APP_TEXT = {
+  en: {
+    description:
+      "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.",
+    offers: [
+      { key: "free", name: "Free", description: "Free plan: for personal site owners and beginners" },
+      { key: "lite", name: "Lite", description: "Lite plan: 30-day membership, one-time purchase" },
+      { key: "pro", name: "Pro", description: "Pro plan: 30-day membership, one-time purchase" },
+    ] as const,
+  },
+  zh: {
+    description:
+      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析。",
+    offers: [
+      { key: "free", name: "免费版", description: "免费版：适合个人站长和初学者" },
+      { key: "lite", name: "Lite 版", description: "Lite 版：30 天会员，一次性购买" },
+      { key: "pro", name: "专业版", description: "专业版：30 天会员，一次性购买" },
+    ] as const,
+  },
+} as const;
+
 /** Organization：只声明可验证的最小字段（无真实公司注册信息/社交账号，不编造） */
 export function organizationSchema() {
   return {
@@ -35,34 +57,25 @@ export function websiteSchema() {
 /**
  * SoftwareApplication：SeeO 以 SaaS Web 应用形式呈现
  * offers 与 PLAN_PRICING 保持单一数据源（免费版 ¥0 + Lite/Pro 30 天一次性购买）
+ * locale：en/zh 输出对应语言的 name/description（价格仍来自 PLAN_PRICING）
  */
-export function softwareApplicationSchema() {
-  const offers = [
-    {
-      "@type": "Offer",
-      name: "免费版",
-      price: "0",
-      priceCurrency: "CNY",
-      url: `${SITE_URL}/pricing`,
-      description: "免费版：适合个人站长和初学者",
-    },
-    {
-      "@type": "Offer",
-      name: "Lite 版",
-      price: (PLAN_PRICING.lite.amountCents / 100).toFixed(2),
-      priceCurrency: PLAN_PRICING.lite.currency,
-      url: `${SITE_URL}/pricing`,
-      description: `Lite 版：${PLAN_PRICING.lite.periodDays} 天会员，一次性购买`,
-    },
-    {
-      "@type": "Offer",
-      name: "专业版",
-      price: (PLAN_PRICING.pro.amountCents / 100).toFixed(2),
-      priceCurrency: PLAN_PRICING.pro.currency,
-      url: `${SITE_URL}/pricing`,
-      description: `专业版：${PLAN_PRICING.pro.periodDays} 天会员，一次性购买`,
-    },
-  ];
+export function softwareApplicationSchema(locale: "en" | "zh" = "zh") {
+  const text = APP_TEXT[locale];
+  const priceOf = (key: "free" | "lite" | "pro") =>
+    key === "free"
+      ? { price: "0", priceCurrency: "CNY" }
+      : {
+          price: (PLAN_PRICING[key].amountCents / 100).toFixed(2),
+          priceCurrency: PLAN_PRICING[key].currency,
+        };
+
+  const offers = text.offers.map((o) => ({
+    "@type": "Offer",
+    name: o.name,
+    ...priceOf(o.key),
+    url: `${SITE_URL}/pricing`,
+    description: o.description,
+  }));
 
   return {
     "@context": "https://schema.org",
@@ -71,8 +84,7 @@ export function softwareApplicationSchema() {
     url: SITE_URL,
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
-    description:
-      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析。",
+    description: text.description,
     offers,
   };
 }

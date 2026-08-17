@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 // 排名趋势图（极光渐变面积线）
 function RankTrendChart() {
   const points = [
@@ -36,7 +38,7 @@ function RankTrendChart() {
 }
 
 // 健康度评分环（示例展示）
-function HealthRing() {
+function HealthRing({ scoreNote }: { scoreNote: string }) {
   const r = 34;
   const c = 2 * Math.PI * r;
   const offset = c - (75 / 100) * c;
@@ -65,8 +67,8 @@ function HealthRing() {
         />
       </svg>
       <div className="absolute text-center">
-        <div className="font-display text-3xl font-bold text-d-text">示例</div>
-        <div className="font-mono text-[10px] text-d-muted">评分示意</div>
+        <div className="font-display text-3xl font-bold text-d-text">75</div>
+        <div className="font-mono text-[10px] text-d-muted">{scoreNote}</div>
       </div>
     </div>
   );
@@ -120,6 +122,8 @@ function MetricPill({
 }
 
 export default function DashboardPreview() {
+  const t = useTranslations("preview");
+
   return (
     <section id="dashboard" className="bg-station-deep px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-7xl">
@@ -127,18 +131,18 @@ export default function DashboardPreview() {
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div className="max-w-2xl">
             <span className="font-mono text-sm text-y-secondary">
-              工作台预览
+              {t("sectionTag")}
             </span>
             <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-y-text sm:text-5xl">
-              看到每一天的变化
+              {t("sectionTitle")}
             </h2>
             <p className="mt-4 text-base text-y-secondary sm:text-lg">
-              所有项目的核心指标汇总在一个仪表盘里，排名涨了还是掉了、健康度有没有回升、流量从哪来，一眼看完。
+              {t("sectionSubtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-lg bg-ink/10 px-3 py-2 font-mono text-xs text-y-secondary">
             <span className="h-2 w-2 rounded-full bg-teal-yellow" />
-            示例数据 · 演示用
+            {t("demoBadge")}
           </div>
         </div>
 
@@ -149,25 +153,25 @@ export default function DashboardPreview() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display text-lg font-bold text-d-text">
-                  排名趋势
+                  {t("rankTrend.title")}
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
-                  示例项目 · 近 30 天 · 移动端
+                  {t("rankTrend.subtitle")}
                 </p>
               </div>
               <div className="text-right">
                 <div className="font-mono text-2xl font-bold text-d-text">
-                  示例
+                  #22
                 </div>
-                <div className="font-mono text-xs text-teal">趋势示意</div>
+                <div className="font-mono text-xs text-teal">{t("trendIllustration")}</div>
               </div>
             </div>
             <div className="mt-6 h-44">
               <RankTrendChart />
             </div>
             <div className="mt-3 flex justify-between font-mono text-[10px] text-d-muted">
-              <span>30 天前</span>
-              <span>今天</span>
+              <span>{t("rankTrend.from")}</span>
+              <span>{t("rankTrend.to")}</span>
             </div>
           </div>
 
@@ -175,35 +179,35 @@ export default function DashboardPreview() {
           <div className="rounded-2xl bg-ink p-6 lg:col-span-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-bold text-d-text">
-                健康度
+                {t("health.title")}
               </h3>
               <span className="rounded bg-teal/15 px-2 py-0.5 font-mono text-[10px] text-teal">
-                示例
+                {t("sample")}
               </span>
             </div>
             <p className="mt-0.5 font-mono text-xs text-d-muted">
-              技术 SEO 审计综合分
+              {t("health.subtitle")}
             </p>
             <div className="mt-4 flex flex-col items-center">
-              <HealthRing />
+              <HealthRing scoreNote={t("health.scoreNote")} />
               <div className="mt-3 grid w-full grid-cols-3 gap-2 text-center">
                 <div>
                   <div className="font-mono text-sm font-semibold text-coral">
-                    示例
+                    {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">错误</div>
+                  <div className="font-mono text-[9px] text-d-muted">{t("health.errors")}</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-gold">
-                    示例
+                    {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">警告</div>
+                  <div className="font-mono text-[9px] text-d-muted">{t("health.warnings")}</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-d-secondary">
-                    示例
+                    {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">提示</div>
+                  <div className="font-mono text-[9px] text-d-muted">{t("health.notices")}</div>
                 </div>
               </div>
             </div>
@@ -214,38 +218,38 @@ export default function DashboardPreview() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display text-lg font-bold text-d-text">
-                  自然流量
+                  {t("traffic.title")}
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
-                  月度访问量趋势 · 示例
+                  {t("traffic.subtitle")}
                 </p>
               </div>
               <div className="text-right">
                 <div className="font-mono text-2xl font-bold text-d-text">
-                  示例
+                  {t("sample")}
                 </div>
-                <div className="font-mono text-xs text-teal">趋势示意</div>
+                <div className="font-mono text-xs text-teal">{t("trendIllustration")}</div>
               </div>
             </div>
             <div className="mt-6 h-40">
               <TrafficBars />
             </div>
             <div className="mt-2 flex justify-between font-mono text-[10px] text-d-muted">
-              <span>1月</span>
-              <span>6月</span>
-              <span>12月</span>
+              <span>{t("traffic.jan")}</span>
+              <span>{t("traffic.jun")}</span>
+              <span>{t("traffic.dec")}</span>
             </div>
           </div>
 
           {/* 指标卡片堆 */}
           <div className="grid grid-cols-2 gap-4 lg:col-span-5">
             <div className="rounded-2xl bg-ink p-5">
-              <div className="font-mono text-[10px] text-d-muted">追踪关键词</div>
+              <div className="font-mono text-[10px] text-d-muted">{t("metrics.trackedKeywords")}</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
-                示例
+                {t("sample")}
               </div>
               <div className="mt-1 font-mono text-xs text-teal">
-                趋势示意
+                {t("trendIllustration")}
               </div>
               <div className="mt-4 flex gap-1">
                 {[60, 75, 45, 88, 70, 92, 80].map((h, i) => (
@@ -258,12 +262,12 @@ export default function DashboardPreview() {
               </div>
             </div>
             <div className="rounded-2xl bg-ink p-5">
-              <div className="font-mono text-[10px] text-d-muted">外链域名</div>
+              <div className="font-mono text-[10px] text-d-muted">{t("metrics.referringDomains")}</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
-                示例
+                {t("sample")}
               </div>
               <div className="mt-1 font-mono text-xs text-coral">
-                趋势示意
+                {t("trendIllustration")}
               </div>
               <div className="mt-4 flex gap-1">
                 {[70, 65, 80, 72, 68, 60, 55].map((h, i) => (
@@ -276,8 +280,8 @@ export default function DashboardPreview() {
               </div>
             </div>
             <div className="col-span-2 grid grid-cols-2 gap-4">
-              <MetricPill label="TOP3 关键词" value="示例" trend="up" />
-              <MetricPill label="TOP10 关键词" value="示例" trend="up" />
+              <MetricPill label={t("metrics.top3")} value={t("sample")} trend="up" />
+              <MetricPill label={t("metrics.top10")} value={t("sample")} trend="up" />
             </div>
           </div>
         </div>

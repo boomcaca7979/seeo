@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { isAuthEnabled } from "@/lib/auth-config";
 
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
 
 export default function CTA() {
+  const t = useTranslations("ctaBlock");
   const router = useRouter();
   const [domainInput, setDomainInput] = useState("");
 
@@ -59,13 +61,13 @@ export default function CTA() {
 
           <div className="relative text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-xs text-gold">
-              免费开始使用
+              {t("badge")}
             </span>
             <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-d-text sm:text-5xl">
-              看清你的搜索流量，从今天开始
+              {t("title")}
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base text-d-secondary sm:text-lg">
-              输入一个域名，5 分钟内拿到第一份审计报告和关键词机会。先用起来，再决定要不要付费。
+              {t("subtitle")}
             </p>
 
             {/* 域名输入框 */}
@@ -77,14 +79,14 @@ export default function CTA() {
                 type="text"
                 value={domainInput}
                 onChange={(e) => setDomainInput(e.target.value)}
-                placeholder="输入你的网站域名 example.com"
+                placeholder={t("placeholder")}
                 className="w-full rounded-lg border border-d-muted/30 bg-ink-elevated px-4 py-3 font-sans text-sm text-d-text placeholder:text-d-muted focus:border-gold focus:outline-none"
               />
               <button
                 type="submit"
                 className="rounded-lg bg-gold px-6 py-3 font-sans text-sm font-semibold text-ink transition-opacity hover:opacity-90"
               >
-                开始分析
+                {t("submit")}
               </button>
             </form>
 
@@ -94,7 +96,7 @@ export default function CTA() {
                 href="#features"
                 className="font-sans text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
               >
-                浏览全部功能 →
+                {t("browseFeatures")}
               </Link>
               <span className="hidden font-mono text-xs text-d-muted sm:inline">
                 ·
@@ -103,16 +105,17 @@ export default function CTA() {
                 href="/pricing"
                 className="font-sans text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
               >
-                查看定价方案
+                {t("viewPricing")}
               </Link>
             </div>
 
             {/* 信任标识 */}
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-xs text-d-muted">
-              <span>● 每日自动刷新</span>
-              <span>● 支持 Google 搜索</span>
-              <span>● PDF 报告导出</span>
-              <span>● 免费开始</span>
+              <span>{t("trust.daily")}</span>
+              <span>{t("trust.google")}</span>
+              {/* PDF 导出为 Pro 专属功能，文案明确标注（Fake Claim #6 修复） */}
+              <span>{t("trust.pdf")}</span>
+              <span>{t("trust.free")}</span>
             </div>
           </div>
         </div>

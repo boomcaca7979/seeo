@@ -2,5 +2,287 @@
   "meta": {
     "siteTitle": "SeeO · SEO Analytics, Rank Tracking & Audit Platform",
     "siteDescription": "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis."
+  },
+  "nav": {
+    "features": "Features",
+    "product": "Product",
+    "pricing": "Pricing",
+    "docs": "Docs",
+    "login": "Log in",
+    "cta": "Start free",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "switchLang": "中文"
+  },
+  "hero": {
+    "badge": "Daily rank updates · Continuous monitoring",
+    "title": "Track rankings. Audit technical SEO. Find the keywords that matter.",
+    "subtitle": "SeeO brings keyword research, rank tracking, backlink analysis, technical audits, competitor analysis, and content optimization together on one workbench — so you always know what to do next.",
+    "primaryCta": "Run your first audit",
+    "secondaryCta": "Explore features",
+    "panel": {
+      "sample": "Sample",
+      "sampleNote": "Sample data · for demo",
+      "caption": "Keyword gravity field · sample data"
+    },
+    "auditBox": {
+      "placeholder": "Enter your website domain, e.g. example.com",
+      "submit": "Run SEO audit",
+      "submitting": "Redirecting…",
+      "hint": "Enter a domain to start an audit — no sign-up required",
+      "errEmpty": "Please enter a website domain",
+      "errInvalid": "Invalid domain format, e.g. example.com",
+      "errPrivate": "Local or private network addresses are not supported",
+      "label": "Website domain"
+    },
+    "field": {
+      "center": "SEO workbench",
+      "satellites": [
+        { "kw": "Long-tail keywords" },
+        { "kw": "Competitor ranks" },
+        { "kw": "Search intent" },
+        { "kw": "SERP features" },
+        { "kw": "Link opportunities" },
+        { "kw": "Content gaps" },
+        { "kw": "Local SEO" }
+      ]
+    }
+  },
+  "ticker": {
+    "items": [
+      { "label": "Keyword research", "value": "Volume / difficulty / intent" },
+      { "label": "Rank tracking", "value": "Daily auto updates" },
+      { "label": "Technical audits", "value": "20+ checks" },
+      { "label": "Competitor analysis", "value": "Share of voice" },
+      { "label": "Content optimization", "value": "SERP Top 10 comparison" },
+      { "label": "Backlink analysis", "value": "DataForSEO powered" },
+      { "label": "Search engine", "value": "Google" },
+      { "label": "Data export", "value": "PDF / Excel (Pro)" }
+    ]
+  },
+  "features": {
+    "sectionTag": "06 / Core modules",
+    "sectionTitle": "One workbench, six dimensions",
+    "sectionSubtitle": "Every step of the SEO workflow — from keyword research to content optimization — lives inside SeeO. Data flows between modules automatically, with no repeated imports and exports.",
+    "cardLink": "Try this module",
+    "cards": [
+      {
+        "tag": "Research",
+        "title": "Keyword Research",
+        "desc": "Expand a seed keyword into a full set of related terms, with search volume, difficulty, intent, and CPC to find long-tail opportunities that can drive traffic.",
+        "bullets": ["Related / phrase match", "KD difficulty score", "Search intent", "Volume / CPC"],
+        "metricLabel": "Data source",
+        "metricValue": "SerpApi"
+      },
+      {
+        "tag": "Tracking",
+        "title": "Rank Tracking",
+        "desc": "Monitor your rankings by keyword, location, and device, and get alerted the moment positions move — no more manual daily checks.",
+        "bullets": ["Daily auto refresh", "Multiple locations / devices", "Rank trend curves", "Volatility alerts"],
+        "metricLabel": "Refresh cadence",
+        "metricValue": "Daily"
+      },
+      {
+        "tag": "Diagnostics",
+        "title": "Technical SEO Audit",
+        "desc": "Crawl your site and surface 404s, redirect chains, duplicate titles, missing Alt text, and other technical issues — prioritized so you know what to fix first.",
+        "bullets": ["Health score", "Errors / warnings / notices", "Page response analysis", "Fix priority"],
+        "metricLabel": "Checks",
+        "metricValue": "20+"
+      },
+      {
+        "tag": "Diagnostics",
+        "title": "Backlink Analysis",
+        "desc": "See who links to you, how anchor text is distributed, and which backlinks are growing or fading — find link sources worth pursuing.",
+        "bullets": ["Backlink overview + DA", "Referring domains", "Anchor text distribution", "Growth / loss trends"],
+        "metricLabel": "Data source",
+        "metricValue": "DataForSEO"
+      },
+      {
+        "tag": "Insights",
+        "title": "Competitor Analysis",
+        "desc": "Compare your keyword rankings side by side with competitors to see where you lag and where the opportunities are — stop going by gut feeling.",
+        "bullets": ["Domain overview comparison", "Share of voice", "Rank gap analysis", "Historical trend overlays"],
+        "metricLabel": "Dimension",
+        "metricValue": "Share of voice"
+      },
+      {
+        "tag": "Optimize",
+        "title": "Content Optimization",
+        "desc": "Enter a page and a target keyword to see which topics to cover, how long to write, and what to improve — benchmarked against the SERP top 10.",
+        "bullets": ["On-page SEO checks", "Content score", "Topic term suggestions", "SEO checklist"],
+        "metricLabel": "Benchmark",
+        "metricValue": "SERP Top 10"
+      }
+    ]
+  },
+  "preview": {
+    "sectionTag": "Dashboard preview",
+    "sectionTitle": "See what changes every day",
+    "sectionSubtitle": "Core metrics from all your projects in one dashboard — rankings up or down, site health recovering, where traffic comes from — at a glance.",
+    "demoBadge": "Sample data · for demo",
+    "sample": "Sample",
+    "trendIllustration": "Trend illustration",
+    "rankTrend": {
+      "title": "Rank trends",
+      "subtitle": "Sample project · last 30 days · mobile",
+      "from": "30 days ago",
+      "to": "Today"
+    },
+    "health": {
+      "title": "Site health",
+      "subtitle": "Technical SEO audit score",
+      "scoreNote": "Score illustration",
+      "errors": "Errors",
+      "warnings": "Warnings",
+      "notices": "Notices"
+    },
+    "traffic": {
+      "title": "Organic traffic",
+      "subtitle": "Monthly visits trend · sample",
+      "jan": "Jan",
+      "jun": "Jun",
+      "dec": "Dec"
+    },
+    "metrics": {
+      "trackedKeywords": "Tracked keywords",
+      "referringDomains": "Referring domains",
+      "top3": "TOP3 keywords",
+      "top10": "TOP10 keywords"
+    }
+  },
+  "ctaBlock": {
+    "badge": "Start free",
+    "title": "Get clarity on your search traffic, starting today",
+    "subtitle": "Enter a domain to run your first audit and surface keyword opportunities. Start free, upgrade when you need more.",
+    "placeholder": "Enter your website domain, e.g. example.com",
+    "submit": "Run your first audit",
+    "browseFeatures": "Browse all features →",
+    "viewPricing": "View pricing",
+    "trust": {
+      "daily": "● Daily auto updates",
+      "google": "● Google search data",
+      "pdf": "● PDF report export with Pro",
+      "free": "● Start free"
+    }
+  },
+  "footer": {
+    "tagline": "An all-in-one SEO analytics platform that puts every opportunity in your search traffic where you can see it.",
+    "dataSource": "Powered by SerpApi / DataForSEO data services",
+    "colProduct": "Product",
+    "colProductLinks": {
+      "seoAudit": "Technical SEO Audit",
+      "rankTracking": "Rank Tracking",
+      "backlinks": "Backlink Analysis",
+      "allFeatures": "All features"
+    },
+    "colPlans": "Plans",
+    "colPlansLinks": {
+      "pricing": "Pricing"
+    },
+    "colResources": "Resources",
+    "colResourcesLinks": {
+      "docs": "Docs"
+    },
+    "colCompany": "Company",
+    "colCompanyLinks": {
+      "about": "About SeeO",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "refund": "Refund Policy"
+    },
+    "copyright": "© 2026 SeeO. Data shown is for demonstration.",
+    "icp": ""
+  },
+  "plans": {
+    "priceUnit": "/30 days",
+    "free": {
+      "name": "Free",
+      "tagline": "For personal site owners and beginners"
+    },
+    "lite": {
+      "name": "Lite",
+      "tagline": "For getting started with SEO"
+    },
+    "pro": {
+      "name": "Pro",
+      "tagline": "For professional SEO practitioners"
+    },
+    "cta": {
+      "start": "Start free",
+      "upgradeLite": "Upgrade to Lite",
+      "upgradePro": "Upgrade to Pro",
+      "renew": "Renew 30 days",
+      "noDowngrade": "No downgrade"
+    },
+    "badge": {
+      "current": "Current plan",
+      "recommended": "Recommended"
+    },
+    "features": {
+      "projects": "{count} projects",
+      "keywords": "{count} tracked keywords",
+      "audits": "{count} audits per day",
+      "auditsUnlimited": "Unlimited audits per day",
+      "contentChecks": "{count} content checks per month",
+      "serpapi": "{count} SerpApi calls per month",
+      "pdf": "PDF report export (Pro)",
+      "excel": "Excel report export (Pro)",
+      "email": "Email weekly reports"
+    },
+    "unlimited": "Unlimited"
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "title": "Choose the plan that fits",
+    "subtitle": "Start free, upgrade anytime. One-time purchase for a 30-day membership. Alipay / WeChat Pay supported.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load plans",
+    "networkError": "Network error, failed to load plans",
+    "noPlans": "No plan information available",
+    "note": "Prices and limits are managed centrally by the billing layer. Payments are processed by the YaoLi Pay aggregated payment service, supporting Alipay and WeChat Pay.",
+    "faqTitle": "Frequently asked questions",
+    "faqEyebrow": "FAQ",
+    "backHome": "← Back to home",
+    "cancelToast": "Payment cancelled — your plan remains unchanged",
+    "createFailed": "Failed to create order, please try again later",
+    "noPayInfo": "No payment information received",
+    "networkRetry": "Network error, please try again later",
+    "faqs": [
+      {
+        "q": "Does the Free plan expire?",
+        "a": "No. The Free plan is available indefinitely, with limits on tracked keywords and monthly SerpApi calls."
+      },
+      {
+        "q": "How do I upgrade?",
+        "a": "Click the upgrade button on the plan you want, choose Alipay or WeChat Pay, and your benefits take effect immediately after payment. Membership is a one-time 30-day purchase; when it expires, your account automatically returns to the Free plan."
+      },
+      {
+        "q": "Which payment methods are supported?",
+        "a": "Alipay and WeChat Pay, provided as aggregated payment services by YaoLi Pay."
+      },
+      {
+        "q": "What happens when my membership expires?",
+        "a": "Your plan automatically returns to Free. Data you have created (projects, keywords, reports, etc.) is kept, but features and quotas follow the Free plan limits. You can purchase again at any time."
+      },
+      {
+        "q": "What is the SerpApi quota?",
+        "a": "SerpApi is a third-party SERP data API billed per call. The Free plan includes 50 calls per month; related features pause until the next monthly refresh once exceeded. Upgrading raises your quota."
+      },
+      {
+        "q": "Where is my data stored?",
+        "a": "Production uses a Turso cloud database, with user authentication provided by Supabase Auth. Each user's data is isolated."
+      }
+    ]
+  },
+  "paymentModal": {
+    "title": "Choose a payment method",
+    "subtitle": "{plan} · 30-day membership",
+    "close": "Close",
+    "alipay": "Alipay",
+    "alipayDesc": "Opens Alipay to complete payment",
+    "wxpay": "WeChat Pay",
+    "wxpayDesc": "Scan the QR code or pay in WeChat",
+    "creating": "Creating order…"
   }
 }

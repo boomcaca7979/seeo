@@ -1,21 +1,54 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { Link as LocaleLink } from "@/i18n/routing";
+import { isLocaleRoutedPath, stripLocalePrefix } from "@/i18n/locale-routed-paths";
+import { localePath } from "@/i18n/seo";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
 
-const navItems = [
-  { label: "功能", href: "#features" },
-  { label: "产品", href: "#dashboard" },
-  { label: "定价", href: "/pricing" },
-  { label: "文档", href: "/docs" },
-];
+// 浏览器可见路径（"/pricing" 或 "/zh/pricing"）。SSG prerender 时
+// usePathname 不可靠（client page 内返回 null / 内部 /en 路径），
+// 用 useSyncExternalStore 读取 window.location.pathname（hydration-safe）
+const subscribeNoop = () => () => {};
 
 export default function Navbar() {
+  const t = useTranslations("nav");
+  const locale = useLocale();
+  const pathname = usePathname();
+  const browserPath = useSyncExternalStore(
+    subscribeNoop,
+    () => window.location.pathname,
+    () => null
+  );
+  const effectivePath = browserPath ?? pathname;
+
   // 演示模式：开始分析直接进 /app；启用模式：进 /signup
   const primaryHref = isAuthEnabled ? "/signup" : "/app";
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // 导航项：label 走 messages；href 为逻辑路径，
+  // locale-routed 页（pricing/docs）按 locale 加 /zh 前缀，锚点保持原样
+  const navItems = [
+    { label: t("features"), href: "#features" },
+    { label: t("product"), href: "#dashboard" },
+    { label: t("pricing"), href: "/pricing", routed: true },
+    { label: t("docs"), href: "/docs", routed: true },
+  ];
+
+  // 语言切换：仅在 locale-routed 路径显示（/ ↔ /zh、/pricing ↔ /zh/pricing）
+  // 切换 URL 用 localePath 自算：en 侧永远无前缀（不会出现 /en）
+  const showLangSwitch = effectivePath
+    ? isLocaleRoutedPath(effectivePath)
+    : false;
+  const otherLocale = locale === "zh" ? "en" : "zh";
+  const switchHref = localePath(
+    otherLocale,
+    stripLocalePrefix(effectivePath ?? "/")
+  );
 
   // Session 感知：loading 时不渲染「登录」，避免已登录用户看到误导性登录入口
   const [authState, setAuthState] = useState<"loading" | "authed" | "anon">("loading");
@@ -65,51 +98,68 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full bg-ink/95 backdrop-blur-sm">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2" onClick={closeMobile}>
+        <LocaleLink href="/" className="flex items-center gap-2" onClick={closeMobile}>
           <span className="font-display text-2xl font-bold tracking-tight text-d-text">
             See
           </span>
           <span className="font-display text-2xl font-bold tracking-tight text-gold">
             O
           </span>
-        </Link>
+        </LocaleLink>
 
         {/* 桌面端导航 */}
         <ul className="hidden items-center gap-8 md:flex">
           {navItems.map((item) => (
-            <li key={item.label}>
-              <Link
-                href={item.href}
-                className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
-              >
-                {item.label}
-              </Link>
+            <li key={item.href}>
+              {item.routed ? (
+                <LocaleLink
+                  href={item.href}
+                  className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                >
+                  {item.label}
+                </LocaleLink>
+              ) : (
+                <Link
+                  href={item.href}
+                  className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                >
+                  {item.label}
+                </Link>
+              )}
             </li>
           ))}
         </ul>
 
         {/* 桌面端 CTA */}
         <div className="hidden items-center gap-3 md:flex">
+          {showLangSwitch && (
+            <Link
+              href={switchHref}
+              className="font-mono text-xs font-medium text-d-secondary transition-colors hover:text-d-text"
+            >
+              {t("switchLang")}
+            </Link>
+          )}
           {showLogin && (
             <Link
               href="/login"
               className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
             >
-              登录
+              {t("login")}
             </Link>
           )}
           <Link
             href={ctaHref}
             className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
           >
-            开始分析
+            {t("cta")}
           </Link>
         </div>
 
         {/* 移动端汉堡按钮 */}
         <button
           type="button"
-          aria-label={mobileOpen ? "关闭菜单" : "打开菜单"}
+          aria-label={mobileOpen ? t("closeMenu") : t("openMenu")}
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"
           onClick={() => setMobileOpen((v) => !v)}
@@ -160,24 +210,43 @@ export default function Navbar() {
         >
           <ul className="mx-auto flex max-w-7xl flex-col px-5 py-3 sm:px-8">
             {navItems.map((item) => (
-              <li key={item.label}>
-                <Link
-                  href={item.href}
-                  onClick={closeMobile}
-                  className="block py-3 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
-                >
-                  {item.label}
-                </Link>
+              <li key={item.href}>
+                {item.routed ? (
+                  <LocaleLink
+                    href={item.href}
+                    onClick={closeMobile}
+                    className="block py-3 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                  >
+                    {item.label}
+                  </LocaleLink>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={closeMobile}
+                    className="block py-3 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                  >
+                    {item.label}
+                  </Link>
+                )}
               </li>
             ))}
             <li className="mt-2 flex flex-col gap-3 border-t border-d-muted/15 pt-3">
+              {showLangSwitch && (
+                <Link
+                  href={switchHref}
+                  onClick={closeMobile}
+                  className="block py-2 font-mono text-xs font-medium text-d-secondary transition-colors hover:text-d-text"
+                >
+                  {t("switchLang")}
+                </Link>
+              )}
               {showLogin && (
                 <Link
                   href="/login"
                   onClick={closeMobile}
                   className="block py-2 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
                 >
-                  登录
+                  {t("login")}
                 </Link>
               )}
               <Link
@@ -185,7 +254,7 @@ export default function Navbar() {
                 onClick={closeMobile}
                 className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
               >
-                开始分析
+                {t("cta")}
               </Link>
             </li>
           </ul>

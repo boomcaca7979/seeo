@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
+import { isLocaleRoutedPath } from "@/i18n/locale-routed-paths";
 import { updateSession } from "@/lib/supabase/middleware";
 
 // ===== proxy（Next 16 的 middleware）=====
@@ -13,30 +14,10 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 const intlMiddleware = createMiddleware(routing);
 
-// Phase 0：仅这些营销路径参与 locale 路由（/zh 版本骨架已就绪）。
-// 其余营销路径（login/signup/about/privacy/terms/refund/features 其他页）
-// 在 Phase 1/2 建好 /zh 版本后逐步加入。
-const LOCALE_ROUTED_PATHS = new Set([
-  "/",
-  "/pricing",
-  "/docs",
-  "/features/seo-audit",
-]);
-
-function isLocaleRouted(pathname: string): boolean {
-  // /zh 或 /zh/ 前缀：剥离后按白名单匹配
-  if (pathname === "/zh" || pathname === "/zh/") return true;
-  if (pathname.startsWith("/zh/")) {
-    const rest = pathname.slice(3);
-    return LOCALE_ROUTED_PATHS.has(rest);
-  }
-  return LOCALE_ROUTED_PATHS.has(pathname);
-}
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isLocaleRouted(pathname)) {
+  if (isLocaleRoutedPath(pathname)) {
     // locale redirect（如 cookie=zh 访问 / → /zh）直接返回；
     // 放行场景由 next-intl 内部 rewrite 命中 [locale] segment。
     // 营销页不做 Supabase session 刷新（dashboard 路径始终走 updateSession）。

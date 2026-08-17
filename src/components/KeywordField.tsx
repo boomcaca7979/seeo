@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 type Satellite = {
   id: string;
   kw: string;
@@ -9,17 +11,26 @@ type Satellite = {
   drift: "a" | "b" | "c";
 };
 
-const satellites: Satellite[] = [
-  { id: "s1", kw: "长尾词挖掘", kd: 28, vol: "12.4K", x: 16, y: 22, drift: "a" },
-  { id: "s2", kw: "竞品排名", kd: 54, vol: "8.7K", x: 84, y: 20, drift: "b" },
-  { id: "s3", kw: "搜索意图", kd: 41, vol: "31.2K", x: 10, y: 70, drift: "c" },
-  { id: "s4", kw: "SERP 特征", kd: 67, vol: "5.3K", x: 90, y: 66, drift: "a" },
-  { id: "s5", kw: "外链机会", kd: 35, vol: "19.8K", x: 26, y: 88, drift: "b" },
-  { id: "s6", kw: "内容缺口", kd: 49, vol: "7.1K", x: 74, y: 90, drift: "c" },
-  { id: "s7", kw: "本地 SEO", kd: 22, vol: "4.6K", x: 50, y: 8, drift: "b" },
-];
+// 布局与示例指标（KD/Vol 均为演示数据）；kw 文案走 messages（hero.field.satellites）
+const SATELLITE_META = [
+  { id: "s1", kd: 28, vol: "12.4K", x: 16, y: 22, drift: "a" },
+  { id: "s2", kd: 54, vol: "8.7K", x: 84, y: 20, drift: "b" },
+  { id: "s3", kd: 41, vol: "31.2K", x: 10, y: 70, drift: "c" },
+  { id: "s4", kd: 67, vol: "5.3K", x: 90, y: 66, drift: "a" },
+  { id: "s5", kd: 35, vol: "19.8K", x: 26, y: 88, drift: "b" },
+  { id: "s6", kd: 49, vol: "7.1K", x: 74, y: 90, drift: "c" },
+  { id: "s7", kd: 22, vol: "4.6K", x: 50, y: 8, drift: "b" },
+] as const;
 
 export default function KeywordField() {
+  const t = useTranslations("hero.field");
+  const labels = t.raw("satellites") as Array<{ kw: string }>;
+  const satellites: Satellite[] = SATELLITE_META.map((meta, i) => ({
+    ...meta,
+    drift: meta.drift as "a" | "b" | "c",
+    kw: labels[i]?.kw ?? "",
+  }));
+
   // 中心点百分比
   const cx = 50;
   const cy = 50;
@@ -128,7 +139,7 @@ export default function KeywordField() {
           style={{ transformOrigin: "50% 50%" } as React.CSSProperties}
         >
           <div className="font-display text-base font-bold text-d-text sm:text-lg">
-            SEO 工具
+            {t("center")}
           </div>
           <div className="mt-0.5 font-mono text-[10px] text-gold sm:text-xs">
             KD 73 · Vol 1.2M

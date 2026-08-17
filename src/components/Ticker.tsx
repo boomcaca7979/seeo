@@ -1,15 +1,9 @@
-const items = [
-  { label: "关键词研究", value: "搜索量 / 难度 / 意图" },
-  { label: "排名追踪", value: "每日自动刷新" },
-  { label: "技术审计", value: "20+ 项检查" },
-  { label: "竞品分析", value: "SOV 份额" },
-  { label: "内容优化", value: "SERP Top10 对比" },
-  { label: "外链分析", value: "DataForSEO 接入" },
-  { label: "搜索引擎", value: "Google" },
-  { label: "数据导出", value: "PDF / Excel" },
-];
+import { useTranslations } from "next-intl";
 
 export default function Ticker() {
+  const t = useTranslations("ticker");
+  const items = t.raw("items") as Array<{ label: string; value: string }>;
+
   // 复制两份用于无缝循环
   const loop = [...items, ...items];
 

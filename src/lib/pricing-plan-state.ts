@@ -19,6 +19,13 @@ export interface PlanCardBase {
   highlighted?: boolean;
 }
 
+export interface PlanCardLabels {
+  /** 当前套餐续费 CTA 文案（按 locale 由调用方传入） */
+  renew: string;
+  /** 不可降级 CTA 文案（按 locale 由调用方传入） */
+  noDowngrade: string;
+}
+
 export interface PlanCardState {
   /** 卡片徽章：当前套餐优先于推荐 */
   badge: "current" | "recommended" | null;
@@ -32,10 +39,17 @@ export interface PlanCardState {
   ctaHref?: string;
 }
 
+// 默认文案（中文）：保持既有调用与测试兼容；双语页面按 locale 覆盖
+const DEFAULT_LABELS: PlanCardLabels = {
+  renew: "续费 30 天",
+  noDowngrade: "不可降级",
+};
+
 export function getPlanCardState(
   currentPlan: PlanTier | null | undefined,
   cardPlan: PlanTier,
-  base: PlanCardBase
+  base: PlanCardBase,
+  labels: PlanCardLabels = DEFAULT_LABELS
 ): PlanCardState {
   // 加载中：保持原文案但禁用，避免先显示「升级到 Lite」再闪变为「当前套餐」
   if (currentPlan === undefined) {
@@ -66,7 +80,7 @@ export function getPlanCardState(
     // 当前套餐：同档允许续费 30 天
     return {
       badge: "current",
-      ctaLabel: "续费 30 天",
+      ctaLabel: labels.renew,
       disabled: false,
       kind: "checkout",
       checkoutPlan: base.checkoutPlan,
@@ -77,7 +91,7 @@ export function getPlanCardState(
     // Pro 用户看 Lite 卡：不可降级
     return {
       badge: null,
-      ctaLabel: "不可降级",
+      ctaLabel: labels.noDowngrade,
       disabled: true,
       kind: "none",
     };

@@ -2,5 +2,287 @@
   "meta": {
     "siteTitle": "SeeO · SEO 数据分析、排名追踪与审计平台",
     "siteDescription": "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。"
+  },
+  "nav": {
+    "features": "功能",
+    "product": "产品",
+    "pricing": "定价",
+    "docs": "文档",
+    "login": "登录",
+    "cta": "开始分析",
+    "openMenu": "打开菜单",
+    "closeMenu": "关闭菜单",
+    "switchLang": "EN"
+  },
+  "hero": {
+    "badge": "每日追踪 · 持续监控",
+    "title": "看清搜索流量的走向",
+    "subtitle": "把关键词、排名、外链、技术审计、竞品和内容优化放在同一张工作台上。SeeO 帮你从一堆搜索数据里，看出下一步该做什么。",
+    "primaryCta": "开始分析你的网站",
+    "secondaryCta": "看看能做什么",
+    "panel": {
+      "sample": "示例",
+      "sampleNote": "示例数据 · 演示用",
+      "caption": "引力场示意 · 数据为示例"
+    },
+    "auditBox": {
+      "placeholder": "输入你的网站域名，如 example.com",
+      "submit": "开始 SEO 审计",
+      "submitting": "跳转中…",
+      "hint": "输入域名即可快速审计，无需注册",
+      "errEmpty": "请输入网站域名",
+      "errInvalid": "域名格式无效，如 example.com",
+      "errPrivate": "不支持审计本地或私有网络地址",
+      "label": "网站域名"
+    },
+    "field": {
+      "center": "SEO 工具",
+      "satellites": [
+        { "kw": "长尾词挖掘" },
+        { "kw": "竞品排名" },
+        { "kw": "搜索意图" },
+        { "kw": "SERP 特征" },
+        { "kw": "外链机会" },
+        { "kw": "内容缺口" },
+        { "kw": "本地 SEO" }
+      ]
+    }
+  },
+  "ticker": {
+    "items": [
+      { "label": "关键词研究", "value": "搜索量 / 难度 / 意图" },
+      { "label": "排名追踪", "value": "每日自动刷新" },
+      { "label": "技术审计", "value": "20+ 项检查" },
+      { "label": "竞品分析", "value": "SOV 份额" },
+      { "label": "内容优化", "value": "SERP Top10 对比" },
+      { "label": "外链分析", "value": "DataForSEO 接入" },
+      { "label": "搜索引擎", "value": "Google" },
+      { "label": "数据导出", "value": "PDF / Excel（Pro）" }
+    ]
+  },
+  "features": {
+    "sectionTag": "06 / 核心模块",
+    "sectionTitle": "一张工作台，看懂六个维度",
+    "sectionSubtitle": "从挖词到内容优化，SEO 工作流的每一步都在 SeeO 里打通，数据在模块之间自动流转，不用反复导入导出。",
+    "cardLink": "试用这个模块",
+    "cards": [
+      {
+        "tag": "挖词",
+        "title": "关键词研究",
+        "desc": "从一个种子词挖出整片相关词，看清搜索量、难度、意图和 CPC，找到能带来流量的长尾机会。",
+        "bullets": ["相关词 / 短语匹配", "KD 难度评分", "搜索意图识别", "搜索量 / CPC"],
+        "metricLabel": "数据来源",
+        "metricValue": "SerpApi"
+      },
+      {
+        "tag": "追踪",
+        "title": "排名追踪",
+        "desc": "按关键词、地区、设备持续监控你的排名变化，波动一发生就提醒你，不用每天手动查。",
+        "bullets": ["每日自动刷新", "多地区 / 多设备", "排名趋势曲线", "波动预警"],
+        "metricLabel": "刷新频率",
+        "metricValue": "每日"
+      },
+      {
+        "tag": "诊断",
+        "title": "技术 SEO 审计",
+        "desc": "全站爬取一遍，把 404、重定向链、重复标题、缺 Alt 这些技术问题按优先级排好给你修。",
+        "bullets": ["健康度评分", "错误 / 警告 / 提示", "页面响应分析", "修复优先级"],
+        "metricLabel": "检查项",
+        "metricValue": "20+"
+      },
+      {
+        "tag": "诊断",
+        "title": "外链分析",
+        "desc": "看清谁在链接你、锚文本怎么分布、哪些外链在涨哪些在掉，找到值得追的外链来源。",
+        "bullets": ["外链总览 + DA", "引荐域名分析", "锚文本分布", "增长 / 流失趋势"],
+        "metricLabel": "数据来源",
+        "metricValue": "DataForSEO"
+      },
+      {
+        "tag": "洞察",
+        "title": "竞品分析",
+        "desc": "把竞品的关键词排名摆在一起对比，看到你们差在哪、机会在哪，别再凭感觉判断。",
+        "bullets": ["域名概览对比", "SOV 份额计算", "排名差距分析", "历史趋势叠加"],
+        "metricLabel": "分析维度",
+        "metricValue": "SOV 份额"
+      },
+      {
+        "tag": "优化",
+        "title": "内容优化",
+        "desc": "输入一个页面和目标关键词，对照 SERP 前 10 给出该写哪些主题词、字数多少、哪里还能改。",
+        "bullets": ["页面 SEO 检测", "内容评分", "主题词建议", "SEO 检查清单"],
+        "metricLabel": "对比基准",
+        "metricValue": "SERP Top10"
+      }
+    ]
+  },
+  "preview": {
+    "sectionTag": "工作台预览",
+    "sectionTitle": "看到每一天的变化",
+    "sectionSubtitle": "所有项目的核心指标汇总在一个仪表盘里，排名涨了还是掉了、健康度有没有回升、流量从哪来，一眼看完。",
+    "demoBadge": "示例数据 · 演示用",
+    "sample": "示例",
+    "trendIllustration": "趋势示意",
+    "rankTrend": {
+      "title": "排名趋势",
+      "subtitle": "示例项目 · 近 30 天 · 移动端",
+      "from": "30 天前",
+      "to": "今天"
+    },
+    "health": {
+      "title": "健康度",
+      "subtitle": "技术 SEO 审计综合分",
+      "scoreNote": "评分示意",
+      "errors": "错误",
+      "warnings": "警告",
+      "notices": "提示"
+    },
+    "traffic": {
+      "title": "自然流量",
+      "subtitle": "月度访问量趋势 · 示例",
+      "jan": "1月",
+      "jun": "6月",
+      "dec": "12月"
+    },
+    "metrics": {
+      "trackedKeywords": "追踪关键词",
+      "referringDomains": "外链域名",
+      "top3": "TOP3 关键词",
+      "top10": "TOP10 关键词"
+    }
+  },
+  "ctaBlock": {
+    "badge": "免费开始使用",
+    "title": "看清你的搜索流量，从今天开始",
+    "subtitle": "输入一个域名，快速拿到第一份审计报告和关键词机会。先用起来，再决定要不要付费。",
+    "placeholder": "输入你的网站域名 example.com",
+    "submit": "开始分析",
+    "browseFeatures": "浏览全部功能 →",
+    "viewPricing": "查看定价方案",
+    "trust": {
+      "daily": "● 每日自动刷新",
+      "google": "● 支持 Google 搜索",
+      "pdf": "● PDF 报告导出（Pro 专属）",
+      "free": "● 免费开始"
+    }
+  },
+  "footer": {
+    "tagline": "一站式 SEO 数据分析平台，把搜索流量里的每一个机会都摆到你看得到的地方。",
+    "dataSource": "基于 SerpApi / DataForSEO 数据服务",
+    "colProduct": "产品",
+    "colProductLinks": {
+      "seoAudit": "技术 SEO 审计",
+      "rankTracking": "关键词排名追踪",
+      "backlinks": "外链分析",
+      "allFeatures": "全部功能"
+    },
+    "colPlans": "方案",
+    "colPlansLinks": {
+      "pricing": "定价方案"
+    },
+    "colResources": "资源",
+    "colResourcesLinks": {
+      "docs": "使用文档"
+    },
+    "colCompany": "公司",
+    "colCompanyLinks": {
+      "about": "关于 SeeO",
+      "privacy": "隐私政策",
+      "terms": "服务条款",
+      "refund": "退款政策"
+    },
+    "copyright": "© 2026 SeeO. 数据为示例演示。",
+    "icp": "ICP 备案号 0000000 号"
+  },
+  "plans": {
+    "priceUnit": "/30天",
+    "free": {
+      "name": "免费版",
+      "tagline": "适合个人站长和初学者"
+    },
+    "lite": {
+      "name": "Lite 版",
+      "tagline": "适合个人 SEO 入门"
+    },
+    "pro": {
+      "name": "专业版",
+      "tagline": "适合专业 SEO 从业者"
+    },
+    "cta": {
+      "start": "开始使用",
+      "upgradeLite": "升级到 Lite",
+      "upgradePro": "升级到 Pro",
+      "renew": "续费 30 天",
+      "noDowngrade": "不可降级"
+    },
+    "badge": {
+      "current": "当前套餐",
+      "recommended": "推荐"
+    },
+    "features": {
+      "projects": "项目数 {count}",
+      "keywords": "关键词追踪 {count}",
+      "audits": "每日审计 {count} 次",
+      "auditsUnlimited": "每日审计 无限",
+      "contentChecks": "内容检查 {count} 次/月",
+      "serpapi": "SerpApi {count} 次/月",
+      "pdf": "PDF 报告导出（Pro 专属）",
+      "excel": "Excel 报告导出（Pro 专属）",
+      "email": "邮件周报"
+    },
+    "unlimited": "无限"
+  },
+  "pricing": {
+    "eyebrow": "PRICING",
+    "title": "选择适合你的方案",
+    "subtitle": "从免费开始，随时升级。一次性购买 30 天会员，支持支付宝 / 微信支付。",
+    "loading": "加载中…",
+    "loadFailed": "加载套餐信息失败",
+    "networkError": "网络错误，加载套餐失败",
+    "noPlans": "暂无套餐信息",
+    "note": "套餐价格与限制统一由 billing 层管理。支付由耀立支付聚合支付服务处理，支持支付宝与微信支付。",
+    "faqTitle": "常见问题",
+    "faqEyebrow": "FAQ",
+    "backHome": "← 返回首页",
+    "cancelToast": "支付已取消，套餐未发生变化",
+    "createFailed": "创建订单失败，请稍后重试",
+    "noPayInfo": "未收到支付信息",
+    "networkRetry": "网络错误，请稍后重试",
+    "faqs": [
+      {
+        "q": "免费版有使用期限吗？",
+        "a": "没有。免费版永久可用，但有关键词数量与 SerpApi 调用次数限制。"
+      },
+      {
+        "q": "如何升级套餐？",
+        "a": "点击对应套餐的升级按钮，选择支付宝或微信支付，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。"
+      },
+      {
+        "q": "支持哪些支付方式？",
+        "a": "目前支持支付宝和微信支付两种方式，由耀立支付提供聚合支付技术服务。"
+      },
+      {
+        "q": "会员到期后会怎样？",
+        "a": "到期后套餐将自动恢复为免费版，已创建的数据（项目、关键词、报告等）不会丢失，但功能与额度将按免费版限制。可以随时重新购买。"
+      },
+      {
+        "q": "SerpApi 额度是什么？",
+        "a": "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 50 次，超出后相关功能暂停至下月刷新。升级套餐可获得更高额度。"
+      },
+      {
+        "q": "数据存储在哪里？",
+        "a": "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。"
+      }
+    ]
+  },
+  "paymentModal": {
+    "title": "选择支付方式",
+    "subtitle": "{plan} · 30 天会员",
+    "close": "关闭",
+    "alipay": "支付宝",
+    "alipayDesc": "跳转支付宝完成支付",
+    "wxpay": "微信支付",
+    "wxpayDesc": "扫码或跳转微信完成支付",
+    "creating": "正在创建订单…"
   }
 }
