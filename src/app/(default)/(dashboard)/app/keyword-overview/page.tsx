@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import RelatedKeywordBars from "@/components/dashboard/charts/RelatedKeywordBars";
+import { formatNumber } from "@/lib/ui-locale";
 
 interface UsageBadge {
   used: number;
@@ -22,13 +24,33 @@ interface SerpState {
 const KEYWORD_LOCATIONS = ["中国", "美国", "英国", "日本", "香港", "台湾"];
 type Device = "PC" | "移动端";
 
+// 地区/城市显示名（仅 UI 展示；API location 参数值保持中文原值不变）
+const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
+  zh: {},
+  en: {
+    "中国": "China", "美国": "United States", "英国": "United Kingdom",
+    "日本": "Japan", "香港": "Hong Kong", "台湾": "Taiwan",
+  },
+};
+
 function detectIntent(query: string): string {
   if (/什么|怎么|为什么|如何|是不是|哪些/.test(query)) return "信息型";
   if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(query)) return "商业型";
   return "导航型";
 }
 
+// 意图显示名（detectIntent 返回值保持中文原值，仅展示时翻译）
+function intentText(t: ReturnType<typeof useTranslations>, value: string): string {
+  if (value === "信息型") return t("intentInformational");
+  if (value === "商业型") return t("intentCommercial");
+  return t("intentNavigational");
+}
+
 export default function KeywordOverviewPage() {
+  const t = useTranslations("dashboard.keywords.overview");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
+  const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const [searchValue, setSearchValue] = useState("");
   const [location, setLocation] = useState("中国");
   const [device, setDevice] = useState<Device>("PC");
@@ -40,7 +62,7 @@ export default function KeywordOverviewPage() {
     e.preventDefault();
     const kw = searchValue.trim();
     if (!kw) {
-      show("请输入关键词", "error");
+      show(t("errKeyword"), "error");
       return;
     }
     setSerp({ loading: true, data: null, error: null, keyword: kw });
@@ -50,7 +72,7 @@ export default function KeywordOverviewPage() {
       );
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "查询失败");
+        const { message } = handleBillingError(json, t("queryFailed"));
         setSerp({ loading: false, data: null, error: message, keyword: kw });
         show(message, "error");
         return;
@@ -58,12 +80,12 @@ export default function KeywordOverviewPage() {
       setSerp({ loading: false, data: json.data, error: null, keyword: kw });
       if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
       if (json.data?.fromCache) {
-        show(`已加载「${kw}」（缓存数据，未消耗额度）`, "info");
+        show(t("cacheHit", { keyword: kw }), "info");
       } else {
-        show(`已加载「${kw}」的真实 SERP 数据`, "success");
+        show(t("loaded", { keyword: kw }), "success");
       }
     } catch (err) {
-      const msg = `网络错误：${(err as Error).message}`;
+      const msg = `${tc("networkError")} ${(err as Error).message}`;
       setSerp({ loading: false, data: null, error: msg, keyword: kw });
       show(msg, "error");
     }
@@ -88,10 +110,10 @@ export default function KeywordOverviewPage() {
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
       {/* 页头 */}
       <h1 className="text-[28px] font-semibold leading-tight text-ink">
-        关键词概览
+        {t("title")}
       </h1>
       <p className="mt-1 text-sm text-ink-60">
-        输入种子词，查看 SERP 真实排名结果与可派生指标。
+        {t("subtitle")}
       </p>
 
       {/* 搜索框 */}
@@ -103,7 +125,7 @@ export default function KeywordOverviewPage() {
             className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             {KEYWORD_LOCATIONS.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>{display(c)}</option>
             ))}
           </select>
           <select
@@ -112,7 +134,7 @@ export default function KeywordOverviewPage() {
             className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             <option value="PC">PC</option>
-            <option value="移动端">移动端</option>
+            <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
           </select>
         </div>
         <div className="relative flex-1">
@@ -124,18 +146,18 @@ export default function KeywordOverviewPage() {
             type="text"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="输入关键词，如：SEO工具、网站建设"
+            placeholder={t("searchPlaceholder")}
             className="w-full rounded-lg border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <button type="submit" disabled={serp.loading} className="btn-primary px-6 py-3">
-          {serp.loading ? "分析中…" : "分析"}
+          {serp.loading ? t("analyzing") : t("analyze")}
         </button>
       </form>
 
       {usage && (
         <div className="mt-4 text-xs text-ink-40">
-          本月 API 已用 {usage.used}/{usage.limit}
+          {t("usage", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
         </div>
       )}
 
@@ -148,8 +170,8 @@ export default function KeywordOverviewPage() {
               <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </div>
-          <div className="mt-3 text-sm font-medium text-ink">输入种子词，点击分析查看搜索量、难度和 CPC</div>
-          <p className="mt-1 text-xs text-ink-40">基于 Google 实时 SERP 抓取，24 小时内重复查询命中缓存</p>
+          <div className="mt-3 text-sm font-medium text-ink">{t("emptyTitle")}</div>
+          <p className="mt-1 text-xs text-ink-40">{t("emptyHint")}</p>
         </div>
       )}
 
@@ -163,10 +185,10 @@ export default function KeywordOverviewPage() {
         <>
           {/* 四张概览卡（真实派生指标） */}
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <OverviewCard label="关键词" value={serp.keyword} sub={`意图：${detectIntent(serp.keyword)}`} />
-            <OverviewCard label="SERP 结果数" value={String(serp.data!.organic.length)} sub="前 100 名" />
-            <OverviewCard label="相关搜索数" value={String(serp.data!.relatedSearches.length)} sub="可拓词建议" />
-            <OverviewCard label="People Also Ask" value={String(serp.data!.relatedQuestions.length)} sub="疑问词" />
+            <OverviewCard label={t("cardKeyword")} value={serp.keyword} sub={t("subIntent", { intent: intentText(t, detectIntent(serp.keyword)) })} />
+            <OverviewCard label={t("cardResults")} value={formatNumber(serp.data!.organic.length, locale)} sub={t("subTop100")} />
+            <OverviewCard label={t("cardRelated")} value={formatNumber(serp.data!.relatedSearches.length, locale)} sub={t("subExpandable")} />
+            <OverviewCard label={t("cardPaa")} value={formatNumber(serp.data!.relatedQuestions.length, locale)} sub={t("subQuestions")} />
           </div>
 
           {/* SERP Top 10 */}
@@ -174,7 +196,7 @@ export default function KeywordOverviewPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-[17px] font-semibold text-ink">SERP Top 10</h2>
               <span className="text-xs text-ink-40">
-                来自 Google 实时抓取{serp.data?.fromCache && " · 缓存数据"}
+                {t("serpSource")}{serp.data?.fromCache && ` · ${t("cachedTag")}`}
               </span>
             </div>
             <div className="card-a mt-3 overflow-hidden">
@@ -185,10 +207,10 @@ export default function KeywordOverviewPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-line-soft bg-line-soft/50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">排名</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">标题</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">域名</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">摘要</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colRank")}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colTitle")}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colDomain")}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colSnippet")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -225,8 +247,8 @@ export default function KeywordOverviewPage() {
           <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-12">
             {/* SERP 域名分布横向条形图 */}
             <ChartCard
-              title="SERP 域名分布"
-              subtitle="前 10 结果中各域名出现次数"
+              title={t("chartDomainTitle")}
+              subtitle={t("chartDomainSubtitle")}
               height={Math.max(240, domainDistribution.length * 28 + 80)}
               className="lg:col-span-7"
             >
@@ -235,8 +257,8 @@ export default function KeywordOverviewPage() {
 
             {/* 相关搜索词 */}
             <ChartCard
-              title="相关搜索词"
-              subtitle={`${serp.data?.relatedSearches.length ?? 0} 个相关词`}
+              title={t("chartRelatedTitle")}
+              subtitle={t("relatedCount", { count: formatNumber(serp.data?.relatedSearches.length ?? 0, locale) })}
               height={320}
               className="lg:col-span-5"
             >
@@ -253,7 +275,7 @@ export default function KeywordOverviewPage() {
                 </div>
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-ink-40">
-                  暂无相关搜索词
+                  {t("noRelated")}
                 </div>
               )}
             </ChartCard>

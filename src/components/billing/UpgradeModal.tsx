@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { planLabel, featureLabel } from "@/lib/plan-labels";
+import { formatNumber } from "@/lib/ui-locale";
 
 // ===== 升级引导 Modal =====
 // 由全局 BillingEventBus 触发，或由各页面手动 open
@@ -17,21 +20,7 @@ export interface UpgradeModalState {
   used?: number;
 }
 
-const PLAN_LABELS: Record<string, string> = {
-  free: "免费版",
-  lite: "Lite 版",
-  pro: "专业版",
-};
-
 const PLAN_ORDER: string[] = ["free", "lite", "pro"];
-
-const FEATURE_LABELS: Record<string, string> = {
-  pdf_export: "PDF 导出",
-  excel_export: "Excel 导出",
-  full_audit: "完整审计",
-  backlinks: "外链分析",
-  email_report: "邮件报告",
-};
 
 function getNextPlan(currentPlan: string): string | null {
   const idx = PLAN_ORDER.indexOf(currentPlan);
@@ -45,11 +34,14 @@ interface UpgradeModalProps {
 }
 
 export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
+  const t = useTranslations("dashboard.upgrade");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
   const { open, currentPlan, requiredPlan, reason, feature, limit, used } = state;
   const recommendPlan = requiredPlan ?? getNextPlan(currentPlan);
-  const recommendLabel = recommendPlan ? (PLAN_LABELS[recommendPlan] ?? recommendPlan) : null;
-  const currentLabel = PLAN_LABELS[currentPlan] ?? currentPlan;
-  const featureLabel = feature ? FEATURE_LABELS[feature] ?? feature : null;
+  const recommendLabel = recommendPlan ? planLabel(recommendPlan, locale) : null;
+  const currentPlanLabel = planLabel(currentPlan, locale);
+  const featureLabelText = feature ? featureLabel(feature, locale) : null;
   const isTopPlan = !recommendPlan;
 
   // ESC 关闭
@@ -77,16 +69,16 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h3 className="font-display text-lg font-bold text-ink">
-              {isTopPlan ? "已达最高套餐" : "升级套餐"}
+              {isTopPlan ? t("topTitle") : t("title")}
             </h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              当前：{currentLabel}
+              {t("current", { plan: currentPlanLabel })}
             </p>
           </div>
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
-            aria-label="关闭"
+            aria-label={tc("close")}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -96,21 +88,21 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
 
         {/* 限制原因 */}
         <div className="mb-5 rounded-lg border border-line-soft bg-paper p-4">
-          {featureLabel && (
+          {featureLabelText && (
             <p className="font-sans text-sm text-ink">
-              <span className="text-ink-40">所需功能：</span>
-              {featureLabel}
+              <span className="text-ink-40">{t("requiredFeature")}</span>
+              {featureLabelText}
             </p>
           )}
           {reason && (
             <p className="font-sans text-sm text-ink">
-              <span className="text-ink-40">原因：</span>
+              <span className="text-ink-40">{t("reason")}</span>
               {reason}
             </p>
           )}
           {typeof used === "number" && typeof limit === "number" && (
             <p className="mt-1 font-mono text-xs text-ink-60">
-              用量：{used.toLocaleString()} / {limit.toLocaleString()}
+              {t("usage", { used: formatNumber(used, locale), limit: formatNumber(limit, locale) })}
             </p>
           )}
         </div>
@@ -120,15 +112,15 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
           <div className="mb-5 rounded-lg border border-brand bg-brand/5 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-mono text-xs text-brand">推荐升级</div>
+                <div className="font-mono text-xs text-brand">{t("recommended")}</div>
                 <div className="mt-1 font-display text-xl font-bold text-ink">
                   {recommendLabel}
                 </div>
               </div>
-              <span className="badge-warn px-2.5 py-1 text-xs">推荐</span>
+              <span className="badge-warn px-2.5 py-1 text-xs">{t("recommendedBadge")}</span>
             </div>
             <p className="mt-2 font-sans text-xs text-ink-60">
-              升级后立即解锁更多功能与更高额度
+              {t("recommendDesc")}
             </p>
           </div>
         )}
@@ -139,14 +131,14 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
             onClick={onClose}
             className="flex-1 btn-secondary py-2.5 text-sm"
           >
-            稍后再说
+            {t("later")}
           </button>
           <Link
             href="/pricing"
             onClick={onClose}
             className="flex-1 btn-primary py-2.5 text-center text-sm"
           >
-            {isTopPlan ? "查看套餐详情" : "查看定价方案"}
+            {isTopPlan ? t("viewDetails") : t("viewPlans")}
           </Link>
         </div>
       </div>

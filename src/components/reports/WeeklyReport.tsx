@@ -1,5 +1,8 @@
 // 综合周报模板（用于 PDF 渲染）
 
+import { useTranslations, useLocale } from "next-intl";
+import { formatNumber } from "@/lib/ui-locale";
+
 export interface WeeklyReportProps {
   projectName: string;
   period: string;
@@ -37,6 +40,8 @@ export default function WeeklyReport({
   keywordSummary,
   generatedAt,
 }: WeeklyReportProps) {
+  const t = useTranslations("dashboard.pdf.weekly");
+  const locale = useLocale() as "en" | "zh";
   return (
     <div
       id="report-content"
@@ -50,99 +55,106 @@ export default function WeeklyReport({
     >
       {/* 封面 */}
       <div style={{ borderBottom: `2px solid ${COLORS.ink}`, paddingBottom: 16, marginBottom: 24 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>SeeO · 综合周报</div>
+        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>{t("docLabel")}</div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: "8px 0 4px" }}>{projectName}</h1>
         <div style={{ fontSize: 13, color: COLORS.ink60 }}>{period}</div>
         <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40, marginTop: 4 }}>
-          生成时间：{generatedAt}
+          {t("generatedAt", { time: generatedAt })}
         </div>
       </div>
 
       {/* 执行摘要 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>关键词总数</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("keywordsTotal")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 700, color: COLORS.ink, marginTop: 4 }}>
-            {keywordSummary.total.toLocaleString()}
+            {formatNumber(keywordSummary.total, locale)}
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink60, marginTop: 2 }}>
-            活跃 {keywordSummary.active.toLocaleString()}
+            {t("activeCount", { count: formatNumber(keywordSummary.active, locale) })}
           </div>
         </div>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>本周排名变化</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("rankChange")}</div>
           <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 8 }}>
             <div>
               <div style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, color: COLORS.pos }}>{rankSummary.up}</div>
-              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>上升</div>
+              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>{t("up")}</div>
             </div>
             <div>
               <div style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, color: COLORS.neg }}>{rankSummary.down}</div>
-              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>下降</div>
+              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>{t("down")}</div>
             </div>
             <div>
               <div style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, color: COLORS.ink40 }}>{rankSummary.out}</div>
-              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>出榜</div>
+              <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>{t("out")}</div>
             </div>
           </div>
         </div>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>审计平均分</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("auditAvg")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 700, color: auditSummary.avgScore !== null ? (auditSummary.avgScore >= 80 ? COLORS.pos : auditSummary.avgScore >= 60 ? COLORS.warn : COLORS.neg) : COLORS.ink40, marginTop: 4 }}>
             {auditSummary.avgScore ?? "—"}
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink60, marginTop: 2 }}>
-            共 {auditSummary.count} 次审计
+            {t("auditCount", { count: auditSummary.count })}
           </div>
         </div>
       </div>
 
       {/* 排名变化明细 */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>排名变化明细</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("rankDetailTitle")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-          <SummaryItem label="追踪关键词总数" value={rankSummary.total} color={COLORS.ink} />
-          <SummaryItem label="本周上升" value={rankSummary.up} color={COLORS.pos} />
-          <SummaryItem label="本周下降" value={rankSummary.down} color={COLORS.neg} />
-          <SummaryItem label="跌出 Top 100" value={rankSummary.out} color={COLORS.warn} />
+          <SummaryItem label={t("detailTotal")} value={rankSummary.total} color={COLORS.ink} />
+          <SummaryItem label={t("detailUp")} value={rankSummary.up} color={COLORS.pos} />
+          <SummaryItem label={t("detailDown")} value={rankSummary.down} color={COLORS.neg} />
+          <SummaryItem label={t("detailOut")} value={rankSummary.out} color={COLORS.warn} />
         </div>
       </div>
 
       {/* 审计摘要 */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>审计摘要</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("auditSummaryTitle")}</div>
         <div style={{ fontSize: 12, color: COLORS.ink60, lineHeight: 1.8 }}>
-          本周共执行 <strong style={{ color: COLORS.ink }}>{auditSummary.count}</strong> 次技术审计。
+          {t.rich("auditSummaryText", {
+            count: auditSummary.count,
+            strong: (chunks) => <strong style={{ color: COLORS.ink }}>{chunks}</strong>,
+          })}
           {auditSummary.avgScore !== null ? (
-            <>平均健康分 <strong style={{ color: auditSummary.avgScore >= 80 ? COLORS.pos : auditSummary.avgScore >= 60 ? COLORS.warn : COLORS.neg }}>{auditSummary.avgScore}</strong> 分。</>
+            t.rich("auditSummaryScore", {
+              score: auditSummary.avgScore,
+              strong: (chunks) => <strong style={{ color: auditSummary.avgScore !== null && auditSummary.avgScore >= 80 ? COLORS.pos : auditSummary.avgScore !== null && auditSummary.avgScore >= 60 ? COLORS.warn : COLORS.neg }}>{chunks}</strong>,
+            })
           ) : (
-            "本周暂无已完成的审计。"
+            t("auditSummaryNone")
           )}
         </div>
       </div>
 
       {/* 关键词概况 */}
       <div style={cardStyle}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>关键词概况</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("keywordOverviewTitle")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <SummaryItem label="总关键词数" value={keywordSummary.total} color={COLORS.ink} />
-          <SummaryItem label="有排名的关键词" value={keywordSummary.active} color={COLORS.pos} />
+          <SummaryItem label={t("overviewTotal")} value={keywordSummary.total} color={COLORS.ink} />
+          <SummaryItem label={t("overviewActive")} value={keywordSummary.active} color={COLORS.pos} />
         </div>
       </div>
 
       <div style={{ marginTop: 24, fontFamily: "monospace", fontSize: 10, color: COLORS.ink40, textAlign: "center" }}>
-        本报告由 SeeO 自动生成 · 数据周期 {period}
+        {t("footer", { period })}
       </div>
     </div>
   );
 }
 
 function SummaryItem({ label, value, color }: { label: string; value: number; color: string }) {
+  const locale = useLocale() as "en" | "zh";
   return (
     <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: 6, padding: "8px 10px" }}>
       <div style={{ fontFamily: "monospace", fontSize: 9, color: COLORS.ink40 }}>{label}</div>
       <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color, marginTop: 2 }}>
-        {value.toLocaleString()}
+        {formatNumber(value, locale)}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_LEGEND_STYLE,
   CHART_SERIES_PALETTE,
@@ -36,11 +37,12 @@ interface Props {
 
 /** 多关键词排名趋势折线图（可勾选） */
 export default function MultiRankTrend({ series, max = 5 }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
   const top = series.slice(0, max);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
   if (!top.length || top.every((s) => s.points.length === 0)) {
-    return <ChartEmpty message="暂无排名历史" hint="刷新排名后显示趋势" />;
+    return <ChartEmpty message={t("multiRankEmpty")} hint={t("multiRankEmptyHint")} />;
   }
 
   // 合并日期：以最长序列为基准
@@ -74,7 +76,7 @@ export default function MultiRankTrend({ series, max = 5 }: Props) {
             contentStyle={CHART_TOOLTIP_STYLE}
             labelStyle={CHART_TOOLTIP_LABEL_STYLE}
             itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-            formatter={(v, n) => v === null ? ["未进前 100", n] : [`#${v}`, n]}
+            formatter={(v, n) => v === null ? [t("notInTop100"), n] : [`#${v}`, n]}
           />
           <Legend
             wrapperStyle={CHART_LEGEND_STYLE}
@@ -103,7 +105,7 @@ export default function MultiRankTrend({ series, max = 5 }: Props) {
       </ResponsiveContainer>
       {hidden.size > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-ink-40">已隐藏：</span>
+          <span className="text-[10px] text-ink-40">{t("hiddenLabel")}</span>
           {Array.from(hidden).map((kw) => (
             <button
               key={kw}
@@ -120,7 +122,7 @@ export default function MultiRankTrend({ series, max = 5 }: Props) {
         </div>
       )}
       <div className="mt-1 text-right text-[10px] text-ink-40">
-        点击图例可切换显示，最多叠加 {max} 条
+        {t("legendHint", { max })}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { createServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { isAuthEnabled } from "@/lib/auth-config";
 import ProjectList from "@/components/dashboard/ProjectList";
 import Onboarding from "@/components/dashboard/Onboarding";
@@ -11,10 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function WorkbenchPage() {
   // 演示模式：直接读 SQLite
   if (!isAuthEnabled) {
+    const ts = await getTranslations("dashboard.sidebar");
     const projects = await listProjectsWithMetrics("demo-user");
     // 无项目时显示首次使用 Onboarding，跳过 alerts/预警区块
     if (projects.length === 0) {
-      return <Onboarding displayName="本地开发" />;
+      return <Onboarding displayName={ts("demoUser")} />;
     }
     const alerts = await listAlerts("demo-user", 50);
     const unread = await countUnreadAlerts("demo-user");
@@ -22,7 +24,7 @@ export default async function WorkbenchPage() {
       <ProjectList
         projects={projects}
         alerts={alerts}
-        displayName="本地开发"
+        displayName={ts("demoUser")}
         unreadAlertCount={unread}
       />
     );
@@ -44,7 +46,7 @@ export default async function WorkbenchPage() {
     .single();
 
   const displayName =
-    profileData?.display_name || user.email?.split("@")[0] || "用户";
+    profileData?.display_name || user.email?.split("@")[0] || "SeeO";
 
   // 查询当前用户的项目（Supabase RLS 自动按 user_id 过滤）
   const { data: userProjects } = await supabase

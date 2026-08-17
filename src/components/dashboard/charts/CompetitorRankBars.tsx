@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_LEGEND_STYLE,
@@ -39,8 +40,10 @@ interface Props {
  * rank=100 代表未上榜（占满高度），实际用 100-rank 显示（数值越高=排名越好）
  */
 export default function CompetitorRankBars({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length) {
-    return <ChartEmpty message="暂无排名对比" hint="选择关键词并刷新后显示" />;
+    return <ChartEmpty message={t("competitorEmpty")} hint={t("competitorEmptyHint")} />;
   }
 
   // 取全部 domain（最多 5 个）
@@ -53,7 +56,7 @@ export default function CompetitorRankBars({ data }: Props) {
   const domains = allDomains.slice(0, 5);
 
   if (domains.length === 0) {
-    return <ChartEmpty message="暂无排名对比" hint="刷新竞品排名后显示" />;
+    return <ChartEmpty message={t("competitorEmpty")} hint={t("competitorEmptyHintAlt")} />;
   }
 
   // 反转 rank：用 101-rank 让数值越高=排名越靠前（柱越高=越好）
@@ -90,7 +93,7 @@ export default function CompetitorRankBars({ data }: Props) {
           cursor={{ fill: "rgba(17,24,39,.04)" }}
           formatter={(v, n) => {
             const val = Number(v);
-            if (val === 0) return ["未进前 100", n];
+            if (val === 0) return [t("notInTop100"), n];
             return [`#${101 - val}`, n];
           }}
         />

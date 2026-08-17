@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 interface SkeletonProps {
   rows?: number;
   className?: string;
@@ -37,21 +41,22 @@ export function ChartSkeleton({ className = "" }: { className?: string }) {
 }
 
 export function EmptyState({
-  title = "暂无数据",
-  hint = "切换条件或稍后再试",
+  title,
+  hint,
 }: {
   title?: string;
   hint?: string;
 }) {
+  const t = useTranslations("dashboard.shared.skeleton");
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full border border-line font-mono text-2xl text-ink-40">
         ∅
       </div>
       <div className="mt-3 font-sans text-sm font-medium text-ink">
-        {title}
+        {title ?? t("emptyTitle")}
       </div>
-      <div className="mt-1 font-sans text-xs text-ink-60">{hint}</div>
+      <div className="mt-1 font-sans text-xs text-ink-60">{hint ?? t("emptyHint")}</div>
     </div>
   );
 }

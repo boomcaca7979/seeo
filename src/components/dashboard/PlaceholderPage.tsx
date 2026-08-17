@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 interface PlaceholderPageProps {
   title: string;
@@ -15,6 +18,8 @@ export default function PlaceholderPage({
   metrics,
   features,
 }: PlaceholderPageProps) {
+  const t = useTranslations("dashboard.shared.placeholder");
+
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
       {/* 标题 */}
@@ -54,7 +59,7 @@ export default function PlaceholderPage({
       {/* 功能预览 */}
       <div className="mt-10">
         <h2 className="font-display text-lg font-bold text-ink">
-          计划交付的能力
+          {t("plannedTitle")}
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {features.map((f) => (
@@ -84,10 +89,10 @@ export default function PlaceholderPage({
           </span>
           <div>
             <div className="font-sans text-sm font-medium text-ink">
-              该模块属于 {phase} 交付
+              {t("phaseDelivery", { phase })}
             </div>
             <div className="mt-0.5 font-sans text-xs text-ink-40">
-              框架已就绪，功能将随版本迭代开放
+              {t("phaseHint")}
             </div>
           </div>
         </div>
@@ -95,7 +100,7 @@ export default function PlaceholderPage({
           href="/app"
           className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
         >
-          返回工作台 →
+          {t("backHome")}
         </Link>
       </div>
     </div>

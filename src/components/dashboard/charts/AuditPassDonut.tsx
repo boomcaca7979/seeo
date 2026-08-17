@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -22,14 +23,16 @@ interface Props {
 
 /** 审计检查通过情况环形占比图 */
 export default function AuditPassDonut({ passed, failed }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   const total = passed + failed;
   if (total === 0) {
-    return <ChartEmpty message="暂无通过情况数据" hint="发起审计后显示" />;
+    return <ChartEmpty message={t("passDonutEmpty")} hint={t("passDonutEmptyHint")} />;
   }
 
   const data = [
-    { name: "通过", value: passed },
-    { name: "未通过", value: failed },
+    { name: t("passed"), value: passed },
+    { name: t("failed"), value: failed },
   ];
   const colors = [CHART_COLORS.pass, CHART_COLORS.error];
 
@@ -56,7 +59,7 @@ export default function AuditPassDonut({ passed, failed }: Props) {
             contentStyle={CHART_TOOLTIP_STYLE}
             labelStyle={CHART_TOOLTIP_LABEL_STYLE}
             itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-            formatter={(v, n) => [`${v} 项 (${total > 0 ? Math.round(((v as number) / total) * 100) : 0}%)`, n]}
+            formatter={(v, n) => [`${v} ${t("itemsUnit")} (${total > 0 ? Math.round(((v as number) / total) * 100) : 0}%)`, n]}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -64,7 +67,7 @@ export default function AuditPassDonut({ passed, failed }: Props) {
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-2xl font-bold text-ink">{Math.round((passed / total) * 100)}%</div>
         <div className="mt-0.5 text-[10px] text-ink-40">
-          {passed} / {total} 项
+          {passed} / {total} {t("itemsUnit")}
         </div>
       </div>
     </div>

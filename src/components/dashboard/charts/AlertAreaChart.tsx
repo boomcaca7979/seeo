@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -41,8 +42,10 @@ function formatDay(iso: string): string {
 
 /** 近 7 天预警数量面积图 */
 export default function AlertAreaChart({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length || data.every((d) => d.count === 0)) {
-    return <ChartEmpty message="近 7 天暂无预警" hint="产生预警后显示" />;
+    return <ChartEmpty message={t("alertEmpty")} hint={t("alertEmptyHint")} />;
   }
 
   const chartData = data.map((d) => ({
@@ -69,7 +72,7 @@ export default function AlertAreaChart({ data }: Props) {
           contentStyle={CHART_TOOLTIP_STYLE}
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-          formatter={(v) => [`${formatNumber(Number(v))} 条`, "预警"]}
+          formatter={(v) => [t("alertCount", { n: formatNumber(Number(v)) }), t("alertLabel")]}
         />
         <Area
           type="monotone"

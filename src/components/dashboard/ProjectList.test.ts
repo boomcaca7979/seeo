@@ -65,8 +65,14 @@ describe("ProjectList 源码契约（映射/绑定/独立性，防回归）", ()
   });
 
   it("③ 弹窗显示 name + domain + 完整 UUID（UUID 与 DELETE ?id= 同源 deleteTarget）", () => {
-    expect(SRC).toContain("{deleteTarget?.name}」（{deleteTarget?.domain}）");
+    // i18n 后确认文案走 message catalog：deleteConfirm ICU 变量直接绑定 deleteTarget 字段
+    expect(SRC).toContain('t("deleteConfirm", { name: deleteTarget?.name ?? "", domain: deleteTarget?.domain ?? "" })');
     expect(SRC).toContain("ID: {deleteTarget?.id}");
+    // zh catalog 中 deleteConfirm/deleteId 必须包含 name/domain/id 占位（保证弹窗仍显示完整信息）
+    const zh = JSON.parse(readFileSync(fileURLToPath(new URL("../../../messages/zh.json", import.meta.url)), "utf-8"));
+    expect(zh.dashboard.projectList.deleteConfirm).toContain("{name}");
+    expect(zh.dashboard.projectList.deleteConfirm).toContain("{domain}");
+    expect(zh.dashboard.projectList.deleteId).toContain("{id}");
   });
 
   it("④ 确认按钮显式传 deleteTarget 给 handleDelete（与弹窗显示同一对象）", () => {
@@ -80,7 +86,7 @@ describe("ProjectList 源码契约（映射/绑定/独立性，防回归）", ()
 
   it("⑥ 发请求前调用 canSubmitDelete 校验，非法时 toast 报错且不发 DELETE", () => {
     expect(SRC).toContain("if (!canSubmitDelete(target))");
-    expect(SRC).toContain("已取消删除");
+    expect(SRC).toContain('show(t("deleteGuardFailed"), "error")');
   });
 
   it("⑦ 确认按钮 disabled 条件含 canSubmitDelete(deleteTarget)", () => {
@@ -94,7 +100,7 @@ describe("ProjectList 源码契约（映射/绑定/独立性，防回归）", ()
 
   it("⑨ 删除成功：清空 deleteTarget + toast（含被删 domain）+ router.refresh()（列表刷新）", () => {
     expect(SRC).toContain("setDeleteTarget(null);");
-    expect(SRC).toContain("${target.domain}，历史数据保留");
+    expect(SRC).toContain('show(t("deletedToast", { domain: target.domain }), "success")');
     expect(SRC.indexOf("router.refresh()")).toBeGreaterThan(SRC.indexOf("handleDelete = async"));
   });
 
@@ -113,8 +119,8 @@ describe("ProjectList 源码契约（映射/绑定/独立性，防回归）", ()
 
   it("⑫ 卡片 Link href 使用 p.id（真实 UUID 进 URL），删除按钮与 Link 为兄弟节点（无嵌套误触发）", () => {
     expect(SRC).toContain('href={`/app/projects/${p.id}`}');
-    // 按钮在 Link 之前闭合，二者不存在 <button><Link> 嵌套
-    const btnPos = SRC.indexOf('aria-label="删除项目"');
+    // 按钮在 Link 之前闭合，二者不存在 <button><Link> 嵌套（i18n 后 aria-label 走 t()）
+    const btnPos = SRC.indexOf('aria-label={t("deleteProject")}');
     const linkPos = SRC.indexOf('href={`/app/projects/${p.id}`}');
     expect(btnPos).toBeGreaterThan(-1);
     expect(linkPos).toBeGreaterThan(-1);

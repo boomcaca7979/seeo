@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -30,8 +31,10 @@ interface Props {
 
 /** 响应时间分布柱状图：按桶着色（快/中/慢） */
 export default function ResponseTimeBars({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length || data.every((d) => d.count === 0)) {
-    return <ChartEmpty message="暂无响应时间分布" hint="深度审计后显示页面明细" />;
+    return <ChartEmpty message={t("responseEmpty")} hint={t("responseEmptyHint")} />;
   }
 
   const colors = [CHART_COLORS.pass, CHART_COLORS.warn, CHART_COLORS.error, "#6B7280"];
@@ -55,7 +58,7 @@ export default function ResponseTimeBars({ data }: Props) {
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
           cursor={{ fill: "rgba(17,24,39,.04)" }}
-          formatter={(v) => [`${v} 个页面`, "数量"]}
+          formatter={(v) => [`${v} ${t("pagesUnit")}`, t("countLabel")]}
         />
         <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={56}>
           {data.map((_, i) => (

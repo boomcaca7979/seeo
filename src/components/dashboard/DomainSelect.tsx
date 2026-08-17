@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface Project {
   id: number;
@@ -22,6 +23,7 @@ const MANUAL_KEY = "__manual__";
  * 挂载时 fetch /api/projects，无项目时直接渲染文本输入框。
  */
 export default function DomainSelect({ value, onChange, placeholder, className }: DomainSelectProps) {
+  const t = useTranslations("dashboard.shared.domainSelect");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [manual, setManual] = useState(false);
@@ -75,7 +77,7 @@ export default function DomainSelect({ value, onChange, placeholder, className }
   if (loading) {
     return (
       <div className={baseClass}>
-        <span className="text-ink-40">加载项目…</span>
+        <span className="text-ink-40">{t("loading")}</span>
       </div>
     );
   }
@@ -88,7 +90,7 @@ export default function DomainSelect({ value, onChange, placeholder, className }
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder ?? "输入域名，如：example.com"}
+          placeholder={placeholder ?? t("placeholder")}
           className={baseClass}
         />
         {projects.length > 0 && (
@@ -97,12 +99,12 @@ export default function DomainSelect({ value, onChange, placeholder, className }
             onClick={() => setManual(false)}
             className="mt-1 font-sans text-[10px] text-ink-40 hover:text-ink-60"
           >
-            返回选择
+            {t("backToSelect")}
           </button>
         )}
         {projects.length === 0 && (
           <p className="mt-1 font-sans text-[10px] text-ink-40">
-            暂无项目，可直接输入域名开始
+            {t("noProjectsHint")}
           </p>
         )}
       </div>
@@ -130,10 +132,10 @@ export default function DomainSelect({ value, onChange, placeholder, className }
       >
         {projects.map((p) => (
           <option key={p.id} value={p.domain}>
-            {p.name}（{p.domain}）
+            {t("projectOption", { name: p.name, domain: p.domain })}
           </option>
         ))}
-        <option value={MANUAL_KEY}>手动输入…</option>
+        <option value={MANUAL_KEY}>{t("manualOption")}</option>
       </select>
     </div>
   );

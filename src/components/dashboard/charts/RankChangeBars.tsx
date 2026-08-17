@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -27,13 +28,15 @@ interface Props {
 
 /** 今日上升 / 下降词数的正负柱状图 */
 export default function RankChangeBars({ up, down }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (up === 0 && down === 0) {
-    return <ChartEmpty message="暂无升降数据" hint="刷新排名后显示" />;
+    return <ChartEmpty message={t("rankChangeEmpty")} hint={t("rankChangeEmptyHint")} />;
   }
 
   const data = [
-    { name: "上升", value: up },
-    { name: "下降", value: -down },
+    { name: t("rising"), value: up },
+    { name: t("falling"), value: -down },
   ];
 
   return (
@@ -49,7 +52,7 @@ export default function RankChangeBars({ up, down }: Props) {
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
           cursor={{ fill: "rgba(17,24,39,.04)" }}
-          formatter={(v) => [`${Math.abs(v as number)} 个词`, "数量"]}
+          formatter={(v) => [`${Math.abs(v as number)} ${t("keywordsUnit")}`, t("countLabel")]}
         />
         <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={56}>
           {data.map((d, i) => (

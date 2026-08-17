@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_LEGEND_STYLE,
@@ -29,22 +30,24 @@ interface Props {
   data: CategoryData[];
 }
 
-const categoryLabel: Record<string, string> = {
-  critical: "严重",
-  warning: "警告",
-  info: "提示",
-};
-
 /** 审计检查项按类别的横向堆叠条形图：通过/未通过 */
 export default function AuditCoverageStacked({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
+  const categoryLabel: Record<string, string> = {
+    critical: t("severityCritical"),
+    warning: t("severityWarning"),
+    info: t("severityInfo"),
+  };
+
   if (!data.length || data.every((d) => d.passed === 0 && d.failed === 0)) {
-    return <ChartEmpty message="暂无检查项分布数据" hint="发起审计后显示" />;
+    return <ChartEmpty message={t("coverageEmpty")} hint={t("coverageEmptyHint")} />;
   }
 
   const chartData = data.map((d) => ({
     name: categoryLabel[d.category] ?? d.category,
-    通过: d.passed,
-    未通过: d.failed,
+    [t("passed")]: d.passed,
+    [t("failed")]: d.failed,
   }));
 
   return (
@@ -78,14 +81,14 @@ export default function AuditCoverageStacked({ data }: Props) {
         />
         <Legend wrapperStyle={CHART_LEGEND_STYLE} />
         <Bar
-          dataKey="通过"
+          dataKey={t("passed")}
           stackId="a"
           fill={CHART_COLORS.pass}
           radius={[0, 0, 0, 0]}
           maxBarSize={26}
         />
         <Bar
-          dataKey="未通过"
+          dataKey={t("failed")}
           stackId="a"
           fill={CHART_COLORS.error}
           radius={[0, 4, 4, 0]}

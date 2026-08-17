@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 interface VennProps {
   selfOnly: number;
   compOnly: number;
@@ -5,10 +9,11 @@ interface VennProps {
 }
 
 export default function KeywordVenn({ selfOnly, compOnly, common }: VennProps) {
+  const t = useTranslations("dashboard.shared.venn");
   // 三圆位置（SVG viewBox 200x160）
-  const c1 = { cx: 65, cy: 65, r: 52, label: "我的独有", value: selfOnly, color: "#ffd400" };
-  const c2 = { cx: 135, cy: 65, r: 52, label: "竞品独有", value: compOnly, color: "#1e9e6a" };
-  const c3 = { cx: 100, cy: 110, r: 52, label: "共同", value: common, color: "#c98a0a" };
+  const c1 = { cx: 65, cy: 65, r: 52, label: t("selfOnly"), value: selfOnly, color: "#ffd400" };
+  const c2 = { cx: 135, cy: 65, r: 52, label: t("compOnly"), value: compOnly, color: "#1e9e6a" };
+  const c3 = { cx: 100, cy: 110, r: 52, label: t("common"), value: common, color: "#c98a0a" };
 
   return (
     <div className="flex flex-col items-center">
@@ -43,20 +48,20 @@ export default function KeywordVenn({ selfOnly, compOnly, common }: VennProps) {
         </text>
         {/* 三圆交集中心 */}
         <text x="100" y="80" fill="#14121a" fontSize="9" textAnchor="middle" fontFamily="monospace" opacity="0.6">
-          交集
+          {t("intersection")}
         </text>
       </svg>
 
       {/* 图例 */}
       <div className="mt-3 flex flex-wrap justify-center gap-3 font-sans text-[10px]">
         <span className="flex items-center gap-1 text-ink-60">
-          <span className="h-2 w-2 rounded-full" style={{ background: c1.color }} /> 我的独有
+          <span className="h-2 w-2 rounded-full" style={{ background: c1.color }} /> {c1.label}
         </span>
         <span className="flex items-center gap-1 text-ink-60">
-          <span className="h-2 w-2 rounded-full" style={{ background: c2.color }} /> 竞品独有
+          <span className="h-2 w-2 rounded-full" style={{ background: c2.color }} /> {c2.label}
         </span>
         <span className="flex items-center gap-1 text-ink-60">
-          <span className="h-2 w-2 rounded-full" style={{ background: c3.color }} /> 共同
+          <span className="h-2 w-2 rounded-full" style={{ background: c3.color }} /> {c3.label}
         </span>
       </div>
     </div>

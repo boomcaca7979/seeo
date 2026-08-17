@@ -7,6 +7,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -36,14 +37,17 @@ export default function RankDistributionDonut({
   top100,
   unranked,
 }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   const values = { top3, top10, top100, unranked };
   const total = top3 + top10 + top100 + unranked;
   if (total === 0) {
-    return <ChartEmpty message="暂无追踪词" hint="添加追踪词后显示分布" />;
+    return <ChartEmpty message={t("distributionEmpty")} hint={t("distributionEmptyHint")} />;
   }
 
   const data = SEGMENTS.map((s) => ({
-    name: s.label,
+    // 未进前 100 需按 locale 翻译，其余 label 本身为 locale 无关文案
+    name: s.key === "unranked" ? t("notInTop100") : s.label,
     value: values[s.key],
   }));
 
@@ -70,13 +74,13 @@ export default function RankDistributionDonut({
             contentStyle={CHART_TOOLTIP_STYLE}
             labelStyle={CHART_TOOLTIP_LABEL_STYLE}
             itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-            formatter={(v, n) => [`${v} 个词 (${total > 0 ? Math.round(((v as number) / total) * 100) : 0}%)`, n]}
+            formatter={(v, n) => [`${v} ${t("keywordsUnit")} (${total > 0 ? Math.round(((v as number) / total) * 100) : 0}%)`, n]}
           />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-2xl font-bold text-ink">{total}</div>
-        <div className="mt-0.5 text-[10px] text-ink-40">追踪词总数</div>
+        <div className="mt-0.5 text-[10px] text-ink-40">{t("trackedTotal")}</div>
       </div>
     </div>
   );

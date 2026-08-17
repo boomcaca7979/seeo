@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 interface ModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface ModalProps {
 }
 
 export default function Modal({ open, onClose, title, children, footer }: ModalProps) {
+  const t = useTranslations("dashboard.shared.modal");
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -39,7 +41,7 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-md text-ink-40 hover:bg-paper hover:text-ink"
-            aria-label="关闭"
+            aria-label={t("close")}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
+import { formatNumber, intlLocale } from "@/lib/ui-locale";
 
 interface IssueGroup {
   type: string;
@@ -29,19 +31,19 @@ interface AuditData {
 }
 
 const severityConfig = {
-  error: { label: "错误", badge: "badge-err", dot: "bg-neg", printColor: "#B23B34" },
-  warning: { label: "警告", badge: "badge-warn", dot: "bg-warn", printColor: "#8a6a00" },
-  notice: { label: "提示", badge: "badge-info", dot: "bg-ink-25", printColor: "#6b7280" },
+  error: { label: "severityError", badge: "badge-err", dot: "bg-neg", printColor: "#B23B34" },
+  warning: { label: "severityWarning", badge: "badge-warn", dot: "bg-warn", printColor: "#8a6a00" },
+  notice: { label: "severityNotice", badge: "badge-info", dot: "bg-ink-25", printColor: "#6b7280" },
 } as const;
 
 const STORAGE_KEY = "seeo:last-audit-domain";
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null, locale: "en" | "zh"): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString("zh-CN", { hour12: false });
+    return d.toLocaleString(intlLocale(locale), { hour12: false });
   } catch {
     return iso;
   }
@@ -49,6 +51,8 @@ function formatTime(iso: string | null): string {
 
 export default function AuditReportPrintPage() {
   const router = useRouter();
+  const t = useTranslations("dashboard.printAudit");
+  const locale = useLocale() as "en" | "zh";
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -122,21 +126,21 @@ export default function AuditReportPrintPage() {
       <div className="mx-auto max-w-3xl p-6 lg:p-8 print:hidden">
         <div className="card-a border border-dashed border-line p-12 text-center">
           <div className="font-display text-lg font-bold text-ink">
-            暂无可打印的审计报告
+            {t("emptyTitle")}
           </div>
           <p className="mt-3 font-sans text-sm text-ink-60">
             {domain
-              ? `域名 ${domain} 还没有完成的审计记录`
-              : "尚未选择审计域名"}
+              ? t("emptyWithDomain", { domain })
+              : t("emptyNoDomain")}
           </p>
           <p className="mt-1 font-mono text-xs text-ink-40">
-            请先到技术审计页发起一次完整审计
+            {t("emptyHint")}
           </p>
           <button
             onClick={handleBack}
             className="btn-primary mt-6"
           >
-            前往技术审计
+            {t("emptyAction")}
           </button>
         </div>
       </div>
@@ -144,7 +148,7 @@ export default function AuditReportPrintPage() {
   }
 
   const healthScore = audit.healthScore ?? 0;
-  const scoreLevel = healthScore >= 80 ? "优秀" : healthScore >= 60 ? "及格" : "待优化";
+  const scoreLevel = healthScore >= 80 ? t("scoreLevelGood") : healthScore >= 60 ? t("scoreLevelPass") : t("scoreLevelPoor");
 
   return (
     <div className="mx-auto max-w-5xl p-6 lg:p-8 print-area">
@@ -154,7 +158,7 @@ export default function AuditReportPrintPage() {
           onClick={handleBack}
           className="btn-secondary"
         >
-          ← 返回审计
+          {t("backBtn")}
         </button>
         <button
           onClick={handlePrint}
@@ -165,7 +169,7 @@ export default function AuditReportPrintPage() {
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             <rect x="6" y="14" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.8" />
           </svg>
-          打印 / 存为 PDF
+          {t("printBtn")}
         </button>
       </div>
 
@@ -173,22 +177,22 @@ export default function AuditReportPrintPage() {
       <div className="card-a p-6 print-header">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="font-mono text-xs text-ink-40 print-mono">SeeO · 技术审计报告</div>
+            <div className="font-mono text-xs text-ink-40 print-mono">{t("reportLabel")}</div>
             <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink print-title sm:text-3xl">
               {audit.domain}
             </h1>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-60 print-mono">
-              <span>审计时间：{formatTime(audit.finishedAt ?? audit.startedAt)}</span>
+              <span>{t("metaTime", { value: formatTime(audit.finishedAt ?? audit.startedAt, locale) })}</span>
               <span>·</span>
-              <span>已爬取页面：{audit.pagesCrawled.toLocaleString()}</span>
+              <span>{t("metaPages", { value: formatNumber(audit.pagesCrawled, locale) })}</span>
               <span>·</span>
-              <span>报告 ID：#{audit.id}</span>
+              <span>{t("metaReportId", { value: `#${audit.id}` })}</span>
             </div>
           </div>
           <div className="flex items-center gap-3 print-score-block">
             <ScoreRing score={healthScore} size={88} thickness={8} />
             <div>
-              <div className="font-display text-base font-bold text-ink print-title">健康度</div>
+              <div className="font-display text-base font-bold text-ink print-title">{t("healthLabel")}</div>
               <div className="font-mono text-xs text-ink-40 print-mono">{scoreLevel}</div>
             </div>
           </div>
@@ -200,32 +204,32 @@ export default function AuditReportPrintPage() {
         <div className="card-a p-5 print-card">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-neg print-dot-error" />
-            <span className="font-mono text-xs text-ink-40 print-mono">错误</span>
+            <span className="font-mono text-xs text-ink-40 print-mono">{t("severityError")}</span>
           </div>
           <div className="mt-2 font-mono text-3xl font-bold text-neg print-num-error">
-            {audit.errors.toLocaleString()}
+            {formatNumber(audit.errors, locale)}
           </div>
-          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">需立即修复</div>
+          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">{t("errorHint")}</div>
         </div>
         <div className="card-a p-5 print-card">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-warn print-dot-warning" />
-            <span className="font-mono text-xs text-ink-40 print-mono">警告</span>
+            <span className="font-mono text-xs text-ink-40 print-mono">{t("severityWarning")}</span>
           </div>
           <div className="mt-2 font-mono text-3xl font-bold text-warn print-num-warning">
-            {audit.warnings.toLocaleString()}
+            {formatNumber(audit.warnings, locale)}
           </div>
-          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">建议尽快处理</div>
+          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">{t("warningHint")}</div>
         </div>
         <div className="card-a p-5 print-card">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-ink-25 print-dot-notice" />
-            <span className="font-mono text-xs text-ink-40 print-mono">提示</span>
+            <span className="font-mono text-xs text-ink-40 print-mono">{t("severityNotice")}</span>
           </div>
           <div className="mt-2 font-mono text-3xl font-bold text-ink print-num-notice">
-            {audit.notices.toLocaleString()}
+            {formatNumber(audit.notices, locale)}
           </div>
-          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">可择机优化</div>
+          <div className="mt-1 font-mono text-[10px] text-ink-40 print-mono">{t("noticeHint")}</div>
         </div>
       </div>
 
@@ -233,17 +237,17 @@ export default function AuditReportPrintPage() {
       <div className="mt-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-bold text-ink print-title">
-            问题清单
+            {t("issuesTitle")}
           </h2>
           <span className="font-mono text-xs text-ink-40 print-mono">
-            共 {audit.issues.length} 类问题
+            {t("issuesCount", { n: audit.issues.length })}
           </span>
         </div>
 
         {audit.issues.length === 0 ? (
           <div className="card-a mt-4 border border-dashed border-line p-10 text-center">
-            <div className="font-display text-base font-bold text-ink-40">未检测到问题</div>
-            <p className="mt-2 font-sans text-sm text-ink-40">本次审计未发现 SEO 问题</p>
+            <div className="font-display text-base font-bold text-ink-40">{t("noIssuesTitle")}</div>
+            <p className="mt-2 font-sans text-sm text-ink-40">{t("noIssuesHint")}</p>
           </div>
         ) : (
           <div className="card-a mt-4 overflow-hidden print-table">
@@ -251,12 +255,12 @@ export default function AuditReportPrintPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft bg-line-soft/40 print-thead">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">问题类型</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">级别</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">影响页面</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">详情</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">示例 URL</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">修复建议</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thType")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thSeverity")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thAffected")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thDetail")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thSampleUrl")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40 print-mono">{t("thSuggestion")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -276,11 +280,11 @@ export default function AuditReportPrintPage() {
                             data-severity={issue.severity}
                           >
                             <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot} print-dot`} />
-                            {cfg.label}
+                            {t(cfg.label)}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-mono text-sm text-ink print-cell">
-                          {issue.affectedPages.toLocaleString()}
+                          {formatNumber(issue.affectedPages, locale)}
                         </td>
                         <td className="px-4 py-3 font-sans text-xs text-ink-60 print-cell">
                           {issue.detail}
@@ -305,7 +309,7 @@ export default function AuditReportPrintPage() {
 
       {/* 页脚（打印时显示） */}
       <div className="mt-8 hidden border-t border-line-soft pt-4 font-mono text-[10px] text-ink-40 print-footer">
-        本报告由 SeeO 自动生成 · {formatTime(audit.finishedAt ?? audit.startedAt)} · 域名 {audit.domain}
+        {t("footer", { time: formatTime(audit.finishedAt ?? audit.startedAt, locale), domain: audit.domain })}
       </div>
     </div>
   );

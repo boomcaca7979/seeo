@@ -3,25 +3,32 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { useToast } from "@/components/dashboard/Toast";
-
-const PLAN_LABELS: Record<string, string> = {
-  free: "Free",
-  lite: "Lite",
-  pro: "Pro",
-};
+import { planLabel } from "@/lib/plan-labels";
 
 type NavItem = {
-  label: string;
+  labelKey:
+    | "overview"
+    | "keywordOverview"
+    | "keywordExpand"
+    | "positionTracking"
+    | "rankCheck"
+    | "audit"
+    | "competitors"
+    | "content"
+    | "backlinks"
+    | "reports"
+    | "settings";
   href: string;
   icon: React.ReactNode;
 };
 
 const navItems: NavItem[] = [
   {
-    label: "概览",
+    labelKey: "overview",
     href: "/app",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -33,7 +40,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "关键词概览",
+    labelKey: "keywordOverview",
     href: "/app/keyword-overview",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -43,7 +50,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "拓词建议",
+    labelKey: "keywordExpand",
     href: "/app/keyword-expand",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -52,7 +59,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "位置追踪",
+    labelKey: "positionTracking",
     href: "/app/position-tracking",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -63,7 +70,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "实时查排名",
+    labelKey: "rankCheck",
     href: "/app/rank-check",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -74,7 +81,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "技术审计",
+    labelKey: "audit",
     href: "/app/audit",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -89,7 +96,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "竞品分析",
+    labelKey: "competitors",
     href: "/app/competitors",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -101,7 +108,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "内容优化",
+    labelKey: "content",
     href: "/app/content",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -111,7 +118,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "外链分析",
+    labelKey: "backlinks",
     href: "/app/backlinks",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -122,7 +129,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "报告中心",
+    labelKey: "reports",
     href: "/app/reports",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -132,7 +139,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    label: "设置",
+    labelKey: "settings",
     href: "/app/settings",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
@@ -153,6 +160,8 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
   const [currentPlan, setCurrentPlan] = useState<string>("free");
   const pathname = usePathname();
   const { show, Toast } = useToast();
+  const t = useTranslations("dashboard.sidebar");
+  const locale = useLocale() as "en" | "zh";
 
   // 拉取当前用户套餐（用于显示套餐标识和升级 CTA）
   useEffect(() => {
@@ -173,7 +182,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
 
   const handleLogout = async () => {
     if (!isAuthEnabled) {
-      show("当前为演示模式，账号系统未启用", "info");
+      show(t("demoToast"), "info");
       return;
     }
     const supabase = createBrowser();
@@ -184,10 +193,10 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
     window.location.assign("/login");
   };
 
-  const userName = displayName ?? "本地开发";
-  const userEmail = email ?? "dev@seeo.local";
+  const userName = displayName ?? t("demoUser");
+  const userEmail = email ?? t("demoEmail");
   const avatarLetter = userName.charAt(0).toUpperCase();
-  const planLabel = PLAN_LABELS[currentPlan] ?? currentPlan;
+  const currentPlanLabel = planLabel(currentPlan, locale);
   // free / lite 显示升级 CTA；pro 不显示
   const showUpgradeCta = currentPlan === "free" || currentPlan === "lite";
 
@@ -220,7 +229,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.labelKey) : undefined}
               className={`group relative mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-line-soft font-semibold text-ink"
@@ -232,7 +241,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
               )}
               <span className="flex-shrink-0">{item.icon}</span>
               {!collapsed && (
-                <span className="whitespace-nowrap">{item.label}</span>
+                <span className="whitespace-nowrap">{t(item.labelKey)}</span>
               )}
             </Link>
           );
@@ -244,15 +253,15 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
         <div className="flex-none px-3 pb-2">
           <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] text-ink-40">当前套餐</span>
-              <span className="font-sans text-xs font-medium text-ink">{planLabel}</span>
+              <span className="font-mono text-[10px] text-ink-40">{t("currentPlan")}</span>
+              <span className="font-sans text-xs font-medium text-ink">{currentPlanLabel}</span>
             </div>
             {showUpgradeCta && (
               <Link
                 href="/pricing"
                 className="mt-2 block w-full rounded-md bg-ink py-1.5 text-center font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
               >
-                升级套餐 →
+                {t("upgradeCta")}
               </Link>
             )}
           </div>
@@ -262,7 +271,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
         <div className="flex-none px-2 pb-1">
           <Link
             href="/pricing"
-            title="升级套餐"
+            title={t("upgradeCta").replace(" →", "")}
             className="flex h-7 w-full items-center justify-center rounded bg-ink text-card"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
@@ -289,9 +298,9 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
             </div>
             <button
               onClick={handleLogout}
-              title="退出登录"
+              title={t("logout")}
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
-              aria-label="退出登录"
+              aria-label={t("logout")}
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                 <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -301,9 +310,9 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
         ) : (
           <button
             onClick={handleLogout}
-            title="退出登录"
+            title={t("logout")}
             className="mx-auto flex h-8 w-8 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
-            aria-label="退出登录"
+            aria-label={t("logout")}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -316,7 +325,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
       <button
         onClick={() => setCollapsed((c) => !c)}
         className="flex h-9 flex-none items-center justify-center border-t border-line text-ink-40 hover:bg-line-soft hover:text-ink"
-        aria-label={collapsed ? "展开侧边栏" : "折叠侧边栏"}
+        aria-label={collapsed ? t("expand") : t("collapse")}
       >
         <svg
           viewBox="0 0 24 24"

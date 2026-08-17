@@ -1,6 +1,7 @@
 import { createServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { getTranslations } from "next-intl/server";
 import { isAuthEnabled } from "@/lib/auth-config";
 import DashboardShell from "@/components/dashboard/DashboardShell";
 import type { DatabaseProfile } from "@/lib/types";
@@ -20,10 +21,11 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 演示模式：固定本地用户，不查 Supabase
+  // 演示模式：固定演示用户（本地化文案），不查 Supabase
   if (!isAuthEnabled) {
+    const t = await getTranslations("dashboard.sidebar");
     return (
-      <DashboardShell displayName="本地开发" email="dev@seeo.local">
+      <DashboardShell displayName={t("demoUser")} email={t("demoEmail")}>
         {children}
       </DashboardShell>
     );
@@ -51,7 +53,7 @@ export default async function DashboardLayout({
 
   const profile = profileData as DatabaseProfile | null;
   const displayName =
-    profile?.display_name || user.email?.split("@")[0] || "用户";
+    profile?.display_name || user.email?.split("@")[0] || "SeeO";
   const email = user.email ?? "";
 
   return (

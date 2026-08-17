@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -40,8 +41,10 @@ function formatDate(iso: string): string {
 
 /** 历史审计分数折线图（近 10 次） */
 export default function AuditScoreTrend({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length) {
-    return <ChartEmpty message="暂无历史分数" hint="审计 2 次以上显示趋势" />;
+    return <ChartEmpty message={t("scoreTrendEmpty")} hint={t("scoreTrendEmptyHint")} />;
   }
 
   const chartData = data.slice(-10).map((d) => ({
@@ -67,7 +70,7 @@ export default function AuditScoreTrend({ data }: Props) {
           contentStyle={CHART_TOOLTIP_STYLE}
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-          formatter={(v) => [`${v} 分`, "健康分"]}
+          formatter={(v) => [`${v} ${t("pointsUnit")}`, t("healthScoreLabel")]}
         />
         <Line
           type="monotone"

@@ -9,6 +9,14 @@ import type { ReactElement } from "react";
 
 vi.mock("@/lib/auth-config", () => ({ isAuthEnabled: true }));
 
+// i18n：详情页为 server component，使用 next-intl/server 的 getTranslations/getLocale；
+// 单测环境无 Next.js 请求上下文，mock 为返回 key 的最简实现。
+vi.mock("next-intl/server", () => ({
+  getTranslations: async () => (key: string, values?: Record<string, unknown>) =>
+    key + (values ? ` ${JSON.stringify(values)}` : ""),
+  getLocale: async () => "en",
+}));
+
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NOT_FOUND");

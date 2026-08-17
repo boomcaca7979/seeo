@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
-import zhMessages from "../../../messages/zh.json";
+import { localeToHtmlLang } from "@/i18n/config";
 import "../globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -74,23 +75,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+// 本布局承载 /app（dashboard）、/login、/signup、/payment 等无 [locale] 段路由：
+// UI locale 由 NEXT_LOCALE cookie → Accept-Language → en 解析（见 src/i18n/request.ts），
+// 同一 URL 下输出 EN/ZH，不做双 URL。
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = (await import(`../../../messages/${locale}.json`)).default;
+
   return (
     <html
-      lang="zh-CN"
+      lang={localeToHtmlLang[locale as "en" | "zh"] ?? "en"}
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-station text-y-text font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
         <JsonLd schema={organizationSchema()} />
         <JsonLd schema={websiteSchema()} />
-        {/* legacy 中文页固定 zh locale（静态，无动态 API），保证 Navbar 等
-            client 组件的 useTranslations 在无 [locale] 段的页面也能工作 */}
-        <NextIntlClientProvider locale="zh" messages={zhMessages}>
+        <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
         <CookieBanner />

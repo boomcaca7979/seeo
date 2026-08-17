@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
+import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
 
 interface BacklinkSummary {
   totalBacklinks: number | null;
@@ -31,23 +33,26 @@ interface BacklinkData {
   fromCache: boolean;
 }
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null, locale: Locale): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString("zh-CN", { hour12: false });
+    return d.toLocaleString(intlLocale(locale), { hour12: false });
   } catch {
     return iso;
   }
 }
 
-function formatNum(n: number | null): string {
+function formatNum(n: number | null, locale: Locale): string {
   if (n === null || n === undefined) return "—";
-  return n.toLocaleString("en-US");
+  return formatNumber(n, locale);
 }
 
 export default function BacklinksPage() {
+  const t = useTranslations("dashboard.backlinks");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as Locale;
   const { show, Toast } = useToast();
   const { features, loading: entitlementsLoading } = useEntitlements();
   const [domain, setDomain] = useState(() => {
@@ -75,14 +80,14 @@ export default function BacklinksPage() {
       if (res.ok) {
         setData(json.data ?? null);
       } else {
-        setError(json?.error ?? "加载失败");
+        setError(json?.error ?? t("loadFailed"));
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const initRef = useRef(false);
   useEffect(() => {
@@ -104,12 +109,12 @@ export default function BacklinksPage() {
   const handleAnalyze = async () => {
     const d = domain.trim();
     if (!d) {
-      show("请输入域名", "error");
+      show(t("errDomain"), "error");
       return;
     }
     setAnalyzing(true);
     setError(null);
-    show("正在拉取外链数据，预计 10-30 秒…", "info");
+    show(t("fetchingToast"), "info");
     try {
       const res = await fetch("/api/backlinks", {
         method: "POST",
@@ -118,7 +123,7 @@ export default function BacklinksPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "拉取失败");
+        const { message } = handleBillingError(json, t("fetchFailed"));
         setError(message);
         show(message, "error");
         return;
@@ -129,11 +134,11 @@ export default function BacklinksPage() {
         // ignore
       }
       setData(json.data);
-      show(json.data?.fromCache ? "命中缓存，未重复扣费" : "拉取完成", "success");
+      show(json.data?.fromCache ? t("cacheHitToast") : t("fetchDoneToast"), "success");
     } catch (e) {
       const msg = (e as Error).message;
       setError(msg);
-      show(`网络错误：${msg}`, "error");
+      show(`${tc("networkError")} ${msg}`, "error");
     } finally {
       setAnalyzing(false);
     }
@@ -141,10 +146,10 @@ export default function BacklinksPage() {
 
   const hasData = data !== null;
   const metrics = [
-    { label: "外链总数", value: hasData ? formatNum(data!.summary.totalBacklinks) : "—" },
-    { label: "引荐域名", value: hasData ? formatNum(data!.summary.referringDomains) : "—" },
-    { label: "权威度", value: hasData ? formatNum(data!.summary.domainRank) : "—" },
-    { label: "DoFollow 占比", value: hasData && data!.summary.dofollowPct !== null ? `${data!.summary.dofollowPct}%` : "—" },
+    { label: t("metricTotalBacklinks"), value: hasData ? formatNum(data!.summary.totalBacklinks, locale) : "—" },
+    { label: t("metricReferringDomains"), value: hasData ? formatNum(data!.summary.referringDomains, locale) : "—" },
+    { label: t("metricAuthority"), value: hasData ? formatNum(data!.summary.domainRank, locale) : "—" },
+    { label: t("metricDofollow"), value: hasData && data!.summary.dofollowPct !== null ? `${data!.summary.dofollowPct}%` : "—" },
   ];
 
   // Feature Gate：backlinks 为 Pro 专属功能
@@ -154,7 +159,7 @@ export default function BacklinksPage() {
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">04</span>
           <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-            外链分析
+            {t("title")}
           </h1>
           <div className="hairline flex-1" />
         </div>
@@ -164,12 +169,12 @@ export default function BacklinksPage() {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink">Pro 套餐专属功能</h2>
+          <h2 className="mt-5 font-display text-xl font-bold text-ink">{t("proTitle")}</h2>
           <p className="mt-2 font-sans text-sm text-ink-60">
-            外链分析需要升级到专业版（Pro）套餐，支持查看外链总数、引荐域名、权威度等数据。
+            {t("proDesc")}
           </p>
           <Link href="/pricing" className="mt-5 inline-block btn-primary px-6 py-2.5 text-sm">
-            升级到 Pro
+            {t("upgradeToPro")}
           </Link>
         </div>
       </div>
@@ -182,19 +187,19 @@ export default function BacklinksPage() {
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">04</span>
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          外链分析
+          {t("title")}
         </h1>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60">
-        数据来自 DataForSEO Backlinks API，覆盖外链总数、引荐域名、权威度、DoFollow 占比与外链明细。
+        {t("subtitle")}
       </p>
 
       {/* 工具栏 */}
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
-            <label className="font-sans text-xs text-ink-40">分析域名</label>
+            <label className="font-sans text-xs text-ink-40">{t("analyzeDomain")}</label>
             <DomainSelect
               value={domain}
               onChange={(d) => {
@@ -205,7 +210,7 @@ export default function BacklinksPage() {
             />
           </div>
           <button type="submit" className="btn-secondary">
-            查看
+            {t("viewBtn")}
           </button>
         </form>
         <button
@@ -219,10 +224,10 @@ export default function BacklinksPage() {
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                 <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
-              拉取中…
+              {t("analyzingBtn")}
             </>
           ) : (
-            "分析"
+            t("analyzeBtn")
           )}
         </button>
       </div>
@@ -241,10 +246,10 @@ export default function BacklinksPage() {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
-              <div className="font-display text-sm font-bold text-neg">拉取失败</div>
+              <div className="font-display text-sm font-bold text-neg">{t("fetchFailedTitle")}</div>
               <p className="mt-1 font-sans text-sm text-ink-60">{error}</p>
               {domain && (
-                <p className="mt-1 font-sans text-xs text-ink-40">域名：{domain}</p>
+                <p className="mt-1 font-sans text-xs text-ink-40">{t("domainIs", { domain })}</p>
               )}
             </div>
           </div>
@@ -272,25 +277,25 @@ export default function BacklinksPage() {
       {!loading && !error && hasData && (
         <div className="card-a mt-6 overflow-hidden">
           <div className="border-b border-line-soft px-4 py-3">
-            <span className="font-display text-sm font-bold text-ink">外链明细</span>
+            <span className="font-display text-sm font-bold text-ink">{t("detailsTitle")}</span>
             <span className="ml-2 font-mono text-xs text-ink-40">
-              共 {data!.backlinks.length} 条 · 按 source rank 降序
+              {t("detailsMeta", { n: data!.backlinks.length })}
             </span>
           </div>
           {data!.backlinks.length === 0 ? (
             <div className="px-4 py-10 text-center font-sans text-sm text-ink-40">
-              DataForSEO 未返回外链明细（该域名可能无外链或数据源未覆盖）
+              {t("detailsEmpty")}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">来源页面</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">锚文本</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">类型</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSource")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thAnchor")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thType")}</th>
                     <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">Rank</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">首次发现</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thFirstSeen")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -324,8 +329,8 @@ export default function BacklinksPage() {
             </div>
           )}
           <div className="border-t border-line-soft px-4 py-2 font-sans text-xs text-ink-40">
-            数据来自 DataForSEO · 抓取于 {formatTime(data!.cachedAt)}
-            {data!.fromCache && <span className="ml-2 text-ink-40">（缓存命中）</span>}
+            {t("dataFrom", { time: formatTime(data!.cachedAt, locale) })}
+            {data!.fromCache && <span className="ml-2 text-ink-40">{t("cacheHitNote")}</span>}
           </div>
         </div>
       )}
@@ -333,9 +338,9 @@ export default function BacklinksPage() {
       {/* 空态引导 */}
       {!loading && !error && !hasData && (
         <div className="card-a mt-6 p-10 text-center">
-          <div className="font-display text-sm font-bold text-ink-60">暂无外链数据</div>
+          <div className="font-display text-sm font-bold text-ink-60">{t("emptyTitle")}</div>
           <p className="mt-1.5 font-sans text-xs text-ink-40">
-            输入域名，点击「分析」拉取真实外链数据
+            {t("emptyDesc")}
           </p>
         </div>
       )}

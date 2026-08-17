@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import {
@@ -24,6 +25,7 @@ import ChartCard from "@/components/dashboard/charts/ChartCard";
 import SOVGroupBars from "@/components/dashboard/charts/SOVGroupBars";
 import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/charts/CompetitorRankBars";
 import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT } from "@/lib/project-selector";
+import { formatNumber, intlLocale } from "@/lib/ui-locale";
 
 interface Competitor {
   id: number;
@@ -108,7 +110,23 @@ function sovBarColor(pct: number): string {
   return "bg-neg";
 }
 
+// 地区/城市显示名（仅 UI 展示；API location 参数值保持中文原值不变）
+const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
+  zh: {},
+  en: {
+    "中国": "China", "美国": "United States", "英国": "United Kingdom",
+    "日本": "Japan", "香港": "Hong Kong", "台湾": "Taiwan",
+    "北京": "Beijing", "上海": "Shanghai", "广州": "Guangzhou", "深圳": "Shenzhen",
+    "纽约": "New York", "洛杉矶": "Los Angeles", "芝加哥": "Chicago",
+    "伦敦": "London", "曼彻斯特": "Manchester", "东京": "Tokyo", "大阪": "Osaka", "台北": "Taipei",
+  },
+};
+
 export default function CompetitorsPage() {
+  const t = useTranslations("dashboard.competitors");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
+  const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const { show, Toast } = useToast();
 
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -280,11 +298,11 @@ export default function CompetitorsPage() {
     e.preventDefault();
     const dm = addDomain.trim().replace(/^https?:\/\//, "").replace(/^www\./, "");
     if (!dm) {
-      show("请输入竞品域名", "error");
+      show(t("errDomain"), "error");
       return;
     }
     if (!projectId) {
-      show("请先在顶栏选择项目", "error");
+      show(t("errNoProject"), "error");
       return;
     }
     setAdding(true);
@@ -300,17 +318,17 @@ export default function CompetitorsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "添加失败");
+        const { message } = handleBillingError(json, t("addFailed"));
         show(message, "error");
         return;
       }
-      show(`已添加竞品：${dm}`, "success");
+      show(t("added", { domain: dm }), "success");
       setAddDomain("");
       setAddName("");
       if (json.usage) setUsage(json.usage);
       await loadCompetitors(projectId);
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(`${tc("networkError")} ${(err as Error).message}`, "error");
     } finally {
       setAdding(false);
     }
@@ -322,29 +340,29 @@ export default function CompetitorsPage() {
       const res = await fetch(`/api/competitors?id=${id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "删除失败");
+        const { message } = handleBillingError(json, t("deleteFailed"));
         show(message, "error");
         return;
       }
-      show("已删除竞品", "success");
+      show(t("deleted"), "success");
       if (json.usage) setUsage(json.usage);
       if (projectId) {
         await loadCompetitors(projectId);
         await loadSov(projectId);
       }
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(`${tc("networkError")} ${(err as Error).message}`, "error");
     }
   };
 
   // 刷新排名
   const handleRefreshRanks = async () => {
     if (selectedKeywordId === null) {
-      show("请先选择关键词", "info");
+      show(t("errNoKeyword"), "info");
       return;
     }
     if (competitors.length === 0) {
-      show("请先添加竞品域名", "info");
+      show(t("errNoCompetitors"), "info");
       return;
     }
     setRanksLoading(true);
@@ -356,7 +374,7 @@ export default function CompetitorsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "刷新失败");
+        const { message } = handleBillingError(json, t("refreshFailed"));
         show(message, "error");
         setRanks({ ...ranks, results: [] } as RanksData | null);
         return;
@@ -364,14 +382,14 @@ export default function CompetitorsPage() {
       setRanks(json.data);
       if (json.usage) setUsage(json.usage);
       if (json.data?.fromCache) {
-        show("命中缓存，未消耗额度", "info");
+        show(t("cacheHit"), "info");
       } else {
-        show("已刷新竞品排名（消耗 1 次额度）", "success");
+        show(t("refreshed"), "success");
       }
       // 刷新 SOV
       if (projectId) await loadSov(projectId);
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(`${tc("networkError")} ${(err as Error).message}`, "error");
     } finally {
       setRanksLoading(false);
     }
@@ -414,7 +432,7 @@ export default function CompetitorsPage() {
   // SOV 趋势图数据（基于当前 sov 结果，单点占位；历史数据需多次刷新积累）
   const sovTrendData = sov && sov.sov.length > 0
     ? [{
-        day: new Date().toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }),
+        day: new Date().toLocaleDateString(intlLocale(locale), { month: "2-digit", day: "2-digit" }),
         ...Object.fromEntries(sov.sov.map((s) => [s.domain, s.percentage])),
       }]
     : [];
@@ -446,19 +464,19 @@ export default function CompetitorsPage() {
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">06</span>
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          竞品分析
+          {t("title")}
         </h1>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60">
-        监控竞品在同一关键词下的排名表现，计算 SOV 份额。
+        {t("subtitle")}
       </p>
 
       {/* 项目未选择提示 */}
       {projectId === null && (
         <div className="card-a mt-6 p-6 text-center">
           <div className="font-sans text-sm text-ink-40">
-            请先在顶栏选择一个项目
+            {t("selectProjectFirst")}
           </div>
         </div>
       )}
@@ -466,7 +484,7 @@ export default function CompetitorsPage() {
       {/* SerpApi 额度用尽 banner */}
       {quotaExceeded && (
         <div className="mt-4 rounded-lg border border-neg/30 bg-neg/5 px-4 py-3 font-sans text-sm text-neg">
-          本月 SerpApi 额度已用尽，无法刷新竞品排名（{usage?.used}/{usage?.limit}）
+          {t("quotaExceeded", { used: formatNumber(usage?.used ?? 0, locale), limit: formatNumber(usage?.limit ?? 0, locale) })}
         </div>
       )}
 
@@ -476,7 +494,7 @@ export default function CompetitorsPage() {
           {usage && (
             <div className="card-a mt-4 flex items-center gap-3 px-4 py-2.5">
               <span className="font-mono text-xs font-semibold text-ink">
-                本月 API 用量 {usage.used}/{usage.limit}
+                {t("usageBar", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
               </span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
                 <div
@@ -485,10 +503,10 @@ export default function CompetitorsPage() {
                 />
               </div>
               {usagePercent > 70 && (
-                <span className="font-mono text-[10px] text-neg">额度紧张</span>
+                <span className="font-mono text-[10px] text-neg">{t("quotaTight")}</span>
               )}
               <span className="font-mono text-[10px] text-ink-40">
-                竞品 {competitors.length} 个 · 关键词 {keywords.length} 个
+                {t("countsSummary", { competitors: formatNumber(competitors.length, locale), keywords: formatNumber(keywords.length, locale) })}
               </span>
             </div>
           )}
@@ -497,10 +515,10 @@ export default function CompetitorsPage() {
           <div className="card-a mt-6 p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-base font-bold text-ink">
-                竞品域名管理
+                {t("manageTitle")}
               </h2>
               <span className="font-mono text-xs text-ink-40">
-                {competitors.length} 个竞品
+                {t("competitorCount", { n: formatNumber(competitors.length, locale) })}
               </span>
             </div>
 
@@ -509,14 +527,14 @@ export default function CompetitorsPage() {
                 type="text"
                 value={addDomain}
                 onChange={(e) => setAddDomain(e.target.value)}
-                placeholder="输入竞品域名，如 example.com"
+                placeholder={t("domainPlaceholder")}
                 className="flex-1 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
               <input
                 type="text"
                 value={addName}
                 onChange={(e) => setAddName(e.target.value)}
-                placeholder="名称（可选）"
+                placeholder={t("namePlaceholder")}
                 className="sm:w-40 rounded-lg border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
               <button
@@ -524,7 +542,7 @@ export default function CompetitorsPage() {
                 disabled={adding || quotaExceeded}
                 className="btn-primary disabled:opacity-60"
               >
-                {adding ? "添加中…" : "+ 添加竞品"}
+                {adding ? t("adding") : t("addBtn")}
               </button>
             </form>
 
@@ -538,7 +556,7 @@ export default function CompetitorsPage() {
                 </div>
               ) : competitors.length === 0 ? (
                 <div className="py-6 text-center font-mono text-xs text-ink-40">
-                  暂无竞品，添加后开始对比
+                  {t("noCompetitors")}
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -554,7 +572,7 @@ export default function CompetitorsPage() {
                       <button
                         onClick={() => setDeleteId(c.id)}
                         className="ml-0.5 text-ink-40 transition-colors hover:text-neg"
-                        aria-label={`删除 ${c.domain}`}
+                        aria-label={t("deleteAria", { domain: c.domain })}
                       >
                         ×
                       </button>
@@ -569,18 +587,18 @@ export default function CompetitorsPage() {
           <div className="card-a mt-6 p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-ink-40">关键词</label>
+                <label className="font-mono text-xs text-ink-40">{t("keywordLabel")}</label>
                 <select
                   value={selectedKeywordId ?? ""}
                   onChange={(e) => setSelectedKeywordId(Number(e.target.value))}
                   className="rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
                 >
                   {keywords.length === 0 ? (
-                    <option value="">暂无追踪关键词</option>
+                    <option value="">{t("noKeywords")}</option>
                   ) : (
                     keywords.map((k) => (
                       <option key={k.id} value={k.id}>
-                        {k.keyword} · {k.location} · {k.device}
+                        {k.keyword} · {display(k.location)} · {k.device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}
                       </option>
                     ))
                   )}
@@ -591,7 +609,7 @@ export default function CompetitorsPage() {
                 disabled={ranksLoading || selectedKeywordId === null || competitors.length === 0 || quotaExceeded}
                 className="btn-secondary disabled:opacity-60"
               >
-                {ranksLoading ? "刷新中…" : "刷新排名"}
+                {ranksLoading ? t("refreshing") : t("refreshBtn")}
               </button>
             </div>
 
@@ -612,10 +630,10 @@ export default function CompetitorsPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-line-soft bg-line-soft/40">
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">域名</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">排名</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">命中页面</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">状态</th>
+                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDomain")}</th>
+                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thRank")}</th>
+                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thUrl")}</th>
+                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thStatus")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -640,7 +658,7 @@ export default function CompetitorsPage() {
                                   {r.domain}
                                 </span>
                                 {r.is_self && (
-                                  <span className="badge-warn">本站</span>
+                                  <span className="badge-warn">{t("selfBadge")}</span>
                                 )}
                               </div>
                             </td>
@@ -666,13 +684,13 @@ export default function CompetitorsPage() {
                             </td>
                             <td className="px-4 py-3">
                               {r.is_self ? (
-                                <span className="font-mono text-[10px] text-ink-40">基准</span>
+                                <span className="font-mono text-[10px] text-ink-40">{t("statusBaseline")}</span>
                               ) : isCompBetter ? (
-                                <span className="font-mono text-[10px] text-neg">领先于我</span>
+                                <span className="font-mono text-[10px] text-neg">{t("statusAhead")}</span>
                               ) : isSelfBetter ? (
-                                <span className="font-mono text-[10px] text-pos">落后于我</span>
+                                <span className="font-mono text-[10px] text-pos">{t("statusBehind")}</span>
                               ) : (
-                                <span className="font-mono text-[10px] text-ink-40">持平</span>
+                                <span className="font-mono text-[10px] text-ink-40">{t("statusTied")}</span>
                               )}
                             </td>
                           </tr>
@@ -685,8 +703,8 @@ export default function CompetitorsPage() {
                 <div className="px-4 py-10 text-center">
                   <div className="font-mono text-xs text-ink-40">
                     {competitors.length === 0
-                      ? "请先添加竞品域名"
-                      : "点击「刷新排名」拉取 SERP 对比数据"}
+                      ? t("emptyAddFirst")
+                      : t("emptyRefreshHint")}
                   </div>
                 </div>
               )}
@@ -696,10 +714,10 @@ export default function CompetitorsPage() {
             {ranks && (
               <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-ink-40">
                 <span>
-                  关键词「{ranks.keyword}」· {ranks.fromCache ? "缓存数据 · 24h 内不重复计费" : "实时数据 · 已消耗 1 次额度"}
+                  {t("tableKeyword", { keyword: ranks.keyword })} · {ranks.fromCache ? t("cachedHint") : t("liveHint")}
                 </span>
                 <span>
-                  共 {ranks.results.length} 个域名对比
+                  {t("domainsCompared", { n: formatNumber(ranks.results.length, locale) })}
                 </span>
               </div>
             )}
@@ -721,7 +739,7 @@ export default function CompetitorsPage() {
                   const mySov = sov.sov.find((s) => s.domain === sov.projectDomain) ?? sov.sov[0];
                   return (
                     <div className="card-a p-5">
-                      <div className="font-mono text-xs text-ink-40">我的 SOV</div>
+                      <div className="font-mono text-xs text-ink-40">{t("mySov")}</div>
                       <div className={`mt-1 font-mono text-2xl font-bold ${sovColor(mySov.percentage)}`}>
                         {mySov.percentage}%
                       </div>
@@ -732,14 +750,14 @@ export default function CompetitorsPage() {
                         />
                       </div>
                       <div className="mt-1.5 font-mono text-[10px] text-ink-40">
-                        得分 {mySov.score} · 关键词 {mySov.keywordCount} 个
+                        {t("mySovDetail", { score: formatNumber(mySov.score, locale), keywords: formatNumber(mySov.keywordCount, locale) })}
                       </div>
                     </div>
                   );
                 })()}
                 {/* Top 1 关键词数 */}
                 <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">Top 3 关键词数</div>
+                  <div className="font-mono text-xs text-ink-40">{t("top3Keywords")}</div>
                   <div className="mt-1 font-mono text-2xl font-bold text-pos">
                     {(() => {
                       const my = sov.sov.find((s) => s.domain === sov.projectDomain);
@@ -747,12 +765,12 @@ export default function CompetitorsPage() {
                     })()}
                   </div>
                   <div className="mt-1.5 font-mono text-[10px] text-ink-40">
-                    进入前 10 的关键词数
+                    {t("top10Hint")}
                   </div>
                 </div>
                 {/* 平均排名 */}
                 <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">我的平均排名</div>
+                  <div className="font-mono text-xs text-ink-40">{t("myAvgRank")}</div>
                   <div className="mt-1 font-mono text-2xl font-bold text-ink">
                     {(() => {
                       const my = sov.sov.find((s) => s.domain === sov.projectDomain);
@@ -760,24 +778,24 @@ export default function CompetitorsPage() {
                     })()}
                   </div>
                   <div className="mt-1.5 font-mono text-[10px] text-ink-40">
-                    所有已分析关键词均值
+                    {t("avgRankHint")}
                   </div>
                 </div>
                 {/* 竞品数量 */}
                 <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">竞品数量</div>
+                  <div className="font-mono text-xs text-ink-40">{t("competitorCountLabel")}</div>
                   <div className="mt-1 font-mono text-2xl font-bold text-ink">
                     {sov.competitorCount}
                   </div>
                   <div className="mt-1.5 font-mono text-[10px] text-ink-40">
-                    已分析 {sov.analyzedKeywords}/{sov.totalKeywords} 个关键词
+                    {t("analyzedKeywords", { analyzed: formatNumber(sov.analyzedKeywords, locale), total: formatNumber(sov.totalKeywords, locale) })}
                   </div>
                 </div>
               </>
             ) : (
               <div className="card-a col-span-full p-6 text-center">
                 <div className="font-mono text-xs text-ink-40">
-                  暂无 SOV 数据，请先添加竞品并刷新排名
+                  {t("noSov")}
                 </div>
               </div>
             )}
@@ -787,16 +805,16 @@ export default function CompetitorsPage() {
           {sov && sov.sov.length > 0 && (
             <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
               <ChartCard
-                title="SOV 份额对比"
-                subtitle="自己 vs 各竞品并排"
+                title={t("sovChartTitle")}
+                subtitle={t("sovChartSubtitle")}
                 height={Math.max(220, sovBarData.length * 32 + 80)}
                 className="lg:col-span-6"
               >
                 <SOVGroupBars data={sovBarData} />
               </ChartCard>
               <ChartCard
-                title="关键词排名对比"
-                subtitle={ranks ? `关键词：${ranks.keyword}` : "选择关键词并刷新后显示"}
+                title={t("rankChartTitle")}
+                subtitle={ranks ? t("rankChartSubtitle", { keyword: ranks.keyword }) : t("rankChartSubtitleEmpty")}
                 height={Math.max(220, rankBarData.length * 40 + 80)}
                 className="lg:col-span-6"
               >
@@ -810,19 +828,19 @@ export default function CompetitorsPage() {
             <div className="card-a mt-6 overflow-hidden">
               <div className="border-b border-line-soft px-5 py-3">
                 <h2 className="font-display text-sm font-bold text-ink">
-                  SOV 份额明细
+                  {t("sovDetailTitle")}
                 </h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-line-soft bg-line-soft/40">
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">域名</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">SOV 份额</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">得分</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">平均排名</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">Top 10 数</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">关键词数</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDomain")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSov")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thScore")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thAvgRank")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thTop10")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKeywords")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -840,7 +858,7 @@ export default function CompetitorsPage() {
                               <span className={`font-mono text-sm ${isSelf ? "font-semibold text-brand" : "text-ink"}`}>
                                 {s.domain}
                               </span>
-                              {isSelf && <span className="badge-warn">本站</span>}
+                              {isSelf && <span className="badge-warn">{t("selfBadge")}</span>}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -879,10 +897,10 @@ export default function CompetitorsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-display text-base font-bold text-ink">
-                    SOV 趋势
+                    {t("sovTrendTitle")}
                   </h2>
                   <p className="mt-0.5 font-mono text-xs text-ink-40">
-                    各域名 SOV 百分比变化 · 多次刷新积累历史数据
+                    {t("sovTrendSubtitle")}
                   </p>
                 </div>
               </div>
@@ -923,8 +941,8 @@ export default function CompetitorsPage() {
                 ) : (
                   <div className="flex h-full items-center justify-center font-mono text-xs text-ink-40">
                     {sov.sov.length <= 1
-                      ? "至少需要 1 个竞品才能对比 SOV 趋势"
-                      : "暂无历史数据，多次刷新排名后显示趋势"}
+                      ? t("trendNeedCompetitor")
+                      : t("trendNoHistory")}
                   </div>
                 )}
               </div>
@@ -939,11 +957,11 @@ export default function CompetitorsPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteId(null)} aria-hidden />
           <div className="relative w-full max-w-sm rounded-xl border border-line bg-card">
             <div className="border-b border-line-soft px-5 py-4">
-              <h3 className="font-display text-base font-bold text-ink">确认删除</h3>
+              <h3 className="font-display text-base font-bold text-ink">{t("deleteConfirmTitle")}</h3>
             </div>
             <div className="px-5 py-4">
               <p className="font-sans text-sm text-ink-60">
-                删除后将同时清除该竞品的所有排名记录，无法恢复。确定继续？
+                {t("deleteConfirmBody")}
               </p>
             </div>
             <div className="flex justify-end gap-2 border-t border-line-soft px-5 py-4">
@@ -951,7 +969,7 @@ export default function CompetitorsPage() {
                 onClick={() => setDeleteId(null)}
                 className="btn-secondary"
               >
-                取消
+                {tc("cancel")}
               </button>
               <button
                 onClick={() => {
@@ -960,7 +978,7 @@ export default function CompetitorsPage() {
                 }}
                 className="rounded-lg bg-neg px-4 py-2 font-sans text-sm font-semibold text-paper transition-opacity hover:opacity-90"
               >
-                确认删除
+                {t("deleteConfirmBtn")}
               </button>
             </div>
           </div>

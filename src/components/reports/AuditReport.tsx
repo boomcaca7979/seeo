@@ -1,5 +1,8 @@
 // 审计报告模板（用于 PDF 渲染）
 
+import { useTranslations, useLocale } from "next-intl";
+import { formatNumber } from "@/lib/ui-locale";
+
 export interface AuditReportProps {
   projectName: string;
   domain: string;
@@ -29,12 +32,6 @@ const cardStyle: React.CSSProperties = {
   padding: 16,
 };
 
-const severityLabel = (s: string): string => {
-  if (s === "error") return "错误";
-  if (s === "warning") return "警告";
-  return "提示";
-};
-
 const severityColor = (s: string): string => {
   if (s === "error") return COLORS.neg;
   if (s === "warning") return COLORS.warn;
@@ -42,6 +39,13 @@ const severityColor = (s: string): string => {
 };
 
 export default function AuditReport({ projectName, domain, healthScore, issues, coverage, generatedAt }: AuditReportProps) {
+  const t = useTranslations("dashboard.pdf.audit");
+  const locale = useLocale() as "en" | "zh";
+  const severityLabel = (s: string): string => {
+    if (s === "error") return t("severityError");
+    if (s === "warning") return t("severityWarning");
+    return t("severityNotice");
+  };
   const errors = issues.filter((i) => i.severity === "error").length;
   const warnings = issues.filter((i) => i.severity === "warning").length;
   const notices = issues.filter((i) => i.severity === "notice" || i.severity === "info").length;
@@ -61,47 +65,47 @@ export default function AuditReport({ projectName, domain, healthScore, issues, 
     >
       {/* 封面 */}
       <div style={{ borderBottom: `2px solid ${COLORS.ink}`, paddingBottom: 16, marginBottom: 24 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>SeeO · 技术审计报告</div>
+        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>{t("docLabel")}</div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: "8px 0 4px" }}>{projectName}</h1>
         <div style={{ fontSize: 13, color: COLORS.ink60 }}>{domain}</div>
         <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40, marginTop: 4 }}>
-          生成时间：{generatedAt}
+          {t("generatedAt", { time: generatedAt })}
         </div>
       </div>
 
       {/* 健康分 + 统计 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 3fr", gap: 12, marginBottom: 24 }}>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>健康分</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("healthScore")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 42, fontWeight: 700, color: scoreColor, marginTop: 4 }}>
             {healthScore}
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>/ 100</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-          <SummaryCard label="错误" value={errors} color={COLORS.neg} />
-          <SummaryCard label="警告" value={warnings} color={COLORS.warn} />
-          <SummaryCard label="提示" value={notices} color={COLORS.ink60} />
+          <SummaryCard label={t("summaryErrors")} value={formatNumber(errors, locale)} color={COLORS.neg} />
+          <SummaryCard label={t("summaryWarnings")} value={formatNumber(warnings, locale)} color={COLORS.warn} />
+          <SummaryCard label={t("summaryNotices")} value={formatNumber(notices, locale)} color={COLORS.ink60} />
         </div>
       </div>
 
       {/* 问题清单 */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>问题清单（共 {issues.length} 项）</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("issuesTitle", { count: issues.length })}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.line}`, textAlign: "left" }}>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>级别</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>类型</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>URL</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>详情</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thSeverity")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thType")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thUrl")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thDetail")}</th>
             </tr>
           </thead>
           <tbody>
             {issues.length === 0 ? (
               <tr>
                 <td colSpan={4} style={{ padding: 16, textAlign: "center", color: COLORS.pos }}>
-                  ✓ 未发现明显问题
+                  {t("noIssues")}
                 </td>
               </tr>
             ) : (
@@ -125,7 +129,7 @@ export default function AuditReport({ projectName, domain, healthScore, issues, 
       {/* 检查项覆盖 */}
       <div style={cardStyle}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-          检查项覆盖（{passedCount}/{coverage.length} 通过）
+          {t("coverageTitle", { passed: passedCount, total: coverage.length })}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
           {coverage.map((c) => (
@@ -150,7 +154,7 @@ export default function AuditReport({ projectName, domain, healthScore, issues, 
       </div>
 
       <div style={{ marginTop: 24, fontFamily: "monospace", fontSize: 10, color: COLORS.ink40, textAlign: "center" }}>
-        本报告由 SeeO 自动生成 · 基于 20+ 项技术 SEO 检查
+        {t("footer")}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { useToast } from "@/components/dashboard/Toast";
@@ -12,6 +13,8 @@ interface AuthFormProps {
 }
 
 export default function AuthForm({ mode }: AuthFormProps) {
+  const t = useTranslations("dashboard.authForm");
+  const tc = useTranslations("dashboard.common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { show, Toast } = useToast();
@@ -32,10 +35,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const validate = (): string | null => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return "邮箱格式不正确";
+      return t("errInvalidEmail");
     }
     if (password.length < 8) {
-      return "密码至少 8 位";
+      return t("errPasswordShort");
     }
     return null;
   };
@@ -52,7 +55,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
     // 演示模式：不调用 Supabase，仅 toast 提示
     if (!isAuthEnabled) {
-      show("当前为演示模式，数据不会保存", "info");
+      show(tc("demoModeNoSave"), "info");
       return;
     }
 
@@ -66,7 +69,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       });
       if (signUpError) {
         setError(signUpError.message === "User already registered"
-          ? "这个邮箱已注册，请直接登录"
+          ? t("errAlreadyRegistered")
           : signUpError.message);
         setLoading(false);
         return;
@@ -83,7 +86,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
       password,
     });
     if (signInError) {
-      setError("邮箱或密码不正确");
+      setError(t("errInvalidCredentials"));
       setLoading(false);
       return;
     }
@@ -97,7 +100,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         {/* 演示模式横幅 */}
         {!isAuthEnabled && (
           <div className="mb-4 rounded-lg border border-gold/40 bg-gold/15 px-4 py-2.5 text-center font-sans text-xs font-medium text-gold">
-            演示模式 · 账号系统未启用
+            {t("demoBanner")}
           </div>
         )}
 
@@ -114,18 +117,18 @@ export default function AuthForm({ mode }: AuthFormProps) {
           </div>
 
           <h1 className="mt-6 text-center font-display text-xl font-bold text-d-text">
-            {isSignup ? "创建你的账号" : "欢迎回来"}
+            {isSignup ? t("signupTitle") : t("loginTitle")}
           </h1>
           <p className="mt-1.5 text-center font-sans text-sm text-d-secondary">
             {isSignup
-              ? "注册后立即开始分析你的网站"
-              : "登录继续查看你的搜索数据"}
+              ? t("signupSubtitle")
+              : t("loginSubtitle")}
           </p>
 
           {/* 表单 */}
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="font-mono text-xs text-d-muted">邮箱</label>
+              <label className="font-mono text-xs text-d-muted">{t("email")}</label>
               <input
                 type="email"
                 value={email}
@@ -136,12 +139,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
               />
             </div>
             <div>
-              <label className="font-mono text-xs text-d-muted">密码</label>
+              <label className="font-mono text-xs text-d-muted">{t("password")}</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={isSignup ? "至少 8 位" : "输入密码"}
+                placeholder={isSignup ? t("passwordPlaceholderSignup") : t("passwordPlaceholderLogin")}
                 autoComplete={isSignup ? "new-password" : "current-password"}
                 className="mt-1.5 w-full rounded-lg border border-d-muted/15 bg-ink-elevated px-3 py-2.5 font-sans text-sm text-d-text placeholder:text-d-muted focus:border-gold/50 focus:outline-none"
               />
@@ -159,10 +162,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
               className="w-full rounded-lg bg-gold px-4 py-2.5 font-sans text-sm font-semibold text-ink transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {loading
-                ? "处理中…"
+                ? t("processing")
                 : isSignup
-                  ? "注册并开始使用"
-                  : "登录"}
+                  ? t("signupBtn")
+                  : t("loginBtn")}
             </button>
           </form>
 
@@ -170,16 +173,16 @@ export default function AuthForm({ mode }: AuthFormProps) {
           <p className="mt-6 text-center font-sans text-xs text-d-secondary">
             {isSignup ? (
               <>
-                已有账号？{" "}
+                {t("hasAccount")}{" "}
                 <Link href={switchHrefWithRedirect} className="font-medium text-gold hover:underline">
-                  直接登录
+                  {t("loginLink")}
                 </Link>
               </>
             ) : (
               <>
-                还没注册？{" "}
+                {t("noAccount")}{" "}
                 <Link href={switchHrefWithRedirect} className="font-medium text-gold hover:underline">
-                  创建账号
+                  {t("signupLink")}
                 </Link>
               </>
             )}

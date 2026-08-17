@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TICK_STYLE,
@@ -35,8 +36,10 @@ interface Props {
 
 /** 相关词搜索量横向条形图（量级对比） */
 export default function RelatedKeywordBars({ data, topN = 15 }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length || data.every((d) => d.volume === 0)) {
-    return <ChartEmpty message="暂无相关词数据" hint="分析后显示相关词量级" />;
+    return <ChartEmpty message={t("relatedEmpty")} hint={t("relatedEmptyHint")} />;
   }
 
   const chartData = [...data]
@@ -79,7 +82,7 @@ export default function RelatedKeywordBars({ data, topN = 15 }: Props) {
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
           cursor={{ fill: "rgba(17,24,39,.04)" }}
-          formatter={(v) => [`${formatNumber(Number(v))}`, "搜索量"]}
+          formatter={(v) => [`${formatNumber(Number(v))}`, t("searchVolumeLabel")]}
         />
         <Bar dataKey="volume" radius={[0, 4, 4, 0]} maxBarSize={18}>
           {chartData.map((d, i) => {

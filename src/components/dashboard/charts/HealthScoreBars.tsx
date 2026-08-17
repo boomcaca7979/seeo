@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -37,8 +38,10 @@ function colorOf(score: number): string {
 
 /** 各项目健康分横向条形图（按分数排序） */
 export default function HealthScoreBars({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length) {
-    return <ChartEmpty message="暂无项目健康分" hint="审计项目后显示" />;
+    return <ChartEmpty message={t("healthEmpty")} hint={t("healthEmptyHint")} />;
   }
 
   const chartData = [...data]
@@ -50,7 +53,7 @@ export default function HealthScoreBars({ data }: Props) {
     }));
 
   if (!chartData.length) {
-    return <ChartEmpty message="暂无审计结果" hint="项目审计后显示健康分" />;
+    return <ChartEmpty message={t("auditResultEmpty")} hint={t("auditResultEmptyHint")} />;
   }
 
   return (
@@ -81,7 +84,7 @@ export default function HealthScoreBars({ data }: Props) {
           labelStyle={CHART_TOOLTIP_LABEL_STYLE}
           itemStyle={CHART_TOOLTIP_ITEM_STYLE}
           cursor={{ fill: "rgba(17,24,39,.04)" }}
-          formatter={(v) => [`${v} 分`, "健康分"]}
+          formatter={(v) => [`${v} ${t("pointsUnit")}`, t("healthScoreLabel")]}
         />
         <Bar dataKey="score" radius={[0, 4, 4, 0]} maxBarSize={22}>
           {chartData.map((d, i) => (

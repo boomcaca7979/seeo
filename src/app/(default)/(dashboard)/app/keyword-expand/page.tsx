@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
+import { formatNumber } from "@/lib/ui-locale";
 
 interface UsageBadge {
   used: number;
@@ -35,13 +37,33 @@ interface ExpandState {
 const KEYWORD_LOCATIONS = ["中国", "美国", "英国", "日本", "香港", "台湾"];
 type Device = "PC" | "移动端";
 
+// 地区/城市显示名（仅 UI 展示；API location 参数值保持中文原值不变）
+const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
+  zh: {},
+  en: {
+    "中国": "China", "美国": "United States", "英国": "United Kingdom",
+    "日本": "Japan", "香港": "Hong Kong", "台湾": "Taiwan",
+  },
+};
+
 export function detectIntent(query: string): string {
   if (/什么|怎么|为什么|如何|是不是|哪些/.test(query)) return "信息型";
   if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(query)) return "商业型";
   return "导航型";
 }
 
+// 意图显示名（detectIntent 返回值保持中文原值，仅展示时翻译）
+function intentText(t: ReturnType<typeof useTranslations>, value: string): string {
+  if (value === "信息型") return t("intentInformational");
+  if (value === "商业型") return t("intentCommercial");
+  return t("intentNavigational");
+}
+
 export default function KeywordExpandPage() {
+  const t = useTranslations("dashboard.keywords.expand");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
+  const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const [searchValue, setSearchValue] = useState("");
   const [location, setLocation] = useState("中国");
   const [device, setDevice] = useState<Device>("PC");
@@ -55,7 +77,7 @@ export default function KeywordExpandPage() {
     e.preventDefault();
     const kw = searchValue.trim();
     if (!kw) {
-      show("请输入关键词", "error");
+      show(t("errKeyword"), "error");
       return;
     }
     setSerp({ loading: true, data: null, error: null, keyword: kw });
@@ -68,7 +90,7 @@ export default function KeywordExpandPage() {
         );
         const json = await res.json();
         if (!res.ok) {
-          const { message } = handleBillingError(json, "查询失败");
+          const { message } = handleBillingError(json, t("queryFailed"));
           setSerp({ loading: false, data: null, error: message, keyword: kw });
           show(message, "error");
           return;
@@ -76,7 +98,7 @@ export default function KeywordExpandPage() {
         setSerp({ loading: false, data: json.data, error: null, keyword: kw });
         if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
       } catch (err) {
-        const msg = `网络错误：${(err as Error).message}`;
+        const msg = `${tc("networkError")} ${(err as Error).message}`;
         setSerp({ loading: false, data: null, error: msg, keyword: kw });
         show(msg, "error");
       }
@@ -91,14 +113,14 @@ export default function KeywordExpandPage() {
         });
         const json = await res.json();
         if (!res.ok) {
-          const { message } = handleBillingError(json, "拓词失败");
+          const { message } = handleBillingError(json, t("expandFailed"));
           setExpand({ loading: false, data: null, error: message });
           return;
         }
         setExpand({ loading: false, data: json.data, error: null });
         if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
       } catch (err) {
-        setExpand({ loading: false, data: null, error: `拓词网络错误：${(err as Error).message}` });
+        setExpand({ loading: false, data: null, error: `${t("expandNetworkError")}${(err as Error).message}` });
       }
     })();
 
@@ -107,7 +129,7 @@ export default function KeywordExpandPage() {
 
   const handleTrackFromExpand = async (keyword: string) => {
     if (trackingIds[keyword]) {
-      show("该词已在追踪中", "info");
+      show(t("alreadyTracking"), "info");
       return;
     }
     setTrackingIds((prev) => ({ ...prev, [keyword]: true }));
@@ -117,7 +139,7 @@ export default function KeywordExpandPage() {
       const userProjects: { domain?: string }[] = projJson?.data ?? [];
       const firstDomain = userProjects[0]?.domain?.trim();
       if (!firstDomain) {
-        show("请先在概览页创建项目，再添加追踪", "error");
+        show(t("noProject"), "error");
         setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
         return;
       }
@@ -128,15 +150,15 @@ export default function KeywordExpandPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "添加失败");
+        const { message } = handleBillingError(json, t("addFailed"));
         show(message, "error");
         setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
         return;
       }
-      show(`已添加追踪：${keyword}`, "success");
+      show(t("trackAdded", { keyword }), "success");
       if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(`${tc("networkError")} ${(err as Error).message}`, "error");
       setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
     }
   };
@@ -152,9 +174,9 @@ export default function KeywordExpandPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
-      <h1 className="text-[28px] font-semibold leading-tight text-ink">拓词建议</h1>
+      <h1 className="text-[28px] font-semibold leading-tight text-ink">{t("title")}</h1>
       <p className="mt-1 text-sm text-ink-60">
-        输入种子词，获取 Google 相关搜索、People Also Ask 与可追踪的相关关键词。
+        {t("subtitle")}
       </p>
 
       {/* 搜索框 */}
@@ -166,7 +188,7 @@ export default function KeywordExpandPage() {
             className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             {KEYWORD_LOCATIONS.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>{display(c)}</option>
             ))}
           </select>
           <select
@@ -175,7 +197,7 @@ export default function KeywordExpandPage() {
             className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             <option value="PC">PC</option>
-            <option value="移动端">移动端</option>
+            <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
           </select>
         </div>
         <div className="relative flex-1">
@@ -187,18 +209,18 @@ export default function KeywordExpandPage() {
             type="text"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="输入关键词，如：SEO工具、网站建设"
+            placeholder={t("searchPlaceholder")}
             className="w-full rounded-lg border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <button type="submit" disabled={serp.loading} className="btn-primary px-6 py-3">
-          {serp.loading ? "分析中…" : "分析"}
+          {serp.loading ? t("analyzing") : t("analyze")}
         </button>
       </form>
 
       {usage && (
         <div className="mt-4 text-xs text-ink-40">
-          本月 API 已用 {usage.used}/{usage.limit}
+          {t("usage", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
         </div>
       )}
 
@@ -210,8 +232,8 @@ export default function KeywordExpandPage() {
               <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </div>
-          <div className="mt-3 text-sm font-medium text-ink">输入种子词，点击分析拉取拓词建议</div>
-          <p className="mt-1 text-xs text-ink-40">包含 Google 相关搜索 + People Also Ask，可一键加入追踪</p>
+          <div className="mt-3 text-sm font-medium text-ink">{t("emptyTitle")}</div>
+          <p className="mt-1 text-xs text-ink-40">{t("emptyHint")}</p>
         </div>
       )}
 
@@ -219,9 +241,9 @@ export default function KeywordExpandPage() {
       {(expand.loading || expand.data || expand.error) && (
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-semibold text-ink">拓词建议</h2>
+            <h2 className="text-[17px] font-semibold text-ink">{t("title")}</h2>
             <span className="text-xs text-ink-40">
-              {expand.data ? `共 ${expandTotal} 个拓词建议` : expand.loading ? "拉取中…" : ""}
+              {expand.data ? t("totalCount", { count: formatNumber(expandTotal, locale) }) : expand.loading ? t("fetching") : ""}
             </span>
           </div>
 
@@ -236,11 +258,11 @@ export default function KeywordExpandPage() {
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="card-a p-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-ink">相关搜索</h3>
-                  <span className="text-xs text-ink-40">{expand.data.related.length} 个</span>
+                  <h3 className="text-sm font-semibold text-ink">{t("relatedTitle")}</h3>
+                  <span className="text-xs text-ink-40">{t("countItems", { count: formatNumber(expand.data.related.length, locale) })}</span>
                 </div>
                 {expand.data.related.length === 0 ? (
-                  <div className="mt-4 py-6 text-center text-xs text-ink-40">暂无相关搜索数据</div>
+                  <div className="mt-4 py-6 text-center text-xs text-ink-40">{t("noRelated")}</div>
                 ) : (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {expand.data.related.map((q) => (
@@ -251,11 +273,11 @@ export default function KeywordExpandPage() {
               </div>
               <div className="card-a p-5">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-ink">People Also Ask</h3>
-                  <span className="text-xs text-ink-40">{expand.data.paa.length} 个</span>
+                  <h3 className="text-sm font-semibold text-ink">{t("paaTitle")}</h3>
+                  <span className="text-xs text-ink-40">{t("countItems", { count: formatNumber(expand.data.paa.length, locale) })}</span>
                 </div>
                 {expand.data.paa.length === 0 ? (
-                  <div className="mt-4 py-6 text-center text-xs text-ink-40">暂无 PAA 数据</div>
+                  <div className="mt-4 py-6 text-center text-xs text-ink-40">{t("noPaa")}</div>
                 ) : (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {expand.data.paa.map((q) => (
@@ -273,8 +295,8 @@ export default function KeywordExpandPage() {
       {(serp.loading || (serp.data && serp.data.relatedSearches.length > 0) || serp.error) && (
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-semibold text-ink">相关关键词</h2>
-            <span className="text-xs text-ink-40">来自 SERP 相关搜索</span>
+            <h2 className="text-[17px] font-semibold text-ink">{t("relatedKeywordsTitle")}</h2>
+            <span className="text-xs text-ink-40">{t("relatedKeywordsSource")}</span>
           </div>
           <div className="card-a mt-3 overflow-hidden">
             {serp.loading ? (
@@ -282,15 +304,15 @@ export default function KeywordExpandPage() {
             ) : serp.error ? (
               <div className="p-6 text-center text-sm text-neg">{serp.error}</div>
             ) : relatedRows.length === 0 ? (
-              <div className="p-6 text-center text-sm text-ink-40">暂无相关关键词</div>
+              <div className="p-6 text-center text-sm text-ink-40">{t("noRelatedKeywords")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-line-soft bg-line-soft/50">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">关键词</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">意图（估算）</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-ink-40">操作</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colKeyword")}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colIntent")}</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-ink-40">{t("colAction")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,14 +320,14 @@ export default function KeywordExpandPage() {
                       <tr key={r.keyword} className="border-b border-line-soft/60 transition-colors hover:bg-line-soft/40">
                         <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
                         <td className="px-4 py-3">
-                          <span className="rounded bg-line-soft px-2 py-0.5 text-xs text-ink-60">{r.intent}</span>
+                          <span className="rounded bg-line-soft px-2 py-0.5 text-xs text-ink-60">{intentText(t, r.intent)}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleTrackFromExpand(r.keyword)}
                             className="text-xs font-medium text-accent hover:underline"
                           >
-                            + 追踪
+                            {t("trackAction")}
                           </button>
                         </td>
                       </tr>
@@ -324,18 +346,19 @@ export default function KeywordExpandPage() {
 }
 
 function ExpandTag({ query, tracked, onTrack }: { query: string; tracked: boolean; onTrack: () => void }) {
+  const t = useTranslations("dashboard.keywords.expand");
   const intent = detectIntent(query);
   return (
     <div className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card pl-3 pr-1.5 py-1">
       <span className="text-xs text-ink">{query}</span>
-      <span className="text-[10px] text-ink-40">{intent}</span>
+      <span className="text-[10px] text-ink-40">{intentText(t, intent)}</span>
       <button
         onClick={onTrack}
         disabled={tracked}
         className={`rounded-full px-1.5 py-0.5 text-[10px] transition-colors ${
           tracked ? "bg-pos/15 text-pos" : "bg-line-soft text-ink-60 hover:bg-ink hover:text-card"
         }`}
-        title={tracked ? "已加入追踪" : "加入追踪"}
+        title={tracked ? t("trackedTitle") : t("trackTitle")}
       >
         {tracked ? "✓" : "+"}
       </button>

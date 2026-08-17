@@ -1,15 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 interface ChartEmptyProps {
   message?: string;
   hint?: string;
 }
 
 /** 图表空态：无数据时统一显示 */
-export default function ChartEmpty({
-  message = "暂无数据",
-  hint,
-}: ChartEmptyProps) {
+export default function ChartEmpty({ message, hint }: ChartEmptyProps) {
+  const t = useTranslations("dashboard.shared.charts");
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-40">
@@ -17,7 +17,7 @@ export default function ChartEmpty({
           <path d="M3 12h18M12 3v18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.3" />
         </svg>
       </div>
-      <div className="mt-2 text-xs font-medium text-ink-60">{message}</div>
+      <div className="mt-2 text-xs font-medium text-ink-60">{message ?? t("noData")}</div>
       {hint && <div className="mt-0.5 text-[10px] text-ink-40">{hint}</div>}
     </div>
   );

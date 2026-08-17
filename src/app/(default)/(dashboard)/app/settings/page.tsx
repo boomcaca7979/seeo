@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
 import { handleBillingError } from "@/lib/billing-error-client";
+import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
+import { PLAN_LABELS, planLabel, FEATURE_LABELS, featureLabel } from "@/lib/plan-labels";
 
 type TabKey = "account" | "plan" | "usage" | "automation";
 
@@ -38,17 +41,19 @@ interface PlanInfo {
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
-function formatLimitValue(v: number): string {
-  if (v >= UNLIMITED) return "无限";
-  return v.toLocaleString();
+type SettingsTranslator = (key: string, values?: Record<string, string | number>) => string;
+
+function formatLimitValue(v: number, locale: Locale, t: SettingsTranslator): string {
+  if (v >= UNLIMITED) return t("unlimited");
+  return formatNumber(v, locale);
 }
 
-function buildPlanLimits(p: PlanInfo): { label: string; value: string }[] {
+function buildPlanLimits(p: PlanInfo, locale: Locale, t: SettingsTranslator): { label: string; value: string }[] {
   return [
-    { label: "项目数", value: formatLimitValue(p.max_projects) },
-    { label: "关键词追踪", value: formatLimitValue(p.max_tracked_keywords) },
-    { label: "每日审计", value: p.audit_daily_limit >= UNLIMITED ? "无限" : `${p.audit_daily_limit} 次` },
-    { label: "报表导出", value: p.can_export_pdf ? "PDF / Excel" : "—" },
+    { label: t("limitProjects"), value: formatLimitValue(p.max_projects, locale, t) },
+    { label: t("limitKeywords"), value: formatLimitValue(p.max_tracked_keywords, locale, t) },
+    { label: t("limitDailyAudit"), value: p.audit_daily_limit >= UNLIMITED ? t("unlimited") : t("timesCount", { n: p.audit_daily_limit }) },
+    { label: t("limitExport"), value: p.can_export_pdf ? "PDF / Excel" : "—" },
   ];
 }
 
@@ -69,7 +74,11 @@ interface AutomationLogRow {
   created_at: string;
 }
 
-const WEEK_DAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+// 星期显示名（仅 UI 展示）
+const WEEK_DAYS: Record<Locale, string[]> = {
+  zh: ["周日", "周一", "周二", "周三", "周四", "周五", "周六"],
+  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+};
 
 interface AccountInfo {
   displayName: string;
@@ -94,20 +103,6 @@ interface UsageData {
   features: Record<string, boolean>;
 }
 
-const PLAN_LABELS: Record<string, string> = {
-  free: "Free",
-  lite: "Lite",
-  pro: "Pro",
-};
-
-const FEATURE_LABELS: Record<string, string> = {
-  pdf_export: "PDF 导出",
-  excel_export: "Excel 导出",
-  full_audit: "完整审计",
-  backlinks: "外链分析",
-  email_report: "邮件报告",
-};
-
 export default function SettingsPage() {
   return (
     <Suspense fallback={null}>
@@ -118,6 +113,9 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const { show, Toast } = useToast();
+  const t = useTranslations("dashboard.settings");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
@@ -136,10 +134,10 @@ function SettingsContent() {
       if (!isAuthEnabled) {
         if (!cancelled) {
           setAccount({
-            displayName: "本地开发",
-            email: "dev@seeo.local",
+            displayName: t("demoName"),
+            email: "demo@seeo.local",
             userId: "demo-user-0001",
-            createdAt: "—（演示模式）",
+            createdAt: t("demoCreatedAt"),
           });
           setAccountLoading(false);
         }
@@ -154,14 +152,14 @@ function SettingsContent() {
           setAccountLoading(false);
           return;
         }
-        const email = user.email ?? "未知";
+        const email = user.email ?? t("unknown");
         const displayName =
           (user.user_metadata as { display_name?: string } | null)?.display_name ||
           email.split("@")[0] ||
-          "用户";
+          t("defaultUser");
         const createdAt = user.created_at
-          ? new Date(user.created_at).toLocaleString("zh-CN", { hour12: false })
-          : "未知";
+          ? new Date(user.created_at).toLocaleString(intlLocale(locale), { hour12: false })
+          : t("unknown");
         setAccount({
           displayName,
           email,
@@ -177,7 +175,7 @@ function SettingsContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale, t]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -189,7 +187,7 @@ function SettingsContent() {
       await new Promise((resolve) => setTimeout(resolve, 200));
       window.location.assign("/login");
     } catch (err) {
-      show(`退出失败：${(err as Error).message}`, "error");
+      show(t("signOutFailed", { message: (err as Error).message }), "error");
     } finally {
       setSigningOut(false);
     }
@@ -215,12 +213,12 @@ function SettingsContent() {
   const isCheckoutSuccess = searchParams.get("payment") === "success";
   useEffect(() => {
     if (!isCheckoutSuccess) return;
-    show("升级成功，套餐权益将在几秒内生效", "success");
+    show(t("upgradeSuccessToast"), "success");
     const timer = setTimeout(() => {
       void fetchUsage();
     }, 1500);
     return () => clearTimeout(timer);
-  }, [isCheckoutSuccess, fetchUsage, show]);
+  }, [isCheckoutSuccess, fetchUsage, show, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -260,10 +258,10 @@ function SettingsContent() {
   }, []);
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "account", label: "账号信息" },
-    { key: "plan", label: "订阅套餐" },
-    { key: "usage", label: "用量统计" },
-    { key: "automation", label: "自动化" },
+    { key: "account", label: t("tabAccount") },
+    { key: "plan", label: t("tabPlan") },
+    { key: "usage", label: t("tabUsage") },
+    { key: "automation", label: t("tabAutomation") },
   ];
 
   return (
@@ -272,12 +270,12 @@ function SettingsContent() {
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">09</span>
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          设置
+          {t("title")}
         </h1>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60">
-        管理账号、订阅与用量。
+        {t("subtitle")}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -306,9 +304,9 @@ function SettingsContent() {
           {/* 账号信息 */}
           {tab === "account" && (
             <div className="card-a p-6">
-              <h2 className="font-display text-lg font-bold text-ink">账号信息</h2>
+              <h2 className="font-display text-lg font-bold text-ink">{t("accountTitle")}</h2>
               {accountLoading ? (
-                <div className="mt-6 font-mono text-xs text-ink-40">加载中…</div>
+                <div className="mt-6 font-mono text-xs text-ink-40">{tc("loading")}</div>
               ) : account ? (
                 <>
                   <div className="mt-5 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
@@ -321,21 +319,21 @@ function SettingsContent() {
                       <div className="mt-0.5 font-mono text-xs text-ink-40">{account.email}</div>
                     </div>
                     <button
-                      onClick={() => show("当前为演示模式，编辑功能将在接入后端后开放", "info")}
+                      onClick={() => show(t("editDemoToast"), "info")}
                       className="btn-secondary"
                     >
-                      编辑
+                      {t("edit")}
                     </button>
                   </div>
 
                   {/* 字段表 */}
                   <div className="mt-6 divide-y divide-line-soft border-t border-line-soft">
                     {[
-                      { label: "显示名", value: account.displayName },
-                      { label: "邮箱", value: account.email },
-                      { label: "账号 ID", value: account.userId },
-                      { label: "注册时间", value: account.createdAt },
-                      { label: "两步验证", value: "未开启" },
+                      { label: t("fieldDisplayName"), value: account.displayName },
+                      { label: t("fieldEmail"), value: account.email },
+                      { label: t("fieldAccountId"), value: account.userId },
+                      { label: t("fieldCreatedAt"), value: account.createdAt },
+                      { label: t("field2fa"), value: t("twofaOff") },
                     ].map((row) => (
                       <div key={row.label} className="flex items-center justify-between py-3">
                         <span className="font-mono text-xs text-ink-40">{row.label}</span>
@@ -352,13 +350,13 @@ function SettingsContent() {
                         disabled={signingOut}
                         className="btn-secondary text-neg disabled:opacity-60"
                       >
-                        {signingOut ? "退出中…" : "退出登录"}
+                        {signingOut ? t("signingOut") : t("signOut")}
                       </button>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="mt-6 font-mono text-xs text-ink-40">无法获取账号信息</div>
+                <div className="mt-6 font-mono text-xs text-ink-40">{t("accountUnavailable")}</div>
               )}
             </div>
           )}
@@ -366,19 +364,32 @@ function SettingsContent() {
           {/* 订阅套餐 */}
           {tab === "plan" && (
             <div>
-              <h2 className="font-display text-lg font-bold text-ink">订阅套餐</h2>
+              <h2 className="font-display text-lg font-bold text-ink">{t("planTitle")}</h2>
               <p className="mt-1 font-mono text-xs text-ink-40">
                 {usageData
-                  ? `当前：${PLAN_LABELS[usageData.plan] ?? usageData.plan} · 可随时升级或降级`
-                  : "加载当前套餐中…"}
+                  ? t("currentLine", { plan: planLabel(usageData.plan, locale) })
+                  : t("loadingCurrentPlan")}
               </p>
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {plansLoading ? (
-                  <div className="col-span-full font-mono text-xs text-ink-40">加载套餐中…</div>
+                  <div className="col-span-full font-mono text-xs text-ink-40">{t("loadingPlans")}</div>
                 ) : plans && plans.length > 0 ? (
                   plans.map((p) => {
                     const isCurrent = usageData?.plan === p.plan;
-                    const limits = buildPlanLimits(p);
+                    const limits = buildPlanLimits(p, locale, t);
+                    // 套餐显示名：优先共享 plan-labels（free/lite/pro），其余回退 API 数据
+                    const knownName = PLAN_LABELS[locale][p.plan];
+                    const planName = knownName ?? p.display.name;
+                    // 价格周期 "/30天"：数字取自数据，文案按 locale 翻译
+                    const priceDays = p.display.priceUnit.match(/\d+/)?.[0];
+                    const priceUnitText = priceDays
+                      ? t("priceUnitDays", { n: priceDays })
+                      : p.display.priceUnit;
+                    const ctaText = knownName
+                      ? p.plan === "free"
+                        ? t("ctaStart")
+                        : t("ctaUpgrade", { plan: planName })
+                      : p.display.ctaLabel;
                     return (
                       <div
                         key={p.plan}
@@ -393,21 +404,21 @@ function SettingsContent() {
                         {/* 推荐 / 当前套餐 标签 */}
                         {p.display.highlighted && !isCurrent && (
                           <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
-                            推荐
+                            {t("badgeRecommended")}
                           </span>
                         )}
                         {isCurrent && (
                           <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
-                            当前套餐
+                            {t("badgeCurrent")}
                           </span>
                         )}
 
-                        <div className="font-display text-base font-bold text-ink">{p.display.name}</div>
+                        <div className="font-display text-base font-bold text-ink">{planName}</div>
                         <div className="mt-2 flex items-baseline gap-0.5">
                           <span className="font-display text-3xl font-bold text-ink">
                             {p.display.price}
                           </span>
-                          <span className="font-mono text-xs text-ink-40">{p.display.priceUnit}</span>
+                          <span className="font-mono text-xs text-ink-40">{priceUnitText}</span>
                         </div>
 
                         <ul className="mt-4 flex-1 space-y-2">
@@ -422,18 +433,18 @@ function SettingsContent() {
                         <button
                           onClick={() =>
                             isCurrent
-                              ? show("当前已在使用此套餐", "info")
-                              : show("套餐变更将通过支付页面完成，支持支付宝 / 微信支付", "info")
+                              ? show(t("currentPlanToast"), "info")
+                              : show(t("planChangeToast"), "info")
                           }
                           className={isCurrent ? "btn-secondary mt-5 w-full" : "btn-primary mt-5 w-full"}
                         >
-                          {isCurrent ? "当前套餐" : p.display.ctaLabel}
+                          {isCurrent ? t("badgeCurrent") : ctaText}
                         </button>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="col-span-full font-mono text-xs text-ink-40">暂无套餐信息</div>
+                  <div className="col-span-full font-mono text-xs text-ink-40">{t("noPlans")}</div>
                 )}
               </div>
             </div>
@@ -459,6 +470,9 @@ function SettingsContent() {
 // ===== 自动化面板 =====
 
 function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info" | "success" | "error") => void }) {
+  const t = useTranslations("dashboard.settings");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
   const [logs, setLogs] = useState<AutomationLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -523,15 +537,15 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         }),
       });
       if (res.ok) {
-        showToast("自动化配置已保存", "success");
+        showToast(t("saveSuccess"), "success");
         await fetchSettings();
       } else {
         const json = await res.json().catch(() => ({}));
-        const { message } = handleBillingError(json, "保存失败");
+        const { message } = handleBillingError(json, t("saveFailed"));
         showToast(message, "error");
       }
     } catch {
-      showToast("网络错误，保存失败", "error");
+      showToast(t("saveNetworkError"), "error");
     } finally {
       setSaving(false);
     }
@@ -546,15 +560,15 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         body: JSON.stringify({ type: "daily_refresh" }),
       });
       if (res.ok) {
-        showToast("每日刷新已执行", "success");
+        showToast(t("dailyRunDone"), "success");
         await fetchLogs();
       } else {
         const json = await res.json().catch(() => ({}));
-        const { message } = handleBillingError(json, "执行失败");
+        const { message } = handleBillingError(json, t("runFailed"));
         showToast(message, "error");
       }
     } catch {
-      showToast("网络错误，执行失败", "error");
+      showToast(t("runNetworkError"), "error");
     } finally {
       setRunningDaily(false);
     }
@@ -569,15 +583,15 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         body: JSON.stringify({ type: "weekly_report" }),
       });
       if (res.ok) {
-        showToast("每周报告已生成", "success");
+        showToast(t("weeklyRunDone"), "success");
         await fetchLogs();
       } else {
         const json = await res.json().catch(() => ({}));
-        const { message } = handleBillingError(json, "执行失败");
+        const { message } = handleBillingError(json, t("runFailed"));
         showToast(message, "error");
       }
     } catch {
-      showToast("网络错误，执行失败", "error");
+      showToast(t("runNetworkError"), "error");
     } finally {
       setRunningWeekly(false);
     }
@@ -586,7 +600,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
   if (loading) {
     return (
       <div className="card-a p-6">
-        <div className="font-mono text-xs text-ink-40">加载中…</div>
+        <div className="font-mono text-xs text-ink-40">{tc("loading")}</div>
       </div>
     );
   }
@@ -600,23 +614,23 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">每日排名刷新</h2>
+            <h2 className="font-display text-lg font-bold text-ink">{t("dailyTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              自动刷新所有追踪关键词的排名并生成预警
+              {t("dailyDesc")}
             </p>
           </div>
           <Toggle checked={dailyEnabled} onChange={setDailyEnabled} />
         </div>
         {dailyEnabled && (
           <div className="mt-5 flex items-center gap-3 border-t border-line-soft pt-5">
-            <label className="font-mono text-xs text-ink-60">执行时间</label>
+            <label className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
             <input
               type="time"
               value={dailyTime}
               onChange={(e) => setDailyTime(e.target.value)}
               className="rounded-lg border border-line bg-card px-3 py-1.5 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
             />
-            <span className="font-mono text-xs text-ink-40">每天</span>
+            <span className="font-mono text-xs text-ink-40">{t("everyDay")}</span>
           </div>
         )}
       </div>
@@ -625,9 +639,9 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">每周报告</h2>
+            <h2 className="font-display text-lg font-bold text-ink">{t("weeklyTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              自动汇总过去 7 天的排名变化、审计情况和关键词概况
+              {t("weeklyDesc")}
             </p>
           </div>
           <Toggle checked={weeklyEnabled} onChange={setWeeklyEnabled} />
@@ -635,19 +649,19 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
         {weeklyEnabled && (
           <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line-soft pt-5">
             <div className="flex items-center gap-2">
-              <label className="font-mono text-xs text-ink-60">执行日</label>
+              <label className="font-mono text-xs text-ink-60">{t("runDayLabel")}</label>
               <select
                 value={weeklyDay}
                 onChange={(e) => setWeeklyDay(Number(e.target.value))}
                 className="rounded-lg border border-line bg-card px-3 py-1.5 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none"
               >
-                {WEEK_DAYS.map((d, i) => (
+                {WEEK_DAYS[locale].map((d, i) => (
                   <option key={i} value={i}>{d}</option>
                 ))}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="font-mono text-xs text-ink-60">执行时间</label>
+              <label className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
               <input
                 type="time"
                 value={weeklyTime}
@@ -666,15 +680,15 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
           disabled={saving}
           className="btn-primary disabled:opacity-60"
         >
-          {saving ? "保存中…" : "保存配置"}
+          {saving ? t("saving") : t("saveBtn")}
         </button>
       </div>
 
       {/* 手动执行 */}
       <div className="card-a p-6">
-        <h2 className="font-display text-lg font-bold text-ink">手动执行</h2>
+        <h2 className="font-display text-lg font-bold text-ink">{t("manualTitle")}</h2>
         <p className="mt-1 font-mono text-xs text-ink-40">
-          立即触发一次任务，不影响定时计划
+          {t("manualDesc")}
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
@@ -688,10 +702,10 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                执行中…
+                {t("runningBtn")}
               </>
             ) : (
-              "立即执行每日刷新"
+              t("runDailyBtn")
             )}
           </button>
           <button
@@ -705,10 +719,10 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                生成中…
+                {t("generatingBtn")}
               </>
             ) : (
-              "立即生成每周报告"
+              t("runWeeklyBtn")
             )}
           </button>
         </div>
@@ -717,16 +731,16 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       {/* 执行历史 */}
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink">执行历史</h2>
+          <h2 className="font-display text-lg font-bold text-ink">{t("historyTitle")}</h2>
           <span className="font-mono text-xs text-ink-40">
-            最近 {logs.length} 条
+            {t("recentCount", { n: logs.length })}
           </span>
         </div>
         {logs.length === 0 ? (
           <div className="mt-6 border-t border-line-soft pt-6 text-center">
-            <div className="font-sans text-sm text-ink-40">暂无执行记录</div>
+            <div className="font-sans text-sm text-ink-40">{t("historyEmpty")}</div>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              手动执行或启用定时任务后将在此显示
+              {t("historyEmptyHint")}
             </p>
           </div>
         ) : (
@@ -735,10 +749,10 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft bg-line-soft/40">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">时间</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">类型</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">状态</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">摘要</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("colTime")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("colType")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("colStatus")}</th>
+                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("colSummary")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -752,13 +766,13 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                       </td>
                       <td className="px-4 py-3">
                         <span className="badge-info">
-                          {log.type === "daily_refresh" ? "每日刷新" : "每周报告"}
+                          {log.type === "daily_refresh" ? t("typeDaily") : t("typeWeekly")}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {log.status === "success" && <span className="badge-good">成功</span>}
-                        {log.status === "failed" && <span className="badge-err">失败</span>}
-                        {log.status === "running" && <span className="badge-warn">运行中</span>}
+                        {log.status === "success" && <span className="badge-good">{t("statusSuccess")}</span>}
+                        {log.status === "failed" && <span className="badge-err">{t("statusFailed")}</span>}
+                        {log.status === "running" && <span className="badge-warn">{t("statusRunning")}</span>}
                       </td>
                       <td className="px-4 py-3 font-sans text-xs text-ink-60">
                         {log.summary ?? "—"}
@@ -778,6 +792,8 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
 // ===== 缓存管理组件 =====
 
 function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info" | "success" | "error") => void }) {
+  const t = useTranslations("dashboard.settings");
+  const locale = useLocale() as "en" | "zh";
   const [total, setTotal] = useState<number | null>(null);
   const [cleaning, setCleaning] = useState(false);
 
@@ -805,13 +821,13 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
       if (res.ok && json.data) {
         const deleted = json.data.deleted as number;
         setTotal(json.data.remaining as number);
-        showToast(`已清理 ${deleted} 条过期缓存`, "success");
+        showToast(t("cacheCleaned", { n: deleted }), "success");
       } else {
-        const { message } = handleBillingError(json, "清理失败");
+        const { message } = handleBillingError(json, t("cacheCleanFailed"));
         showToast(message, "error");
       }
     } catch {
-      showToast("网络错误，清理失败", "error");
+      showToast(t("cacheNetworkError"), "error");
     } finally {
       setCleaning(false);
     }
@@ -821,17 +837,17 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
     <div className="card-a p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-display text-lg font-bold text-ink">缓存管理</h2>
+          <h2 className="font-display text-lg font-bold text-ink">{t("cacheTitle")}</h2>
           <p className="mt-1 font-mono text-xs text-ink-40">
-            SerpApi 结果缓存，自动在每日刷新后清理过期项
+            {t("cacheDesc")}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-4">
           <div className="text-right">
             <div className="font-mono text-2xl font-bold text-ink">
-              {total === null ? "—" : total.toLocaleString()}
+              {total === null ? "—" : formatNumber(total, locale)}
             </div>
-            <div className="font-mono text-[10px] text-ink-40">当前条目</div>
+            <div className="font-mono text-[10px] text-ink-40">{t("cacheEntries")}</div>
           </div>
           <button
             onClick={handleCleanup}
@@ -844,10 +860,10 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                清理中…
+                {t("cacheCleaning")}
               </>
             ) : (
-              "清理过期缓存"
+              t("cacheCleanBtn")
             )}
           </button>
         </div>
@@ -867,10 +883,14 @@ function UsageDashboard({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const t = useTranslations("dashboard.settings");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
+
   if (loading && !usageData) {
     return (
       <div className="card-a p-6">
-        <div className="font-mono text-xs text-ink-40">加载中…</div>
+        <div className="font-mono text-xs text-ink-40">{tc("loading")}</div>
       </div>
     );
   }
@@ -878,19 +898,19 @@ function UsageDashboard({
   if (!usageData) {
     return (
       <div className="card-a p-6">
-        <div className="font-mono text-xs text-ink-40">暂无用量数据</div>
+        <div className="font-mono text-xs text-ink-40">{t("usageNoData")}</div>
       </div>
     );
   }
 
-  const planLabel = PLAN_LABELS[usageData.plan] ?? usageData.plan;
+  const currentPlanName = planLabel(usageData.plan, locale);
 
   // 用量项列表
   const usageItems = [
-    { label: "SerpApi 搜索", key: "serpapi" as const, unit: "次" },
-    { label: "DataForSEO 外链", key: "dataforseo" as const, unit: "次" },
-    { label: "内容检查", key: "content_check" as const, unit: "次" },
-    { label: "今日审计", key: "audit" as const, unit: "次" },
+    { label: t("usageSerpapi"), key: "serpapi" as const, unit: t("unitTimes") },
+    { label: t("usageDataforseo"), key: "dataforseo" as const, unit: t("unitTimes") },
+    { label: t("usageContentCheck"), key: "content_check" as const, unit: t("unitTimes") },
+    { label: t("usageAudit"), key: "audit" as const, unit: t("unitTimes") },
   ];
 
   const isUnlimited = (limit: number) => limit >= 2147483647;
@@ -901,13 +921,13 @@ function UsageDashboard({
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">套餐用量</h2>
+            <h2 className="font-display text-lg font-bold text-ink">{t("planUsageTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              当前套餐：{planLabel} · 状态：{usageData.subscriptionStatus}
+              {t("currentStatusLine", { plan: currentPlanName, status: usageData.subscriptionStatus })}
             </p>
           </div>
           <button onClick={onRefresh} className="btn-secondary">
-            刷新
+            {t("refresh")}
           </button>
         </div>
 
@@ -924,13 +944,13 @@ function UsageDashboard({
                   <span className="font-sans text-sm font-medium text-ink">{item.label}</span>
                   <span className="font-mono text-xs">
                     {unlimited ? (
-                      <span className="text-ink-40">无限</span>
+                      <span className="text-ink-40">{t("unlimited")}</span>
                     ) : (
                       <>
                         <span className={isNearLimit ? "text-neg" : "text-ink"}>
-                          {u.used.toLocaleString()}
+                          {formatNumber(u.used, locale)}
                         </span>
-                        <span className="text-ink-40"> / {u.limit.toLocaleString()} {item.unit}</span>
+                        <span className="text-ink-40"> / {formatNumber(u.limit, locale)} {item.unit}</span>
                       </>
                     )}
                   </span>
@@ -942,8 +962,8 @@ function UsageDashboard({
                   />
                 </div>
                 <div className="mt-1 font-mono text-[10px] text-ink-40">
-                  {unlimited ? "不限量" : `已用 ${Math.round(ratio * 100)}%`}
-                  {!unlimited && isNearLimit && <span className="ml-2 text-neg">· 接近上限</span>}
+                  {unlimited ? t("unlimitedNote") : t("usedPct", { n: Math.round(ratio * 100) })}
+                  {!unlimited && isNearLimit && <span className="ml-2 text-neg">· {t("nearLimit")}</span>}
                 </div>
               </div>
             );
@@ -953,15 +973,15 @@ function UsageDashboard({
         {/* 项目 / 关键词限额 */}
         <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line-soft pt-5">
           <div>
-            <div className="font-mono text-[10px] text-ink-40">项目数上限</div>
+            <div className="font-mono text-[10px] text-ink-40">{t("limitProjectsMax")}</div>
             <div className="mt-1 font-mono text-lg font-bold text-ink">
-              {isUnlimited(usageData.limits.max_projects) ? "无限" : usageData.limits.max_projects.toLocaleString()}
+              {isUnlimited(usageData.limits.max_projects) ? t("unlimited") : formatNumber(usageData.limits.max_projects, locale)}
             </div>
           </div>
           <div>
-            <div className="font-mono text-[10px] text-ink-40">关键词追踪上限</div>
+            <div className="font-mono text-[10px] text-ink-40">{t("limitKeywordsMax")}</div>
             <div className="mt-1 font-mono text-lg font-bold text-ink">
-              {isUnlimited(usageData.limits.max_tracked_keywords) ? "无限" : usageData.limits.max_tracked_keywords.toLocaleString()}
+              {isUnlimited(usageData.limits.max_tracked_keywords) ? t("unlimited") : formatNumber(usageData.limits.max_tracked_keywords, locale)}
             </div>
           </div>
         </div>
@@ -969,30 +989,30 @@ function UsageDashboard({
 
       {/* Features 开关展示 */}
       <div className="card-a p-6">
-        <h2 className="font-display text-lg font-bold text-ink">功能权益</h2>
-        <p className="mt-1 font-mono text-xs text-ink-40">当前套餐可用功能</p>
+        <h2 className="font-display text-lg font-bold text-ink">{t("featuresTitle")}</h2>
+        <p className="mt-1 font-mono text-xs text-ink-40">{t("featuresSubtitle")}</p>
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {Object.entries(FEATURE_LABELS).map(([key, label]) => {
+          {Object.keys(FEATURE_LABELS[locale]).map((key) => {
             const enabled = !!usageData.features[key];
             return (
               <div
                 key={key}
                 className="flex items-center justify-between rounded-lg border border-line bg-card px-4 py-3"
               >
-                <span className="font-sans text-sm text-ink">{label}</span>
+                <span className="font-sans text-sm text-ink">{featureLabel(key, locale)}</span>
                 {enabled ? (
                   <span className="flex items-center gap-1 font-mono text-xs text-green-600">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    已开通
+                    {t("featureOn")}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 font-mono text-xs text-ink-40">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
-                    未开通
+                    {t("featureOff")}
                   </span>
                 )}
               </div>

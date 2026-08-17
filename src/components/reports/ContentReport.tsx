@@ -1,5 +1,8 @@
 // 内容检查报告模板（用于 PDF 渲染）
 
+import { useTranslations, useLocale } from "next-intl";
+import { formatNumber } from "@/lib/ui-locale";
+
 export interface ContentReportProps {
   projectName: string;
   url: string;
@@ -47,6 +50,8 @@ export default function ContentReport({
   topKeywords,
   generatedAt,
 }: ContentReportProps) {
+  const t = useTranslations("dashboard.pdf.content");
+  const locale = useLocale() as "en" | "zh";
   const scoreColor = contentScore >= 80 ? COLORS.pos : contentScore >= 60 ? COLORS.warn : COLORS.neg;
   const readColor = readabilityScore >= 80 ? COLORS.pos : readabilityScore >= 60 ? COLORS.warn : COLORS.neg;
 
@@ -63,61 +68,61 @@ export default function ContentReport({
     >
       {/* 封面 */}
       <div style={{ borderBottom: `2px solid ${COLORS.ink}`, paddingBottom: 16, marginBottom: 24 }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>SeeO · 内容检查报告</div>
+        <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40 }}>{t("docLabel")}</div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: "8px 0 4px" }}>{projectName}</h1>
         <div style={{ fontSize: 13, color: COLORS.ink60 }}>{url}</div>
         <div style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.ink40, marginTop: 4 }}>
-          生成时间：{generatedAt}
+          {t("generatedAt", { time: generatedAt })}
         </div>
       </div>
 
       {/* 评分 + 可读性 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>内容评分</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("contentScore")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 36, fontWeight: 700, color: scoreColor, marginTop: 4 }}>
             {contentScore}
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>/ 100</div>
         </div>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>可读性</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("readability")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 36, fontWeight: 700, color: readColor, marginTop: 4 }}>
             {readabilityScore}
           </div>
           <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink60, marginTop: 2 }}>{readabilityLevel}</div>
         </div>
         <div style={{ ...cardStyle, textAlign: "center" }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>字数</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("wordCount")}</div>
           <div style={{ fontFamily: "monospace", fontSize: 36, fontWeight: 700, color: COLORS.ink, marginTop: 4 }}>
-            {wordCount.toLocaleString()}
+            {formatNumber(wordCount, locale)}
           </div>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>字符</div>
+          <div style={{ fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("wordCountUnit")}</div>
         </div>
       </div>
 
       {/* 关键词密度 */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>关键词密度</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("densityTitle")}</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${COLORS.line}`, textAlign: "left" }}>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>关键词</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>出现次数</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>密度</th>
-              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>状态</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thKeyword")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thCount")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thDensity")}</th>
+              <th style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink40 }}>{t("thStatus")}</th>
             </tr>
           </thead>
           <tbody>
             {keywordDensity.length === 0 ? (
               <tr>
                 <td colSpan={4} style={{ padding: 16, textAlign: "center", color: COLORS.ink40 }}>
-                  暂无目标关键词
+                  {t("empty")}
                 </td>
               </tr>
             ) : (
               keywordDensity.map((item, idx) => {
-                const status = item.density >= 2 && item.density <= 5 ? "理想" : item.density > 5 ? "堆砌风险" : "偏低";
+                const status = item.density >= 2 && item.density <= 5 ? t("statusIdeal") : item.density > 5 ? t("statusOveruse") : t("statusLow");
                 const statusColor = item.density >= 2 && item.density <= 5 ? COLORS.pos : item.density > 5 ? COLORS.warn : COLORS.ink40;
                 return (
                   <tr key={idx} style={{ borderBottom: `1px solid ${COLORS.line}` }}>
@@ -135,7 +140,7 @@ export default function ContentReport({
 
       {/* 标题建议 */}
       <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>标题建议</div>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("titleSuggestions")}</div>
         <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
           {titleSuggestions.map((s, idx) => (
             <li key={idx} style={{ padding: "6px 0", borderBottom: `1px solid ${COLORS.line}`, fontSize: 12, display: "flex", gap: 8 }}>
@@ -151,9 +156,9 @@ export default function ContentReport({
       {/* 标题结构 + 高频词 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={cardStyle}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>标题结构</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("headingStructure")}</div>
           {headingStructure.length === 0 ? (
-            <div style={{ padding: 12, textAlign: "center", color: COLORS.ink40, fontSize: 11 }}>未检测到标题</div>
+            <div style={{ padding: 12, textAlign: "center", color: COLORS.ink40, fontSize: 11 }}>{t("emptyHeadings")}</div>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
               {headingStructure.map((h, idx) => (
@@ -166,12 +171,12 @@ export default function ContentReport({
           )}
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>高频词 TOP 10</div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("topWords")}</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <tbody>
               {topKeywords.length === 0 ? (
                 <tr>
-                  <td style={{ padding: 12, textAlign: "center", color: COLORS.ink40 }}>未提取到高频词</td>
+                  <td style={{ padding: 12, textAlign: "center", color: COLORS.ink40 }}>{t("emptyTopWords")}</td>
                 </tr>
               ) : (
                 topKeywords.map((k, idx) => (
@@ -192,7 +197,7 @@ export default function ContentReport({
       </div>
 
       <div style={{ marginTop: 24, fontFamily: "monospace", fontSize: 10, color: COLORS.ink40, textAlign: "center" }}>
-        本报告由 SeeO 自动生成 · 基于真实页面内容分析
+        {t("footer")}
       </div>
     </div>
   );

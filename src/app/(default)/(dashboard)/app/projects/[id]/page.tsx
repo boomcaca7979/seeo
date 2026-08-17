@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
 import { createServer } from "@/lib/supabase/server";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { rankRows } from "@/lib/mock-data";
@@ -7,6 +8,7 @@ import { matchMockProject } from "@/lib/project-match";
 import type { DatabaseProject } from "@/lib/types";
 import Sparkline from "@/components/dashboard/Sparkline";
 import { getProjectById } from "@/lib/db";
+import { formatNumber, type Locale } from "@/lib/ui-locale";
 
 // 服务端读 Supabase/Turso，避免静态预渲染
 export const dynamic = "force-dynamic";
@@ -17,6 +19,8 @@ interface PageProps {
 
 export default async function ProjectDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const t = await getTranslations("dashboard.shared.projectDetail");
+  const locale = (await getLocale()) as Locale;
 
   // 演示模式：从 Turso/SQLite 数据库按 id 查询真实项目
   if (!isAuthEnabled) {
@@ -32,7 +36,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       created_at: row.created_at,
       updated_at: row.created_at,
     };
-    return renderDetail(project, matchMockProject(project.domain));
+    return renderDetail(project, matchMockProject(project.domain), t, locale);
   }
 
   const supabase = await createServer();
@@ -45,39 +49,41 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const project = data as DatabaseProject | null;
   if (!project) notFound();
 
-  return renderDetail(project, matchMockProject(project.domain));
+  return renderDetail(project, matchMockProject(project.domain), t, locale);
 }
 
 function renderDetail(
   project: DatabaseProject,
-  mock: ReturnType<typeof matchMockProject>
+  mock: ReturnType<typeof matchMockProject>,
+  t: Awaited<ReturnType<typeof getTranslations>>,
+  locale: Locale
 ) {
   const trendData = mock.trend.map((t) => ({ d: t.day, v: t.value }));
 
   const metrics = [
     {
-      label: "自然流量预估",
+      label: t("metricOrganicTraffic"),
       value: mock.organicTraffic,
       trend: "up" as const,
       trendValue: "+23.4%",
       spark: trendData,
     },
     {
-      label: "关键词总数",
-      value: mock.trackedKeywords.toLocaleString(),
+      label: t("metricKeywords"),
+      value: formatNumber(mock.trackedKeywords, locale),
       trend: "up" as const,
       trendValue: "+47",
       spark: trendData.map((d, i) => ({ ...d, v: d.v + i * 2 })),
     },
     {
-      label: "外链总数",
+      label: t("metricBacklinks"),
       value: mock.backlinks,
       trend: "down" as const,
       trendValue: "-8",
       spark: trendData.map((d, i) => ({ ...d, v: d.v - i })).reverse(),
     },
     {
-      label: "健康度评分",
+      label: t("metricHealth"),
       value: `${mock.healthScore}/100`,
       trend: "up" as const,
       trendValue: "+5",
@@ -86,17 +92,17 @@ function renderDetail(
   ];
 
   const quickLinks = [
-    { title: "技术审计", desc: "查看本站技术 SEO 问题", href: "/app/audit", tag: "诊断" },
-    { title: "外链分析", desc: "查看外链来源与增长", href: "/app/backlinks", tag: "诊断" },
-    { title: "竞品分析", desc: "对比竞品的流量与关键词", href: "/app/competitors", tag: "洞察" },
-    { title: "内容优化", desc: "针对页面给出优化建议", href: "/app/content", tag: "优化" },
+    { title: t("quickLinkAuditTitle"), desc: t("quickLinkAuditDesc"), href: "/app/audit", tag: t("tagDiagnose") },
+    { title: t("quickLinkBacklinksTitle"), desc: t("quickLinkBacklinksDesc"), href: "/app/backlinks", tag: t("tagDiagnose") },
+    { title: t("quickLinkCompetitorsTitle"), desc: t("quickLinkCompetitorsDesc"), href: "/app/competitors", tag: t("tagInsight") },
+    { title: t("quickLinkContentTitle"), desc: t("quickLinkContentDesc"), href: "/app/content", tag: t("tagOptimize") },
   ];
 
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
       {/* 面包屑 */}
       <nav className="flex items-center gap-2 font-mono text-xs text-ink-40">
-        <Link href="/app" className="hover:text-ink">工作台</Link>
+        <Link href="/app" className="hover:text-ink">{t("breadcrumbHome")}</Link>
         <span>/</span>
         <span className="text-ink-60">{project.domain}</span>
       </nav>
@@ -109,15 +115,15 @@ function renderDetail(
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {project.name}
         </h1>
-        <span className="badge-good">活跃</span>
+        <span className="badge-good">{t("statusActive")}</span>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-mono text-xs text-ink-40">{project.domain}</p>
 
       {/* 核心指标卡片（流量/关键词/外链/健康度为示意数据） */}
       <div className="mt-8 flex items-center gap-2">
-        <span className="font-mono text-xs text-ink-40">核心指标</span>
-        <span className="badge-warn">示意数据</span>
+        <span className="font-mono text-xs text-ink-40">{t("metricsTitle")}</span>
+        <span className="badge-warn">{t("demoDataBadge")}</span>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((m) => (
@@ -135,7 +141,7 @@ function renderDetail(
               }`}
             >
               {m.trend === "up" ? "▲" : "▼"} {m.trendValue}
-              <span className="ml-1 text-ink-40">近 30 天</span>
+              <span className="ml-1 text-ink-40">{t("last30Days")}</span>
             </div>
           </div>
         ))}
@@ -146,16 +152,16 @@ function renderDetail(
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-lg font-bold text-ink">
-              排名追踪概览
+              {t("rankOverviewTitle")}
             </h2>
             {/* 表格行数据为示意数据 */}
-            <span className="badge-warn">示意数据</span>
+            <span className="badge-warn">{t("demoDataBadge")}</span>
           </div>
           <Link
             href="/app/position-tracking"
             className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
           >
-            查看全部 →
+            {t("viewAll")}
           </Link>
         </div>
 
@@ -164,12 +170,12 @@ function renderDetail(
             <table className="w-full">
               <thead>
                 <tr className="border-b border-line-soft bg-line-soft/40">
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">关键词</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">当前排名</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">7 天变化</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">搜索量</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">KD</th>
-                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">意图</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKeyword")}</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thCurrentRank")}</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thChange7d")}</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSearchVolume")}</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKD")}</th>
+                  <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thIntent")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -219,7 +225,7 @@ function renderDetail(
       {/* 快捷入口 */}
       <div className="mt-10">
         <h2 className="font-display text-lg font-bold text-ink">
-          快捷入口
+          {t("quickLinksTitle")}
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {quickLinks.map((q) => (
@@ -236,7 +242,7 @@ function renderDetail(
                 {q.desc}
               </p>
               <span className="mt-3 font-sans text-xs font-medium text-ink-60 opacity-0 transition-opacity group-hover:opacity-100">
-                进入 →
+                {t("enter")}
               </span>
             </Link>
           ))}

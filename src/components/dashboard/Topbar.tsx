@@ -2,20 +2,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
+import { planLabel } from "@/lib/plan-labels";
+import { formatRelativeTime } from "@/lib/relative-time";
 
 interface TopbarProps {
   displayName: string;
   email: string;
 }
-
-const PLAN_LABELS: Record<string, string> = {
-  free: "Free",
-  lite: "Lite",
-  pro: "Pro",
-};
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
   free: "bg-line-soft text-ink-60",
@@ -48,21 +45,10 @@ const alertDotColor: Record<string, string> = {
 // SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
 
 
-function formatRelativeTime(isoStr: string): string {
-  const then = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
-  if (Number.isNaN(then)) return isoStr;
-  const diffMs = Date.now() - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin} 分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} 小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay} 天前`;
-  return new Date(then).toLocaleDateString("zh-CN");
-}
-
 export default function Topbar({ displayName, email }: TopbarProps) {
+  const t = useTranslations("dashboard.topbar");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
   const [projectOpen, setProjectOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -219,7 +205,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             {currentProject ? currentProject.name.charAt(0).toUpperCase() : "—"}
           </span>
           <span className="font-sans text-sm font-medium text-ink">
-            {currentProject ? currentProject.domain : "未选择项目"}
+            {currentProject ? currentProject.domain : t("noProject")}
           </span>
           <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-ink-40">
             <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -229,11 +215,11 @@ export default function Topbar({ displayName, email }: TopbarProps) {
         {projectOpen && (
           <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-1.5">
             <div className="px-2 py-1.5 font-sans text-[10px] uppercase tracking-wider text-ink-40">
-              切换项目
+              {t("switchProject")}
             </div>
             {projects.length === 0 ? (
               <div className="px-2 py-3 font-sans text-xs text-ink-40">
-                暂无项目
+                {t("noProjects")}
               </div>
             ) : (
               projects.map((p) => (
@@ -250,7 +236,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                       {p.domain}
                     </div>
                     <div className="font-sans text-[10px] text-ink-40">
-                      健康 {p.healthScore === null ? "未审计" : p.healthScore}
+                      {t("health")} {p.healthScore === null ? t("notAudited") : p.healthScore}
                     </div>
                   </div>
                   {p.id === selectedId && (
@@ -265,7 +251,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 onClick={() => setProjectOpen(false)}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft hover:text-ink"
               >
-                <span className="text-ink">+</span> 新建项目
+                <span className="text-ink">+</span> {t("newProject")}
               </Link>
             </div>
           </div>
@@ -281,7 +267,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
           </svg>
           <input
             type="text"
-            placeholder="搜索关键词、域名、报告…"
+            placeholder={t("searchPlaceholder")}
             className="w-full rounded-lg border border-line bg-card py-2 pl-9 pr-14 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
           <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-40">
@@ -297,7 +283,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
           <button
             onClick={() => setBellOpen((o) => !o)}
             className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-60 hover:bg-card hover:text-ink"
-            aria-label="预警通知"
+            aria-label={t("notifications")}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
               <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -312,16 +298,16 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden">
               {/* 头部 */}
               <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
-                <span className="text-sm font-bold text-ink">预警通知</span>
+                <span className="text-sm font-bold text-ink">{t("notifications")}</span>
                 {unread > 0 && (
-                  <span className="font-sans text-[10px] text-ink-40">{unread} 条未读</span>
+                  <span className="font-sans text-[10px] text-ink-40">{t("unread", { count: unread })}</span>
                 )}
               </div>
 
               {/* 列表 */}
               {alerts.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <div className="font-sans text-xs text-ink-40">暂无预警</div>
+                  <div className="font-sans text-xs text-ink-40">{t("noAlerts")}</div>
                 </div>
               ) : (
                 <div>
@@ -336,7 +322,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                       <div className="flex-1 min-w-0">
                         <div className="font-sans text-xs text-ink leading-snug">{a.title}</div>
                         <div className="mt-0.5 font-sans text-[10px] text-ink-40">
-                          {a.domain ?? "—"} · {formatRelativeTime(a.created_at)}
+                          {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                         </div>
                       </div>
                     </div>
@@ -351,17 +337,17 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                     onClick={handleMarkAllRead}
                     className="font-sans text-[11px] text-ink-60 hover:text-ink"
                   >
-                    全部标为已读
+                    {t("markAllRead")}
                   </button>
                 ) : (
-                  <span className="font-sans text-[11px] text-ink-40">全部已读</span>
+                  <span className="font-sans text-[11px] text-ink-40">{t("allRead")}</span>
                 )}
                 <Link
                   href="/app"
                   onClick={() => setBellOpen(false)}
                   className="font-sans text-[11px] text-accent hover:underline"
                 >
-                  查看全部 →
+                  {t("viewAll")}
                 </Link>
               </div>
             </div>
@@ -375,7 +361,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             className="flex items-center gap-2 rounded-lg p-1 hover:bg-line-soft"
           >
             <span className={`rounded px-2 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
-              {PLAN_LABELS[currentPlan] ?? currentPlan}
+              {planLabel(currentPlan, locale)}
             </span>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
               {displayName.charAt(0).toUpperCase()}
@@ -393,10 +379,10 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 </p>
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
-                    {PLAN_LABELS[currentPlan] ?? currentPlan}
+                    {planLabel(currentPlan, locale)}
                   </span>
                   {(currentPlan === "free" || currentPlan === "lite") && (
-                    <span className="font-mono text-[10px] text-ink-40">点击下方升级</span>
+                    <span className="font-mono text-[10px] text-ink-40">{t("upgradeHint")}</span>
                   )}
                 </div>
               </div>
@@ -406,14 +392,14 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                   onClick={() => setUserMenuOpen(false)}
                   className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-line-soft hover:text-ink"
                 >
-                  定价方案
+                  {t("pricing")}
                 </Link>
                 <Link
                   href="/docs"
                   onClick={() => setUserMenuOpen(false)}
                   className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-line-soft hover:text-ink"
                 >
-                  帮助文档
+                  {t("docs")}
                 </Link>
               </div>
               {isAuthEnabled ? (
@@ -421,11 +407,11 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2.5 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"
                 >
-                  退出登录
+                  {t("logout")}
                 </button>
               ) : (
                 <div className="px-4 py-2.5 font-sans text-[10px] text-ink-40">
-                  演示模式 · 账号系统未启用
+                  {t("demoMode")}
                 </div>
               )}
             </div>

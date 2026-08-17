@@ -53,7 +53,9 @@ describe("相关关键词表格 intent 来源（防回归）", () => {
     expect(SOURCE).not.toContain("交易型");
   });
 
-  it("表头标注「意图（估算）」，不伪装成真实分析结果", () => {
-    expect(SOURCE).toContain("意图（估算）");
+  it("表头标注「意图（估算）」，不伪装成真实分析结果（i18n 后文案位于 zh message catalog）", () => {
+    expect(SOURCE).toContain('t("colIntent")');
+    const zh = JSON.parse(readFileSync(fileURLToPath(new URL("../../../../../../messages/zh.json", import.meta.url)), "utf-8"));
+    expect(zh.dashboard.keywords.expand.colIntent).toContain("意图（估算）");
   });
 });

@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
+import { formatNumber, intlLocale } from "@/lib/ui-locale";
 import RankingReport from "@/components/reports/RankingReport";
 import AuditReport from "@/components/reports/AuditReport";
 import ContentReport from "@/components/reports/ContentReport";
@@ -90,30 +92,34 @@ interface AutomationLog {
   created_at: string;
 }
 
-function formatTime(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-    if (Number.isNaN(d.getTime())) return iso;
-    const now = Date.now();
-    const diff = now - d.getTime();
-    if (diff < 60_000) return "刚刚";
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
-    return d.toLocaleString("zh-CN", { hour12: false });
-  } catch {
-    return iso;
-  }
-}
-
-const typeConfig: Record<ReportType, { label: string; badge: string; desc: string }> = {
-  ranking: { label: "排名", badge: "badge-warn", desc: "追踪关键词的当前排名与变化" },
-  audit: { label: "审计", badge: "badge-warn", desc: "技术 SEO 审计结果与健康分" },
-  content: { label: "内容", badge: "badge-warn", desc: "页面内容质量与可读性分析" },
-  weekly: { label: "周报", badge: "badge-warn", desc: "本周排名/审计/关键词综合汇总" },
+const typeConfig: Record<ReportType, { badge: string }> = {
+  ranking: { badge: "badge-warn" },
+  audit: { badge: "badge-warn" },
+  content: { badge: "badge-warn" },
+  weekly: { badge: "badge-warn" },
 };
 
 export default function ReportsPage() {
+  const t = useTranslations("dashboard.reportsPage");
+  const locale = useLocale() as "en" | "zh";
+  const typeLabel = (type: ReportType) => t(`types.${type}.label`);
+  const typeName = (type: ReportType) => t(`types.${type}.name`);
+  const typeDesc = (type: ReportType) => t(`types.${type}.desc`);
+  const formatTime = (iso: string | null): string => {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+      if (Number.isNaN(d.getTime())) return iso;
+      const now = Date.now();
+      const diff = now - d.getTime();
+      if (diff < 60_000) return t("timeJustNow");
+      if (diff < 3_600_000) return t("timeMinutesAgo", { count: Math.floor(diff / 60_000) });
+      if (diff < 86_400_000) return t("timeHoursAgo", { count: Math.floor(diff / 3_600_000) });
+      return d.toLocaleString(intlLocale(locale), { hour12: false });
+    } catch {
+      return iso;
+    }
+  };
   const { show, Toast } = useToast();
   const { features, loading: entitlementsLoading } = useEntitlements();
   const canExportPdf = entitlementsLoading ? false : features.pdf_export;
@@ -208,7 +214,7 @@ export default function ReportsPage() {
       const res = await fetch(`/api/reports/${type}`, { cache: "no-store" });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        const { message } = handleBillingError(json, "导出失败");
+        const { message } = handleBillingError(json, t("errExport"));
         show(message, "error");
         return;
       }
@@ -224,9 +230,9 @@ export default function ReportsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      show(`已下载 ${filename}`, "success");
+      show(t("downloadedToast", { filename }), "success");
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(t("networkErrorToast", { message: (err as Error).message }), "error");
     } finally {
       setDownloading(null);
     }
@@ -261,7 +267,7 @@ export default function ReportsPage() {
         const json = await res.json();
         const data: AuditLatestData = json.data;
         if (!data) {
-          show("暂无审计数据，请先执行审计", "error");
+          show(t("noAuditData"), "error");
           setGenerating(false);
           return;
         }
@@ -285,7 +291,7 @@ export default function ReportsPage() {
         const json = await res.json();
         const rows: ContentCheckFull[] = json.data ?? [];
         if (rows.length === 0) {
-          show("暂无内容检查数据，请先执行分析", "error");
+          show(t("noContentData"), "error");
           setGenerating(false);
           return;
         }
@@ -303,7 +309,7 @@ export default function ReportsPage() {
           url: r.url,
           contentScore: r.content_score ?? 0,
           readabilityScore: r.readability_score ?? 0,
-          readabilityLevel: r.readability_level ?? "中等",
+          readabilityLevel: r.readability_level ?? t("defaultReadabilityLevel"),
           wordCount: r.word_count_full ?? r.word_count ?? 0,
           keywordDensity: kd,
           titleSuggestions: ts,
@@ -348,7 +354,7 @@ export default function ReportsPage() {
 
       setPreviewOpen(true);
     } catch (err) {
-      show(`生成失败：${(err as Error).message}`, "error");
+      show(t("generateFailed", { message: (err as Error).message }), "error");
     } finally {
       setGenerating(false);
     }
@@ -363,7 +369,7 @@ export default function ReportsPage() {
         const verifyRes = await fetch(`/api/reports/pdf?id=${verifyId}`, { cache: "no-store" });
         if (!verifyRes.ok) {
           const json = await verifyRes.json().catch(() => ({}));
-          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          const { message } = handleBillingError(json, t("pdfDenied"));
           show(message, "error");
           return;
         }
@@ -373,7 +379,7 @@ export default function ReportsPage() {
         if (!verifyRes.ok && verifyRes.status !== 404) {
           // 404 是正常的（id=0 不存在），但 403 表示 feature 不允许
           const json = await verifyRes.json().catch(() => ({}));
-          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          const { message } = handleBillingError(json, t("pdfDenied"));
           show(message, "error");
           return;
         }
@@ -381,14 +387,14 @@ export default function ReportsPage() {
 
       const filename = `seeo-${selectedType}-${Date.now()}.pdf`;
       const blob = await generatePDF({
-        title: `${typeConfig[selectedType].label}报告`,
+        title: t("pdfDocTitle", { type: typeLabel(selectedType) }),
         filename,
         elementId: "report-content",
       });
       downloadPDF(blob, filename);
-      show("PDF 已下载", "success");
+      show(t("pdfDownloaded"), "success");
     } catch (err) {
-      show(`PDF 生成失败：${(err as Error).message}`, "error");
+      show(t("pdfFailed", { message: (err as Error).message }), "error");
     }
   };
 
@@ -398,16 +404,16 @@ export default function ReportsPage() {
       let dataJson = "";
 
       if (selectedType === "ranking" && rankData) {
-        title = `排名报告 · ${rankData.domain}`;
+        title = t("saveTitleRanking", { domain: rankData.domain });
         dataJson = JSON.stringify(rankData);
       } else if (selectedType === "audit" && auditData) {
-        title = `审计报告 · ${auditData.domain}`;
+        title = t("saveTitleAudit", { domain: auditData.domain });
         dataJson = JSON.stringify({ healthScore: auditData.healthScore, issues: auditData.issues });
       } else if (selectedType === "content" && contentData) {
-        title = `内容报告 · ${contentData.url.slice(0, 40)}`;
+        title = t("saveTitleContent", { url: contentData.url.slice(0, 40) });
         dataJson = JSON.stringify({ contentScore: contentData.contentScore, url: contentData.url });
       } else if (selectedType === "weekly" && weeklyData) {
-        title = `周报 · ${weeklyData.period}`;
+        title = t("saveTitleWeekly", { period: weeklyData.period });
         dataJson = JSON.stringify(weeklyData);
       } else {
         return;
@@ -421,14 +427,14 @@ export default function ReportsPage() {
       const json = await res.json();
       if (res.ok) {
         setSavedReportId(json.data?.id ?? null);
-        show("已保存到报告中心", "success");
+        show(t("savedToast"), "success");
         await loadReports();
       } else {
-        const { message } = handleBillingError(json, "保存失败");
+        const { message } = handleBillingError(json, t("saveFailed"));
         show(message, "error");
       }
     } catch (err) {
-      show(`保存失败：${(err as Error).message}`, "error");
+      show(t("saveFailedToast", { message: (err as Error).message }), "error");
     }
   };
 
@@ -437,7 +443,7 @@ export default function ReportsPage() {
       setPreviewOpen(false);
       return;
     }
-    if (window.confirm("是否保存到报告中心？")) {
+    if (window.confirm(t("confirmSave"))) {
       void handleSaveReport().then(() => setPreviewOpen(false));
     } else {
       setPreviewOpen(false);
@@ -446,11 +452,11 @@ export default function ReportsPage() {
 
   const handleSendEmail = async () => {
     if (!emailToSend.trim()) {
-      show("请输入收件人邮箱", "error");
+      show(t("errEmailEmpty"), "error");
       return;
     }
     if (!savedReportId) {
-      show("请先保存报告", "error");
+      show(t("errSaveFirst"), "error");
       return;
     }
     setSendingEmail(true);
@@ -462,33 +468,33 @@ export default function ReportsPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        show("邮件已发送", "success");
+        show(t("emailSent"), "success");
         setEmailModalOpen(false);
         setEmailToSend("");
       } else {
-        const { message } = handleBillingError(json, "发送失败");
+        const { message } = handleBillingError(json, t("emailFailed"));
         show(message, "error");
       }
     } catch (err) {
-      show(`发送失败：${(err as Error).message}`, "error");
+      show(t("emailFailedToast", { message: (err as Error).message }), "error");
     } finally {
       setSendingEmail(false);
     }
   };
 
   const handleDeleteReport = async (id: number) => {
-    if (!window.confirm("确认删除该报告？")) return;
+    if (!window.confirm(t("confirmDelete"))) return;
     try {
       const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
       if (res.ok) {
-        show("已删除", "success");
+        show(t("deletedToast"), "success");
         await loadReports();
       } else {
         const json = await res.json().catch(() => ({}));
-        show(json?.error ?? "删除失败", "error");
+        show(json?.error ?? t("deleteFailed"), "error");
       }
     } catch (err) {
-      show(`删除失败：${(err as Error).message}`, "error");
+      show(t("deleteFailedToast", { message: (err as Error).message }), "error");
     }
   };
 
@@ -503,25 +509,25 @@ export default function ReportsPage() {
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">08</span>
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          报表中心
+          {t("title")}
         </h1>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60">
-        生成、下载和分享 SEO 报告。
+        {t("subtitle")}
       </p>
 
       {/* 生成报告区 */}
       <div className="card-a mt-5 p-5">
-        <div className="font-sans text-xs text-ink-40">报告类型</div>
+        <div className="font-sans text-xs text-ink-40">{t("reportTypeLabel")}</div>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {reportTypes.map((t) => {
-            const cfg = typeConfig[t];
-            const selected = selectedType === t;
+          {reportTypes.map((rt) => {
+            const cfg = typeConfig[rt];
+            const selected = selectedType === rt;
             return (
               <button
-                key={t}
-                onClick={() => setSelectedType(t)}
+                key={rt}
+                onClick={() => setSelectedType(rt)}
                 className={`rounded-lg border p-4 text-left transition-colors ${
                   selected
                     ? "border-brand bg-brand/5"
@@ -529,12 +535,12 @@ export default function ReportsPage() {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className={cfg.badge}>{cfg.label}</span>
+                  <span className={cfg.badge}>{typeLabel(rt)}</span>
                 </div>
                 <div className="mt-2 font-display text-sm font-bold text-ink">
-                  {t === "ranking" ? "排名追踪报告" : t === "audit" ? "技术审计报告" : t === "content" ? "内容检查报告" : "综合周报"}
+                  {typeName(rt)}
                 </div>
-                <div className="mt-1 font-sans text-xs text-ink-60">{cfg.desc}</div>
+                <div className="mt-1 font-sans text-xs text-ink-60">{typeDesc(rt)}</div>
               </button>
             );
           })}
@@ -551,10 +557,10 @@ export default function ReportsPage() {
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                生成中…
+                {t("generating")}
               </>
             ) : (
-              "生成报告"
+              t("generateBtn")
             )}
           </button>
         </div>
@@ -564,17 +570,17 @@ export default function ReportsPage() {
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
-            <span className="badge-warn">排名</span>
+            <span className="badge-warn">{typeLabel("ranking")}</span>
             <span className="font-mono text-[10px] text-ink-40">CSV</span>
           </div>
-          <h3 className="mt-3 font-display text-base font-bold text-ink">关键词排名 CSV</h3>
+          <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvRankingTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
-            全部追踪关键词 + 近 30 天排名历史
+            {t("csvRankingDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[10px] text-ink-40">已追踪</div>
+            <div className="font-sans text-[10px] text-ink-40">{t("trackedLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
-              {loading ? "—" : trackedCount.toLocaleString()}
+              {loading ? "—" : formatNumber(trackedCount, locale)}
             </div>
           </div>
           <div className="mt-5 flex-1" />
@@ -584,31 +590,31 @@ export default function ReportsPage() {
               disabled={downloading === "rankings" || trackedCount === 0}
               className="btn-secondary disabled:opacity-50"
             >
-              {downloading === "rankings" ? "生成中…" : "下载 CSV"}
+              {downloading === "rankings" ? t("generating") : t("downloadCsv")}
             </button>
           ) : (
             <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              升级解锁 CSV 导出
+              {t("upgradeCsv")}
             </Link>
           )}
         </div>
 
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
-            <span className="badge-warn">内容</span>
+            <span className="badge-warn">{typeLabel("content")}</span>
             <span className="font-mono text-[10px] text-ink-40">CSV</span>
           </div>
-          <h3 className="mt-3 font-display text-base font-bold text-ink">内容检测 CSV</h3>
+          <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvContentTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
-            最近 100 条内容检测记录
+            {t("csvContentDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[10px] text-ink-40">累计检测</div>
+            <div className="font-sans text-[10px] text-ink-40">{t("checksLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
-              {loading ? "—" : contentCount.toLocaleString()}
+              {loading ? "—" : formatNumber(contentCount, locale)}
             </div>
           </div>
           <div className="mt-5 flex-1" />
@@ -618,14 +624,14 @@ export default function ReportsPage() {
               disabled={downloading === "content" || contentCount === 0}
               className="btn-secondary disabled:opacity-50"
             >
-              {downloading === "content" ? "生成中…" : "下载 CSV"}
+              {downloading === "content" ? t("generating") : t("downloadCsv")}
             </button>
           ) : (
             <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              升级解锁 CSV 导出
+              {t("upgradeCsv")}
             </Link>
           )}
         </div>
@@ -635,7 +641,7 @@ export default function ReportsPage() {
       <div className="mt-10">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">08-1</span>
-          <h2 className="font-display text-lg font-bold text-ink">历史报告</h2>
+          <h2 className="font-display text-lg font-bold text-ink">{t("historyTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
         <div className="card-a mt-4 overflow-hidden">
@@ -643,17 +649,17 @@ export default function ReportsPage() {
             <TableSkeleton rows={3} />
           ) : reports.length === 0 ? (
             <div className="px-4 py-10 text-center font-sans text-xs text-ink-40">
-              暂无报告，点击上方生成
+              {t("emptyReports")}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-line-soft bg-line-soft/40">
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">标题</th>
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">类型</th>
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">生成时间</th>
-                    <th className="px-4 py-3 text-right font-sans text-xs font-semibold text-ink-40">操作</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thTitle")}</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thType")}</th>
+                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thTime")}</th>
+                    <th className="px-4 py-3 text-right font-sans text-xs font-semibold text-ink-40">{t("thActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -661,7 +667,7 @@ export default function ReportsPage() {
                     <tr key={r.id} className="border-b border-line-soft">
                       <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{r.title}</td>
                       <td className="px-4 py-3">
-                        <span className={typeConfig[r.type].badge}>{typeConfig[r.type].label}</span>
+                        <span className={typeConfig[r.type].badge}>{typeLabel(r.type)}</span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-ink-60">{formatTime(r.created_at)}</td>
                       <td className="px-4 py-3 text-right">
@@ -684,11 +690,11 @@ export default function ReportsPage() {
                                 setSavedReportId(r.id);
                                 setPreviewOpen(true);
                               } catch {
-                                show("报告数据解析失败", "error");
+                                show(t("parseFailed"), "error");
                               }
                             }}
                             className="rounded-md p-1.5 text-ink-40 hover:bg-paper hover:text-ink"
-                            aria-label="查看"
+                            aria-label={t("viewLabel")}
                           >
                             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -698,7 +704,7 @@ export default function ReportsPage() {
                           <button
                             onClick={() => handleDeleteReport(r.id)}
                             className="rounded-md p-1.5 text-ink-40 hover:bg-neg/10 hover:text-neg"
-                            aria-label="删除"
+                            aria-label={t("deleteLabel")}
                           >
                             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -717,12 +723,12 @@ export default function ReportsPage() {
 
       {/* 说明区 */}
       <div className="card-a mt-8 border-dashed border-line p-5">
-        <h2 className="font-display text-sm font-bold text-ink">关于报告导出</h2>
+        <h2 className="font-display text-sm font-bold text-ink">{t("aboutTitle")}</h2>
         <ul className="mt-2 space-y-1.5 font-sans text-xs text-ink-40">
-          <li>· PDF 报告基于 html2pdf.js 在浏览器端生成，无需服务器渲染</li>
-          <li>· CSV 报告带 UTF-8 BOM，Excel 直接打开中文不乱码</li>
-          <li>· 邮件发送基于 Resend，需配置 RESEND_API_KEY 环境变量</li>
-          <li>· 全部基于本地 SQLite 真实数据，不消耗 SerpApi 额度</li>
+          <li>{t("aboutPdf")}</li>
+          <li>{t("aboutCsv")}</li>
+          <li>{t("aboutEmail")}</li>
+          <li>{t("aboutData")}</li>
         </ul>
       </div>
 
@@ -733,12 +739,12 @@ export default function ReportsPage() {
           <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl border border-line bg-card">
             <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
               <h3 className="font-display text-base font-bold text-ink">
-                {typeConfig[selectedType].label}报告预览
+                {t("previewTitle", { type: typeLabel(selectedType) })}
               </h3>
               <button
                 onClick={handleClosePreview}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-ink-40 hover:bg-paper hover:text-ink"
-                aria-label="关闭"
+                aria-label={t("closeLabel")}
               >
                 <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                   <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -753,24 +759,24 @@ export default function ReportsPage() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-4">
               <div className="font-sans text-xs text-ink-40">
-                {savedReportId ? `已保存 · ID ${savedReportId}` : "未保存"}
+                {savedReportId ? t("savedStatus", { id: savedReportId }) : t("notSavedStatus")}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {!savedReportId && (
                   <button onClick={handleSaveReport} className="btn-secondary">
-                    保存到报告中心
+                    {t("saveBtn")}
                   </button>
                 )}
                 {canExportPdf ? (
                   <button onClick={handleDownloadPdf} className="btn-primary">
-                    下载 PDF
+                    {t("downloadPdfBtn")}
                   </button>
                 ) : (
                   <Link href="/pricing" className="btn-primary inline-flex items-center gap-1.5">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    升级解锁 PDF 导出
+                    {t("upgradePdf")}
                   </Link>
                 )}
                 {canEmailReport ? (
@@ -779,14 +785,14 @@ export default function ReportsPage() {
                     disabled={!savedReportId}
                     className="btn-secondary disabled:opacity-50"
                   >
-                    发送邮件
+                    {t("sendEmailBtn")}
                   </button>
                 ) : (
                   <Link href="/pricing" className="btn-secondary inline-flex items-center gap-1.5">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    升级解锁邮件发送
+                    {t("upgradeEmail")}
                   </Link>
                 )}
               </div>
@@ -800,9 +806,9 @@ export default function ReportsPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEmailModalOpen(false)} aria-hidden />
           <div className="relative w-full max-w-md rounded-xl border border-line bg-card p-5">
-            <h3 className="font-display text-base font-bold text-ink">发送报告邮件</h3>
+            <h3 className="font-display text-base font-bold text-ink">{t("emailModalTitle")}</h3>
             <div className="mt-4">
-              <label className="font-sans text-xs text-ink-40">收件人邮箱</label>
+              <label className="font-sans text-xs text-ink-40">{t("emailLabel")}</label>
               <input
                 type="email"
                 value={emailToSend}
@@ -813,14 +819,14 @@ export default function ReportsPage() {
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setEmailModalOpen(false)} className="btn-secondary">
-                取消
+                {t("cancelBtn")}
               </button>
               <button
                 onClick={handleSendEmail}
                 disabled={sendingEmail || !emailToSend.trim()}
                 className="btn-primary disabled:opacity-60"
               >
-                {sendingEmail ? "发送中…" : "发送"}
+                {sendingEmail ? t("sending") : t("sendBtn")}
               </button>
             </div>
           </div>

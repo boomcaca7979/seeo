@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { isAuthEnabled } from "@/lib/auth-config";
 import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { canSubmitDelete } from "@/lib/delete-guard";
+import { formatRelativeTime } from "@/lib/relative-time";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import HealthScoreBars from "@/components/dashboard/charts/HealthScoreBars";
 import AlertAreaChart from "@/components/dashboard/charts/AlertAreaChart";
@@ -42,39 +44,22 @@ const alertBadgeClass: Record<string, string> = {
   warning: "badge-warn",
   info: "badge-good",
 };
-const alertBadgeLabel: Record<string, string> = {
-  error: "错误",
-  warning: "警告",
-  info: "提示",
-};
-
-/** ISO 时间转相对时间 */
-function formatRelativeTime(isoStr: string): string {
-  const then = new Date(isoStr.endsWith("Z") ? isoStr : isoStr + "Z").getTime();
-  if (Number.isNaN(then)) return isoStr;
-  const diffMs = Date.now() - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin} 分钟前`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} 小时前`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay} 天前`;
-  return new Date(then).toLocaleDateString("zh-CN");
-}
-
-function useTodayLabel(): string {
+function useTodayLabel(locale: "en" | "zh"): string {
   const [label, setLabel] = useState("");
   useEffect(() => {
     const d = new Date();
-    const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const w = weekdays[d.getDay()];
-    const id = window.setTimeout(() => setLabel(`${y}年${m}月${day}日 · ${w}`), 0);
+    // 按当前 UI locale 输出「2026年8月17日 · 星期一」/「Aug 17, 2026 · Monday」
+    const datePart = d.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const weekday = d.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
+      weekday: "long",
+    });
+    const id = window.setTimeout(() => setLabel(`${datePart} · ${weekday}`), 0);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [locale]);
   return label;
 }
 
@@ -86,11 +71,14 @@ export default function ProjectList({
 }: ProjectListProps) {
   const router = useRouter();
   const { show, Toast } = useToast();
+  const t = useTranslations("dashboard.projectList");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as "en" | "zh";
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProjectWithMetrics | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const todayLabel = useTodayLabel();
+  const todayLabel = useTodayLabel(locale);
 
   // 各项目健康分（仅含已审计的）
   const healthData = useMemo(
@@ -139,18 +127,18 @@ export default function ProjectList({
       });
       const data = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(data, "创建失败");
+        const { message } = handleBillingError(data, t("createFailed"));
         show(message, "error");
         setCreating(false);
         return;
       }
       setModalOpen(false);
-      show("项目已创建，进入审计…", "success");
+      show(t("createdToast"), "success");
       // 优先使用服务端返回的 domain（已规范化），跳转到审计页
       const savedDomain = (data?.data?.domain ?? domain) as string;
       router.push(`/app/audit?domain=${encodeURIComponent(savedDomain)}`);
     } catch {
-      show("网络错误，请稍后重试", "error");
+      show(tc("networkError"), "error");
     }
     setCreating(false);
   };
@@ -159,7 +147,7 @@ export default function ProjectList({
   // 发请求前经 canSubmitDelete 最后一道防线校验 id/domain，非法一律拒绝并报错。
   const handleDelete = async (target: ProjectWithMetrics) => {
     if (!canSubmitDelete(target)) {
-      show("删除目标校验失败（id 或域名缺失/非法），已取消删除", "error");
+      show(t("deleteGuardFailed"), "error");
       setDeleteTarget(null);
       return;
     }
@@ -168,15 +156,15 @@ export default function ProjectList({
       const res = await fetch(`/api/projects?id=${encodeURIComponent(target.id)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
-        show(data.error || "删除失败", "error");
+        show(data.error || t("deleteFailed"), "error");
         setDeleting(false);
         return;
       }
       setDeleteTarget(null);
-      show(`项目已删除（${target.domain}，历史数据保留）`, "success");
+      show(t("deletedToast", { domain: target.domain }), "success");
       router.refresh();
     } catch {
-      show("网络错误，请稍后重试", "error");
+      show(tc("networkError"), "error");
     }
     setDeleting(false);
   };
@@ -188,7 +176,7 @@ export default function ProjectList({
         <div className="flex items-center justify-between font-sans text-[11px] text-ink-40">
           <span>{todayLabel || "\u00A0"}</span>
           <span>
-            {isAuthEnabled ? "数据更新时间" : "数据更新时间 · 演示模式"}
+            {isAuthEnabled ? t("dataUpdatedAt") : t("dataUpdatedAtDemo")}
           </span>
         </div>
 
@@ -199,10 +187,10 @@ export default function ProjectList({
               className="font-display font-bold tracking-tight text-ink"
               style={{ fontSize: 32, lineHeight: 1.2 }}
             >
-              你好，{displayName}
+              {t("greeting", { name: displayName })}
             </h1>
             <p className="mt-1.5 font-sans text-sm text-ink-60">
-              你有 {projects.length} 个项目在追踪，{unreadAlertCount} 条预警待查看。
+              {t("summary", { projects: projects.length, alerts: unreadAlertCount })}
             </p>
           </div>
           <button
@@ -210,7 +198,7 @@ export default function ProjectList({
             className="btn-primary"
           >
             <span className="text-base leading-none">＋</span>
-            新建项目
+            {t("newProject")}
           </button>
         </div>
 
@@ -219,9 +207,9 @@ export default function ProjectList({
           {/* 区块头：编号 + 标题 + 发丝线 + 计数 */}
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">01</span>
-            <h2 className="font-display text-base font-bold text-ink">我的项目</h2>
+            <h2 className="font-display text-base font-bold text-ink">{t("myProjects")}</h2>
             <div className="hairline flex-1" />
-            <span className="font-sans text-xs text-ink-40">共 {projects.length} 个</span>
+            <span className="font-sans text-xs text-ink-40">{t("total", { count: projects.length })}</span>
           </div>
 
           {projects.length === 0 ? (
@@ -231,17 +219,17 @@ export default function ProjectList({
                   ∅
                 </div>
                 <div className="mt-3 font-sans text-sm font-medium text-ink">
-                  暂无项目
+                  {t("emptyTitle")}
                 </div>
                 <div className="mt-1 font-sans text-xs text-ink-40">
-                  点击右上角「创建项目」开始
+                  {t("emptyHint")}
                 </div>
                 <button
                   onClick={() => setModalOpen(true)}
                   className="btn-primary mt-6"
                 >
                   <span className="text-base leading-none">＋</span>
-                  新建第一个项目
+                  {t("createFirst")}
                 </button>
               </div>
             </div>
@@ -259,7 +247,7 @@ export default function ProjectList({
                     <button
                       onClick={() => setDeleteTarget(p)}
                       className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-ink-40 hover:bg-line-soft hover:text-neg"
-                      aria-label="删除项目"
+                      aria-label={t("deleteProject")}
                     >
                       <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                         <path
@@ -290,10 +278,10 @@ export default function ProjectList({
                       <div className="mt-4 flex items-end justify-between">
                         <div>
                           <div className="font-sans text-[10px] tracking-wider uppercase text-ink-40">
-                            健康分
+                            {t("healthScore")}
                           </div>
                           <div className={`mt-0.5 font-sans text-2xl font-bold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
-                            {hasScore ? score : "未审计"}
+                            {hasScore ? score : t("notAudited")}
                           </div>
                         </div>
                         {hasScore && (
@@ -317,7 +305,7 @@ export default function ProjectList({
                       <div className="mt-3 flex items-center justify-between">
                         <div>
                           <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
-                            追踪关键词
+                            {t("trackedKeywords")}
                           </div>
                           <div className="mt-0.5 font-mono text-base font-semibold text-ink">
                             {p.trackedKeywordCount.toLocaleString()}
@@ -325,7 +313,7 @@ export default function ProjectList({
                         </div>
                         <div className="text-right">
                           <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
-                            近 7 天排名
+                            {t("rank7d")}
                           </div>
                           <div className="mt-0.5 flex items-center justify-end gap-1.5 font-mono text-xs">
                             <span className="text-pos">▲ {p.rankUp7d}</span>
@@ -337,7 +325,7 @@ export default function ProjectList({
                       {/* 底部元信息 + 右箭头 */}
                       <div className="mt-4 flex items-center justify-between">
                         <span className="font-sans text-[10px] text-ink-40">
-                          最近审计 {p.lastAuditTime ? formatRelativeTime(p.lastAuditTime) : "未审计"} · 预警 {p.alertCount}
+                          {t("lastAudit")} {p.lastAuditTime ? formatRelativeTime(p.lastAuditTime, locale, tc) : t("notAudited")} · {t("alertsCount")} {p.alertCount}
                         </span>
                         <span className="font-mono text-sm text-ink-40 opacity-0 group-hover:opacity-100">
                           →
@@ -355,22 +343,22 @@ export default function ProjectList({
         <section className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">02</span>
-            <h2 className="font-display text-base font-bold text-ink">数据概览</h2>
+            <h2 className="font-display text-base font-bold text-ink">{t("overview")}</h2>
             <div className="hairline flex-1" />
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
             <ChartCard
-              title="各项目健康分"
-              subtitle="按分数排序 · 红/黄/绿着色"
+              title={t("healthByProject")}
+              subtitle={t("healthByProjectSub")}
               height={Math.max(220, healthData.length * 32 + 80)}
               className="lg:col-span-7"
             >
               <HealthScoreBars data={healthData} />
             </ChartCard>
             <ChartCard
-              title="近 7 天预警数量"
-              subtitle={`共 ${alerts.length} 条预警`}
+              title={t("alerts7d")}
+              subtitle={t("alerts7dSub", { count: alerts.length })}
               height={260}
               className="lg:col-span-5"
             >
@@ -383,13 +371,13 @@ export default function ProjectList({
         <section className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">03</span>
-            <h2 className="font-display text-base font-bold text-ink">预警提醒</h2>
+            <h2 className="font-display text-base font-bold text-ink">{t("alertsSection")}</h2>
             <div className="hairline flex-1" />
             <span
               className="font-sans text-[10px] font-bold tracking-wider text-brand"
               style={{ border: "1px solid currentColor", borderRadius: 3, padding: "2px 6px" }}
             >
-              排名变化
+              {tc("rankChange")}
             </span>
           </div>
 
@@ -400,7 +388,7 @@ export default function ProjectList({
                   ✓
                 </div>
                 <div className="mt-3 font-sans text-sm font-medium text-ink">
-                  暂无预警，继续保持
+                  {t("noAlertsTitle")}
                 </div>
               </div>
             </div>
@@ -417,11 +405,11 @@ export default function ProjectList({
                   <div className="flex-1 min-w-0">
                     <div className="font-sans text-sm text-ink">{a.title}</div>
                     <div className="font-sans text-[10px] text-ink-40">
-                      {a.domain ?? "—"} · {formatRelativeTime(a.created_at)}
+                      {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                     </div>
                   </div>
                   <span className={alertBadgeClass[a.level]}>
-                    {alertBadgeLabel[a.level]}
+                    {t(a.level === "error" ? "alertError" : a.level === "warning" ? "alertWarning" : "alertInfo")}
                   </span>
                 </div>
               ))}
@@ -434,14 +422,14 @@ export default function ProjectList({
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="新建项目"
+        title={t("createTitle")}
         footer={
           <>
             <button
               onClick={() => setModalOpen(false)}
               className="btn-secondary"
             >
-              取消
+              {tc("cancel")}
             </button>
             <button
               type="submit"
@@ -449,24 +437,24 @@ export default function ProjectList({
               disabled={creating}
               className="btn-primary"
             >
-              {creating ? "创建中…" : "创建项目"}
+              {creating ? t("creating") : t("createCta")}
             </button>
           </>
         }
       >
         <form id="new-project-form" onSubmit={handleCreate} className="space-y-4">
           <div>
-            <label className="font-sans text-xs text-ink-60">项目名称</label>
+            <label className="font-sans text-xs text-ink-60">{t("projectName")}</label>
             <input
               name="name"
               type="text"
               required
-              placeholder="如：主站 SEO 优化"
+              placeholder={t("projectNamePlaceholder")}
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
           <div>
-            <label className="font-sans text-xs text-ink-60">域名</label>
+            <label className="font-sans text-xs text-ink-60">{t("domain")}</label>
             <input
               name="domain"
               type="text"
@@ -475,7 +463,7 @@ export default function ProjectList({
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
             <p className="mt-1.5 font-sans text-[10px] text-ink-40">
-              不带 http://，直接输入域名
+              {t("domainHint")}
             </p>
           </div>
         </form>
@@ -485,14 +473,14 @@ export default function ProjectList({
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="删除项目"
+        title={t("deleteTitle")}
         footer={
           <>
             <button
               onClick={() => setDeleteTarget(null)}
               className="btn-secondary"
             >
-              取消
+              {tc("cancel")}
             </button>
             <button
               onClick={() => deleteTarget && handleDelete(deleteTarget)}
@@ -500,20 +488,20 @@ export default function ProjectList({
               className="btn-primary"
               style={{ backgroundColor: "var(--color-neg)", color: "#fff" }}
             >
-              {deleting ? "删除中…" : "确认删除"}
+              {deleting ? t("deleting") : t("deleteCta")}
             </button>
           </>
         }
       >
         <p className="font-sans text-sm text-ink-60">
-          确定要删除项目「{deleteTarget?.name}」（{deleteTarget?.domain}）吗？
+          {t("deleteConfirm", { name: deleteTarget?.name ?? "", domain: deleteTarget?.domain ?? "" })}
         </p>
         {/* 最终核对：完整项目 UUID（与 DELETE 请求 ?id= 参数一致） */}
         <p className="mt-1.5 font-mono text-[11px] break-all text-ink-40">
           ID: {deleteTarget?.id}
         </p>
         <p className="mt-2 font-sans text-xs text-ink-40">
-          仅删除项目记录，历史追踪数据和审计报告保留不变。
+          {t("deleteNote")}
         </p>
       </Modal>
 

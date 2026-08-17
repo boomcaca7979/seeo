@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import {
   CHART_COLORS,
   CHART_TICK_STYLE,
@@ -33,8 +34,10 @@ interface Props {
 
 /** SOV 横向条形图（自己 vs 各竞品，自己用品牌黑、竞品用蓝） */
 export default function SOVGroupBars({ data }: Props) {
+  const t = useTranslations("dashboard.shared.charts");
+
   if (!data.length || data.every((d) => d.sov === 0)) {
-    return <ChartEmpty message="暂无 SOV 数据" hint="刷新竞品排名后显示" />;
+    return <ChartEmpty message={t("sovEmpty")} hint={t("sovEmptyHint")} />;
   }
 
   const chartData = [...data]

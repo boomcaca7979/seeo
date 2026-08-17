@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
+import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
 import Link from "next/link";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import { useToast } from "@/components/dashboard/Toast";
@@ -21,15 +23,15 @@ import { useEntitlements } from "@/components/billing/EntitlementsContext";
 // 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
 
 const severityConfig = {
-  error: { label: "错误", badge: "badge-err", bar: "#E14B4B", text: "text-neg", dot: "bg-neg" },
-  warning: { label: "警告", badge: "badge-warn", bar: "#C98A0A", text: "text-warn", dot: "bg-warn" },
-  notice: { label: "提示", badge: "badge-info", bar: "var(--color-ink-25)", text: "text-ink-40", dot: "bg-ink-25" },
+  error: { badge: "badge-err", bar: "#E14B4B", text: "text-neg", dot: "bg-neg" },
+  warning: { badge: "badge-warn", bar: "#C98A0A", text: "text-warn", dot: "bg-warn" },
+  notice: { badge: "badge-info", bar: "var(--color-ink-25)", text: "text-ink-40", dot: "bg-ink-25" },
 } as const;
 
 const categoryConfig = {
-  critical: { label: "严重", badge: "badge-err", text: "text-neg" },
-  warning: { label: "警告", badge: "badge-warn", text: "text-warn" },
-  info: { label: "提示", badge: "badge-info", text: "text-ink-40" },
+  critical: { badge: "badge-err", text: "text-neg" },
+  warning: { badge: "badge-warn", text: "text-warn" },
+  info: { badge: "badge-info", text: "text-ink-40" },
 } as const;
 
 interface IssueGroup {
@@ -98,17 +100,21 @@ interface AuditData {
 type FilterType = "all" | "error" | "warning" | "notice";
 
 /** 将 SQLite datetime（UTC）转为本地时间可读字符串 */
-function formatTime(iso: string | null): string {
+function formatTime(
+  iso: string | null,
+  locale: Locale,
+  tc: (key: "justNow" | "minutesAgo" | "hoursAgo", values?: { n: number }) => string
+): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
     if (Number.isNaN(d.getTime())) return iso;
     const now = Date.now();
     const diff = now - d.getTime();
-    if (diff < 60_000) return "刚刚";
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
-    return d.toLocaleString("zh-CN", { hour12: false });
+    if (diff < 60_000) return tc("justNow");
+    if (diff < 3_600_000) return tc("minutesAgo", { n: Math.floor(diff / 60_000) });
+    if (diff < 86_400_000) return tc("hoursAgo", { n: Math.floor(diff / 3_600_000) });
+    return d.toLocaleString(intlLocale(locale), { hour12: false });
   } catch {
     return iso;
   }
@@ -125,14 +131,28 @@ interface ProjectItem {
 }
 
 export default function AuditPage() {
+  const tc = useTranslations("dashboard.common");
   return (
-    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-ink-40">加载中…</div>}>
+    <Suspense fallback={<div className="p-8 text-center font-mono text-sm text-ink-40">{tc("loading")}</div>}>
       <AuditPageInner />
     </Suspense>
   );
 }
 
 function AuditPageInner() {
+  const t = useTranslations("dashboard.audit");
+  const tc = useTranslations("dashboard.common");
+  const locale = useLocale() as Locale;
+  const severityLabel: Record<"error" | "warning" | "notice", string> = {
+    error: t("sevError"),
+    warning: t("sevWarning"),
+    notice: t("sevNotice"),
+  };
+  const categoryLabel: Record<"critical" | "warning" | "info", string> = {
+    critical: t("catCritical"),
+    warning: t("catWarning"),
+    info: t("catInfo"),
+  };
   const { show, Toast } = useToast();
   const { features, loading: entitlementsLoading } = useEntitlements();
   const canFullAudit = entitlementsLoading ? false : features.full_audit;
@@ -222,7 +242,7 @@ function AuditPageInner() {
     setActiveDepth(depth);
     setAuditing(true);
     show(
-      depth === "quick" ? "快速审计进行中，正在审计首页…" : "深度审计进行中，正在爬取页面…",
+      depth === "quick" ? t("toastQuickRunning") : t("toastFullRunning"),
       "info"
     );
     try {
@@ -233,7 +253,7 @@ function AuditPageInner() {
       });
       const json = await res.json();
       if (!res.ok) {
-        const { message } = handleBillingError(json, "审计失败");
+        const { message } = handleBillingError(json, t("auditFailed"));
         show(message, "error");
         return;
       }
@@ -271,38 +291,38 @@ function AuditPageInner() {
         const finalStatus = finalJson.data?.status;
         if (finalStatus === "completed") {
           show(
-            `审计完成：健康度 ${finalJson.data?.healthScore ?? 0} 分，已爬 ${finalJson.data?.pagesCrawled ?? 0} 页`,
+            t("toastDone", { score: finalJson.data?.healthScore ?? 0, pages: finalJson.data?.pagesCrawled ?? 0 }),
             "success"
           );
         } else if (finalStatus === "failed") {
           const apiErr = finalJson.data?.error || finalJson?.error;
-          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
-          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+          const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
+          show(apiErr ? t("apiErrorWithHint", { error: apiErr, hint }) : hint, "error");
         } else if (finalStatus === "running") {
           // 轮询超时，审计仍在运行（after() 执行较慢或被限流）
-          show("审计仍在进行中，请稍后刷新页面查看结果", "info");
+          show(t("stillRunning"), "info");
         } else {
           // data=null：审计记录丢失
-          show("审计记录未找到，请稍后重试", "error");
+          show(t("recordMissing"), "error");
         }
       } else {
         // 兼容旧同步模式（直接返回结果）
         if (json.data?.status === "completed") {
           show(
-            `审计完成：健康度 ${json.data?.healthScore ?? 0} 分，已爬 ${json.data?.pagesCrawled ?? 0} 页`,
+            t("toastDone", { score: json.data?.healthScore ?? 0, pages: json.data?.pagesCrawled ?? 0 }),
             "success"
           );
         } else if (json.data?.status === "failed") {
           const apiErr = json.data?.error || json?.error;
-          const hint = depth === "full" ? "审计超时，请尝试「快速审计」模式" : "审计失败，请稍后重试";
-          show(apiErr ? `${apiErr}（${hint}）` : hint, "error");
+          const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
+          show(apiErr ? t("apiErrorWithHint", { error: apiErr, hint }) : hint, "error");
         } else {
-          show("审计状态异常，请稍后重试", "error");
+          show(t("statusAbnormal"), "error");
         }
         await loadLatest(domain);
       }
     } catch (err) {
-      show(`网络错误：${(err as Error).message}`, "error");
+      show(t("networkErrorWith", { message: (err as Error).message }), "error");
     } finally {
       setStarting(false);
       setAuditing(false);
@@ -336,22 +356,22 @@ function AuditPageInner() {
         // 403 = FEATURE_NOT_AVAILABLE（feature 不允许），触发升级引导
         // 400/404 = feature 允许但 id 无效，继续生成 PDF
         if (verifyRes.status === 403) {
-          const { message } = handleBillingError(json, "PDF 导出权限不足");
+          const { message } = handleBillingError(json, t("pdfNoPermission"));
           show(message, "error");
           return;
         }
       }
 
-      const filename = `SeeO审计报告_${audit.domain}_${todayStr()}.pdf`;
+      const filename = t("pdfFilename", { domain: audit.domain, date: todayStr() });
       const blob = await generatePDF({
-        title: `审计报告 · ${audit.domain}`,
+        title: t("reportTitle", { domain: audit.domain }),
         filename,
         elementId: "report-content",
       });
       downloadPDF(blob, filename);
-      show("PDF 已下载", "success");
+      show(t("pdfDownloaded"), "success");
     } catch (err) {
-      show(`PDF 生成失败：${(err as Error).message}`, "error");
+      show(t("pdfFailed", { message: (err as Error).message }), "error");
     } finally {
       setExporting(false);
     }
@@ -366,7 +386,7 @@ function AuditPageInner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "audit",
-          title: `审计报告 · ${audit.domain}`,
+          title: t("reportTitle", { domain: audit.domain }),
           data_json: JSON.stringify({
             healthScore: audit.healthScore,
             issues: audit.issues,
@@ -376,14 +396,14 @@ function AuditPageInner() {
       });
       const json = await res.json();
       if (res.ok) {
-        show("已保存到报表中心", "success");
+        show(t("savedToReports"), "success");
         setExportOpen(false);
       } else {
-        const { message } = handleBillingError(json, "保存失败");
+        const { message } = handleBillingError(json, t("saveFailed"));
         show(message, "error");
       }
     } catch (err) {
-      show(`保存失败：${(err as Error).message}`, "error");
+      show(t("saveFailedWith", { message: (err as Error).message }), "error");
     } finally {
       setSaving(false);
     }
@@ -449,7 +469,7 @@ function AuditPageInner() {
       { bucket: "<1s", count: 0 },
       { bucket: "1-3s", count: 0 },
       { bucket: "3-10s", count: 0 },
-      { bucket: "超时", count: 0 },
+      { bucket: t("bucketTimeout"), count: 0 },
     ];
     for (const p of pagesDetail) {
       if (!p.ok) {
@@ -463,15 +483,15 @@ function AuditPageInner() {
       }
     }
     return buckets;
-  }, [audit?.pagesDetail]);
+  }, [audit?.pagesDetail, t]);
 
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8 print-area">
       {/* 打印专用页眉 */}
       <div className="mb-6 hidden border-b border-line pb-3 print:block">
-        <div className="font-sans text-xs text-ink-40">SeeO · 技术审计报告</div>
+        <div className="font-sans text-xs text-ink-40">{t("printHeader")}</div>
         <h1 className="mt-1 font-display text-xl font-bold text-ink">
-          {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt) : formatTime(new Date().toISOString())}
+          {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt, locale, tc) : formatTime(new Date().toISOString(), locale, tc)}
         </h1>
       </div>
 
@@ -479,19 +499,19 @@ function AuditPageInner() {
       <div className="flex items-center gap-3 print:hidden">
         <span className="font-mono text-xs text-ink-40">05</span>
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          技术 SEO 审计
+          {t("title")}
         </h1>
         <div className="hairline flex-1" />
       </div>
       <p className="mt-1.5 font-sans text-sm text-ink-60 print:hidden">
-        自建抓取检测，不消耗 SerpApi 额度。BFS 爬取同域名页面（上限 50 页），20+ 项检查并计算健康分。
+        {t("subtitle")}
       </p>
 
       {/* 工具栏 */}
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
-            <label className="font-sans text-xs text-ink-40">审计域名</label>
+            <label className="font-sans text-xs text-ink-40">{t("domainLabel")}</label>
             <DomainSelect
               value={domain}
               onChange={(d) => {
@@ -501,7 +521,7 @@ function AuditPageInner() {
             />
           </div>
           <button type="submit" className="btn-secondary">
-            查看
+            {t("viewBtn")}
           </button>
         </form>
         <div className="flex items-center gap-2">
@@ -516,19 +536,19 @@ function AuditPageInner() {
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                审计首页…
+                {t("quickAuditing")}
               </>
             ) : starting && pendingDepth === "quick" ? (
-              "启动中…"
+              t("starting")
             ) : (
-              "快速审计"
+              t("quickAudit")
             )}
           </button>
           {canFullAudit ? (
             <button
               onClick={() => openConfirm("full")}
               disabled={auditing || starting}
-              title="耗时较长，建议本地使用"
+              title={t("fullAuditTip")}
               className="btn-secondary disabled:opacity-60"
             >
               {auditing && activeDepth === "full" ? (
@@ -537,24 +557,24 @@ function AuditPageInner() {
                     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
                     <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
-                  深度审计中…
+                  {t("fullAuditing")}
                 </>
               ) : starting && pendingDepth === "full" ? (
-                "启动中…"
+                t("starting")
               ) : (
-                "深度审计"
+                t("fullAudit")
               )}
             </button>
           ) : (
             <Link
               href="/pricing"
-              title="深度审计为 Pro 套餐功能"
+              title={t("fullAuditProTip")}
               className="btn-secondary inline-flex items-center gap-1.5"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              升级解锁深度审计
+              {t("upgradeFullAudit")}
             </Link>
           )}
           {hasResult && (
@@ -562,7 +582,7 @@ function AuditPageInner() {
               onClick={() => setExportOpen(true)}
               className="btn-secondary"
             >
-              导出报告
+              {t("exportReport")}
             </button>
           )}
         </div>
@@ -573,20 +593,20 @@ function AuditPageInner() {
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-sans text-xs text-ink-40 print:hidden">
           {audit ? (
             <>
-              <span>域名：<span className="text-ink-60">{audit.domain}</span></span>
+              <span>{t("domainColon")}<span className="text-ink-60">{audit.domain}</span></span>
               <span>·</span>
-              <span>上次审计：<span className="text-ink-60">{formatTime(audit.finishedAt ?? audit.startedAt)}</span></span>
+              <span>{t("lastAuditColon")}<span className="text-ink-60">{formatTime(audit.finishedAt ?? audit.startedAt, locale, tc)}</span></span>
               <span>·</span>
-              <span>已爬取：<span className="text-ink-60">{audit.pagesCrawled.toLocaleString()} 个页面</span></span>
+              <span>{t("pagesCrawledColon")}<span className="text-ink-60">{t("pagesUnit", { n: audit.pagesCrawled })}</span></span>
               {audit.status === "running" && (
                 <>
                   <span>·</span>
-                  <span className="text-warn">审计进行中…</span>
+                  <span className="text-warn">{t("auditInProgress")}</span>
                 </>
               )}
             </>
           ) : domain.trim() ? (
-            <span>暂无审计记录，点击右侧按钮开始首次审计</span>
+            <span>{t("noAuditRecord")}</span>
           ) : null}
         </div>
       )}
@@ -600,8 +620,8 @@ function AuditPageInner() {
               <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
             </svg>
           </div>
-          <div className="mt-3 text-sm font-medium text-ink">先去工作台创建项目，或手动输入域名</div>
-          <p className="mt-1 text-xs text-ink-40">审计域名会自动从你的项目列表中选择</p>
+          <div className="mt-3 text-sm font-medium text-ink">{t("emptyProjectsTitle")}</div>
+          <p className="mt-1 text-xs text-ink-40">{t("emptyProjectsHint")}</p>
         </div>
       )}
 
@@ -610,10 +630,10 @@ function AuditPageInner() {
         <div className="card-a mt-4 p-5 print:hidden">
           <div className="flex items-center justify-between font-sans text-xs text-ink-40">
             <span>
-              {activeDepth === "quick" ? "正在审计首页…" : "正在爬取并检测页面…"}
+              {activeDepth === "quick" ? t("progressQuick") : t("progressFull")}
             </span>
             <span className="text-warn">
-              {activeDepth === "quick" ? "首页" : "1-2 分钟"}
+              {activeDepth === "quick" ? t("progressBadgeQuick") : t("progressBadgeFull")}
             </span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-line-soft">
@@ -624,8 +644,9 @@ function AuditPageInner() {
           </div>
           <p className="mt-2 font-sans text-[10px] text-ink-40">
             {activeDepth === "quick"
-              ? "预计 3-5 秒完成，请稍候"
-              : "预计 1-2 分钟完成，请勿关闭页面"}
+              ? t("etaQuick")
+              : t("etaFull")
+            }
           </p>
         </div>
       )}
@@ -644,16 +665,16 @@ function AuditPageInner() {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
-              <div className="font-display text-sm font-bold text-neg">审计未完成</div>
+              <div className="font-display text-sm font-bold text-neg">{t("failedTitle")}</div>
               <p className="mt-1 font-sans text-sm text-ink-60">
                 {audit?.error
                   ? audit.error
                   : activeDepth === "full"
-                    ? "深度审计可能因页面过多超时，请尝试「快速审计」模式（仅审计首页）"
-                    : "爬虫未能完成抓取，请稍后重试"}
+                    ? t("failedHintFull")
+                    : t("failedHintDefault")}
               </p>
               <p className="mt-1 font-sans text-xs text-ink-40">
-                域名：{audit?.domain ?? domain} · {formatTime(audit?.finishedAt ?? audit?.startedAt ?? null)}
+                {t("domainColon")}{audit?.domain ?? domain} · {formatTime(audit?.finishedAt ?? audit?.startedAt ?? null, locale, tc)}
               </p>
             </div>
           </div>
@@ -669,35 +690,35 @@ function AuditPageInner() {
               <>
                 <ScoreRing score={healthScore} size={140} thickness={10} showLabel />
                 <div className="mt-3 font-display text-base font-bold text-ink">
-                  网站健康度
+                  {t("healthTitle")}
                 </div>
                 {/* 较上次审计变化 */}
                 {audit?.comparison ? (
                   <div className="mt-2">
                     {audit.comparison.previous === null ? (
-                      <span className="badge-info">首次审计</span>
+                      <span className="badge-info">{t("firstAuditBadge")}</span>
                     ) : audit.comparison.scoreChange >= 5 ? (
-                      <span className="badge-pos">↑ {audit.comparison.scoreChange} 分</span>
+                      <span className="badge-pos">{t("scoreUp", { n: audit.comparison.scoreChange })}</span>
                     ) : audit.comparison.scoreChange <= -5 ? (
-                      <span className="badge-err">↓ {Math.abs(audit.comparison.scoreChange)} 分</span>
+                      <span className="badge-err">{t("scoreDown", { n: Math.abs(audit.comparison.scoreChange) })}</span>
                     ) : (
-                      <span className="badge-info">持平</span>
+                      <span className="badge-info">{t("scoreFlat")}</span>
                     )}
                   </div>
                 ) : (
-                  <div className="mt-2 font-mono text-xs text-ink-40">基于真实爬取结果计算</div>
+                  <div className="mt-2 font-mono text-xs text-ink-40">{t("scoreNote")}</div>
                 )}
               </>
             ) : (
               <>
                 <div className="flex h-[140px] w-[140px] items-center justify-center rounded-full border-2 border-dashed border-line">
-                  <span className="font-mono text-xs text-ink-40">无数据</span>
+                  <span className="font-mono text-xs text-ink-40">{t("noData")}</span>
                 </div>
                 <div className="mt-3 font-display text-base font-bold text-ink">
-                  网站健康度
+                  {t("healthTitle")}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-ink-40">
-                  发起审计后显示
+                  {t("runAuditToShow")}
                 </div>
               </>
             )}
@@ -709,39 +730,39 @@ function AuditPageInner() {
               <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.error.bar }} />
               <div className="flex items-center gap-2 pl-2">
                 <span className="h-2 w-2 rounded-full bg-neg" />
-                <span className="font-mono text-xs text-ink-40">错误</span>
+                <span className="font-mono text-xs text-ink-40">{t("sevError")}</span>
               </div>
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-neg">
-                {audit?.errors.toLocaleString() ?? 0}
+                {formatNumber(audit?.errors ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
-                影响页面，需立即修复
+                {t("errCaption")}
               </div>
             </div>
             <div className="card-a relative overflow-hidden p-5">
               <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.warning.bar }} />
               <div className="flex items-center gap-2 pl-2">
                 <span className="h-2 w-2 rounded-full bg-warn" />
-                <span className="font-mono text-xs text-ink-40">警告</span>
+                <span className="font-mono text-xs text-ink-40">{t("sevWarning")}</span>
               </div>
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-warn">
-                {audit?.warnings.toLocaleString() ?? 0}
+                {formatNumber(audit?.warnings ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
-                建议尽快处理
+                {t("warnCaption")}
               </div>
             </div>
             <div className="card-a relative overflow-hidden p-5">
               <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.notice.bar }} />
               <div className="flex items-center gap-2 pl-2">
                 <span className="h-2 w-2 rounded-full bg-ink-25" />
-                <span className="font-mono text-xs text-ink-40">提示</span>
+                <span className="font-mono text-xs text-ink-40">{t("sevNotice")}</span>
               </div>
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-ink">
-                {audit?.notices.toLocaleString() ?? 0}
+                {formatNumber(audit?.notices ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
-                可择机优化
+                {t("noticeCaption")}
               </div>
             </div>
           </div>
@@ -756,15 +777,15 @@ function AuditPageInner() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">05-0</span>
-              <h2 className="font-display text-lg font-bold text-ink">审计概览图表</h2>
+              <h2 className="font-display text-lg font-bold text-ink">{t("chartsTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
               {/* 检查项类别分布 横向堆叠条 */}
               <ChartCard
-                title="检查项分布"
-                subtitle="按类别（严重/警告/提示）显示通过/未通过数量"
+                title={t("chartCoverageTitle")}
+                subtitle={t("chartCoverageSub")}
                 height={240}
                 className="lg:col-span-7"
               >
@@ -773,8 +794,8 @@ function AuditPageInner() {
 
               {/* 通过情况 donut */}
               <ChartCard
-                title="检查通过情况"
-                subtitle={`通过 ${passCount} 项 / 未通过 ${failCount} 项`}
+                title={t("chartPassTitle")}
+                subtitle={t("chartPassSub", { passed: passCount, failed: failCount })}
                 height={240}
                 className="lg:col-span-5"
               >
@@ -783,8 +804,8 @@ function AuditPageInner() {
 
               {/* 历史分数折线 */}
               <ChartCard
-                title="历史审计分数"
-                subtitle="近 10 次审计健康分变化"
+                title={t("chartHistoryTitle")}
+                subtitle={t("chartHistorySub")}
                 height={260}
                 className="lg:col-span-7"
               >
@@ -793,8 +814,8 @@ function AuditPageInner() {
 
               {/* 响应时间分布柱状（深度审计页面明细） */}
               <ChartCard
-                title="响应时间分布"
-                subtitle={activeDepth === "full" ? "深度审计页面明细" : "需深度审计后显示"}
+                title={t("chartResponseTitle")}
+                subtitle={activeDepth === "full" ? t("chartResponseSubFull") : t("chartResponseSubEmpty")}
                 height={260}
                 className="lg:col-span-5"
               >
@@ -807,10 +828,10 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-bold text-ink">
-              问题清单
+              {t("issuesTitle")}
             </h2>
             <span className="font-mono text-xs text-ink-40">
-              {hasResult ? `共 ${issueCount} 类问题` : "暂无数据"}
+              {hasResult ? t("issuesCount", { n: issueCount }) : t("noData")}
             </span>
           </div>
 
@@ -818,10 +839,10 @@ function AuditPageInner() {
           {hasResult && audit && audit.issues.length > 0 && (
             <div className="mt-3 flex gap-2">
               {([
-                { key: "all" as const, label: "全部", count: audit.issues.length },
-                { key: "error" as const, label: "错误", count: audit.issues.filter((i) => i.severity === "error").length },
-                { key: "warning" as const, label: "警告", count: audit.issues.filter((i) => i.severity === "warning").length },
-                { key: "notice" as const, label: "提示", count: audit.issues.filter((i) => i.severity === "notice").length },
+                { key: "all" as const, label: t("filterAll"), count: audit.issues.length },
+                { key: "error" as const, label: t("sevError"), count: audit.issues.filter((i) => i.severity === "error").length },
+                { key: "warning" as const, label: t("sevWarning"), count: audit.issues.filter((i) => i.severity === "warning").length },
+                { key: "notice" as const, label: t("sevNotice"), count: audit.issues.filter((i) => i.severity === "notice").length },
               ]).map((btn) => (
                 <button
                   key={btn.key}
@@ -844,11 +865,11 @@ function AuditPageInner() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-line-soft bg-line-soft/40">
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">检查项</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">级别</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">影响页面</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">示例 URL</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">详情</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thCheck")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSeverity")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thAffected")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSampleUrl")}</th>
+                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDetail")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -868,11 +889,11 @@ function AuditPageInner() {
                             <td className="px-4 py-3">
                               <span className={cfg.badge}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                                {cfg.label}
+                                {severityLabel[issue.severity]}
                               </span>
                             </td>
                             <td className="px-4 py-3 font-mono text-sm text-ink">
-                              {issue.affectedPages.toLocaleString()}
+                              {formatNumber(issue.affectedPages, locale)}
                             </td>
                             <td className="px-4 py-3 font-mono text-xs text-ink-60">
                               <span className="block max-w-[200px] truncate" title={issue.sampleUrl}>
@@ -896,8 +917,8 @@ function AuditPageInner() {
                             <tr className="border-b border-line-soft bg-[#FBFAF4]">
                               <td colSpan={5} className="px-4 py-3">
                                 <div className="flex flex-col gap-1 font-sans text-xs">
-                                  <span className="text-ink-40">问题详情：{issue.detail}</span>
-                                  <span className="text-ink-60">修复建议：{issue.suggestion ?? "—"}</span>
+                                  <span className="text-ink-40">{t("issueDetailLabel")}{issue.detail}</span>
+                                  <span className="text-ink-60">{t("suggestionLabel")}{issue.suggestion ?? "—"}</span>
                                 </div>
                               </td>
                             </tr>
@@ -911,9 +932,9 @@ function AuditPageInner() {
             </div>
           ) : (
             <div className="card-a mt-4 border border-dashed border-line p-10 text-center">
-              <div className="font-display text-base font-bold text-ink-40">暂无问题清单</div>
+              <div className="font-display text-base font-bold text-ink-40">{t("issuesEmptyTitle")}</div>
               <p className="mt-2 font-sans text-sm text-ink-40">
-                {audit ? "审计尚未完成或未检测到问题" : "发起首次审计后，此处将展示真实检测结果"}
+                {audit ? t("issuesEmptyRun") : t("issuesEmptyFirst")}
               </p>
             </div>
           )}
@@ -926,15 +947,15 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">05-1</span>
-            <h2 className="font-display text-lg font-bold text-ink">历史对比</h2>
+            <h2 className="font-display text-lg font-bold text-ink">{t("comparisonTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
 
           {audit.comparison.previous === null ? (
             <div className="card-a mt-4 p-6 text-center">
-              <span className="badge-info">首次审计</span>
+              <span className="badge-info">{t("firstAuditBadge")}</span>
               <p className="mt-2 font-mono text-xs text-ink-40">
-                暂无历史数据，下次审计后将显示对比
+                {t("firstAuditHint")}
               </p>
             </div>
           ) : (
@@ -943,49 +964,49 @@ function AuditPageInner() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {/* 上次 */}
                 <div className="rounded-lg border border-line bg-card p-4">
-                  <div className="font-mono text-xs text-ink-40">上次审计</div>
+                  <div className="font-mono text-xs text-ink-40">{t("prevAuditLabel")}</div>
                   <div className="mt-1 font-mono text-xs text-ink-60">
-                    {formatTime(audit.comparison.previous.checkedAt)}
+                    {formatTime(audit.comparison.previous.checkedAt, locale, tc)}
                   </div>
                   <div className="mt-2 font-mono text-2xl font-bold text-ink-60">
                     {audit.comparison.previous.score}
-                    <span className="text-sm text-ink-40"> 分</span>
+                    <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-ink-40">
-                    {audit.comparison.previous.issues} 个问题
+                    {t("issuesUnit", { n: audit.comparison.previous.issues })}
                   </div>
                 </div>
 
                 {/* 变化箭头 */}
                 <div className="flex flex-col items-center justify-center">
-                  <div className="font-mono text-xs text-ink-40">变化</div>
+                  <div className="font-mono text-xs text-ink-40">{t("changeLabel")}</div>
                   <div className={`mt-1 font-mono text-2xl font-bold ${
                     audit.comparison.scoreChange > 0 ? "text-pos" :
                     audit.comparison.scoreChange < 0 ? "text-neg" : "text-ink-40"
                   }`}>
                     {audit.comparison.scoreChange > 0 ? "↑" : audit.comparison.scoreChange < 0 ? "↓" : "→"}
-                    {" "}{Math.abs(audit.comparison.scoreChange)} 分
+                    {" "}{Math.abs(audit.comparison.scoreChange)}{" "}{t("pointsUnit")}
                   </div>
                   <div className={`mt-0.5 font-mono text-[10px] ${
                     audit.comparison.issuesChange < 0 ? "text-pos" :
                     audit.comparison.issuesChange > 0 ? "text-neg" : "text-ink-40"
                   }`}>
-                    {audit.comparison.issuesChange > 0 ? "+" : ""}{audit.comparison.issuesChange} 个问题
+                    {audit.comparison.issuesChange > 0 ? "+" : ""}{t("issuesUnit", { n: audit.comparison.issuesChange })}
                   </div>
                 </div>
 
                 {/* 本次 */}
                 <div className="rounded-lg border-2 border-brand bg-brand/5 p-4">
-                  <div className="font-mono text-xs text-brand">本次审计</div>
+                  <div className="font-mono text-xs text-brand">{t("currentAuditLabel")}</div>
                   <div className="mt-1 font-mono text-xs text-ink-60">
-                    {formatTime(audit.comparison.current.checkedAt)}
+                    {formatTime(audit.comparison.current.checkedAt, locale, tc)}
                   </div>
                   <div className="mt-2 font-mono text-2xl font-bold text-ink">
                     {audit.comparison.current.score}
-                    <span className="text-sm text-ink-40"> 分</span>
+                    <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-ink-40">
-                    {audit.comparison.current.issues} 个问题
+                    {t("issuesUnit", { n: audit.comparison.current.issues })}
                   </div>
                 </div>
               </div>
@@ -995,14 +1016,14 @@ function AuditPageInner() {
                 {/* 新增问题 */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="badge-err">新增</span>
+                    <span className="badge-err">{t("newBadge")}</span>
                     <span className="font-mono text-xs text-ink-40">
-                      {audit.comparison.newIssues.length} 个新问题
+                      {t("newIssuesCount", { n: audit.comparison.newIssues.length })}
                     </span>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {audit.comparison.newIssues.length === 0 ? (
-                      <div className="font-mono text-xs text-ink-40 py-2">无新增问题</div>
+                      <div className="font-mono text-xs text-ink-40 py-2">{t("noNewIssues")}</div>
                     ) : (
                       audit.comparison.newIssues.slice(0, 8).map((issue, idx) => (
                         <div key={`new-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
@@ -1021,14 +1042,14 @@ function AuditPageInner() {
                 {/* 已修复 */}
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="badge-pos">已修复</span>
+                    <span className="badge-pos">{t("resolvedBadge")}</span>
                     <span className="font-mono text-xs text-ink-40">
-                      {audit.comparison.resolvedIssues.length} 个问题已修复
+                      {t("resolvedCount", { n: audit.comparison.resolvedIssues.length })}
                     </span>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {audit.comparison.resolvedIssues.length === 0 ? (
-                      <div className="font-mono text-xs text-ink-40 py-2">无已修复问题</div>
+                      <div className="font-mono text-xs text-ink-40 py-2">{t("noResolvedIssues")}</div>
                     ) : (
                       audit.comparison.resolvedIssues.slice(0, 8).map((issue, idx) => (
                         <div key={`resolved-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
@@ -1052,7 +1073,7 @@ function AuditPageInner() {
                     onClick={() => setShowUnchanged(!showUnchanged)}
                     className="font-mono text-xs text-ink-60 hover:text-ink"
                   >
-                    {showUnchanged ? "▼" : "▶"} 未变化问题（{audit.comparison.unchangedIssues.length} 个）
+                    {showUnchanged ? "▼" : "▶"}{" "}{t("unchangedToggle", { n: audit.comparison.unchangedIssues.length })}
                   </button>
                   {showUnchanged && (
                     <div className="mt-2 space-y-1.5">
@@ -1080,11 +1101,15 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">05-2</span>
-            <h2 className="font-display text-lg font-bold text-ink">检查项覆盖</h2>
+            <h2 className="font-display text-lg font-bold text-ink">{t("coverageTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
           <p className="mt-1.5 font-mono text-xs text-ink-40">
-            共 {audit.coverage.length} 项检查 · 通过 {audit.coverage.filter((c) => c.passed).length} 项 · 未通过 {audit.coverage.filter((c) => !c.passed).length} 项
+            {t("coverageSummary", {
+              total: audit.coverage.length,
+              passed: audit.coverage.filter((c) => c.passed).length,
+              failed: audit.coverage.filter((c) => !c.passed).length,
+            })}
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -1119,10 +1144,10 @@ function AuditPageInner() {
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className={`badge-${check.category === "critical" ? "err" : check.category === "warning" ? "warn" : "info"}`}>
-                      {catCfg.label}
+                      {categoryLabel[check.category]}
                     </span>
                     <span className="font-mono text-[10px] text-ink-40">
-                      {check.passed ? "通过" : `影响 ${check.affectedPages} 页`}
+                      {check.passed ? t("checkPassed") : t("checkAffected", { n: check.affectedPages })}
                     </span>
                   </div>
                 </div>
@@ -1138,10 +1163,10 @@ function AuditPageInner() {
           <div className="card-a flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
             <div>
               <div className="font-display text-base font-bold text-ink">
-                下一步：追踪关键词排名
+                {t("nextStepTitle")}
               </div>
               <p className="mt-1 font-sans text-sm text-ink-60">
-                把审计发现的关键词加入监控，每日自动记录 Google 排名变化。
+                {t("nextStepDesc")}
               </p>
             </div>
             <Link
@@ -1152,7 +1177,7 @@ function AuditPageInner() {
               }
               className="btn-primary whitespace-nowrap"
             >
-              添加关键词追踪 →
+              {t("nextStepCta")}
             </Link>
           </div>
         </div>
@@ -1162,43 +1187,46 @@ function AuditPageInner() {
       <Modal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
-        title={pendingDepth === "quick" ? "确认发起快速审计" : "确认发起深度审计"}
+        title={pendingDepth === "quick" ? t("confirmQuickTitle") : t("confirmFullTitle")}
         footer={
           <>
             <button
               onClick={() => setConfirmOpen(false)}
               className="btn-secondary"
             >
-              取消
+              {tc("cancel")}
             </button>
             <button
               onClick={handleConfirmAudit}
               className="btn-primary"
             >
-              确认审计
+              {t("confirmAuditBtn")}
             </button>
           </>
         }
       >
         <div className="space-y-3">
           <p className="font-sans text-sm text-ink">
-            将对域名 <span className="font-mono text-brand">{domain}</span> 发起
-            {pendingDepth === "quick" ? "快速" : "深度"}技术审计。
+            {t.rich("confirmBody", {
+              domainVal: domain,
+              depth: pendingDepth === "quick" ? t("depthQuick") : t("depthFull"),
+              domain: (chunks) => <span className="font-mono text-brand">{chunks}</span>,
+            })}
           </p>
           {pendingDepth === "quick" ? (
             <ul className="space-y-1.5 font-mono text-xs text-ink-40">
-              <li>· 仅爬取首页（1 页），3-5 秒完成</li>
-              <li>· 覆盖 80% 检查项（标题/描述/H1/alt/canonical/SSL 等）</li>
-              <li>· 不包含重复标题/描述/H1、死链、sitemap（需多页交叉）</li>
-              <li>· 同一域名 1 小时内仅允许审计一次</li>
+              <li>{t("quickPoint1")}</li>
+              <li>{t("quickPoint2")}</li>
+              <li>{t("quickPoint3")}</li>
+              <li>{t("rateLimitPoint")}</li>
             </ul>
           ) : (
             <ul className="space-y-1.5 font-mono text-xs text-ink-40">
-              <li>· BFS 爬取同域名页面，上限 50 页</li>
-              <li>· 并发 2，单页超时 10 秒，尊重 robots.txt</li>
-              <li>· 20+ 项检查（含重复标题/描述/H1、死链、sitemap）</li>
-              <li>· 预计 1-2 分钟完成，耗时较长建议本地使用</li>
-              <li>· 同一域名 1 小时内仅允许审计一次</li>
+              <li>{t("fullPoint1")}</li>
+              <li>{t("fullPoint2")}</li>
+              <li>{t("fullPoint3")}</li>
+              <li>{t("fullPoint4")}</li>
+              <li>{t("rateLimitPoint")}</li>
             </ul>
           )}
         </div>
@@ -1208,11 +1236,11 @@ function AuditPageInner() {
       <Modal
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        title="导出审计报告"
+        title={t("exportTitle")}
       >
         <div className="space-y-3">
           <p className="font-sans text-xs text-ink-60">
-            域名：{audit?.domain} · 健康度 {audit?.healthScore ?? 0} 分
+            {t("exportMeta", { domain: audit?.domain ?? "", score: audit?.healthScore ?? 0 })}
           </p>
           <div className="flex flex-col gap-2">
             {canExportPdf ? (
@@ -1221,14 +1249,14 @@ function AuditPageInner() {
                 disabled={exporting || saving}
                 className="btn-primary disabled:opacity-60"
               >
-                {exporting ? "生成中…" : "下载 PDF"}
+                {exporting ? t("generating") : t("downloadPdf")}
               </button>
             ) : (
               <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-1.5">
                 <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                   <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                升级解锁 PDF 导出
+                {t("upgradePdf")}
               </Link>
             )}
             <button
@@ -1236,12 +1264,12 @@ function AuditPageInner() {
               disabled={exporting || saving}
               className="btn-secondary disabled:opacity-60"
             >
-              {saving ? "保存中…" : "保存到报表中心"}
+              {saving ? t("saving") : t("saveToReports")}
             </button>
           </div>
           <p className="font-sans text-[10px] text-ink-40">
-            · PDF 在浏览器端即时生成，不占存储<br />
-            · 保存到报表中心后可在报表页随时回看
+            {t("exportNote1")}<br />
+            {t("exportNote2")}
           </p>
         </div>
       </Modal>
@@ -1265,7 +1293,7 @@ function AuditPageInner() {
               name: c.name,
               passed: c.passed,
             }))}
-            generatedAt={formatTime(audit.finishedAt ?? audit.startedAt)}
+            generatedAt={formatTime(audit.finishedAt ?? audit.startedAt, locale, tc)}
           />
         </div>
       )}
