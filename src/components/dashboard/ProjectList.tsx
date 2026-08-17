@@ -8,6 +8,7 @@ import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
+import { canSubmitDelete } from "@/lib/delete-guard";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import HealthScoreBars from "@/components/dashboard/charts/HealthScoreBars";
 import AlertAreaChart from "@/components/dashboard/charts/AlertAreaChart";
@@ -154,11 +155,17 @@ export default function ProjectList({
     setCreating(false);
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
+  // 删除提交：参数显式传入渲染时捕获的项目对象（不读 selectedProjectId、不用数组 index）。
+  // 发请求前经 canSubmitDelete 最后一道防线校验 id/domain，非法一律拒绝并报错。
+  const handleDelete = async (target: ProjectWithMetrics) => {
+    if (!canSubmitDelete(target)) {
+      show("删除目标校验失败（id 或域名缺失/非法），已取消删除", "error");
+      setDeleteTarget(null);
+      return;
+    }
     setDeleting(true);
     try {
-      const res = await fetch(`/api/projects?id=${deleteTarget.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(target.id)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
         show(data.error || "删除失败", "error");
@@ -166,7 +173,7 @@ export default function ProjectList({
         return;
       }
       setDeleteTarget(null);
-      show("项目已删除（历史数据保留）", "success");
+      show(`项目已删除（${target.domain}，历史数据保留）`, "success");
       router.refresh();
     } catch {
       show("网络错误，请稍后重试", "error");
@@ -488,8 +495,8 @@ export default function ProjectList({
               取消
             </button>
             <button
-              onClick={handleDelete}
-              disabled={deleting}
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              disabled={deleting || !canSubmitDelete(deleteTarget)}
               className="btn-primary"
               style={{ backgroundColor: "var(--color-neg)", color: "#fff" }}
             >
@@ -500,6 +507,10 @@ export default function ProjectList({
       >
         <p className="font-sans text-sm text-ink-60">
           确定要删除项目「{deleteTarget?.name}」（{deleteTarget?.domain}）吗？
+        </p>
+        {/* 最终核对：完整项目 UUID（与 DELETE 请求 ?id= 参数一致） */}
+        <p className="mt-1.5 font-mono text-[11px] break-all text-ink-40">
+          ID: {deleteTarget?.id}
         </p>
         <p className="mt-2 font-sans text-xs text-ink-40">
           仅删除项目记录，历史追踪数据和审计报告保留不变。
