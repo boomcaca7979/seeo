@@ -10,6 +10,7 @@
 // 不会被重定向到 /zh。
 
 import { defineRouting } from "next-intl/routing";
+import { createNavigation } from "next-intl/navigation";
 import { locales, defaultLocale } from "./config";
 
 export const routing = defineRouting({
@@ -17,3 +18,7 @@ export const routing = defineRouting({
   defaultLocale,
   localePrefix: "as-needed",
 });
+
+// locale-aware 导航 API（Link/useRouter/usePathname）：
+// href 无需手写 /zh 前缀，按当前 locale 自动生成，避免出现 /en、/zh/zh 等错误路径
+export const { Link, useRouter, usePathname } = createNavigation(routing);

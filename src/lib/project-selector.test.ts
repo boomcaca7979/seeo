@@ -14,7 +14,7 @@ import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } fro
 
 const SRC = {
   topbar: readFileSync(fileURLToPath(new URL("../components/dashboard/Topbar.tsx", import.meta.url)), "utf-8"),
-  competitors: readFileSync(fileURLToPath(new URL("../app/(dashboard)/app/competitors/page.tsx", import.meta.url)), "utf-8"),
+  competitors: readFileSync(fileURLToPath(new URL("../app/(default)/(dashboard)/app/competitors/page.tsx", import.meta.url)), "utf-8"),
 };
 
 describe("共享常量（Topbar 与 competitors 使用同一契约）", () => {
@@ -72,7 +72,7 @@ describe("competitors 页项目 id 全链路 string（防回归）", () => {
 
 describe("audit 页项目 id string 化（防回归）", () => {
   it("ProjectItem.id 为 string（供 position-tracking 链接拼 UUID）", () => {
-    const src = readFileSync(fileURLToPath(new URL("../app/(dashboard)/app/audit/page.tsx", import.meta.url)), "utf-8");
+    const src = readFileSync(fileURLToPath(new URL("../app/(default)/(dashboard)/app/audit/page.tsx", import.meta.url)), "utf-8");
     expect(src).toMatch(/interface ProjectItem \{[\s\S]*?id: string;/);
   });
 });

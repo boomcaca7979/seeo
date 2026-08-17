@@ -6,8 +6,8 @@ import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
 import { alternatesFor } from "@/i18n/seo";
-import PricingPage from "../../pricing/page";
-import { metadata as pricingMetadata } from "../../pricing/layout";
+import PricingPage from "../../(default)/pricing/page";
+import { metadata as pricingMetadata } from "../../(default)/pricing/layout";
 
 interface LocalePricingPageProps {
   params: Promise<{ locale: string }>;

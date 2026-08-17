@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
 import { alternatesFor } from "@/i18n/seo";
-import DocsPage, { metadata as docsMetadata } from "../../docs/page";
+import DocsPage, { metadata as docsMetadata } from "../../(default)/docs/page";
 
 interface LocaleDocsPageProps {
   params: Promise<{ locale: string }>;

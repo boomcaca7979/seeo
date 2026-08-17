@@ -8,7 +8,7 @@ import { isLocale } from "@/i18n/config";
 import { alternatesFor } from "@/i18n/seo";
 import SeoAuditFeaturePage, {
   metadata as seoAuditMetadata,
-} from "../../../features/seo-audit/page";
+} from "../../../(default)/features/seo-audit/page";
 
 interface LocaleSeoAuditPageProps {
   params: Promise<{ locale: string }>;

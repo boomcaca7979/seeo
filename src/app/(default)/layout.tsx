@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
 import { CookieBanner } from "@/components/cookie-banner";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
-import "./globals.css";
+import zhMessages from "../../../messages/zh.json";
+import "../globals.css";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -86,7 +88,11 @@ export default function RootLayout({
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
         <JsonLd schema={organizationSchema()} />
         <JsonLd schema={websiteSchema()} />
-        {children}
+        {/* legacy 中文页固定 zh locale（静态，无动态 API），保证 Navbar 等
+            client 组件的 useTranslations 在无 [locale] 段的页面也能工作 */}
+        <NextIntlClientProvider locale="zh" messages={zhMessages}>
+          {children}
+        </NextIntlClientProvider>
         <CookieBanner />
       </body>
     </html>
