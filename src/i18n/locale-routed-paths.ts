@@ -7,6 +7,12 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/pricing",
   "/docs",
   "/features/seo-audit",
+  "/features/rank-tracking",
+  "/features/backlink-analysis",
+  "/about",
+  "/privacy",
+  "/terms",
+  "/refund",
 ]);
 
 /** 剥离 /zh locale 前缀，返回逻辑路径（en 即原样） */

@@ -135,8 +135,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
     >
       <body className="min-h-full flex flex-col bg-station text-y-text font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
-        <JsonLd schema={organizationSchema()} />
-        <JsonLd schema={websiteSchema()} />
+        <JsonLd schema={organizationSchema(locale)} />
+        <JsonLd schema={websiteSchema(locale)} />
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

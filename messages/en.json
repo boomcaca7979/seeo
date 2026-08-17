@@ -38,26 +38,64 @@
     "field": {
       "center": "SEO workbench",
       "satellites": [
-        { "kw": "Long-tail keywords" },
-        { "kw": "Competitor ranks" },
-        { "kw": "Search intent" },
-        { "kw": "SERP features" },
-        { "kw": "Link opportunities" },
-        { "kw": "Content gaps" },
-        { "kw": "Local SEO" }
+        {
+          "kw": "Long-tail keywords"
+        },
+        {
+          "kw": "Competitor ranks"
+        },
+        {
+          "kw": "Search intent"
+        },
+        {
+          "kw": "SERP features"
+        },
+        {
+          "kw": "Link opportunities"
+        },
+        {
+          "kw": "Content gaps"
+        },
+        {
+          "kw": "Local SEO"
+        }
       ]
     }
   },
   "ticker": {
     "items": [
-      { "label": "Keyword research", "value": "Volume / difficulty / intent" },
-      { "label": "Rank tracking", "value": "Daily auto updates" },
-      { "label": "Technical audits", "value": "20+ checks" },
-      { "label": "Competitor analysis", "value": "Share of voice" },
-      { "label": "Content optimization", "value": "SERP Top 10 comparison" },
-      { "label": "Backlink analysis", "value": "DataForSEO powered" },
-      { "label": "Search engine", "value": "Google" },
-      { "label": "Data export", "value": "PDF / Excel (Pro)" }
+      {
+        "label": "Keyword research",
+        "value": "Volume / difficulty / intent"
+      },
+      {
+        "label": "Rank tracking",
+        "value": "Daily auto updates"
+      },
+      {
+        "label": "Technical audits",
+        "value": "20+ checks"
+      },
+      {
+        "label": "Competitor analysis",
+        "value": "Share of voice"
+      },
+      {
+        "label": "Content optimization",
+        "value": "SERP Top 10 comparison"
+      },
+      {
+        "label": "Backlink analysis",
+        "value": "DataForSEO powered"
+      },
+      {
+        "label": "Search engine",
+        "value": "Google"
+      },
+      {
+        "label": "Data export",
+        "value": "PDF / Excel (Pro)"
+      }
     ]
   },
   "features": {
@@ -70,7 +108,12 @@
         "tag": "Research",
         "title": "Keyword Research",
         "desc": "Expand a seed keyword into a full set of related terms, with search volume, difficulty, intent, and CPC to find long-tail opportunities that can drive traffic.",
-        "bullets": ["Related / phrase match", "KD difficulty score", "Search intent", "Volume / CPC"],
+        "bullets": [
+          "Related / phrase match",
+          "KD difficulty score",
+          "Search intent",
+          "Volume / CPC"
+        ],
         "metricLabel": "Data source",
         "metricValue": "SerpApi"
       },
@@ -78,7 +121,12 @@
         "tag": "Tracking",
         "title": "Rank Tracking",
         "desc": "Monitor your rankings by keyword, location, and device, and get alerted the moment positions move — no more manual daily checks.",
-        "bullets": ["Daily auto refresh", "Multiple locations / devices", "Rank trend curves", "Volatility alerts"],
+        "bullets": [
+          "Daily auto refresh",
+          "Multiple locations / devices",
+          "Rank trend curves",
+          "Volatility alerts"
+        ],
         "metricLabel": "Refresh cadence",
         "metricValue": "Daily"
       },
@@ -86,7 +134,12 @@
         "tag": "Diagnostics",
         "title": "Technical SEO Audit",
         "desc": "Crawl your site and surface 404s, redirect chains, duplicate titles, missing Alt text, and other technical issues — prioritized so you know what to fix first.",
-        "bullets": ["Health score", "Errors / warnings / notices", "Page response analysis", "Fix priority"],
+        "bullets": [
+          "Health score",
+          "Errors / warnings / notices",
+          "Page response analysis",
+          "Fix priority"
+        ],
         "metricLabel": "Checks",
         "metricValue": "20+"
       },
@@ -94,7 +147,12 @@
         "tag": "Diagnostics",
         "title": "Backlink Analysis",
         "desc": "See who links to you, how anchor text is distributed, and which backlinks are growing or fading — find link sources worth pursuing.",
-        "bullets": ["Backlink overview + DA", "Referring domains", "Anchor text distribution", "Growth / loss trends"],
+        "bullets": [
+          "Backlink overview + DA",
+          "Referring domains",
+          "Anchor text distribution",
+          "Growth / loss trends"
+        ],
         "metricLabel": "Data source",
         "metricValue": "DataForSEO"
       },
@@ -102,7 +160,12 @@
         "tag": "Insights",
         "title": "Competitor Analysis",
         "desc": "Compare your keyword rankings side by side with competitors to see where you lag and where the opportunities are — stop going by gut feeling.",
-        "bullets": ["Domain overview comparison", "Share of voice", "Rank gap analysis", "Historical trend overlays"],
+        "bullets": [
+          "Domain overview comparison",
+          "Share of voice",
+          "Rank gap analysis",
+          "Historical trend overlays"
+        ],
         "metricLabel": "Dimension",
         "metricValue": "Share of voice"
       },
@@ -110,7 +173,12 @@
         "tag": "Optimize",
         "title": "Content Optimization",
         "desc": "Enter a page and a target keyword to see which topics to cover, how long to write, and what to improve — benchmarked against the SERP top 10.",
-        "bullets": ["On-page SEO checks", "Content score", "Topic term suggestions", "SEO checklist"],
+        "bullets": [
+          "On-page SEO checks",
+          "Content score",
+          "Topic term suggestions",
+          "SEO checklist"
+        ],
         "metricLabel": "Benchmark",
         "metricValue": "SERP Top 10"
       }
@@ -284,5 +352,602 @@
     "wxpay": "WeChat Pay",
     "wxpayDesc": "Scan the QR code or pay in WeChat",
     "creating": "Creating order…"
+  },
+  "featureShared": {
+    "eyebrow": "FEATURE",
+    "sections": {
+      "whatItDoes": "What it does",
+      "howItWorks": "How it works",
+      "checkCoverage": "Check coverage",
+      "fitAndLimits": "Fit & limits",
+      "faq": "FAQ"
+    },
+    "fitTitle": "Who it's for",
+    "limitsTitle": "Real limitations",
+    "related": "RELATED",
+    "cta": {
+      "signup": "Start free",
+      "pricing": "View pricing",
+      "docs": "Product docs"
+    },
+    "backHome": "← Back to home",
+    "labels": {
+      "input": "INPUT",
+      "process": "PROCESS",
+      "output": "OUTPUT",
+      "dataSource": "DATA SOURCE"
+    }
+  },
+  "seoAudit": {
+    "meta": {
+      "title": "Technical SEO Audit Tool · SeeO",
+      "description": "Run a technical SEO audit with SeeO: crawl your site, execute 20+ technical checks, and get a health score with prioritized fixes. Quick single-page checks and full-site audits."
+    },
+    "title": "Technical SEO Audit",
+    "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority",
+    "whatItDoes": "The technical SEO audit crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Audit history is saved, so you can compare scores and issue counts between runs.",
+    "how": {
+      "input": "A website URL (one domain)",
+      "process": [
+        "In-house crawler (server-side fetching based on cheerio) retrieves page HTML",
+        "Runs 20+ rule-based checks on each page",
+        "Computes a health score weighted across checks",
+        "Ranks issues by impact"
+      ],
+      "output": [
+        "Health score (0–100)",
+        "Issue list with fix recommendations",
+        "Audit history comparison",
+        "PDF / Excel audit reports (Pro)"
+      ],
+      "dataSource": "SeeO's own crawler fetches the target site directly — no third-party data API involved"
+    },
+    "checks": [
+      {
+        "cat": "On-page basics",
+        "items": "Title tags, meta descriptions, heading hierarchy, image alt text"
+      },
+      {
+        "cat": "Indexability",
+        "items": "canonical, robots.txt, sitemap, noindex detection"
+      },
+      {
+        "cat": "Security & performance",
+        "items": "SSL certificate, page load, mobile readiness"
+      },
+      {
+        "cat": "Link structure",
+        "items": "Internal link structure, broken link detection"
+      }
+    ],
+    "who": [
+      "Site owners who need regular technical health checks",
+      "Teams verifying a redesign or migration didn't introduce regressions",
+      "Anyone taking over a new site who needs a fast baseline"
+    ],
+    "limits": [
+      "Full-site audits crawl up to 50 pages per run",
+      "Daily audit counts are limited by plan",
+      "Checks are rule-driven static analysis — no manual diagnosis"
+    ],
+    "faqs": [
+      {
+        "q": "Do I need an account to audit a website?",
+        "a": "The homepage offers a no-signup single-page quick audit — enter a URL and see basic checks immediately. Saving audit history, running full-site audits, and comparing history require a free account."
+      },
+      {
+        "q": "What does the audit check?",
+        "a": "20+ technical SEO checks covering title tags, meta descriptions, H1 hierarchy, image alt text, canonical, SSL certificates, robots.txt, sitemap, mobile readiness, and page performance."
+      },
+      {
+        "q": "How deep can audits go?",
+        "a": "Two depths: quick mode audits 1 page; full mode crawls from your sitemap with a maximum of 50 pages."
+      },
+      {
+        "q": "How are results presented?",
+        "a": "Every audit produces a 0–100 health score (weighted across checks), a priority-ranked issue list with fix suggestions, and comparison against previous audits."
+      },
+      {
+        "q": "Can I export audit reports?",
+        "a": "Yes — PDF and Excel export is included in the Pro plan."
+      },
+      {
+        "q": "Is there a limit on audit frequency?",
+        "a": "Yes, audits are limited per day; the quota depends on your plan (see the pricing page)."
+      }
+    ],
+    "related": {
+      "rankTracking": {
+        "title": "Rank Tracking →",
+        "desc": "Daily Google rank monitoring"
+      },
+      "backlinks": {
+        "title": "Backlink Analysis →",
+        "desc": "Total backlinks and referring domains"
+      }
+    },
+    "cta": {
+      "title": "Run your first audit",
+      "subtitle": "Single-page quick audits are available on the free plan"
+    }
+  },
+  "rankTracking": {
+    "meta": {
+      "title": "Rank Tracking Tool · SeeO",
+      "description": "Track Google keyword rankings by keyword, location, and device with SeeO. Daily automatic refreshes, history trends, and volatility alerts. Powered by SerpApi."
+    },
+    "title": "Keyword Rank Tracking",
+    "subtitle": "Your real Google positions recorded automatically every day — know immediately when rankings move",
+    "whatItDoes": "Rank tracking monitors Google search positions across four dimensions: keyword × domain × location × device. Rankings refresh automatically once a day and are written to history, so you can view a trend curve for every keyword — and get an alert whenever rankings move significantly.",
+    "how": {
+      "input": "A keyword list + target domain + location + device (desktop / mobile)",
+      "process": [
+        "A daily scheduled job queries rankings (with controlled concurrency)",
+        "Identical parameters are cached for 24 hours to avoid duplicate calls",
+        "Each result is compared with the previous record to compute the change",
+        "Movements beyond the threshold generate an alert"
+      ],
+      "output": [
+        "Daily rank records and history trend curves",
+        "Rank changes (up / down / unchanged)",
+        "Volatility alerts",
+        "Rank reports (exportable)"
+      ],
+      "dataSource": "SerpApi (Google SERP data, billed per call; SeeO adds usage counting and circuit-breaker protection)"
+    },
+    "who": [
+      "Site owners who need daily data to judge optimization impact",
+      "SEO practitioners managing multi-location, multi-device rankings",
+      "Agencies reporting rank trends to clients"
+    ],
+    "limits": [
+      "Google only (no Bing or Baidu yet)",
+      "Manual refresh processes up to 20 keywords per request",
+      "Trackable keyword counts are limited by plan",
+      "SerpApi calls are protected by a system-level circuit breaker"
+    ],
+    "faqs": [
+      {
+        "q": "Where does ranking data come from?",
+        "a": "From SerpApi's Google search results. SeeO does not currently support Bing, Baidu, or other search engines."
+      },
+      {
+        "q": "How often do rankings refresh?",
+        "a": "Once a day via a scheduled job; you can also trigger a manual refresh on the rank tracking page — up to 20 keywords per request."
+      },
+      {
+        "q": "Can I track rankings by location and device?",
+        "a": "Yes. Each keyword can specify a location and device (desktop / mobile); rankings are recorded per dimension."
+      },
+      {
+        "q": "Do repeated queries for the same keyword consume quota twice?",
+        "a": "No. Queries with identical parameters (keyword + domain + location + device) reuse a 24-hour cache without calling SerpApi again."
+      },
+      {
+        "q": "Will I be notified of rank changes?",
+        "a": "Yes. After each refresh, significant movements automatically generate alerts you can view in-app."
+      },
+      {
+        "q": "Do I need an account to use rank tracking?",
+        "a": "Yes. Rank tracking keeps continuous history, so you need a free account to add projects and keywords."
+      }
+    ],
+    "related": {
+      "seoAudit": {
+        "title": "Technical SEO Audit →",
+        "desc": "20+ technical checks and a health score"
+      },
+      "backlinks": {
+        "title": "Backlink Analysis →",
+        "desc": "Total backlinks and referring domains"
+      }
+    },
+    "cta": {
+      "title": "Start tracking your keywords",
+      "subtitle": "Add a project and keywords after signing up"
+    }
+  },
+  "backlinks": {
+    "meta": {
+      "title": "Backlink Analysis Tool · SeeO",
+      "description": "Analyze backlinks with SeeO: total backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text distribution. Powered by DataForSEO. Pro plan, 7-day cache."
+    },
+    "title": "Backlink Analysis",
+    "subtitle": "See the scale, quality, and composition of links pointing to your site",
+    "whatItDoes": "Backlink analysis pulls the link profile of a domain: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Results are cached for 7 days, so you can compare across refreshes.",
+    "how": {
+      "input": "A domain (e.g. example.com)",
+      "process": [
+        "Checks the 7-day cache first — a hit returns instantly without consuming quota",
+        "On a miss, fetches backlink data from DataForSEO",
+        "Stores results with a 7-day cache",
+        "A 1-hour per-domain cooldown prevents duplicate fetches"
+      ],
+      "output": [
+        "Total backlinks / referring domains / Domain Rank / dofollow ratio",
+        "Link details (source, anchor, target, first seen)",
+        "Referring domain and anchor distributions"
+      ],
+      "dataSource": "DataForSEO backlink database (billed per call; SeeO enforces a monthly quota)"
+    },
+    "who": [
+      "Pro users measuring link-building results",
+      "SEO practitioners studying competitor link profiles",
+      "Anyone monitoring link growth and loss over time"
+    ],
+    "limits": [
+      "Included in the Pro plan only",
+      "Per-domain data is cached for 7 days — not real-time",
+      "Monthly query quota depends on your plan",
+      "Coverage follows the DataForSEO index"
+    ],
+    "faqs": [
+      {
+        "q": "Where does backlink data come from?",
+        "a": "From DataForSEO's backlink database. SeeO does not build its own link index; results come directly from this third-party data provider."
+      },
+      {
+        "q": "Which plans include backlink analysis?",
+        "a": "Backlink analysis is a Pro feature — not available on Free or Lite. See the pricing page for details."
+      },
+      {
+        "q": "How often can I query?",
+        "a": "Results per domain are cached for 7 days and served from cache during that window; after expiry, a domain can be re-fetched at most once per hour."
+      },
+      {
+        "q": "Which metrics are provided?",
+        "a": "Total backlinks, referring domains, Domain Rank, dofollow ratio, and per-link details: source page, anchor text, target page, and first-seen date."
+      },
+      {
+        "q": "Is there a query limit?",
+        "a": "Yes — a monthly quota that depends on your plan. Queries pause when the quota is exhausted (see the pricing page)."
+      }
+    ],
+    "related": {
+      "seoAudit": {
+        "title": "Technical SEO Audit →",
+        "desc": "20+ technical checks and a health score"
+      },
+      "rankTracking": {
+        "title": "Rank Tracking →",
+        "desc": "Daily Google rank monitoring"
+      }
+    },
+    "cta": {
+      "title": "Use backlink analysis",
+      "subtitle": "Backlink analysis is included in the Pro plan"
+    }
+  },
+  "docsPage": {
+    "meta": {
+      "title": "Docs · SeeO",
+      "description": "SeeO product docs: what SeeO is, its core features, data sources, and how to use them."
+    },
+    "eyebrow": "DOCS",
+    "title": "Product Docs",
+    "subtitle": "What SeeO is, what it can do, and where the data comes from",
+    "sections": {
+      "intro": "Introduction",
+      "features": "Core features",
+      "dataSources": "Data sources",
+      "faq": "FAQ"
+    },
+    "intro": [
+      "SeeO is an SEO analytics platform that helps site owners and SEO practitioners make search optimization decisions based on real data.",
+      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, backlink analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
+      "SeeO does not build its own search index. Real-time SERP data comes from third-party APIs such as SerpApi and DataForSEO, combined with SeeO's own crawler for technical audits and content analysis."
+    ],
+    "features": [
+      {
+        "id": "audit",
+        "name": "SEO Audit",
+        "desc": "Crawl a site and run 20+ technical SEO checks, producing a health score and prioritized fixes.",
+        "capabilities": [
+          "Single-page / multi-page crawl depths",
+          "20+ technical checks",
+          "Health score",
+          "Audit history comparison"
+        ]
+      },
+      {
+        "id": "keyword-research",
+        "name": "Keyword Research",
+        "desc": "Expand seed keywords into related terms with search volume, difficulty, CPC, and intent.",
+        "capabilities": [
+          "Keyword overview",
+          "Related keyword expansion",
+          "Search intent",
+          "KD difficulty score"
+        ]
+      },
+      {
+        "id": "rank-tracking",
+        "name": "Rank Tracking",
+        "desc": "Monitor Google rankings by keyword, location, and device with daily refreshes and history trends.",
+        "capabilities": [
+          "Daily automatic refresh",
+          "Multi-device / multi-location",
+          "Rank trend curves",
+          "Volatility alerts"
+        ]
+      },
+      {
+        "id": "competitor-analysis",
+        "name": "Competitor Analysis",
+        "desc": "Compare keyword rankings and share of voice with competitors to spot gaps and opportunities.",
+        "capabilities": [
+          "Domain comparison",
+          "SOV calculation",
+          "Rank gap analysis",
+          "Overlapping history trends"
+        ]
+      },
+      {
+        "id": "backlink-analysis",
+        "name": "Backlink Analysis",
+        "desc": "View total backlinks, referring domains, anchor distribution, and growth / loss trends.",
+        "capabilities": [
+          "Backlink overview",
+          "Referring domain analysis",
+          "Anchor distribution",
+          "Growth / loss trends"
+        ]
+      },
+      {
+        "id": "content-optimization",
+        "name": "Content Optimization",
+        "desc": "Compare page content against the SERP top 10 for topic coverage, content score, and fixes.",
+        "capabilities": [
+          "Content score",
+          "Topic coverage analysis",
+          "SERP top-10 comparison",
+          "SEO checklist"
+        ]
+      }
+    ],
+    "dataSources": [
+      {
+        "name": "SerpApi",
+        "scope": "Keyword search volume, rank queries, SERP results, related keyword expansion",
+        "note": "Third-party API billed per call; SeeO adds usage counting and circuit-breaker protection"
+      },
+      {
+        "name": "DataForSEO",
+        "scope": "Backlink data, referring domains, domain authority",
+        "note": "Third-party API used by the backlink analysis module"
+      },
+      {
+        "name": "In-house crawler",
+        "scope": "Page HTML parsing, technical SEO checks, content analysis",
+        "note": "Server-side fetching based on cheerio — no third-party dependency"
+      }
+    ],
+    "faqs": [
+      {
+        "q": "Which search engines does SeeO support?",
+        "a": "Google only for now (data via SerpApi). Bing, Baidu, and other search engines are not supported yet."
+      },
+      {
+        "q": "How often does data refresh?",
+        "a": "Rankings refresh automatically once a day (scheduled job). Audits run on demand with two depths: quick (1 page) and full (up to 50 pages)."
+      },
+      {
+        "q": "What is the SerpApi quota?",
+        "a": "SerpApi is a third-party SERP data API billed per call. SeeO enforces per-plan monthly quotas with server-side usage counting — see the pricing page for the current limits. When a quota runs out, the related features pause until it resets."
+      },
+      {
+        "q": "Where is data stored?",
+        "a": "Development uses local SQLite; production runs on the Turso cloud database. Authentication is provided by Supabase Auth."
+      },
+      {
+        "q": "How do I export reports?",
+        "a": "The reports center supports audit and rank reports in PDF and Excel (CSV) formats. PDF and Excel export are included in the Pro plan."
+      }
+    ],
+    "contact": {
+      "title": "Still have questions?",
+      "body": "Our official support email will be published here once confirmed.",
+      "note": "Contact channel pending announcement"
+    }
+  },
+  "aboutPage": {
+    "meta": {
+      "title": "About SeeO · SEO Analytics Platform",
+      "description": "What SeeO is: an all-in-one SEO analytics platform for site owners and SEO practitioners. Learn about SeeO's positioning, real capabilities, data sources, who it's for, and what it doesn't do."
+    },
+    "eyebrow": "ABOUT",
+    "title": "About SeeO",
+    "subtitle": "What SeeO is, who it serves, how it works — and what it currently doesn't do",
+    "sections": {
+      "what": "What SeeO is",
+      "who": "Who it's for",
+      "how": "How it works",
+      "capabilities": "Core capabilities",
+      "dataSources": "Data sources",
+      "notDoing": "What SeeO doesn't offer",
+      "faq": "FAQ"
+    },
+    "what": [
+      "SeeO is an SEO analytics platform that helps site owners and SEO practitioners make search optimization decisions based on real data.",
+      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, backlink analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
+      "Compared with stitching together multiple tools, SeeO covers the complete SEO data workflow with one account and one workbench, organized around a single project (website) dimension."
+    ],
+    "who": [
+      {
+        "who": "Indie site owners",
+        "why": "Need data to decide which pages and keywords deserve effort — not gut-feel optimization"
+      },
+      {
+        "who": "SEO practitioners",
+        "why": "Need audits, tracking, and competitor comparison in one workbench with less tool-switching"
+      },
+      {
+        "who": "Content teams",
+        "why": "Need to check content coverage against real SERP results instead of subjective review"
+      }
+    ],
+    "how": {
+      "input": "Users create projects and add website domains and keyword lists",
+      "process": "SeeO's own crawler fetches pages for technical checks; SerpApi queries keyword rankings; DataForSEO pulls backlink data; a scheduled job refreshes rankings daily and generates volatility alerts",
+      "output": "Health scores with fixes, rank trend curves, competitor comparisons, content optimization suggestions, and exportable PDF / Excel reports"
+    },
+    "capabilities": [
+      {
+        "name": "Technical SEO Audit",
+        "desc": "In-house crawler fetches pages and runs 20+ technical checks with a health score",
+        "href": "/features/seo-audit"
+      },
+      {
+        "name": "Rank Tracking",
+        "desc": "Monitor Google rankings by keyword, location, and device with daily refreshes",
+        "href": "/features/rank-tracking"
+      },
+      {
+        "name": "Backlink Analysis",
+        "desc": "View total backlinks, referring domains, and anchor distribution via DataForSEO",
+        "href": "/features/backlink-analysis"
+      },
+      {
+        "name": "Keyword Research",
+        "desc": "Expand seed keywords and view volume, difficulty, and search intent"
+      },
+      {
+        "name": "Competitor Analysis",
+        "desc": "Compare keyword rankings and share of voice to spot gaps and opportunities"
+      },
+      {
+        "name": "Content Optimization",
+        "desc": "Check page coverage and optimization room against the SERP top 10"
+      }
+    ],
+    "dataSources": [
+      {
+        "name": "SerpApi",
+        "scope": "Keyword search volume, rank queries, SERP results, related keyword expansion"
+      },
+      {
+        "name": "DataForSEO",
+        "scope": "Backlink data, referring domains, domain authority"
+      },
+      {
+        "name": "In-house crawler",
+        "scope": "Page HTML parsing, technical SEO checks, content analysis (based on cheerio)"
+      },
+      {
+        "name": "Supabase Auth",
+        "scope": "User signup, login, and session management"
+      },
+      {
+        "name": "Turso",
+        "scope": "Production business data storage"
+      }
+    ],
+    "notDoingIntro": "To avoid misunderstanding, here is what SeeO explicitly does not (yet) offer:",
+    "notDoing": [
+      "AI citation tracking",
+      "LLM rank monitoring and GEO scoring",
+      "Team collaboration",
+      "Bing, Baidu, and other non-Google search engine data",
+      "A self-built search index (data comes from third-party APIs)"
+    ],
+    "faqs": [
+      {
+        "q": "Is SeeO an AI tool?",
+        "a": "No. SeeO is a data-driven SEO analytics platform that gets real data from third-party APIs such as SerpApi and DataForSEO plus its own crawler. SeeO currently does not offer AI citation tracking, LLM rank monitoring, or GEO scoring."
+      },
+      {
+        "q": "Which search engines does SeeO support?",
+        "a": "Google only for now (data via SerpApi). Bing, Baidu, and other search engines are not supported yet."
+      },
+      {
+        "q": "Do I need to install anything to use SeeO?",
+        "a": "No. SeeO is a web app — sign up and use all features in your browser."
+      },
+      {
+        "q": "Where is SeeO's data stored?",
+        "a": "Production stores business data on the Turso cloud database; authentication is provided by Supabase Auth."
+      },
+      {
+        "q": "How often does data refresh?",
+        "a": "Rankings refresh automatically once a day and can also be refreshed manually. Audits run on demand with single-page and full-site depths."
+      }
+    ],
+    "cta": {
+      "title": "See pricing plans",
+      "subtitle": "Free, Lite, and Pro — pick what fits",
+      "pricing": "View pricing",
+      "docs": "Product docs"
+    }
+  },
+  "privacyPage": {
+    "meta": {
+      "title": "Privacy Policy · SeeO",
+      "description": "SeeO privacy policy: how we collect, use, and protect your personal information."
+    },
+    "title": "Privacy Policy",
+    "sections": {
+      "collect": "01 Data collection",
+      "use": "02 Data usage",
+      "storage": "03 Data storage",
+      "cookies": "04 Cookies",
+      "contact": "05 Contact"
+    },
+    "collectIntro": "SeeO collects the following information to provide the service:",
+    "collectItems": [
+      "Email address (for account registration and login)",
+      "Domains and keywords you enter (for SEO analysis)",
+      "SerpApi call records (for usage monitoring)"
+    ],
+    "use": "Your data is used only to provide the SEO analysis service and is never sold to third parties.",
+    "storage": "User authentication data is hosted by Supabase; business data is stored in the Turso cloud database. Both are third-party infrastructure services.",
+    "cookies": "We use essential cookies to keep you signed in. When third-party analytics tools are used, we ask for your consent first.",
+    "contact": "For privacy questions, our official contact email will be published here once confirmed.",
+    "contactNote": "Contact channel pending announcement",
+    "lastUpdated": "Last updated: August 2026"
+  },
+  "termsPage": {
+    "meta": {
+      "title": "Terms of Service · SeeO",
+      "description": "SeeO terms of service: the terms and conditions for using the SeeO platform."
+    },
+    "title": "Terms of Service",
+    "sections": {
+      "service": "01 Service description",
+      "responsibilities": "02 User responsibilities",
+      "disclaimer": "03 Disclaimer",
+      "changes": "04 Service changes and termination",
+      "disputes": "05 Dispute resolution"
+    },
+    "service": "SeeO is an all-in-one SEO analytics platform providing keyword tracking, rank monitoring, technical audits, competitor analysis, and content optimization. The service is built on SerpApi and SeeO's own crawling capabilities.",
+    "responsibilitiesIntro": "When using this service, you agree to:",
+    "responsibilities": [
+      "Not abuse the APIs, including but not limited to scripted bulk requests and circumventing usage limits",
+      "Not crawl other websites for malicious purposes (such as plagiarism or attacks)",
+      "Not use the service for any illegal or infringing activity",
+      "Keep your account credentials safe — losses caused by credential leaks are your responsibility"
+    ],
+    "disclaimer": "SEO data is for reference only; improved rankings or traffic are not guaranteed. Search results are affected by search engine algorithms, location, device, timing, and other factors, so this service makes no commitment to the absolute accuracy of its data.",
+    "changes": "We reserve the right to change, suspend, or terminate part or all of the service at any time. If your account is banned for violating these terms, paid fees are non-refundable.",
+    "disputes": "The interpretation of and disputes under these terms are governed by the laws of the People's Republic of China. Disputes should first be resolved through negotiation; if negotiation fails, they shall be submitted to the people's court with jurisdiction at the domicile of the service provider.",
+    "lastUpdated": "Last updated: August 2026"
+  },
+  "refundPage": {
+    "meta": {
+      "title": "Refund Policy · SeeO",
+      "description": "SeeO refund policy: conditions and process for refunds on one-time plan purchases."
+    },
+    "title": "Refund Policy",
+    "sections": {
+      "policy": "01 Refund policy",
+      "process": "02 How to request a refund",
+      "after": "03 What happens after a refund",
+      "banned": "04 Banned accounts"
+    },
+    "policy": "You can request a refund for a paid order. We honor full refunds for requests submitted within 7 calendar days of a successful payment; refunds are returned via the original payment method.",
+    "process": "Send a refund request including your registered email, subscription order number, and reason. Requests are processed within 3 business days and refunded via the original payment channel. Our official contact email will be published here once confirmed.",
+    "processNote": "Contact channel pending announcement",
+    "after": "After a refund is processed, the system recalculates your membership from your remaining valid orders — your plan may be downgraded accordingly, and feature access follows the new plan.",
+    "banned": "For accounts banned due to violations of the Terms of Service, see the terms regarding fees.",
+    "lastUpdated": "Last updated: August 2026"
   }
 }

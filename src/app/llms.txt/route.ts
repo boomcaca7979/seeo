@@ -37,23 +37,25 @@ Free, Lite, and Pro plans: ${SITE_URL}/pricing
 
 ## Public Pages
 
-- Home: ${SITE_URL}/
-- Pricing: ${SITE_URL}/pricing
-- Docs: ${SITE_URL}/docs
-- About: ${SITE_URL}/about
-- SEO Audit: ${SITE_URL}/features/seo-audit
-- Rank Tracking: ${SITE_URL}/features/rank-tracking
-- Backlink Analysis: ${SITE_URL}/features/backlink-analysis
+Marketing pages are bilingual: English (default, no URL prefix) and Chinese (zh, /zh prefix).
+
+- Home: ${SITE_URL}/ · Chinese: ${SITE_URL}/zh
+- Pricing: ${SITE_URL}/pricing · Chinese: ${SITE_URL}/zh/pricing
+- Docs: ${SITE_URL}/docs · Chinese: ${SITE_URL}/zh/docs
+- About: ${SITE_URL}/about · Chinese: ${SITE_URL}/zh/about
+- SEO Audit: ${SITE_URL}/features/seo-audit · Chinese: ${SITE_URL}/zh/features/seo-audit
+- Rank Tracking: ${SITE_URL}/features/rank-tracking · Chinese: ${SITE_URL}/zh/features/rank-tracking
+- Backlink Analysis: ${SITE_URL}/features/backlink-analysis · Chinese: ${SITE_URL}/zh/features/backlink-analysis
 - Login: ${SITE_URL}/login
 - Signup: ${SITE_URL}/signup
-- Privacy Policy: ${SITE_URL}/privacy
-- Terms of Service: ${SITE_URL}/terms
-- Refund Policy: ${SITE_URL}/refund
+- Privacy Policy: ${SITE_URL}/privacy · Chinese: ${SITE_URL}/zh/privacy
+- Terms of Service: ${SITE_URL}/terms · Chinese: ${SITE_URL}/zh/terms
+- Refund Policy: ${SITE_URL}/refund · Chinese: ${SITE_URL}/zh/refund
 
 ## Important
 
 - SeeO is an SEO software platform. It is not an AI search analytics tool.
-- Language: the product interface is in Chinese (zh-CN); this file is in English for AI systems.
+- Language: marketing pages are bilingual — English at unprefixed URLs and Chinese under /zh. The product dashboard (/app) is in Chinese (zh-CN).
 - Some demo pages display sample data labeled as such ("示例数据").
 `;
 

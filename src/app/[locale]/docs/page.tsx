@@ -1,12 +1,12 @@
-// ===== /zh/docs 骨架 =====
-// Phase 0：复用现有中文文档页组件与基础 metadata，不做翻译。
-// canonical/hreflang 按 locale 覆盖（en: /docs · zh: /zh/docs）。
+// ===== /docs（en）· /zh/docs（zh）=====
+// 复用 (default)/docs/page 内容组件（文案已走 messages 按 locale 输出）；
+// 本文件负责 locale 接线与双语 metadata（title/description/og/canonical/hreflang）。
 
 import type { Metadata } from "next";
-import { setRequestLocale } from "next-intl/server";
-import { isLocale } from "@/i18n/config";
-import { alternatesFor } from "@/i18n/seo";
-import DocsPage, { metadata as docsMetadata } from "../../(default)/docs/page";
+import { setRequestLocale, getTranslations } from "next-intl/server";
+import { isLocale, localeToOgLocale } from "@/i18n/config";
+import { alternatesFor, localeUrl } from "@/i18n/seo";
+import DocsPage from "../../(default)/docs/page";
 
 interface LocaleDocsPageProps {
   params: Promise<{ locale: string }>;
@@ -17,8 +17,16 @@ export async function generateMetadata({
 }: LocaleDocsPageProps): Promise<Metadata> {
   const { locale } = await params;
   const loc = isLocale(locale) ? locale : "en";
+  const t = await getTranslations({ locale: loc, namespace: "docsPage.meta" });
   return {
-    ...docsMetadata,
+    title: t("title"),
+    description: t("description"),
+    openGraph: {
+      url: localeUrl(loc, "/docs"),
+      title: t("title"),
+      description: t("description"),
+      locale: localeToOgLocale[loc],
+    },
     ...alternatesFor(loc, "/docs"),
   };
 }

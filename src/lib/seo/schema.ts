@@ -35,22 +35,24 @@ const APP_TEXT = {
 } as const;
 
 /** Organization：只声明可验证的最小字段（无真实公司注册信息/社交账号，不编造） */
-export function organizationSchema() {
+export function organizationSchema(locale?: "en" | "zh") {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: SITE_NAME,
     url: SITE_URL,
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
   };
 }
 
 /** WebSite：无站内搜索功能，不加 SearchAction */
-export function websiteSchema() {
+export function websiteSchema(locale?: "en" | "zh") {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: SITE_NAME,
     url: SITE_URL,
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
   };
 }
 
@@ -85,17 +87,20 @@ export function softwareApplicationSchema(locale: "en" | "zh" = "zh") {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     description: text.description,
+    inLanguage: locale === "zh" ? "zh-CN" : "en",
     offers,
   };
 }
 
 /** BreadcrumbList：items 为 [首页, ...层级页面]，url 传相对路径（以 / 开头） */
 export function breadcrumbSchema(
-  items: Array<{ name: string; url: string }>
+  items: Array<{ name: string; url: string }>,
+  locale?: "en" | "zh"
 ) {
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
     itemListElement: items.map((item, i) => ({
       "@type": "ListItem",
       position: i + 1,
@@ -106,17 +111,21 @@ export function breadcrumbSchema(
 }
 
 /** AboutPage：品牌实体页（/about） */
-export function aboutPageSchema(input: {
-  name: string;
-  description: string;
-  url: string;
-}) {
+export function aboutPageSchema(
+  input: {
+    name: string;
+    description: string;
+    url: string;
+  },
+  locale?: "en" | "zh"
+) {
   return {
     "@context": "https://schema.org",
     "@type": "AboutPage",
     name: input.name,
     description: input.description,
     url: `${SITE_URL}${input.url}`,
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
     mainEntity: {
       "@type": "Organization",
       name: SITE_NAME,
@@ -126,17 +135,21 @@ export function aboutPageSchema(input: {
 }
 
 /** WebPage：功能能力页（/features/*） */
-export function webPageSchema(input: {
-  name: string;
-  description: string;
-  url: string;
-}) {
+export function webPageSchema(
+  input: {
+    name: string;
+    description: string;
+    url: string;
+  },
+  locale?: "en" | "zh"
+) {
   return {
     "@context": "https://schema.org",
     "@type": "WebPage",
     name: input.name,
     description: input.description,
     url: `${SITE_URL}${input.url}`,
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
     isPartOf: { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
   };
 }
@@ -147,12 +160,14 @@ export function webPageSchema(input: {
  */
 export function faqPageSchema(
   url: string,
-  faqs: Array<{ q: string; a: string }>
+  faqs: Array<{ q: string; a: string }>,
+  locale?: "en" | "zh"
 ) {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     url: `${SITE_URL}${url}`,
+    ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
     mainEntity: faqs.map((f) => ({
       "@type": "Question",
       name: f.q,
