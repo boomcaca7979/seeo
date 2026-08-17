@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { getYaolipayConfig, getReturnUrl, isValidPaymentChannel } from "@/lib/yaolipay/config";
 import { createOrder } from "@/lib/yaolipay/client";
-import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured } from "@/lib/billing";
+import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured, canPurchasePlan } from "@/lib/billing";
 import { createPendingOrder } from "@/lib/orders/service";
 import type { PaymentChannel } from "@/lib/yaolipay/types";
 
@@ -95,6 +95,23 @@ export async function POST(req: Request) {
     );
   }
 
+  // ===== 套餐权限校验（P0：防降级购买/绕过 UI 直接下单）=====
+  // currentPlan 一律取服务端查询结果（auth.plan = requireAuth 内
+  // getUserPlan 返回的 effectivePlan），绝不信任前端传来的任何套餐字段。
+  // 规则：free→lite/pro 购买；lite→lite / pro→pro 续费；lite→pro 升级；
+  //       pro→lite 拒绝（PLAN_DOWNGRADE_NOT_ALLOWED）
+  const gate = canPurchasePlan(auth.plan, plan);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      {
+        error: "当前套餐不支持该购买：Pro 会员不可降级购买 Lite",
+        code: gate.errorCode,
+      },
+      { status: 400 }
+    );
+  }
+  const purchaseType = gate.purchaseType!;
+
   // 从服务端价格表获取金额（不信任客户端）
   // Preview 测试模式：getEffectivePaymentAmountCents 可能返回 1（¥0.01）
   // 正常模式/Production：始终返回 PLAN_PRICING[plan].amountCents
@@ -110,12 +127,13 @@ export async function POST(req: Request) {
   const clientIp = getClientIp(req);
   const returnUrl = getReturnUrl();
 
-  // 1. 先创建本地 pending 订单
+  // 1. 先创建本地 pending 订单（param 记录购买类型，供后续对账/分析）
   const pendingResult = await createPendingOrder({
     userId,
     plan,
     paymentChannel: payment_channel as PaymentChannel,
     clientIp,
+    purchaseType,
   });
   if (!pendingResult || !pendingResult.order) {
     console.error("[Payment Create] createPendingOrder 失败:", {

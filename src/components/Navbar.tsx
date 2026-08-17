@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { isAuthEnabled } from "@/lib/auth-config";
+import { createBrowser } from "@/lib/supabase/browser";
 
 const navItems = [
   { label: "功能", href: "#features" },
@@ -15,6 +16,27 @@ export default function Navbar() {
   // 演示模式：开始分析直接进 /app；启用模式：进 /signup
   const primaryHref = isAuthEnabled ? "/signup" : "/app";
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Session 感知：loading 时不渲染「登录」，避免已登录用户看到误导性登录入口
+  const [authState, setAuthState] = useState<"loading" | "authed" | "anon">("loading");
+  useEffect(() => {
+    // 演示模式无需检测（无真实登录，CTA 已指向 /app）
+    if (!isAuthEnabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createBrowser();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!cancelled) setAuthState(user ? "authed" : "anon");
+      } catch {
+        if (!cancelled) setAuthState("anon");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const showLogin = isAuthEnabled && authState === "anon";
+  const ctaHref = authState === "authed" ? "/app" : primaryHref;
 
   // Escape 关闭移动端菜单
   useEffect(() => {
@@ -68,7 +90,7 @@ export default function Navbar() {
 
         {/* 桌面端 CTA */}
         <div className="hidden items-center gap-3 md:flex">
-          {isAuthEnabled && (
+          {showLogin && (
             <Link
               href="/login"
               className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
@@ -77,7 +99,7 @@ export default function Navbar() {
             </Link>
           )}
           <Link
-            href={primaryHref}
+            href={ctaHref}
             className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
           >
             开始分析
@@ -149,7 +171,7 @@ export default function Navbar() {
               </li>
             ))}
             <li className="mt-2 flex flex-col gap-3 border-t border-d-muted/15 pt-3">
-              {isAuthEnabled && (
+              {showLogin && (
                 <Link
                   href="/login"
                   onClick={closeMobile}
@@ -159,7 +181,7 @@ export default function Navbar() {
                 </Link>
               )}
               <Link
-                href={primaryHref}
+                href={ctaHref}
                 onClick={closeMobile}
                 className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
               >

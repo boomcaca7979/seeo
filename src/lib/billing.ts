@@ -285,7 +285,7 @@ const FEATURE_PLAN_GATE: Record<Feature, {
   backlinks: { minPlan: "pro", flagField: "dataforseo_monthly_limit", reason: "外链查询为 Pro 套餐功能" },
 };
 
-const PLAN_RANK: Record<PlanTier, number> = {
+export const PLAN_RANK: Record<PlanTier, number> = {
   free: 0,
   lite: 1,
   pro: 2,
@@ -318,6 +318,51 @@ export function isSubscriptionActive(
   } catch {
     return false;
   }
+}
+
+/**
+ * 购买类型：新购买 / 升级 / 续费（30 天会员模式下同档再买为续费）
+ */
+export type PurchaseType = "PURCHASE" | "UPGRADE" | "RENEWAL";
+
+/** canPurchasePlan 返回结构 */
+export interface PurchaseCheckResult {
+  allowed: boolean;
+  /** allowed 时的购买类型（PURCHASE / UPGRADE / RENEWAL） */
+  purchaseType?: PurchaseType;
+  /** 拒绝时的稳定错误码（PLAN_DOWNGRADE_NOT_ALLOWED） */
+  errorCode?: string;
+}
+
+/**
+ * 套餐购买规则（购买 30 天会员模式）：
+ *   free → lite / pro  PURCHASE 允许
+ *   lite → lite        RENEWAL  允许（续费 30 天）
+ *   lite → pro         UPGRADE  允许
+ *   pro  → pro         RENEWAL  允许（续费 30 天）
+ *   pro  → lite        拒绝（PLAN_DOWNGRADE_NOT_ALLOWED）
+ *
+ * 注意：currentPlan 必须由服务端查询（profiles.effectivePlan）得出，
+ * 不可信任前端传入。过期订阅 effectivePlan=free，允许重新购买。
+ */
+export function canPurchasePlan(
+  currentPlan: PlanTier,
+  targetPlan: "lite" | "pro"
+): PurchaseCheckResult {
+  const currentRank = PLAN_RANK[currentPlan] ?? 0;
+  const targetRank = PLAN_RANK[targetPlan] ?? 0;
+  if (targetRank < currentRank) {
+    return {
+      allowed: false,
+      errorCode: "PLAN_DOWNGRADE_NOT_ALLOWED",
+    };
+  }
+  return {
+    allowed: true,
+    // free 起步为新购买；付费档升档为升级；同档为续费
+    purchaseType:
+      currentRank === 0 ? "PURCHASE" : targetRank > currentRank ? "UPGRADE" : "RENEWAL",
+  };
 }
 
 /**

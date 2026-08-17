@@ -4,7 +4,7 @@
 // notify / query 都调用同一个 completeOrder，避免逻辑差异
 
 import { getAdminClient } from "@/lib/supabase/admin";
-import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents } from "@/lib/billing";
+import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents, type PurchaseType } from "@/lib/billing";
 import type { PlanTier } from "@/lib/auth";
 import type { PaymentChannel, OrderStatus } from "@/lib/yaolipay/types";
 
@@ -53,12 +53,14 @@ export function generateOutTradeNo(): string {
 /**
  * 创建本地 pending 订单
  * 在调用耀立 createOrder 之前先创建本地订单
+ * purchaseType 写入 param 字段（JSON），复用现有列，不改变表结构
  */
 export async function createPendingOrder(args: {
   userId: string;
   plan: "lite" | "pro";
   paymentChannel: PaymentChannel;
   clientIp: string;
+  purchaseType?: PurchaseType;
 }): Promise<{ order: OrderRecord; error?: string } | null> {
   const admin = getAdminClient();
   if (!admin) {
@@ -90,6 +92,9 @@ export async function createPendingOrder(args: {
         payment_status: "pending",
         period_type: `${pricing.periodDays}d`,
         clientip: args.clientIp,
+        param: args.purchaseType
+          ? JSON.stringify({ purchase_type: args.purchaseType })
+          : null,
       })
       .select()
       .single();
@@ -264,7 +269,23 @@ export async function completeOrder(args: {
 
     if (rpcError) {
       console.error("[Orders] extend_membership RPC 失败:", rpcError.message);
-      // 不回滚订单状态（订单已 paid，后续可通过 query 重试 RPC）
+      if (rpcError.message.includes("PLAN_DOWNGRADE_NOT_ALLOWED")) {
+        // 竞态降级保护：下单时是 Lite，支付完成前用户已升级 Pro，
+        // 此订单不能再把会员降回 Lite。
+        // 处理：订单保留 paid（钱已收，需人工退款），但不开通会员周期；
+        // 设置 period_end 为当前时间，避免 query 轮询无限重试 retryMembershipActivation。
+        const downgradeTs = new Date().toISOString();
+        try {
+          await admin
+            .from("orders")
+            .update({ period_end: downgradeTs })
+            .eq("out_trade_no", args.outTradeNo);
+          finalOrder.period_end = downgradeTs;
+        } catch (err) {
+          console.error("[Orders] 降级订单 period_end 更新失败:", err);
+        }
+      }
+      // 其他 RPC 错误：不回滚订单状态（订单已 paid，后续可通过 query 重试 RPC）
     } else if (rpcResult) {
       // RPC 返回新的到期时间
       newPeriodEndIso = new Date(rpcResult as string).toISOString();

@@ -264,6 +264,32 @@ describe("completeOrder", () => {
     expect(recompute).toBeDefined();
     expect(recompute?.args).toEqual({ p_user_id: "u1" });
   });
+
+  it("竞态降级保护：RPC 拒绝 PLAN_DOWNGRADE_NOT_ALLOWED → 订单保留 paid 且 period_end 被设置（阻断无限重试）", async () => {
+    // 场景：用户下单 Lite 后、支付完成前已升级 Pro；
+    // completeOrder 调用 extend_membership(lite) 被 0010 RPC 拒绝
+    const order = pendingOrder();
+    state.orderQueryResults = [order];
+    state.conditionalUpdateData = { ...order, payment_status: "paid" };
+    state.extendResult = {
+      data: null,
+      error: {
+        message:
+          "PLAN_DOWNGRADE_NOT_ALLOWED: current effective plan pro, target plan lite",
+      },
+    };
+
+    const r = await completeOrder({
+      outTradeNo: order.out_trade_no,
+      paidAmount: 9.9,
+    });
+
+    // 订单已收款，保持 ok=true / opened=true，但不抛异常
+    expect(r.ok).toBe(true);
+    expect(r.opened).toBe(true);
+    // period_end 被写入（非 null），query 轮询不会无限重试 retryMembershipActivation
+    expect(r.order?.period_end).not.toBeNull();
+  });
 });
 
 describe("handleRefundSuccess", () => {

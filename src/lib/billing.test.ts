@@ -161,3 +161,53 @@ describe("isSubscriptionActive 订阅有效性", () => {
     expect(isSubscriptionActive("inactive", future)).toBe(false);
   });
 });
+
+describe("canPurchasePlan 套餐购买规则（CASE 1-6）", () => {
+  it("CASE 1: free → lite 允许，类型 PURCHASE", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("free", "lite")).toEqual({
+      allowed: true,
+      purchaseType: "PURCHASE",
+    });
+  });
+
+  it("CASE 2: free → pro 允许，类型 PURCHASE", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("free", "pro")).toEqual({
+      allowed: true,
+      purchaseType: "PURCHASE",
+    });
+  });
+
+  it("CASE 3: lite → lite 允许，类型 RENEWAL", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("lite", "lite")).toEqual({
+      allowed: true,
+      purchaseType: "RENEWAL",
+    });
+  });
+
+  it("CASE 4: lite → pro 允许，类型 UPGRADE", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("lite", "pro")).toEqual({
+      allowed: true,
+      purchaseType: "UPGRADE",
+    });
+  });
+
+  it("CASE 5: pro → pro 允许，类型 RENEWAL", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("pro", "pro")).toEqual({
+      allowed: true,
+      purchaseType: "RENEWAL",
+    });
+  });
+
+  it("CASE 6: pro → lite 必须拒绝，错误码 PLAN_DOWNGRADE_NOT_ALLOWED", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    const result = canPurchasePlan("pro", "lite");
+    expect(result.allowed).toBe(false);
+    expect(result.errorCode).toBe("PLAN_DOWNGRADE_NOT_ALLOWED");
+    expect(result.purchaseType).toBeUndefined();
+  });
+});

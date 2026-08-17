@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
+import { getPlanCardState } from "@/lib/pricing-plan-state";
 
 // 前端类型（与后端 PlanInfo 对应，只取展示所需字段）
 interface PlanDisplayInfo {
@@ -106,6 +107,32 @@ function PricingContent() {
   const [selectedPlan, setSelectedPlan] = useState<"lite" | "pro" | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // 当前用户套餐：undefined = 加载中；null = 未登录（anonymous/free）
+  // 401 视为未登录，不是系统错误
+  const [currentPlan, setCurrentPlan] = useState<"free" | "lite" | "pro" | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/account/usage", { cache: "no-store" });
+        if (res.status === 401) {
+          if (!cancelled) setCurrentPlan(null);
+          return;
+        }
+        const json = await res.json();
+        if (!cancelled && res.ok && json?.data?.plan) {
+          setCurrentPlan(json.data.plan as "free" | "lite" | "pro");
+        } else {
+          // 查询失败按未登录处理，保持可购买（后端会再拦截）
+          setCurrentPlan(null);
+        }
+      } catch {
+        if (!cancelled) setCurrentPlan(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // Checkout 取消回流提示
   const isCheckoutCancel = searchParams.get("payment") === "cancel";
   useEffect(() => {
@@ -200,15 +227,27 @@ function PricingContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {plans.map((p) => {
               const features = buildFeatureList(p);
-              const isCheckout = !!p.display.checkoutPlan;
+              const card = getPlanCardState(
+                currentPlan,
+                p.plan as "free" | "lite" | "pro",
+                p.display
+              );
               return (
                 <div
                   key={p.plan}
-                  className={`card-a p-6 relative ${p.display.highlighted ? "border-brand" : ""}`}
+                  className={`card-a p-6 relative ${
+                    card.badge === "current" || p.display.highlighted ? "border-brand" : ""
+                  }`}
                 >
-                  {p.display.highlighted && (
+                  {(card.badge === "current" || card.badge === "recommended") && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="badge-warn text-xs px-3 py-1 bg-card">推荐</span>
+                      <span
+                        className={`text-xs px-3 py-1 bg-card ${
+                          card.badge === "current" ? "badge-pos" : "badge-warn"
+                        }`}
+                      >
+                        {card.badge === "current" ? "当前套餐" : "推荐"}
+                      </span>
                     </div>
                   )}
                   <div className="mb-5">
@@ -234,25 +273,26 @@ function PricingContent() {
                     ))}
                   </ul>
 
-                  {/* CTA：打开支付方式选择弹窗 */}
-                  {isCheckout ? (
-                    <button
-                      onClick={() => setSelectedPlan(p.display.checkoutPlan!)}
-                      className={`block w-full text-center py-2.5 ${
-                        p.display.highlighted ? "btn-primary" : "btn-secondary"
-                      }`}
-                    >
-                      {p.display.ctaLabel}
-                    </button>
-                  ) : (
+                  {/* CTA：按当前套餐状态渲染（购买/升级/续费/当前套餐/不可降级） */}
+                  {card.kind === "link" ? (
                     <Link
-                      href={p.display.ctaHref ?? "/app"}
+                      href={card.ctaHref ?? "/app"}
                       className={`block w-full text-center py-2.5 ${
-                        p.display.highlighted ? "btn-primary" : "btn-secondary"
+                        card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
                       }`}
                     >
-                      {p.display.ctaLabel}
+                      {card.ctaLabel}
                     </Link>
+                  ) : (
+                    <button
+                      onClick={() => card.checkoutPlan && setSelectedPlan(card.checkoutPlan)}
+                      disabled={card.disabled}
+                      className={`block w-full text-center py-2.5 ${
+                        card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
+                      }`}
+                    >
+                      {card.ctaLabel}
+                    </button>
                   )}
                 </div>
               );
