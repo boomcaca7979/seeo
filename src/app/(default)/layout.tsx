@@ -83,7 +83,20 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
+  // BUG-004：未知根路径命中静态 /_not-found 壳时本 layout 仍会渲染，
+  // getLocale() 内部 headers() 在静态上下文抛 DYNAMIC_SERVER_USAGE → 500。
+  // 捕获后回退默认语言，保证 404 壳正常输出；动态路由（/app、/login 等）
+  // cookies()/headers() 正常可用，行为不变。
+  let locale: string;
+  try {
+    locale = await getLocale();
+  } catch (err) {
+    if (err instanceof Error && (err as Error & { digest?: string }).digest === "DYNAMIC_SERVER_USAGE") {
+      locale = "en";
+    } else {
+      throw err;
+    }
+  }
   const messages = (await import(`../../../messages/${locale}.json`)).default;
 
   return (
