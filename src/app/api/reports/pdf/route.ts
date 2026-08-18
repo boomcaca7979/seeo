@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -37,16 +37,16 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const idParam = searchParams.get("id");
   if (!idParam) {
-    return NextResponse.json({ error: "缺少 id 参数" }, { status: 400 });
+    return NextResponse.json({ error: "缺少 id 参数", code: "MISSING_ID" }, { status: 400 });
   }
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) {
-    return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
+    return NextResponse.json({ error: "id 参数无效", code: "INVALID_ID" }, { status: 400 });
   }
 
   const report = await getReport(userId, id);
   if (!report) {
-    return NextResponse.json({ error: "报告不存在" }, { status: 404 });
+    return NextResponse.json({ error: "报告不存在", code: "REPORT_NOT_FOUND" }, { status: 404 });
   }
 
   // 返回报告数据，前端据此生成 PDF

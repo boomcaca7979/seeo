@@ -14,18 +14,18 @@ export async function DELETE(
 ) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const { id: idStr } = await params;
   const id = Number(idStr);
   if (!Number.isInteger(id) || id <= 0) {
-    return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
+    return NextResponse.json({ error: "id 参数无效", code: "INVALID_ID" }, { status: 400 });
   }
 
   const userId = auth.user?.id ?? "demo-user";
   const ok = await deleteKeywordGroup(userId, id);
   if (!ok) {
-    return NextResponse.json({ error: "未找到该分组" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该分组", code: "GROUP_NOT_FOUND" }, { status: 404 });
   }
   return NextResponse.json({ data: { ok: true } });
 }

@@ -46,7 +46,7 @@ function mapError(e: unknown) {
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;

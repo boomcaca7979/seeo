@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed || !auth.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user.id;
 
@@ -31,18 +31,18 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const outTradeNo = body.out_trade_no?.trim();
   if (!outTradeNo) {
-    return NextResponse.json({ error: "out_trade_no 必填" }, { status: 400 });
+    return NextResponse.json({ error: "out_trade_no 必填", code: "OUT_TRADE_NO_REQUIRED" }, { status: 400 });
   }
 
   // 1. 查询本地订单（限制只能查自己的）
   const order = await getOrderByOutTradeNoForUser(outTradeNo, userId);
   if (!order) {
-    return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+    return NextResponse.json({ error: "订单不存在", code: "ORDER_NOT_FOUND" }, { status: 404 });
   }
 
   // 2. 如果已经是终态（paid/refunded/failed），直接返回

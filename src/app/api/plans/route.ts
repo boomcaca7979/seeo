@@ -15,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ data: plans });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "获取套餐信息失败" },
+      { error: err instanceof Error ? err.message : "获取套餐信息失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }

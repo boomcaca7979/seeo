@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   // 用户鉴权（演示模式跳过）
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -49,13 +49,13 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const { type } = body;
   if (!type || (type !== "daily_refresh" && type !== "weekly_report")) {
     return NextResponse.json(
-      { error: "type 必须是 daily_refresh 或 weekly_report" },
+      { error: "type 必须是 daily_refresh 或 weekly_report", code: "AUTOMATION_TYPE_INVALID" },
       { status: 400 }
     );
   }
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       return NextResponse.json(body, { status });
     }
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "执行失败" },
+      { error: err instanceof Error ? err.message : "执行失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", code: "AUTH_REQUIRED" }, { status: 401 });
   }
 
   try {
@@ -187,7 +187,7 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "执行失败" },
+      { error: err instanceof Error ? err.message : "执行失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }

@@ -29,7 +29,7 @@ function todayStr(): string {
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -48,7 +48,7 @@ export async function GET() {
 
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: "暂无追踪关键词，请先在排名追踪页添加" },
+      { error: "暂无追踪关键词，请先在排名追踪页添加", code: "NO_TRACKING_KEYWORDS" },
       { status: 404 }
     );
   }

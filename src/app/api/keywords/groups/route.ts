@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const groups = await listKeywordGroups(userId);
@@ -23,21 +23,21 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   let body: { name?: string; description?: string };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const name = (body.name ?? "").trim();
   if (!name) {
-    return NextResponse.json({ error: "name 不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "name 不能为空", code: "NAME_REQUIRED" }, { status: 400 });
   }
   if (name.length > 50) {
-    return NextResponse.json({ error: "name 长度不能超过 50 个字符" }, { status: 400 });
+    return NextResponse.json({ error: "name 长度不能超过 50 个字符", code: "NAME_TOO_LONG" }, { status: 400 });
   }
 
   const description = body.description?.trim() || undefined;

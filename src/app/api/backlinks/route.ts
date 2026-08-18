@@ -89,7 +89,7 @@ function parseFetchedAt(iso: string): number {
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -108,7 +108,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const domain = normalizeDomain(searchParams.get("domain") ?? "");
   if (!domain) {
-    return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
+    return NextResponse.json({ error: "域名格式无效，如 example.com", code: "INVALID_DOMAIN" }, { status: 400 });
   }
 
   const summary = await getBacklinkSummary(userId, domain);
@@ -136,7 +136,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -145,12 +145,12 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const domain = normalizeDomain(String(body.domain ?? ""));
   if (!domain) {
-    return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
+    return NextResponse.json({ error: "域名格式无效，如 example.com", code: "INVALID_DOMAIN" }, { status: 400 });
   }
 
   // P5：backlinks Feature 权限校验（Pro 专属，free/lite 拒绝）
@@ -168,7 +168,7 @@ export async function POST(req: Request) {
   // 未配置凭证
   if (!isDataForSeoConfigured()) {
     return NextResponse.json(
-      { error: "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）" },
+      { error: "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）", code: "DATAFORSEO_NOT_CONFIGURED" },
       { status: 503 }
     );
   }
@@ -192,6 +192,7 @@ export async function POST(req: Request) {
       const usage = await peekUsage(userId, "dataforseo", plan);
       return NextResponse.json({
         error: `该域名外链数据冷却中，请约 ${remainingMin} 分钟后再试（1 小时内仅允许拉取一次）`,
+        code: "BACKLINK_COOLDOWN",
         usage,
       }, { status: 429 });
     }
@@ -217,7 +218,7 @@ export async function POST(req: Request) {
       return NextResponse.json(billingErr, { status: 429 });
     }
     const msg = (e as Error)?.message ?? String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, code: "UPSTREAM_ERROR" }, { status: 500 });
   }
 
   // 调 DataForSEO 拉取（失败不写库，可重试）
@@ -254,9 +255,9 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     if (err instanceof DataForSeoNotConfiguredError) {
-      return NextResponse.json({ error: err.message }, { status: 503 });
+      return NextResponse.json({ error: err.message, code: "UPSTREAM_ERROR" }, { status: 503 });
     }
     const msg = (err as Error)?.message ?? String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, code: "UPSTREAM_ERROR" }, { status: 500 });
   }
 }

@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -41,7 +41,7 @@ export async function GET() {
     .select("id, name, domain, created_at")
     .order("created_at", { ascending: true });
   if (error) {
-    return NextResponse.json({ error: "查询项目失败" }, { status: 500 });
+    return NextResponse.json({ error: "查询项目失败", code: "PROJECT_QUERY_FAILED" }, { status: 500 });
   }
   const projects = await listProjectsWithMetricsForUser(userId, userProjects ?? []);
   return NextResponse.json({ data: projects });
@@ -50,7 +50,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -58,29 +58,29 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const name = String(body.name ?? "").trim();
   const domain = String(body.domain ?? "").trim();
 
   if (!name) {
-    return NextResponse.json({ error: "项目名称不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "项目名称不能为空", code: "NAME_REQUIRED" }, { status: 400 });
   }
   if (!domain) {
-    return NextResponse.json({ error: "域名不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "域名不能为空", code: "DOMAIN_REQUIRED" }, { status: 400 });
   }
 
   // 域名格式校验
   const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
   if (!domainRegex.test(domain)) {
-    return NextResponse.json({ error: "域名格式不正确，如 example.com" }, { status: 400 });
+    return NextResponse.json({ error: "域名格式不正确，如 example.com", code: "INVALID_DOMAIN" }, { status: 400 });
   }
 
   // 重复检查（SQLite 侧）
   const existing = await getProjectByDomain(userId, domain);
   if (existing) {
-    return NextResponse.json({ error: "该域名已存在项目" }, { status: 400 });
+    return NextResponse.json({ error: "该域名已存在项目", code: "PROJECT_EXISTS" }, { status: 400 });
   }
 
   // P2：套餐项目数量限额校验（max_projects）
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
       .select("id, name, domain, created_at, updated_at")
       .single();
     if (supaErr || !supaProject) {
-      return NextResponse.json({ error: "创建项目失败（Supabase）" }, { status: 500 });
+      return NextResponse.json({ error: "创建项目失败（Supabase）", code: "PROJECT_CREATE_FAILED" }, { status: 500 });
     }
     // 同步写 SQLite（存 domain 用于指标关联，user_id 隔离）
     await addProject(userId, name, domain);
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -136,7 +136,7 @@ export async function DELETE(req: Request) {
       .eq("user_id", userId)
       .single();
     if (!project) {
-      return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
+      return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
     }
     // 删 Supabase（同样带 user_id 条件，不依赖 RLS 单独兜底）
     const { error: delErr } = await supabase
@@ -145,7 +145,7 @@ export async function DELETE(req: Request) {
       .eq("id", idParam)
       .eq("user_id", userId);
     if (delErr) {
-      return NextResponse.json({ error: "删除项目失败" }, { status: 500 });
+      return NextResponse.json({ error: "删除项目失败", code: "PROJECT_DELETE_FAILED" }, { status: 500 });
     }
     // 删 SQLite（按 domain + user_id）
     const sqliteProject = await getProjectByDomain(userId, project.domain);
@@ -158,11 +158,11 @@ export async function DELETE(req: Request) {
   // 演示模式：id 是 SQLite 整数
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) {
-    return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
+    return NextResponse.json({ error: "id 参数无效", code: "INVALID_ID" }, { status: 400 });
   }
   const ok = await removeProject(userId, id);
   if (!ok) {
-    return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
   return NextResponse.json({ data: { ok: true } });
 }

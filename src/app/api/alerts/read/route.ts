@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown> = {};
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   if (id !== undefined && id !== null) {
     const numId = Number(id);
     if (!Number.isInteger(numId) || numId <= 0) {
-      return NextResponse.json({ error: "id 参数无效" }, { status: 400 });
+      return NextResponse.json({ error: "id 参数无效", code: "INVALID_ID" }, { status: 400 });
     }
     await markAlertRead(userId, numId);
   } else {

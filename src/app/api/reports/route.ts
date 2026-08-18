@@ -17,14 +17,14 @@ const VALID_TYPES: ReportType[] = ["ranking", "audit", "content", "weekly"];
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
   const projectIdRaw = searchParams.get("project_id");
   const projectId = projectIdRaw ? Number(projectIdRaw) : undefined;
 
   if (projectId !== undefined && !Number.isFinite(projectId)) {
-    return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
+    return NextResponse.json({ error: "project_id 参数无效", code: "INVALID_PROJECT_ID" }, { status: 400 });
   }
 
   const userId = auth.user?.id ?? "demo-user";
@@ -36,13 +36,13 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const type = String(body.type ?? "") as ReportType;
@@ -53,13 +53,13 @@ export async function POST(req: Request) {
     : null;
 
   if (!VALID_TYPES.includes(type)) {
-    return NextResponse.json({ error: "type 必须是 ranking/audit/content/weekly" }, { status: 400 });
+    return NextResponse.json({ error: "type 必须是 ranking/audit/content/weekly", code: "REPORT_TYPE_INVALID" }, { status: 400 });
   }
   if (!title) {
-    return NextResponse.json({ error: "title 不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "title 不能为空", code: "TITLE_REQUIRED" }, { status: 400 });
   }
   if (!dataJson) {
-    return NextResponse.json({ error: "data_json 不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "data_json 不能为空", code: "DATA_JSON_REQUIRED" }, { status: 400 });
   }
 
   const userId = auth.user?.id ?? "demo-user";

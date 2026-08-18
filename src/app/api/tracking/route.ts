@@ -34,7 +34,7 @@ async function withUsage<T>(payload: T, userId: string, plan: import("@/lib/auth
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -50,7 +50,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   let body: Record<string, unknown>;
   try {
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
   const id = Number(searchParams.get("id") ?? "");

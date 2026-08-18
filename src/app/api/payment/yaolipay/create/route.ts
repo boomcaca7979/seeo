@@ -39,14 +39,14 @@ function getClientIp(req: Request): string {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed || !auth.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user.id;
 
   // 演示模式：不创建真实订单
   if (auth.skip) {
     return NextResponse.json(
-      { error: "演示模式下不支持支付，请在生产环境开启鉴权后使用" },
+      { error: "演示模式下不支持支付，请在生产环境开启鉴权后使用", code: "PAYMENT_DEMO_DISABLED" },
       { status: 503 }
     );
   }
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const config = getYaolipayConfig();
   if (!config) {
     return NextResponse.json(
-      { error: "耀立支付配置缺失，请联系管理员" },
+      { error: "耀立支付配置缺失，请联系管理员", code: "YAOLIPAY_NOT_CONFIGURED" },
       { status: 503 }
     );
   }
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
   // 直接拒绝创建订单，防止 Production 误配置导致错误价格订单。
   if (isTestPaymentMisconfigured()) {
     return NextResponse.json(
-      { error: "测试支付开关在非 Preview 环境启用，已拒绝创建订单" },
+      { error: "测试支付开关在非 Preview 环境启用，已拒绝创建订单", code: "PAYMENT_TEST_MODE_FORBIDDEN" },
       { status: 503 }
     );
   }
@@ -78,19 +78,19 @@ export async function POST(req: Request) {
     console.error("[Payment Create] JSON 解析失败:", parseErr instanceof Error ? parseErr.message : String(parseErr));
     const rawText = await req.text().catch(() => "<unreadable>");
     console.error("[Payment Create] 原始 body:", rawText.slice(0, 500));
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const { plan, payment_channel } = body;
   if (!isValidPlan(plan)) {
     return NextResponse.json(
-      { error: "plan 必须是 lite 或 pro" },
+      { error: "plan 必须是 lite 或 pro", code: "PLAN_PARAM_INVALID" },
       { status: 400 }
     );
   }
   if (!isValidPaymentChannel(payment_channel)) {
     return NextResponse.json(
-      { error: "payment_channel 必须是 alipay 或 wxpay" },
+      { error: "payment_channel 必须是 alipay 或 wxpay", code: "PAYMENT_CHANNEL_INVALID" },
       { status: 400 }
     );
   }
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
   const pricing = PLAN_PRICING[plan];
   if (!pricing) {
     return NextResponse.json(
-      { error: `套餐 ${plan} 价格未配置` },
+      { error: `套餐 ${plan} 价格未配置`, code: "PLAN_PRICE_NOT_CONFIGURED" },
       { status: 503 }
     );
   }
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
       error: pendingResult?.error,
     });
     return NextResponse.json(
-      { error: "创建本地订单失败", detail: pendingResult?.error ?? "未知错误" },
+      { error: "创建本地订单失败", code: "PAYMENT_CREATE_FAILED", detail: pendingResult?.error ?? "未知错误" },
       { status: 500 }
     );
   }
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
       const { markOrderFailed } = await import("@/lib/orders/service");
       await markOrderFailed(order.out_trade_no);
       return NextResponse.json(
-        { error: yaolipayResp.msg ?? "耀立下单失败" },
+        { error: yaolipayResp.msg ?? "耀立下单失败", code: "PAYMENT_FAILED" },
         { status: 500 }
       );
     }
@@ -198,6 +198,6 @@ export async function POST(req: Request) {
     const { markOrderFailed } = await import("@/lib/orders/service");
     await markOrderFailed(order.out_trade_no);
     const msg = err instanceof Error ? err.message : "耀立下单异常";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, code: "PAYMENT_CREATE_FAILED" }, { status: 500 });
   }
 }

@@ -28,33 +28,33 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed || !auth.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user.id;
 
   // 演示模式
   if (auth.skip) {
     return NextResponse.json(
-      { error: "演示模式下不支持退款" },
+      { error: "演示模式下不支持退款", code: "REFUND_DEMO_DISABLED" },
       { status: 503 }
     );
   }
 
   const config = getYaolipayConfig();
   if (!config) {
-    return NextResponse.json({ error: "耀立支付配置缺失" }, { status: 503 });
+    return NextResponse.json({ error: "耀立支付配置缺失", code: "YAOLIPAY_NOT_CONFIGURED" }, { status: 503 });
   }
 
   let body: { out_trade_no?: string; money?: unknown };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const outTradeNo = body.out_trade_no?.trim();
   if (!outTradeNo) {
-    return NextResponse.json({ error: "out_trade_no 必填" }, { status: 400 });
+    return NextResponse.json({ error: "out_trade_no 必填", code: "OUT_TRADE_NO_REQUIRED" }, { status: 400 });
   }
 
   // 解析退款金额（可选；不传则全额退款）
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     const moneyStr = String(body.money);
     const money = parseFloat(moneyStr);
     if (!Number.isFinite(money) || money <= 0) {
-      return NextResponse.json({ error: "money 必须为正数" }, { status: 400 });
+      return NextResponse.json({ error: "money 必须为正数", code: "MONEY_INVALID" }, { status: 400 });
     }
     refundAmountCents = Math.round(money * 100);
   }
@@ -71,13 +71,13 @@ export async function POST(req: Request) {
   // 1. 查询订单（限制只能查自己的）
   const order = await getOrderByOutTradeNoForUser(outTradeNo, userId);
   if (!order) {
-    return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+    return NextResponse.json({ error: "订单不存在", code: "ORDER_NOT_FOUND" }, { status: 404 });
   }
 
   // 2. 只能退 paid 订单
   if (order.payment_status !== "paid") {
     return NextResponse.json(
-      { error: `订单状态为 ${order.payment_status}，不可退款` },
+      { error: `订单状态为 ${order.payment_status}，不可退款`, code: "REFUND_NOT_ALLOWED" },
       { status: 400 }
     );
   }
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   const refundCents = refundAmountCents ?? orderAmountCents;
   if (refundCents > orderAmountCents) {
     return NextResponse.json(
-      { error: "退款金额不能超过订单金额" },
+      { error: "退款金额不能超过订单金额", code: "REFUND_AMOUNT_EXCEEDED" },
       { status: 400 }
     );
   }
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
 
     if (yaolipayResp.code !== 0) {
       return NextResponse.json(
-        { error: yaolipayResp.msg ?? "耀立退款失败" },
+        { error: yaolipayResp.msg ?? "耀立退款失败", code: "REFUND_FAILED" },
         { status: 500 }
       );
     }
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
 
     if (!result.ok) {
       console.error("[Yaolipay Refund] 处理退款成功失败:", result.error);
-      return NextResponse.json({ error: result.error }, { status: 500 });
+      return NextResponse.json({ error: result.error, code: "REFUND_FAILED" }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -135,6 +135,6 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[Yaolipay Refund] 异常:", err);
     const msg = err instanceof Error ? err.message : "退款异常";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg, code: "REFUND_FAILED" }, { status: 500 });
   }
 }

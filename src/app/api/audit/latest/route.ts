@@ -75,14 +75,14 @@ function computeCheckCoverage(issues: AuditIssueRow[]): Array<CheckMeta & { pass
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const domain = (searchParams.get("domain") ?? "").trim().toLowerCase();
 
   if (!domain) {
-    return NextResponse.json({ error: "缺少 domain 参数" }, { status: 400 });
+    return NextResponse.json({ error: "缺少 domain 参数", code: "MISSING_DOMAIN" }, { status: 400 });
   }
 
   // 回收因 after() 被服务器回收而永久停留在 running 的审计行，

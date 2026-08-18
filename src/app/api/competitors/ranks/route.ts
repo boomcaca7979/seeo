@@ -57,7 +57,7 @@ function mapError(e: unknown) {
 async function refreshRanks(userId: string, keywordId: number, plan: PlanTier = "free") {
   const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
-    return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该关键词", code: "KEYWORD_NOT_FOUND" }, { status: 404 });
   }
 
   // 通过 keyword.domain 找到所属 project
@@ -128,7 +128,7 @@ async function refreshRanks(userId: string, keywordId: number, plan: PlanTier = 
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -144,7 +144,7 @@ export async function GET(req: Request) {
 
   const kw = await getTrackedKeywordById(userId, keywordId);
   if (!kw) {
-    return NextResponse.json({ error: "未找到该关键词" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该关键词", code: "KEYWORD_NOT_FOUND" }, { status: 404 });
   }
 
   // 读已有最新记录
@@ -208,7 +208,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;

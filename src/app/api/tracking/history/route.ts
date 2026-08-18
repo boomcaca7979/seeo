@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);

@@ -27,7 +27,7 @@ function todayStr(): string {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const isAuthed = !!auth.user;
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   if (!rl.allowed) {
     const resetHours = Math.round(rl.resetMs / (60 * 60 * 1000));
     return NextResponse.json({
-      error: `今日审计次数已达上限，请约 ${resetHours} 小时后再试`,
+      error: `今日审计次数已达上限，请约 ${resetHours} 小时后再试`, code: "AUDIT_RATE_LIMITED",
       data: { resetMs: rl.resetMs },
     }, { status: 429 });
   }
@@ -53,12 +53,12 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const rawDomain = String(body.domain ?? "").trim();
   if (!rawDomain) {
-    return NextResponse.json({ error: "域名不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "域名不能为空", code: "DOMAIN_REQUIRED" }, { status: 400 });
   }
 
   // depth 参数：'quick'（默认，只爬首页）| 'full'（50 页 BFS）
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   // 域名格式校验：支持多段子域（如 www.example.com），与 /api/projects 正则对齐
   // 禁止以 - 开头/结尾，TLD 2-63 字符
   if (!domain || !/^(?=.{1,253}$)(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$/i.test(domain)) {
-    return NextResponse.json({ error: "域名格式无效，如 example.com" }, { status: 400 });
+    return NextResponse.json({ error: "域名格式无效，如 example.com", code: "INVALID_DOMAIN" }, { status: 400 });
   }
 
   // 防滥用：按 depth 分别限制 1 小时冷却
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
   const latest = await getLatestAudit(userId, domain);
   if (latest && latest.status === "running") {
     return NextResponse.json({
-      error: "该域名审计正在进行中，请等待完成",
+      error: "该域名审计正在进行中，请等待完成", code: "AUDIT_IN_PROGRESS",
       data: { auditId: latest.id, status: "running", pagesCrawled: latest.pages_crawled },
     }, { status: 409 });
   }
@@ -117,6 +117,7 @@ export async function POST(req: Request) {
         const depthLabel = depth === "full" ? "深度审计" : "快速审计";
         return NextResponse.json({
           error: `该域名${depthLabel}冷却中，请约 ${remainingMin} 分钟后再试（同模式 1 小时内仅允许一次，可切另一种模式）`,
+      code: "AUDIT_COOLDOWN",
           data: { cooldownRemainingMs: remainingMs, lastAuditId: latest.id },
         }, { status: 429 });
       }

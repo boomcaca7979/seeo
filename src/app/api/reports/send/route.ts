@@ -21,7 +21,7 @@ const typeLabel: Record<string, string> = {
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -40,29 +40,29 @@ export async function POST(req: Request) {
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const reportId = Number(body.report_id);
   const email = String(body.email ?? "").trim();
 
   if (!Number.isFinite(reportId)) {
-    return NextResponse.json({ error: "report_id 无效" }, { status: 400 });
+    return NextResponse.json({ error: "report_id 无效", code: "INVALID_ID" }, { status: 400 });
   }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return NextResponse.json({ error: "邮箱格式不正确" }, { status: 400 });
+    return NextResponse.json({ error: "邮箱格式不正确", code: "EMAIL_INVALID" }, { status: 400 });
   }
 
   if (!isEmailConfigured()) {
     return NextResponse.json(
-      { error: "邮件功能未配置：缺少 RESEND_API_KEY 环境变量" },
+      { error: "邮件功能未配置：缺少 RESEND_API_KEY 环境变量", code: "RESEND_NOT_CONFIGURED" },
       { status: 503 }
     );
   }
 
   const report = await getReport(userId, reportId);
   if (!report) {
-    return NextResponse.json({ error: "报告不存在" }, { status: 404 });
+    return NextResponse.json({ error: "报告不存在", code: "REPORT_NOT_FOUND" }, { status: 404 });
   }
 
   // 解析报告数据生成摘要
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
   );
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error ?? "发送失败" }, { status: 502 });
+    return NextResponse.json({ error: result.error ?? "发送失败", code: "SEND_FAILED" }, { status: 502 });
   }
 
   return NextResponse.json({ data: { success: true, messageId: result.messageId } });

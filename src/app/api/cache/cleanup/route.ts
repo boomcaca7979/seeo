@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const total = await countCacheEntries();
   return NextResponse.json({ data: { total } });
@@ -21,12 +21,12 @@ export async function GET() {
 export async function POST() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   // 全局缓存清理属于运维操作，限制为 Pro 套餐用户
   if (auth.plan !== "pro") {
     return NextResponse.json(
-      { error: "需要 Pro 套餐权限才能执行缓存清理" },
+      { error: "需要 Pro 套餐权限才能执行缓存清理", code: "PLAN_REQUIRED" },
       { status: 403 }
     );
   }

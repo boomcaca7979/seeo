@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
@@ -30,16 +30,16 @@ export async function GET(req: Request) {
   // project_id 接受前端项目引用：演示模式为整数字符串，鉴权模式为 Supabase UUID
   const projectRef = (searchParams.get("project_id") ?? "").trim();
   if (!projectRef) {
-    return NextResponse.json({ error: "project_id 参数无效" }, { status: 400 });
+    return NextResponse.json({ error: "project_id 参数无效", code: "INVALID_PROJECT_ID" }, { status: 400 });
   }
   const projectId = await resolveSqliteProjectId(userId, projectRef);
   if (projectId === null) {
-    return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
 
   const project = await getProjectById(userId, projectId);
   if (!project) {
-    return NextResponse.json({ error: "未找到该项目" }, { status: 404 });
+    return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
 
   // 获取该项目所有追踪关键词（通过 domain 关联）

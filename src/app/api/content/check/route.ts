@@ -106,14 +106,14 @@ function parsePrevAnalysis(prev: ContentCheckFull): ContentAnalysisResult | null
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "请求体格式错误，需要 JSON" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const rawUrl = String(body.url ?? "").trim();
@@ -121,10 +121,10 @@ export async function POST(req: Request) {
   const targetKeywords = parseKeywords(body.targetKeywords ?? (keyword ? [keyword] : []));
 
   if (!rawUrl) {
-    return NextResponse.json({ error: "URL 不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "URL 不能为空", code: "URL_REQUIRED" }, { status: 400 });
   }
   if (targetKeywords.length === 0) {
-    return NextResponse.json({ error: "关键词不能为空" }, { status: 400 });
+    return NextResponse.json({ error: "关键词不能为空", code: "KEYWORD_REQUIRED" }, { status: 400 });
   }
 
   const url = normalizeUrl(rawUrl);
@@ -221,7 +221,7 @@ export async function POST(req: Request) {
           : `抓取失败：${e.message}`;
       return NextResponse.json({ error: msg, code: e.code }, { status: 502 });
     }
-    return NextResponse.json({ error: `服务器错误：${(e as Error).message}` }, { status: 500 });
+    return NextResponse.json({ error: `服务器错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" }, { status: 500 });
   }
 }
 
@@ -243,7 +243,7 @@ interface HistoryItem {
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);

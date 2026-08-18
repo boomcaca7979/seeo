@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
 
   const userId = auth.user?.id ?? "demo-user";
@@ -35,7 +35,7 @@ export async function GET() {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "查询用量失败" },
+      { error: err instanceof Error ? err.message : "查询用量失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }

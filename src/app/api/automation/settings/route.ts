@@ -16,12 +16,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const settings = await getAutomationSettings(userId);
   if (!settings) {
-    return NextResponse.json({ error: "配置不存在" }, { status: 404 });
+    return NextResponse.json({ error: "配置不存在", code: "SETTINGS_NOT_FOUND" }, { status: 404 });
   }
   return NextResponse.json({ data: settings });
 }
@@ -29,14 +29,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "请求体格式错误" }, { status: 400 });
+    return NextResponse.json({ error: "请求体格式错误", code: "INVALID_JSON" }, { status: 400 });
   }
 
   const allowed: Array<keyof typeof body> = [
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     typeof update.daily_refresh_enabled !== "number" &&
     typeof update.daily_refresh_enabled !== "boolean"
   ) {
-    return NextResponse.json({ error: "daily_refresh_enabled 必须是布尔值" }, { status: 400 });
+    return NextResponse.json({ error: "daily_refresh_enabled 必须是布尔值", code: "DAILY_REFRESH_ENABLED_INVALID" }, { status: 400 });
   }
   if (typeof update.daily_refresh_enabled === "boolean") {
     update.daily_refresh_enabled = update.daily_refresh_enabled ? 1 : 0;
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       update.weekly_report_day < 0 ||
       update.weekly_report_day > 6)
   ) {
-    return NextResponse.json({ error: "weekly_report_day 必须是 0-6 的整数" }, { status: 400 });
+    return NextResponse.json({ error: "weekly_report_day 必须是 0-6 的整数", code: "WEEKLY_REPORT_DAY_INVALID" }, { status: 400 });
   }
 
   try {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: settings });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "更新失败" },
+      { error: err instanceof Error ? err.message : "更新失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }

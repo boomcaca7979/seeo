@@ -36,7 +36,7 @@ interface CheckItem {
 export async function GET() {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
 
@@ -55,7 +55,7 @@ export async function GET() {
 
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: "暂无内容检测记录，请先在内容优化页进行检测" },
+      { error: "暂无内容检测记录，请先在内容优化页进行检测", code: "NO_CONTENT_CHECKS" },
       { status: 404 }
     );
   }

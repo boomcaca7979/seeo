@@ -19,12 +19,12 @@ export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized", code: "AUTH_REQUIRED" }, { status: 401 });
   }
 
   const admin = getAdminClient();
   if (!admin) {
-    return NextResponse.json({ error: "admin client 不可用" }, { status: 503 });
+    return NextResponse.json({ error: "admin client 不可用", code: "ADMIN_CLIENT_UNAVAILABLE" }, { status: 503 });
   }
 
   try {
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
     if (queryError) {
       console.error("[Cron Expire] 查询过期用户失败:", queryError.message);
-      return NextResponse.json({ error: queryError.message }, { status: 500 });
+      return NextResponse.json({ error: queryError.message, code: "UPSTREAM_ERROR" }, { status: 500 });
     }
 
     if (!expiredUsers || expiredUsers.length === 0) {
@@ -92,7 +92,7 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[Cron Expire] 异常:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "执行失败" },
+      { error: err instanceof Error ? err.message : "执行失败", code: "UPSTREAM_ERROR" },
       { status: 500 }
     );
   }
