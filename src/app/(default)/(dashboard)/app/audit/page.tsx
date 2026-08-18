@@ -490,7 +490,10 @@ function AuditPageInner() {
       {/* 打印专用页眉 */}
       <div className="mb-6 hidden border-b border-line pb-3 print:block">
         <div className="font-sans text-xs text-ink-40">{t("printHeader")}</div>
-        <h1 className="mt-1 font-display text-xl font-bold text-ink">
+        {/* BUG-001：audit=null 时 SSR 渲染 new Date() 时间文本，与客户端 hydration 时刻必然不一致，
+            触发 React 18 生产模式整树客户端重渲染，期间页面事件未挂载（点击「快速审计」无反应）。
+            suppressHydrationWarning 抑制该 mismatch，保持 SSR 树有效。 */}
+        <h1 className="mt-1 font-display text-xl font-bold text-ink" suppressHydrationWarning>
           {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt, locale, tc) : formatTime(new Date().toISOString(), locale, tc)}
         </h1>
       </div>
@@ -528,6 +531,7 @@ function AuditPageInner() {
           <button
             onClick={() => openConfirm("quick")}
             disabled={auditing || starting}
+            title={auditing || starting ? t("auditInProgress") : undefined}
             className="btn-primary disabled:opacity-60"
           >
             {auditing && activeDepth === "quick" ? (

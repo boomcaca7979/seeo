@@ -121,6 +121,10 @@ function SettingsContent() {
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
+  // BUG-002：auth-enabled 生产环境的真实编辑流程状态
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [usageLoading, setUsageLoading] = useState(false);
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
@@ -190,6 +194,37 @@ function SettingsContent() {
       show(t("signOutFailed", { message: (err as Error).message }), "error");
     } finally {
       setSigningOut(false);
+    }
+  };
+
+  // BUG-002：编辑账号信息。
+  // auth-enabled：进入真实编辑流程（Supabase Auth user_metadata.display_name，即页面 displayName 数据源）；
+  // demo / auth-disabled：保持原有演示模式提示，不进入编辑。
+  const startEditAccount = () => {
+    if (!isAuthEnabled) {
+      show(t("editDemoToast"), "info");
+      return;
+    }
+    setEditName(account?.displayName ?? "");
+    setEditingAccount(true);
+  };
+
+  // 保存显示名称：调用 Supabase Auth updateUser 持久化到 user_metadata
+  const saveDisplayName = async () => {
+    const name = editName.trim();
+    if (!name || !account) return;
+    setSavingName(true);
+    try {
+      const supabase = createBrowser();
+      const { error } = await supabase.auth.updateUser({ data: { display_name: name } });
+      if (error) throw error;
+      setAccount({ ...account, displayName: name });
+      setEditingAccount(false);
+      show(t("editSaved"), "success");
+    } catch {
+      show(t("saveFailed"), "error");
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -314,16 +349,52 @@ function SettingsContent() {
                     <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/30 bg-brand/15 font-display text-2xl font-bold text-ink">
                       {account.displayName.slice(0, 1)}
                     </div>
-                    <div className="flex-1">
-                      <div className="font-sans text-base font-semibold text-ink">{account.displayName}</div>
-                      <div className="mt-0.5 font-mono text-xs text-ink-40">{account.email}</div>
-                    </div>
-                    <button
-                      onClick={() => show(t("editDemoToast"), "info")}
-                      className="btn-secondary"
-                    >
-                      {t("edit")}
-                    </button>
+                    {editingAccount ? (
+                      /* BUG-002：auth-enabled 真实编辑（仅显示名称；邮箱变更需验证流程，不在此提供） */
+                      <div className="flex-1">
+                        <label className="font-mono text-xs text-ink-40" htmlFor="edit-display-name">
+                          {t("fieldDisplayName")}
+                        </label>
+                        <input
+                          id="edit-display-name"
+                          type="text"
+                          value={editName}
+                          maxLength={50}
+                          onChange={(e) => setEditName(e.target.value)}
+                          disabled={savingName}
+                          className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-1.5 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none disabled:opacity-60"
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            onClick={() => void saveDisplayName()}
+                            disabled={!editName.trim() || savingName}
+                            className="btn-primary disabled:opacity-60"
+                          >
+                            {savingName ? t("saving") : t("editSave")}
+                          </button>
+                          <button
+                            onClick={() => setEditingAccount(false)}
+                            disabled={savingName}
+                            className="btn-secondary disabled:opacity-60"
+                          >
+                            {tc("cancel")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1">
+                          <div className="font-sans text-base font-semibold text-ink">{account.displayName}</div>
+                          <div className="mt-0.5 font-mono text-xs text-ink-40">{account.email}</div>
+                        </div>
+                        <button
+                          onClick={startEditAccount}
+                          className="btn-secondary"
+                        >
+                          {t("edit")}
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* 字段表 */}
