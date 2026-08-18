@@ -83,7 +83,8 @@ describe("softwareApplicationSchema", () => {
     );
     offers.forEach((o) => {
       expect(o.priceCurrency).toBe("CNY");
-      expect(o.url).toBe(`${SITE_URL}/pricing`);
+      // Phase 5：offers url 随 locale（默认 zh → /zh/pricing；en → /pricing）
+      expect(o.url).toBe(`${SITE_URL}/zh/pricing`);
     });
   });
 

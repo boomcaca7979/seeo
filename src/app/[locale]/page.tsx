@@ -3,6 +3,7 @@
 // 文案全部走 messages（en.json / zh.json），本文件只负责组合与 locale 接线。
 
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
 import { alternatesFor } from "@/i18n/seo";
@@ -14,6 +15,7 @@ import DashboardPreview from "@/components/DashboardPreview";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 import JsonLd from "@/components/JsonLd";
+import HreflangAlternates from "@/components/HreflangAlternates";
 import { softwareApplicationSchema } from "@/lib/seo/schema";
 
 interface LocaleHomePageProps {
@@ -31,10 +33,14 @@ export async function generateMetadata({
 
 export default async function LocaleHomePage({ params }: LocaleHomePageProps) {
   const { locale } = await params;
+  // 无效 locale 段（如 /foobar 命中 [locale]）→ 404（[locale]/not-found.tsx）
+  if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
-  const loc = isLocale(locale) ? locale : "en";
+  const loc = locale;
   return (
     <>
+      {/* 标准小写 hreflang（React hoist 到 <head>） */}
+      <HreflangAlternates path="/" />
       {/* 首页产品实体：SoftwareApplication（价格来自 PLAN_PRICING 单一来源，语言随 locale） */}
       <JsonLd schema={softwareApplicationSchema(loc)} />
       <Navbar />

@@ -3,10 +3,12 @@
 // 本文件负责 locale 接线与双语 metadata（title/description/og/canonical/hreflang）。
 
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { isLocale, localeToOgLocale } from "@/i18n/config";
 import { alternatesFor, localePath, localeUrl } from "@/i18n/seo";
 import JsonLd from "@/components/JsonLd";
+import HreflangAlternates from "@/components/HreflangAlternates";
 import { breadcrumbSchema } from "@/lib/seo/schema";
 import PricingPage from "../../(default)/pricing/page";
 
@@ -52,16 +54,23 @@ export default async function LocalePricingPage({
   params,
 }: LocalePricingPageProps) {
   const { locale } = await params;
+  // 无效 locale 段（如 /foobar 命中 [locale]）→ 404（[locale]/not-found.tsx）
+  if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
-  const loc = isLocale(locale) ? locale : "en";
+  const loc = locale;
   return (
     <>
+      {/* 标准小写 hreflang（React hoist 到 <head>） */}
+      <HreflangAlternates path="/pricing" />
       {/* 面包屑按 locale 输出（zh 指向 /zh 与 /zh/pricing） */}
       <JsonLd
-        schema={breadcrumbSchema([
-          { name: loc === "zh" ? "首页" : "Home", url: localePath(loc, "/") },
-          { name: loc === "zh" ? "定价" : "Pricing", url: localePath(loc, "/pricing") },
-        ])}
+        schema={breadcrumbSchema(
+          [
+            { name: loc === "zh" ? "首页" : "Home", url: localePath(loc, "/") },
+            { name: loc === "zh" ? "定价" : "Pricing", url: localePath(loc, "/pricing") },
+          ],
+          loc
+        )}
       />
       <PricingPage />
     </>

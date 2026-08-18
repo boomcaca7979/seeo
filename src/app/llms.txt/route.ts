@@ -55,7 +55,7 @@ Marketing pages are bilingual: English (default, no URL prefix) and Chinese (zh,
 ## Important
 
 - SeeO is an SEO software platform. It is not an AI search analytics tool.
-- Language: marketing pages are bilingual — English at unprefixed URLs and Chinese under /zh. The product dashboard (/app) is in Chinese (zh-CN).
+- Language: marketing pages are bilingual — English at unprefixed URLs and Chinese under /zh. The product dashboard (/app) supports both English and Chinese UI on the same URL, selected by the NEXT_LOCALE cookie (default: English).
 - Some demo pages display sample data labeled as such ("示例数据").
 `;
 

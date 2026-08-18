@@ -3,9 +3,11 @@
 // 本文件负责 locale 接线与双语 metadata（title/description/og/canonical/hreflang）。
 
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { isLocale, localeToOgLocale } from "@/i18n/config";
 import { alternatesFor, localeUrl } from "@/i18n/seo";
+import HreflangAlternates from "@/components/HreflangAlternates";
 import BacklinkAnalysisFeaturePage from "../../../(default)/features/backlink-analysis/page";
 
 interface LocaleBacklinksPageProps {
@@ -35,6 +37,14 @@ export default async function LocaleBacklinksPage({
   params,
 }: LocaleBacklinksPageProps) {
   const { locale } = await params;
+  // 无效 locale 段（如 /foobar 命中 [locale]）→ 404（[locale]/not-found.tsx）
+  if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
-  return <BacklinkAnalysisFeaturePage />;
+  return (
+    <>
+      {/* 标准小写 hreflang（React hoist 到 <head>） */}
+      <HreflangAlternates path="/features/backlink-analysis" />
+      <BacklinkAnalysisFeaturePage />
+    </>
+  );
 }

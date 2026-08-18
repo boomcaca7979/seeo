@@ -6,6 +6,12 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Phase 5：multiple root layouts 下，默认 /_not-found 静态壳会因 (default)
+  // layout 读取 cookies 在运行时 500。globalNotFound 在路由层直接返回
+  // src/app/global-not-found.tsx（绕过 layout 渲染），未知路径正确 404。
+  experimental: {
+    globalNotFound: true,
+  },
   images: {
     unoptimized: true,
   },

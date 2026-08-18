@@ -3,7 +3,7 @@
 // EN 无前缀、ZH /zh 前缀、hreflang 双向 + x-default 指向 EN。
 
 import { describe, it, expect } from "vitest";
-import { localePath, localeUrl, alternatesFor, SITE_URL } from "./seo";
+import { localePath, localeUrl, alternatesFor, hreflangAlternates, SITE_URL } from "./seo";
 
 describe("localePath", () => {
   it("EN（默认语言）无前缀", () => {
@@ -33,27 +33,44 @@ describe("localeUrl", () => {
 });
 
 describe("alternatesFor", () => {
-  it("EN 页面：canonical 无前缀 + 三向 hreflang", () => {
+
+  it("EN 页面：canonical 无前缀", () => {
     const { alternates } = alternatesFor("en", "/pricing");
     expect(alternates?.canonical).toBe("/pricing");
-    expect(alternates?.languages).toEqual({
-      en: `${SITE_URL}/pricing`,
-      "zh-CN": `${SITE_URL}/zh/pricing`,
-      "x-default": `${SITE_URL}/pricing`,
-    });
   });
 
   it("ZH 页面：canonical 为 /zh 前缀", () => {
     const { alternates } = alternatesFor("zh", "/pricing");
     expect(alternates?.canonical).toBe("/zh/pricing");
-    expect(alternates?.languages?.["zh-CN"]).toBe(`${SITE_URL}/zh/pricing`);
-    expect(alternates?.languages?.en).toBe(`${SITE_URL}/pricing`);
-    expect(alternates?.languages?.["x-default"]).toBe(`${SITE_URL}/pricing`);
   });
 
   it("首页：EN / 与 ZH /zh", () => {
     expect(alternatesFor("en", "/").alternates?.canonical).toBe("/");
     expect(alternatesFor("zh", "/").alternates?.canonical).toBe("/zh");
-    expect(alternatesFor("zh", "/").alternates?.languages?.en).toBe(`${SITE_URL}/`);
   });
+
+});
+
+describe("hreflangAlternates", () => {
+
+  it("EN/ZH 页面均输出 en + zh-CN + x-default", () => {
+    const alternates = hreflangAlternates("/pricing");
+
+    expect(alternates).toEqual([
+      { hreflang: "en", href: `${SITE_URL}/pricing` },
+      { hreflang: "zh-CN", href: `${SITE_URL}/zh/pricing` },
+      { hreflang: "x-default", href: `${SITE_URL}/pricing` },
+    ]);
+  });
+
+  it("首页输出正确的 EN / ZH URL", () => {
+    const alternates = hreflangAlternates("/");
+
+    expect(alternates).toEqual([
+      { hreflang: "en", href: `${SITE_URL}/` },
+      { hreflang: "zh-CN", href: `${SITE_URL}/zh` },
+      { hreflang: "x-default", href: `${SITE_URL}/` },
+    ]);
+  });
+
 });

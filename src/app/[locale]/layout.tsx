@@ -6,7 +6,6 @@
 //   - 静态渲染：generateStaticParams + setRequestLocale（不使用 headers()）
 
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
@@ -14,7 +13,7 @@ import { CookieBanner } from "@/components/cookie-banner";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { routing } from "@/i18n/routing";
-import { defaultLocale, localeToHreflang, localeToOgLocale, type Locale } from "@/i18n/config";
+import { defaultLocale, localeToOgLocale, type Locale } from "@/i18n/config";
 import { localeUrl } from "@/i18n/seo";
 import "../globals.css";
 
@@ -108,35 +107,36 @@ export async function generateMetadata({
         "max-video-preview": -1,
       },
     },
-    // 双向 hreflang（页面级 generateMetadata 会覆盖各自 canonical）
+    // canonical 兜底（页面级 generateMetadata 会覆盖各自 canonical）。
+    // hreflang 不走 metadata API（Next 16 序列化为 camelCase hrefLang），
+    // 由各页面的 <HreflangAlternates /> 渲染标准小写 <link>。
     alternates: {
       canonical: loc === "en" ? "/" : "/zh",
-      languages: {
-        [localeToHreflang.en]: localeUrl("en", "/"),
-        [localeToHreflang.zh]: localeUrl("zh", "/"),
-        "x-default": localeUrl("en", "/"),
-      },
     },
   };
 }
 
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params;
-  if (!hasLocale(routing.locales, locale)) notFound();
+  // 无效 locale 的 404 由各页面 notFound() 触发（[locale]/not-found.tsx 承接），
+  // layout 不再 notFound()：那会冒泡到全局 /_not-found（(default) layout 读取
+  // cookies，多 root layouts 下运行时 500）。
 
   // 启用静态渲染
   setRequestLocale(locale);
   const messages = await getMessages();
+  // schema inLanguage 需要 Locale 类型：与 generateMetadata 相同的收窄
+  const loc: Locale = hasLocale(routing.locales, locale) ? locale : defaultLocale;
 
   return (
     <html
-      lang={locale === "zh" ? "zh-CN" : "en"}
+      lang={loc === "zh" ? "zh-CN" : "en"}
       className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-station text-y-text font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
-        <JsonLd schema={organizationSchema(locale)} />
-        <JsonLd schema={websiteSchema(locale)} />
+        <JsonLd schema={organizationSchema(loc)} />
+        <JsonLd schema={websiteSchema(loc)} />
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>

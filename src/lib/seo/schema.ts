@@ -70,12 +70,13 @@ export function softwareApplicationSchema(locale: "en" | "zh" = "zh") {
           price: (PLAN_PRICING[key].amountCents / 100).toFixed(2),
           priceCurrency: PLAN_PRICING[key].currency,
         };
+  const pricingUrl = locale === "zh" ? `${SITE_URL}/zh/pricing` : `${SITE_URL}/pricing`;
 
   const offers = text.offers.map((o) => ({
     "@type": "Offer",
     name: o.name,
     ...priceOf(o.key),
-    url: `${SITE_URL}/pricing`,
+    url: pricingUrl,
     description: o.description,
   }));
 
