@@ -122,11 +122,15 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   // layout 不再 notFound()：那会冒泡到全局 /_not-found（(default) layout 读取
   // cookies，多 root layouts 下运行时 500）。
 
-  // 启用静态渲染
-  setRequestLocale(locale);
-  const messages = await getMessages();
   // schema inLanguage 需要 Locale 类型：与 generateMetadata 相同的收窄
   const loc: Locale = hasLocale(routing.locales, locale) ? locale : defaultLocale;
+
+  // 启用静态渲染。注意必须传规范化后的 loc（而非原始 locale）：
+  // 无效 locale（如 /this-page-not-exist）若原样传入，not-found 边界里的
+  // getLocale()/getTranslations() 会因校验失败回退到 request config 的
+  // cookie/header 解析，污染静态渲染 store → 运行时 500（BUG-004 同类）。
+  setRequestLocale(loc);
+  const messages = await getMessages();
 
   return (
     <html

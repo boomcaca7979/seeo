@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
-import { handleBillingError } from "@/lib/billing-error-client";
+import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { formatNumber, intlLocale } from "@/lib/ui-locale";
@@ -491,7 +491,7 @@ export default function ReportsPage() {
         await loadReports();
       } else {
         const json = await res.json().catch(() => ({}));
-        show(json?.error ?? t("deleteFailed"), "error");
+        show(resolveApiErrorMessage(json, undefined, t("deleteFailed")) || t("deleteFailed"), "error");
       }
     } catch (err) {
       show(t("deleteFailedToast", { message: (err as Error).message }), "error");

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import JsonLd from "@/components/JsonLd";
 import { getLocale, getTranslations } from "next-intl/server";
 import { localePath } from "@/i18n/seo";
@@ -234,6 +235,7 @@ export default async function AboutPage() {
           </Link>
         </div>
       </div>
+        <Footer />
     </div>
   );
 }

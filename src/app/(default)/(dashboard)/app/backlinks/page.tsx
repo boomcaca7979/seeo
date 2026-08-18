@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
-import { handleBillingError } from "@/lib/billing-error-client";
+import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
@@ -80,7 +80,7 @@ export default function BacklinksPage() {
       if (res.ok) {
         setData(json.data ?? null);
       } else {
-        setError(json?.error ?? t("loadFailed"));
+        setError(resolveApiErrorMessage(json, undefined, t("loadFailed")) || t("loadFailed"));
       }
     } catch (e) {
       setError((e as Error).message);

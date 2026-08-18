@@ -1,13 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { getLocale, getTranslations } from "next-intl/server";
+import { useLocale, useTranslations } from "next-intl";
 import { localePath } from "@/i18n/seo";
 import { LOCALE_ROUTED_PATHS } from "@/i18n/locale-routed-paths";
 
 // 链接定义：href 为逻辑路径，渲染时 locale-routed 路径按 locale 加 /zh 前缀
-// async RSC：用 getTranslations/getLocale（server API），避免 async 组件中调用 hook
-export default async function Footer() {
-  const t = await getTranslations("footer");
-  const locale = await getLocale();
+// client 组件：可同时嵌入 server 营销页与 client 页面（如 /pricing），
+// 文案/locale 由 (default)/[locale] layout 的 NextIntlClientProvider 提供
+export default function Footer() {
+  const t = useTranslations("footer");
+  const locale = useLocale();
 
   // locale-routed 路径（/、/pricing、/docs、/features/seo-audit）按 locale 生成；
   // 其余 legacy 页面路径保持原样

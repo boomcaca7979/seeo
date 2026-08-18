@@ -3,7 +3,6 @@
 // 数据库文件：data/seeo.db（已加入 .gitignore）
 // 以后迁移 Supabase 时只需替换本文件实现，页面/API 路由不动
 
-import { promises as fs } from "node:fs";
 import * as fsSync from "node:fs";
 import path from "node:path";
 import { SQLiteAdapter, type DBAdapter } from "./adapter";
@@ -12,19 +11,32 @@ const DB_PATH = path.join(process.cwd(), "data", "seeo.db");
 
 let dbInstance: DBAdapter | null = null;
 
-async function ensureDir(): Promise<void> {
-  await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-}
-
 export async function getAdapter(): Promise<DBAdapter> {
   if (!dbInstance) {
     const tursoUrl = process.env.TURSO_DATABASE_URL;
     const tursoToken = process.env.TURSO_AUTH_TOKEN;
-    if (tursoUrl && tursoToken) {
+    // URL 必须是 libsql:// / https?:// / file: 等合法格式，
+    // 否则 libsql 会在运行时抛晦涩的 URL_INVALID 并演变成 500
+    // （本地常见诱因：next start 加载了从 Vercel 导出的 .env.production 占位值）
+    const isAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
+    const urlValid = !!tursoUrl && /^(libsql|https?|file):\/\//i.test(tursoUrl.trim());
+    if (urlValid && tursoToken) {
       const { TursoAdapter } = await import("./turso-adapter");
-      dbInstance = new TursoAdapter(tursoUrl, tursoToken);
+      dbInstance = new TursoAdapter(tursoUrl.trim(), tursoToken);
       await migrate(dbInstance);
+    } else if (isAuthEnabled) {
+      // auth-enabled（生产/真实后端）：缺 Turso 配置属部署错误，显式报错而非隐蔽 500
+      throw new Error(
+        "[db] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN missing or invalid. " +
+          "Set valid Turso credentials (libsql://… or https://…) for auth-enabled environments."
+      );
     } else {
+      // demo / auth-disabled：无需远程数据库，回退本地 SQLite（data/seeo.db）
+      if (tursoUrl || tursoToken) {
+        console.warn(
+          "[db] Ignored invalid TURSO_DATABASE_URL/TURSO_AUTH_TOKEN (demo mode, auth disabled) — falling back to local SQLite."
+        );
+      }
       // local SQLite（动态 import 避免 Vercel 构建时加载原生模块）
       const dir = path.dirname(DB_PATH);
       if (!fsSync.existsSync(dir)) fsSync.mkdirSync(dir, { recursive: true });

@@ -1617,10 +1617,26 @@
       "subtitle": "Generate, download and share SEO reports.",
       "reportTypeLabel": "Report type",
       "types": {
-        "ranking": { "label": "Ranking", "name": "Rank Tracking Report", "desc": "Current ranks and changes of tracked keywords" },
-        "audit": { "label": "Audit", "name": "Technical Audit Report", "desc": "Technical SEO audit results and health score" },
-        "content": { "label": "Content", "name": "Content Check Report", "desc": "Page content quality and readability analysis" },
-        "weekly": { "label": "Weekly", "name": "Weekly Summary Report", "desc": "Weekly roundup of rankings, audits and keywords" }
+        "ranking": {
+          "label": "Ranking",
+          "name": "Rank Tracking Report",
+          "desc": "Current ranks and changes of tracked keywords"
+        },
+        "audit": {
+          "label": "Audit",
+          "name": "Technical Audit Report",
+          "desc": "Technical SEO audit results and health score"
+        },
+        "content": {
+          "label": "Content",
+          "name": "Content Check Report",
+          "desc": "Page content quality and readability analysis"
+        },
+        "weekly": {
+          "label": "Weekly",
+          "name": "Weekly Summary Report",
+          "desc": "Weekly roundup of rankings, audits and keywords"
+        }
       },
       "generateBtn": "Generate report",
       "generating": "Generating…",
@@ -2126,5 +2142,11 @@
     "INVALID_URL": "Invalid URL: {detail}",
     "HTTP_ERROR": "Page returned an error: {detail}",
     "UNKNOWN": "Crawl failed: {detail}"
+  },
+  "notFoundPage": {
+    "title": "Page Not Found | SeeO",
+    "heading": "Page not found",
+    "desc": "The page you are looking for does not exist.",
+    "back": "Back to Home"
   }
 }

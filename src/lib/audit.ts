@@ -26,6 +26,7 @@ import {
   crossPageChecks,
   type AuditIssue,
   type CrossPageExtra,
+  type LocalizedText,
 } from "@/lib/seo/audit-checks";
 import { compareAudits } from "@/lib/seo/audit-history";
 
@@ -177,6 +178,11 @@ function normalizeLink(href: string): string | null {
   }
 }
 
+/** LText 序列化为 JSON 字符串存库；历史纯文本 string 原样存储 */
+function serializeLocalized(t: LocalizedText): string {
+  return typeof t === "string" ? t : JSON.stringify(t);
+}
+
 /** 将 AuditIssue 写入数据库（type=checkId, detail=message） */
 async function writeIssueToDb(userId: string, auditId: number, issue: AuditIssue): Promise<void> {
   await addAuditIssue(userId, {
@@ -184,8 +190,8 @@ async function writeIssueToDb(userId: string, auditId: number, issue: AuditIssue
     type: issue.checkId,
     severity: issue.severity,
     url: issue.url,
-    detail: issue.message,
-    suggestion: issue.suggestion,
+    detail: serializeLocalized(issue.message),
+    suggestion: serializeLocalized(issue.suggestion),
   });
 }
 
@@ -387,46 +393,46 @@ export async function runAudit(
               pagesDetail.push({ url, responseTimeMs: 0, status: statusCode, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
-                checkName: "站内死链",
+                checkName: { en: "Broken internal links", zh: "站内死链" },
                 message: err.message,
                 url,
                 severity: statusCode === 404 ? "error" : "warning",
                 suggestion: statusCode === 404
-                  ? "添加 301 重定向到相关页面，或恢复缺失内容"
-                  : "检查服务器状态与页面可用性",
+                  ? { en: "Add a 301 redirect to a relevant page or restore the missing content", zh: "添加 301 重定向到相关页面，或恢复缺失内容" }
+                  : { en: "Check server status and page availability", zh: "检查服务器状态与页面可用性" },
               });
             } else if (err.code === "TIMEOUT") {
               pagesDetail.push({ url, responseTimeMs: homepageTimeoutRetried ? STARTPAGE_RETRY_MS : 10_000, status: 0, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "slow-page",
-                checkName: "页面加载慢",
+                checkName: { en: "Slow page load", zh: "页面加载慢" },
                 message: homepageTimeoutRetried
-                  ? `首页抓取超时（重试 ${STARTPAGE_RETRY_MS / 1000}s 仍失败）`
-                  : "抓取超时（10s）",
+                  ? { en: `Homepage fetch timed out (retry at ${STARTPAGE_RETRY_MS / 1000}s still failed)`, zh: `首页抓取超时（重试 ${STARTPAGE_RETRY_MS / 1000}s 仍失败）` }
+                  : { en: "Fetch timed out (10s)", zh: "抓取超时（10s）" },
                 url,
                 severity: "warning",
-                suggestion: "优化服务器响应时间，检查后端服务状态",
+                suggestion: { en: "Improve server response time and check backend health", zh: "优化服务器响应时间，检查后端服务状态" },
               });
             } else if (err.code === "NETWORK") {
               pagesDetail.push({ url, responseTimeMs: 0, status: 0, ok: false });
               await writeIssueToDb(userId, auditId, {
                 checkId: "broken-links",
-                checkName: "站内死链",
+                checkName: { en: "Broken internal links", zh: "站内死链" },
                 message: err.message,
                 url,
                 severity: "error",
-                suggestion: "检查域名解析与服务器可达性",
+                suggestion: { en: "Check DNS resolution and server reachability", zh: "检查域名解析与服务器可达性" },
               });
             }
           } else {
             pagesDetail.push({ url, responseTimeMs: 0, status: 0, ok: false });
             await writeIssueToDb(userId, auditId, {
               checkId: "broken-links",
-              checkName: "站内死链",
-              message: (err as Error).message || "未知错误",
+              checkName: { en: "Broken internal links", zh: "站内死链" },
+              message: (err as Error).message || { en: "Unknown error", zh: "未知错误" },
               url,
               severity: "error",
-              suggestion: "检查 URL 是否可访问",
+              suggestion: { en: "Check that the URL is reachable", zh: "检查 URL 是否可访问" },
             });
           }
 
@@ -481,11 +487,11 @@ export async function runAudit(
     if (!homepageParsed) {
       await writeIssueToDb(userId, auditId, {
         checkId: "startpage-unparsed",
-        checkName: "起始页未能解析",
-        message: "起始页未能解析，单页检查项未执行，本次审计结果不可用",
+        checkName: { en: "Start page could not be parsed", zh: "起始页未能解析" },
+        message: { en: "The start page could not be parsed; per-page checks were not executed and this audit is unusable", zh: "起始页未能解析，单页检查项未执行，本次审计结果不可用" },
         url: baseUrl.toString(),
         severity: "error",
-        suggestion: "请稍后重试，或检查目标站点是否可访问。冷启动场景下重试一次通常可成功",
+        suggestion: { en: "Retry later or verify the target site is reachable; a single retry usually succeeds after cold start", zh: "请稍后重试，或检查目标站点是否可访问。冷启动场景下重试一次通常可成功" },
       });
 
       const pagesDetailJson = JSON.stringify(pagesDetail);

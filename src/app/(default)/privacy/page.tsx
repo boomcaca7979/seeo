@@ -1,4 +1,6 @@
 import JsonLd from "@/components/JsonLd";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { getLocale, getTranslations } from "next-intl/server";
 import { localePath } from "@/i18n/seo";
 import { breadcrumbSchema } from "@/lib/seo/schema";
@@ -15,6 +17,7 @@ export default async function PrivacyPage() {
 
   return (
     <div className="min-h-screen bg-paper">
+      <Navbar />
       <JsonLd
         schema={breadcrumbSchema(
           [
@@ -57,6 +60,7 @@ export default async function PrivacyPage() {
           <p className="pt-8 border-t border-line text-sm text-ink-40">{t("lastUpdated")}</p>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

@@ -12,6 +12,10 @@ import Link from "next/link";
 export default function GlobalNotFound() {
   return (
     <html lang="en">
+      <head>
+        <title>Page Not Found | SeeO</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </head>
       <body
         style={{
           margin: 0,

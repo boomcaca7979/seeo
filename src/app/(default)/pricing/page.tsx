@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
 import { getPlanCardState } from "@/lib/pricing-plan-state";
@@ -359,6 +360,7 @@ function PricingContent() {
         />
       )}
 
+      <Footer />
       <Toast />
     </div>
   );

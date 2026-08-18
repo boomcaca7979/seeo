@@ -1617,10 +1617,26 @@
       "subtitle": "生成、下载和分享 SEO 报告。",
       "reportTypeLabel": "报告类型",
       "types": {
-        "ranking": { "label": "排名", "name": "排名追踪报告", "desc": "追踪关键词的当前排名与变化" },
-        "audit": { "label": "审计", "name": "技术审计报告", "desc": "技术 SEO 审计结果与健康分" },
-        "content": { "label": "内容", "name": "内容检查报告", "desc": "页面内容质量与可读性分析" },
-        "weekly": { "label": "周报", "name": "综合周报", "desc": "本周排名/审计/关键词综合汇总" }
+        "ranking": {
+          "label": "排名",
+          "name": "排名追踪报告",
+          "desc": "追踪关键词的当前排名与变化"
+        },
+        "audit": {
+          "label": "审计",
+          "name": "技术审计报告",
+          "desc": "技术 SEO 审计结果与健康分"
+        },
+        "content": {
+          "label": "内容",
+          "name": "内容检查报告",
+          "desc": "页面内容质量与可读性分析"
+        },
+        "weekly": {
+          "label": "周报",
+          "name": "综合周报",
+          "desc": "本周排名/审计/关键词综合汇总"
+        }
       },
       "generateBtn": "生成报告",
       "generating": "生成中…",
@@ -2126,5 +2142,11 @@
     "INVALID_URL": "URL 无效：{detail}",
     "HTTP_ERROR": "页面返回错误：{detail}",
     "UNKNOWN": "抓取失败：{detail}"
+  },
+  "notFoundPage": {
+    "title": "页面不存在 | SeeO",
+    "heading": "页面不存在",
+    "desc": "您访问的页面不存在或已被移动。",
+    "back": "返回首页"
   }
 }

@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
-import { allCheckMeta, checkMetaMap, type CheckMeta } from "@/lib/seo/audit-checks";
+import { allCheckMeta, checkMetaMap, pickText, type CheckMeta, type LText } from "@/lib/seo/audit-checks";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -34,7 +34,32 @@ interface PageDetailEntry {
   ok: boolean;
 }
 
-function groupIssues(issues: AuditIssueRow[]): IssueGroup[] {
+type UiLocale = "en" | "zh";
+
+/** 读取 UI locale：NEXT_LOCALE cookie → en（与 billing-error-client 优先级一致） */
+function readUiLocale(req: Request): UiLocale {
+  const cookie = req.headers.get("cookie") ?? "";
+  return /(?:^|;\s*)NEXT_LOCALE=zh(?:;|$)/.test(cookie) ? "zh" : "en";
+}
+
+/** DB 字符串 → 按 locale 文本：新数据为 JSON LText，历史数据为纯文本 string */
+function dbTextToLocale(raw: string | null | undefined, locale: UiLocale): string | null {
+  if (raw === null || raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("{") && trimmed.includes('"en"') && trimmed.includes('"zh"')) {
+    try {
+      const parsed = JSON.parse(trimmed) as LText;
+      if (parsed && typeof parsed.en === "string" && typeof parsed.zh === "string") {
+        return pickText(parsed, locale);
+      }
+    } catch {
+      // 非 JSON LText，按原文返回
+    }
+  }
+  return raw;
+}
+
+function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
   const map = new Map<string, IssueGroup>();
   for (const issue of issues) {
     const checkId = issue.type;
@@ -45,12 +70,12 @@ function groupIssues(issues: AuditIssueRow[]): IssueGroup[] {
     } else {
       map.set(checkId, {
         checkId,
-        checkName: meta?.name ?? checkId,
+        checkName: meta ? pickText(meta.name, locale) : checkId,
         severity: issue.severity,
         affectedPages: 1,
         sampleUrl: issue.url,
-        detail: issue.detail,
-        suggestion: issue.suggestion,
+        detail: dbTextToLocale(issue.detail, locale) ?? "",
+        suggestion: dbTextToLocale(issue.suggestion, locale),
       });
     }
   }
@@ -58,8 +83,14 @@ function groupIssues(issues: AuditIssueRow[]): IssueGroup[] {
   return Array.from(map.values()).sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
-/** 计算检查项覆盖：哪些通过、哪些未通过 */
-function computeCheckCoverage(issues: AuditIssueRow[]): Array<CheckMeta & { passed: boolean; affectedPages: number }> {
+/** 计算检查项覆盖：哪些通过、哪些未通过（name/description 按 locale 输出纯文本） */
+type CheckCoverageEntry = Omit<CheckMeta, "name" | "description"> & {
+  name: string;
+  description: string;
+  passed: boolean;
+  affectedPages: number;
+};
+function computeCheckCoverage(issues: AuditIssueRow[], locale: UiLocale): CheckCoverageEntry[] {
   const hitMap = new Map<string, number>();
   for (const issue of issues) {
     const checkId = issue.type;
@@ -67,6 +98,8 @@ function computeCheckCoverage(issues: AuditIssueRow[]): Array<CheckMeta & { pass
   }
   return allCheckMeta.map((meta) => ({
     ...meta,
+    name: pickText(meta.name, locale),
+    description: pickText(meta.description, locale),
     passed: !hitMap.has(meta.id),
     affectedPages: hitMap.get(meta.id) ?? 0,
   }));
@@ -95,8 +128,9 @@ export async function GET(req: Request) {
   }
 
   const issues = audit.status === "completed" ? await getAuditIssues(userId, audit.id) : [];
-  const grouped = groupIssues(issues);
-  const coverage = computeCheckCoverage(issues);
+  const locale = readUiLocale(req);
+  const grouped = groupIssues(issues, locale);
+  const coverage = computeCheckCoverage(issues, locale);
 
   // 解析 comparison JSON
   let comparison: AuditHistoryComparison | null = null;
