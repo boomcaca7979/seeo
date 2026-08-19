@@ -61,7 +61,7 @@ export default async function DocsPage() {
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
       <Navbar />
 
-      <div className="mx-auto max-w-4xl px-6 py-16">
+      <div className="doc-shell px-6 py-16">
         <span className="font-mono text-xs text-brand">{t("eyebrow")}</span>
         <h1 className="mt-3 font-mono text-3xl font-bold text-ink mb-2">{t("title")}</h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
@@ -98,7 +98,7 @@ export default async function DocsPage() {
                   {f.capabilities.map((c) => (
                     <span
                       key={c}
-                      className="rounded border border-line bg-paper px-2 py-0.5 font-mono text-[10px] text-ink-60"
+                      className="rounded border border-line bg-paper px-2 py-0.5 font-mono text-[0.625rem] text-ink-60"
                     >
                       {c}
                     </span>
@@ -157,7 +157,7 @@ export default async function DocsPage() {
 
       {/* 返回首页 */}
       <div className="border-t border-line">
-        <div className="mx-auto max-w-4xl px-6 py-6 text-center">
+        <div className="doc-shell px-6 py-6 text-center">
           <Link
             href={localePath(locale, "/")}
             className="font-mono text-xs text-ink-40 transition-colors hover:text-ink"

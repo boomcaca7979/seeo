@@ -173,8 +173,8 @@ export default function KeywordExpandPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
-      <h1 className="text-[28px] font-semibold leading-tight text-ink">{t("title")}</h1>
+    <div className="dash-container p-6 lg:p-8">
+      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">{t("title")}</h1>
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
@@ -241,7 +241,7 @@ export default function KeywordExpandPage() {
       {(expand.loading || expand.data || expand.error) && (
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-semibold text-ink">{t("title")}</h2>
+            <h2 className="text-[1.0625rem] font-semibold text-ink">{t("title")}</h2>
             <span className="text-xs text-ink-40">
               {expand.data ? t("totalCount", { count: formatNumber(expandTotal, locale) }) : expand.loading ? t("fetching") : ""}
             </span>
@@ -295,7 +295,7 @@ export default function KeywordExpandPage() {
       {(serp.loading || (serp.data && serp.data.relatedSearches.length > 0) || serp.error) && (
         <div className="mt-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-semibold text-ink">{t("relatedKeywordsTitle")}</h2>
+            <h2 className="text-[1.0625rem] font-semibold text-ink">{t("relatedKeywordsTitle")}</h2>
             <span className="text-xs text-ink-40">{t("relatedKeywordsSource")}</span>
           </div>
           <div className="card-a mt-3 overflow-hidden">
@@ -351,11 +351,11 @@ function ExpandTag({ query, tracked, onTrack }: { query: string; tracked: boolea
   return (
     <div className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card pl-3 pr-1.5 py-1">
       <span className="text-xs text-ink">{query}</span>
-      <span className="text-[10px] text-ink-40">{intentText(t, intent)}</span>
+      <span className="text-[0.625rem] text-ink-40">{intentText(t, intent)}</span>
       <button
         onClick={onTrack}
         disabled={tracked}
-        className={`rounded-full px-1.5 py-0.5 text-[10px] transition-colors ${
+        className={`rounded-full px-1.5 py-0.5 text-[0.625rem] transition-colors ${
           tracked ? "bg-pos/15 text-pos" : "bg-line-soft text-ink-60 hover:bg-ink hover:text-card"
         }`}
         title={tracked ? t("trackedTitle") : t("trackTitle")}

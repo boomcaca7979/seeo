@@ -95,6 +95,49 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ===== 大屏自适应排版（rem 等比缩放，带上限） =====
+ * ≥1920px 根字号 16→17px，≥2560px 17→18px：
+ * 所有 rem 系文字/间距/容器等比放大，px 系固定元素不动。
+ * 断点本身为媒体查询 rem（基于初始字号），不受此影响。 */
+@media (min-width: 120rem) {
+  html { font-size: 17px; }
+}
+@media (min-width: 160rem) {
+  html { font-size: 18px; }
+}
+
+/* ===== 响应式内容容器 =====
+ * site-shell  营销页结构容器：1280px 基准，≥1536px 提升至 1440px
+ * dash-container  Dashboard 内容容器：1280px 基准，≥1536px 提升至 1600px
+ * doc-shell   文档/功能长文容器：896px 基准（可读行长），≥1536px 放宽至 1152px
+ * 均只负责 宽度 + 居中，padding 由使用处自带。 */
+.site-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+}
+@media (min-width: 96rem) {
+  .site-shell { max-width: 90rem; }
+}
+
+.dash-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+}
+@media (min-width: 96rem) {
+  .dash-container { max-width: 100rem; }
+}
+
+.doc-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 56rem;
+}
+@media (min-width: 96rem) {
+  .doc-shell { max-width: 72rem; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -136,7 +179,7 @@ body {
 /* mono 微型标签 */
 .micro-label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.6875rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--color-ink-40);
@@ -151,7 +194,7 @@ body {
   border-radius: 4px;
   border: 1px solid currentColor;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1.4;
   letter-spacing: 0;
@@ -173,7 +216,7 @@ body {
   color: #ffffff;
   border-radius: 6px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -199,7 +242,7 @@ body {
   border: 1px solid var(--color-line);
   border-radius: 6px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;

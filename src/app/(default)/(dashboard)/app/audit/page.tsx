@@ -486,7 +486,7 @@ function AuditPageInner() {
   }, [audit?.pagesDetail, t]);
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8 print-area">
+    <div className="dash-container p-6 lg:p-8 print-area">
       {/* 打印专用页眉 */}
       <div className="mb-6 hidden border-b border-line pb-3 print:block">
         <div className="font-sans text-xs text-ink-40">{t("printHeader")}</div>
@@ -646,7 +646,7 @@ function AuditPageInner() {
               style={{ width: activeDepth === "quick" ? "100%" : "50%" }}
             />
           </div>
-          <p className="mt-2 font-sans text-[10px] text-ink-40">
+          <p className="mt-2 font-sans text-[0.625rem] text-ink-40">
             {activeDepth === "quick"
               ? t("etaQuick")
               : t("etaFull")
@@ -739,7 +739,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-neg">
                 {formatNumber(audit?.errors ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
                 {t("errCaption")}
               </div>
             </div>
@@ -752,7 +752,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-warn">
                 {formatNumber(audit?.warnings ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
                 {t("warnCaption")}
               </div>
             </div>
@@ -765,7 +765,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-bold text-ink">
                 {formatNumber(audit?.notices ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[10px] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
                 {t("noticeCaption")}
               </div>
             </div>
@@ -976,7 +976,7 @@ function AuditPageInner() {
                     {audit.comparison.previous.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-ink-40">
+                  <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
                     {t("issuesUnit", { n: audit.comparison.previous.issues })}
                   </div>
                 </div>
@@ -991,7 +991,7 @@ function AuditPageInner() {
                     {audit.comparison.scoreChange > 0 ? "↑" : audit.comparison.scoreChange < 0 ? "↓" : "→"}
                     {" "}{Math.abs(audit.comparison.scoreChange)}{" "}{t("pointsUnit")}
                   </div>
-                  <div className={`mt-0.5 font-mono text-[10px] ${
+                  <div className={`mt-0.5 font-mono text-[0.625rem] ${
                     audit.comparison.issuesChange < 0 ? "text-pos" :
                     audit.comparison.issuesChange > 0 ? "text-neg" : "text-ink-40"
                   }`}>
@@ -1009,7 +1009,7 @@ function AuditPageInner() {
                     {audit.comparison.current.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-ink-40">
+                  <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
                     {t("issuesUnit", { n: audit.comparison.current.issues })}
                   </div>
                 </div>
@@ -1034,7 +1034,7 @@ function AuditPageInner() {
                           <div className="font-sans text-xs text-ink">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[10px] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1060,7 +1060,7 @@ function AuditPageInner() {
                           <div className="font-sans text-xs text-ink">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[10px] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1086,7 +1086,7 @@ function AuditPageInner() {
                           <div className="font-sans text-xs text-ink-60">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[10px] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1116,7 +1116,7 @@ function AuditPageInner() {
             })}
           </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {audit.coverage.map((check) => {
               const catCfg = categoryConfig[check.category];
               return (
@@ -1143,14 +1143,14 @@ function AuditPageInner() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 font-mono text-[10px] text-ink-40">
+                  <div className="mt-1 font-mono text-[0.625rem] text-ink-40">
                     {check.description}
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className={`badge-${check.category === "critical" ? "err" : check.category === "warning" ? "warn" : "info"}`}>
                       {categoryLabel[check.category]}
                     </span>
-                    <span className="font-mono text-[10px] text-ink-40">
+                    <span className="font-mono text-[0.625rem] text-ink-40">
                       {check.passed ? t("checkPassed") : t("checkAffected", { n: check.affectedPages })}
                     </span>
                   </div>
@@ -1271,7 +1271,7 @@ function AuditPageInner() {
               {saving ? t("saving") : t("saveToReports")}
             </button>
           </div>
-          <p className="font-sans text-[10px] text-ink-40">
+          <p className="font-sans text-[0.625rem] text-ink-40">
             {t("exportNote1")}<br />
             {t("exportNote2")}
           </p>

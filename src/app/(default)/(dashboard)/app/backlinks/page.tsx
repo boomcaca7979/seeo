@@ -155,7 +155,7 @@ export default function BacklinksPage() {
   // Feature Gate：backlinks 为 Pro 专属功能
   if (!entitlementsLoading && !features.backlinks) {
     return (
-      <div className="mx-auto max-w-7xl p-6 lg:p-8">
+      <div className="dash-container p-6 lg:p-8">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">04</span>
           <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
@@ -182,7 +182,7 @@ export default function BacklinksPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">04</span>

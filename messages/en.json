@@ -974,6 +974,7 @@
     },
     "topbar": {
       "noProject": "No project selected",
+      "menu": "Open menu",
       "switchProject": "Switch project",
       "noProjects": "No projects yet",
       "health": "Health",

@@ -46,7 +46,7 @@ export default function ScoreRing({
           <span className={`font-display font-bold text-ink ${size >= 120 ? "text-3xl" : "text-xl"}`}>
             {score}
           </span>
-          <span className="font-mono text-[9px] text-ink-40">/ 100</span>
+          <span className="font-mono text-[0.5625rem] text-ink-40">/ 100</span>
         </div>
       )}
     </div>

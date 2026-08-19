@@ -99,7 +99,7 @@ export default function RankCheckPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-6 lg:p-8">
-      <h1 className="text-[28px] font-semibold leading-tight text-ink">{t("title")}</h1>
+      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">{t("title")}</h1>
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
@@ -174,7 +174,7 @@ export default function RankCheckPage() {
           </button>
         </div>
 
-        <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-[11px] text-ink-60">
+        <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-[0.6875rem] text-ink-60">
           {t("quotaHint")}
         </div>
       </form>
@@ -236,7 +236,7 @@ export default function RankCheckPage() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-[11px] text-ink-40">
+              <div className="mt-4 flex items-center justify-between text-[0.6875rem] text-ink-40">
                 <span>{t("regionLabel")}：{display(country)} · {display(city)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
                 <span>{t("queryTime")}：{new Date(result.fetchedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</span>
               </div>

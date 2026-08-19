@@ -99,7 +99,7 @@ function renderDetail(
   ];
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 面包屑 */}
       <nav className="flex items-center gap-2 font-mono text-xs text-ink-40">
         <Link href="/app" className="hover:text-ink">{t("breadcrumbHome")}</Link>

@@ -21,7 +21,7 @@ export default function PlaceholderPage({
   const t = useTranslations("dashboard.shared.placeholder");
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 标题 */}
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-2xl">
@@ -49,7 +49,7 @@ export default function PlaceholderPage({
               {m.value}
             </div>
             <div className="mt-2 h-8 rounded-lg bg-line-soft" />
-            <div className="mt-2 font-sans text-[10px] text-ink-40">
+            <div className="mt-2 font-sans text-[0.625rem] text-ink-40">
               {m.hint}
             </div>
           </div>

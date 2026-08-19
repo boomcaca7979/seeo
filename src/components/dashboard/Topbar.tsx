@@ -12,6 +12,8 @@ import { formatRelativeTime } from "@/lib/relative-time";
 interface TopbarProps {
   displayName: string;
   email: string;
+  /** 移动端（<lg）打开侧边抽屉 */
+  onMobileMenuClick?: () => void;
 }
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
@@ -45,7 +47,7 @@ const alertDotColor: Record<string, string> = {
 // SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
 
 
-export default function Topbar({ displayName, email }: TopbarProps) {
+export default function Topbar({ displayName, email, onMobileMenuClick }: TopbarProps) {
   const t = useTranslations("dashboard.topbar");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
@@ -195,16 +197,29 @@ export default function Topbar({ displayName, email }: TopbarProps) {
 
   return (
     <header className="flex h-16 flex-none items-center justify-between gap-4 border-b border-line bg-card px-5">
+      {/* 移动端菜单按钮 */}
+      {onMobileMenuClick && (
+        <button
+          onClick={onMobileMenuClick}
+          className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-ink-60 hover:bg-line-soft hover:text-ink lg:hidden"
+          aria-label={t("menu")}
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
+
       {/* 项目切换器：描边 chip */}
-      <div className="relative" ref={projectRef}>
+      <div className="relative min-w-0" ref={projectRef}>
         <button
           onClick={() => setProjectOpen((o) => !o)}
           className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2 hover:border-ink-25"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded bg-ink text-xs font-semibold text-card">
+          <span className="flex h-6 w-6 flex-none items-center justify-center rounded bg-ink text-xs font-semibold text-card">
             {currentProject ? currentProject.name.charAt(0).toUpperCase() : "—"}
           </span>
-          <span className="font-sans text-sm font-medium text-ink">
+          <span className="max-w-[140px] truncate font-sans text-sm font-medium text-ink sm:max-w-[220px] lg:max-w-none">
             {currentProject ? currentProject.domain : t("noProject")}
           </span>
           <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-ink-40">
@@ -214,7 +229,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
 
         {projectOpen && (
           <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-1.5">
-            <div className="px-2 py-1.5 font-sans text-[10px] uppercase tracking-wider text-ink-40">
+            <div className="px-2 py-1.5 font-sans text-[0.625rem] uppercase tracking-wider text-ink-40">
               {t("switchProject")}
             </div>
             {projects.length === 0 ? (
@@ -235,7 +250,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                     <div className="font-mono text-sm text-ink truncate">
                       {p.domain}
                     </div>
-                    <div className="font-sans text-[10px] text-ink-40">
+                    <div className="font-sans text-[0.625rem] text-ink-40">
                       {t("health")} {p.healthScore === null ? t("notAudited") : p.healthScore}
                     </div>
                   </div>
@@ -270,7 +285,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             placeholder={t("searchPlaceholder")}
             className="w-full rounded-lg border border-line bg-card py-2 pl-9 pr-14 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[10px] text-ink-40">
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[0.625rem] text-ink-40">
             ⌘K
           </kbd>
         </div>
@@ -300,7 +315,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
               <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
                 <span className="text-sm font-bold text-ink">{t("notifications")}</span>
                 {unread > 0 && (
-                  <span className="font-sans text-[10px] text-ink-40">{t("unread", { count: unread })}</span>
+                  <span className="font-sans text-[0.625rem] text-ink-40">{t("unread", { count: unread })}</span>
                 )}
               </div>
 
@@ -321,7 +336,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                       <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                       <div className="flex-1 min-w-0">
                         <div className="font-sans text-xs text-ink leading-snug">{a.title}</div>
-                        <div className="mt-0.5 font-sans text-[10px] text-ink-40">
+                        <div className="mt-0.5 font-sans text-[0.625rem] text-ink-40">
                           {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                         </div>
                       </div>
@@ -335,17 +350,17 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 {unread > 0 ? (
                   <button
                     onClick={handleMarkAllRead}
-                    className="font-sans text-[11px] text-ink-60 hover:text-ink"
+                    className="font-sans text-[0.6875rem] text-ink-60 hover:text-ink"
                   >
                     {t("markAllRead")}
                   </button>
                 ) : (
-                  <span className="font-sans text-[11px] text-ink-40">{t("allRead")}</span>
+                  <span className="font-sans text-[0.6875rem] text-ink-40">{t("allRead")}</span>
                 )}
                 <Link
                   href="/app"
                   onClick={() => setBellOpen(false)}
-                  className="font-sans text-[11px] text-accent hover:underline"
+                  className="font-sans text-[0.6875rem] text-accent hover:underline"
                 >
                   {t("viewAll")}
                 </Link>
@@ -360,7 +375,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-2 rounded-lg p-1 hover:bg-line-soft"
           >
-            <span className={`rounded px-2 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+            <span className={`rounded px-2 py-0.5 font-mono text-[0.625rem] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
               {planLabel(currentPlan, locale)}
             </span>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
@@ -374,15 +389,15 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                 <p className="font-sans text-sm font-medium text-ink truncate">
                   {displayName}
                 </p>
-                <p className="font-mono text-[10px] text-ink-40 truncate">
+                <p className="font-mono text-[0.625rem] text-ink-40 truncate">
                   {email}
                 </p>
                 <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+                  <span className={`rounded px-1.5 py-0.5 font-mono text-[0.625rem] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
                     {planLabel(currentPlan, locale)}
                   </span>
                   {(currentPlan === "free" || currentPlan === "lite") && (
-                    <span className="font-mono text-[10px] text-ink-40">{t("upgradeHint")}</span>
+                    <span className="font-mono text-[0.625rem] text-ink-40">{t("upgradeHint")}</span>
                   )}
                 </div>
               </div>
@@ -410,7 +425,7 @@ export default function Topbar({ displayName, email }: TopbarProps) {
                   {t("logout")}
                 </button>
               ) : (
-                <div className="px-4 py-2.5 font-sans text-[10px] text-ink-40">
+                <div className="px-4 py-2.5 font-sans text-[0.625rem] text-ink-40">
                   {t("demoMode")}
                 </div>
               )}

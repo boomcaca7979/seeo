@@ -201,7 +201,7 @@ function PricingContent() {
       </div>
 
       {/* 定价卡 */}
-      <div className="mx-auto max-w-6xl px-6 pb-16">
+      <div className="site-shell px-6 pb-16">
         {loading ? (
           <div className="text-center font-mono text-xs text-ink-40">{t("pricing.loading")}</div>
         ) : plans && plans.length > 0 ? (

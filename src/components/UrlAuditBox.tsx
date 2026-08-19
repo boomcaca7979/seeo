@@ -89,7 +89,7 @@ export default function UrlAuditBox() {
       {error && (
         <p className="mt-2 text-left font-mono text-xs text-coral">{error}</p>
       )}
-      <p className="mt-2 text-left font-mono text-[10px] text-y-muted/60">
+      <p className="mt-2 text-left font-mono text-[0.625rem] text-y-muted/60">
         {t("hint")}
       </p>
     </div>

@@ -14,7 +14,7 @@ export default function FeatureCards() {
 
   return (
     <section id="features" className="bg-station px-5 py-20 sm:px-8 sm:py-28">
-      <div className="mx-auto max-w-7xl">
+      <div className="site-shell">
         {/* 标题 */}
         <div className="max-w-2xl">
           <span className="font-mono text-sm text-y-secondary">
@@ -41,7 +41,7 @@ export default function FeatureCards() {
                   {f.tag}
                 </span>
                 <div className="text-right">
-                  <div className="font-mono text-[10px] text-d-muted">
+                  <div className="font-mono text-[0.625rem] text-d-muted">
                     {f.metricLabel}
                   </div>
                   <div className="flex items-center justify-end gap-1">

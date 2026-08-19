@@ -153,9 +153,12 @@ const navItems: NavItem[] = [
 interface SidebarProps {
   displayName?: string;
   email?: string;
+  /** 移动端（<lg）抽屉开合状态；桌面端 sidebar 常驻 */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export default function Sidebar({ displayName, email }: SidebarProps) {
+export default function Sidebar({ displayName, email, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string>("free");
   const pathname = usePathname();
@@ -204,11 +207,13 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
     <aside
       className={`flex h-screen flex-none flex-col border-r border-line bg-card ${
         collapsed ? "w-16" : "w-60"
+      } fixed inset-y-0 left-0 z-50 transition-transform duration-150 lg:static lg:translate-x-0 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
       {/* Logo */}
       <div className="flex h-16 flex-none items-center justify-between border-b border-line px-4">
-        <Link href="/app" className="flex items-center gap-1.5 overflow-hidden">
+        <Link href="/app" onClick={onMobileClose} className="flex items-center gap-1.5 overflow-hidden">
           <span className="text-lg font-bold tracking-tight text-ink">
             See
           </span>
@@ -230,6 +235,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
               key={item.href}
               href={item.href}
               title={collapsed ? t(item.labelKey) : undefined}
+              onClick={onMobileClose}
               className={`group relative mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-line-soft font-semibold text-ink"
@@ -253,7 +259,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
         <div className="flex-none px-3 pb-2">
           <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] text-ink-40">{t("currentPlan")}</span>
+              <span className="font-mono text-[0.625rem] text-ink-40">{t("currentPlan")}</span>
               <span className="font-sans text-xs font-medium text-ink">{currentPlanLabel}</span>
             </div>
             {showUpgradeCta && (
@@ -292,7 +298,7 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
               <div className="truncate text-xs font-medium text-ink">
                 {userName}
               </div>
-              <div className="truncate text-[10px] text-ink-40">
+              <div className="truncate text-[0.625rem] text-ink-40">
                 {userEmail}
               </div>
             </div>
@@ -321,10 +327,10 @@ export default function Sidebar({ displayName, email }: SidebarProps) {
         )}
       </div>
 
-      {/* 折叠按钮 */}
+      {/* 折叠按钮（仅桌面） */}
       <button
         onClick={() => setCollapsed((c) => !c)}
-        className="flex h-9 flex-none items-center justify-center border-t border-line text-ink-40 hover:bg-line-soft hover:text-ink"
+        className="hidden h-9 flex-none items-center justify-center border-t border-line text-ink-40 hover:bg-line-soft hover:text-ink lg:flex"
         aria-label={collapsed ? t("expand") : t("collapse")}
       >
         <svg

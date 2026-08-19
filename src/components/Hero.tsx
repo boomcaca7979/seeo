@@ -21,7 +21,7 @@ export default function Hero() {
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl">
+      <div className="relative site-shell">
         {/* 标题 */}
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-y-muted/40 bg-station-deep/60 px-3 py-1 font-mono text-xs text-y-secondary">
@@ -63,10 +63,10 @@ export default function Hero() {
                 <span className="h-2.5 w-2.5 rounded-full bg-gold/70" />
                 <span className="h-2.5 w-2.5 rounded-full bg-teal/70" />
               </div>
-              <div className="font-mono text-[10px] text-d-muted sm:text-xs">
+              <div className="font-mono text-[0.625rem] text-d-muted sm:text-xs">
                 seeo.asia / keyword-gravity-field
               </div>
-              <div className="font-mono text-[10px] text-d-muted sm:text-xs">
+              <div className="font-mono text-[0.625rem] text-d-muted sm:text-xs">
                 ● {t("panel.sample")}
               </div>
             </div>
@@ -76,14 +76,14 @@ export default function Hero() {
               <KeywordField />
 
               {/* 面板角标信息 */}
-              <div className="absolute left-3 top-3 hidden font-mono text-[10px] text-d-muted sm:block">
+              <div className="absolute left-3 top-3 hidden font-mono text-[0.625rem] text-d-muted sm:block">
                 <div>NODES: 8</div>
                 <div>EDGES: 7</div>
               </div>
-              <div className="absolute right-3 top-3 hidden font-mono text-[10px] text-d-muted sm:block">
+              <div className="absolute right-3 top-3 hidden font-mono text-[0.625rem] text-d-muted sm:block">
                 <div>{t("panel.sampleNote")}</div>
               </div>
-              <div className="absolute bottom-3 left-3 hidden font-mono text-[10px] text-d-secondary sm:block">
+              <div className="absolute bottom-3 left-3 hidden font-mono text-[0.625rem] text-d-secondary sm:block">
                 {t("panel.caption")}
               </div>
             </div>

@@ -97,13 +97,13 @@ export default function DomainSelect({ value, onChange, placeholder, className }
           <button
             type="button"
             onClick={() => setManual(false)}
-            className="mt-1 font-sans text-[10px] text-ink-40 hover:text-ink-60"
+            className="mt-1 font-sans text-[0.625rem] text-ink-40 hover:text-ink-60"
           >
             {t("backToSelect")}
           </button>
         )}
         {projects.length === 0 && (
-          <p className="mt-1 font-sans text-[10px] text-ink-40">
+          <p className="mt-1 font-sans text-[0.625rem] text-ink-40">
             {t("noProjectsHint")}
           </p>
         )}

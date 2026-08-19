@@ -300,7 +300,7 @@ function SettingsContent() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头：编号 + 标题 + 发丝线 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">09</span>
@@ -441,7 +441,7 @@ function SettingsContent() {
                   ? t("currentLine", { plan: planLabel(usageData.plan, locale) })
                   : t("loadingCurrentPlan")}
               </p>
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {plansLoading ? (
                   <div className="col-span-full font-mono text-xs text-ink-40">{t("loadingPlans")}</div>
                 ) : plans && plans.length > 0 ? (
@@ -474,12 +474,12 @@ function SettingsContent() {
                       >
                         {/* 推荐 / 当前套餐 标签 */}
                         {p.display.highlighted && !isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-bold text-ink">
                             {t("badgeRecommended")}
                           </span>
                         )}
                         {isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[10px] font-bold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-bold text-ink">
                             {t("badgeCurrent")}
                           </span>
                         )}
@@ -918,7 +918,7 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
             <div className="font-mono text-2xl font-bold text-ink">
               {total === null ? "—" : formatNumber(total, locale)}
             </div>
-            <div className="font-mono text-[10px] text-ink-40">{t("cacheEntries")}</div>
+            <div className="font-mono text-[0.625rem] text-ink-40">{t("cacheEntries")}</div>
           </div>
           <button
             onClick={handleCleanup}
@@ -1032,7 +1032,7 @@ function UsageDashboard({
                     style={{ width: `${Math.min(ratio * 100, 100)}%` }}
                   />
                 </div>
-                <div className="mt-1 font-mono text-[10px] text-ink-40">
+                <div className="mt-1 font-mono text-[0.625rem] text-ink-40">
                   {unlimited ? t("unlimitedNote") : t("usedPct", { n: Math.round(ratio * 100) })}
                   {!unlimited && isNearLimit && <span className="ml-2 text-neg">· {t("nearLimit")}</span>}
                 </div>
@@ -1044,13 +1044,13 @@ function UsageDashboard({
         {/* 项目 / 关键词限额 */}
         <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line-soft pt-5">
           <div>
-            <div className="font-mono text-[10px] text-ink-40">{t("limitProjectsMax")}</div>
+            <div className="font-mono text-[0.625rem] text-ink-40">{t("limitProjectsMax")}</div>
             <div className="mt-1 font-mono text-lg font-bold text-ink">
               {isUnlimited(usageData.limits.max_projects) ? t("unlimited") : formatNumber(usageData.limits.max_projects, locale)}
             </div>
           </div>
           <div>
-            <div className="font-mono text-[10px] text-ink-40">{t("limitKeywordsMax")}</div>
+            <div className="font-mono text-[0.625rem] text-ink-40">{t("limitKeywordsMax")}</div>
             <div className="mt-1 font-mono text-lg font-bold text-ink">
               {isUnlimited(usageData.limits.max_tracked_keywords) ? t("unlimited") : formatNumber(usageData.limits.max_tracked_keywords, locale)}
             </div>

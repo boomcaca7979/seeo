@@ -3,7 +3,8 @@
 
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
-import { allCheckMeta, checkMetaMap, pickText, type CheckMeta, type LText } from "@/lib/seo/audit-checks";
+import { allCheckMeta, checkMetaMap, pickText, type CheckMeta, type IssueSeverity, type LText } from "@/lib/seo/audit-checks";
+import { localizeLegacyDetail, localizeLegacySuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -34,16 +35,18 @@ interface PageDetailEntry {
   ok: boolean;
 }
 
-type UiLocale = "en" | "zh";
-
 /** 读取 UI locale：NEXT_LOCALE cookie → en（与 billing-error-client 优先级一致） */
 function readUiLocale(req: Request): UiLocale {
   const cookie = req.headers.get("cookie") ?? "";
   return /(?:^|;\s*)NEXT_LOCALE=zh(?:;|$)/.test(cookie) ? "zh" : "en";
 }
 
-/** DB 字符串 → 按 locale 文本：新数据为 JSON LText，历史数据为纯文本 string */
-function dbTextToLocale(raw: string | null | undefined, locale: UiLocale): string | null {
+/** DB 字符串 → 按 locale 文本：新数据为 JSON LText；历史纯文本按旧中文模板映射 */
+function dbTextToLocale(
+  raw: string | null | undefined,
+  locale: UiLocale,
+  legacyMap: (text: string, locale: UiLocale) => string
+): string | null {
   if (raw === null || raw === undefined) return null;
   const trimmed = raw.trim();
   if (trimmed.startsWith("{") && trimmed.includes('"en"') && trimmed.includes('"zh"')) {
@@ -56,7 +59,7 @@ function dbTextToLocale(raw: string | null | undefined, locale: UiLocale): strin
       // 非 JSON LText，按原文返回
     }
   }
-  return raw;
+  return legacyMap(raw, locale);
 }
 
 function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
@@ -74,8 +77,8 @@ function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
         severity: issue.severity,
         affectedPages: 1,
         sampleUrl: issue.url,
-        detail: dbTextToLocale(issue.detail, locale) ?? "",
-        suggestion: dbTextToLocale(issue.suggestion, locale),
+        detail: dbTextToLocale(issue.detail, locale, localizeLegacyDetail) ?? "",
+        suggestion: dbTextToLocale(issue.suggestion, locale, localizeLegacySuggestion),
       });
     }
   }
@@ -105,6 +108,59 @@ function computeCheckCoverage(issues: AuditIssueRow[], locale: UiLocale): CheckC
   }));
 }
 
+/** comparison 快照中的 issue 结构（写入时序列化，message/checkName 为存储原值） */
+interface ComparisonIssue {
+  checkId: string;
+  checkName: unknown;
+  message: unknown;
+  url: string;
+  severity: string;
+  suggestion?: unknown;
+}
+
+/**
+ * comparison JSON 读取层双语化：
+ * - checkName：历史/新数据均存 checkId（机器值）→ 映射当前 catalog 的本地化名称
+ * - message：新数据为 LText JSON 字符串、历史数据为旧纯中文 → 按 locale 输出
+ * 仅转换用户可见字段，score/issues 数量等机器值原样保留。
+ */
+function localizeComparisonIssue(
+  issue: ComparisonIssue,
+  locale: UiLocale
+): { checkId: string; checkName: string; message: string; url: string; severity: IssueSeverity; suggestion: string } {
+  const meta = checkMetaMap[issue.checkId];
+  const severity: IssueSeverity =
+    issue.severity === "error" || issue.severity === "warning" || issue.severity === "notice"
+      ? issue.severity
+      : "notice";
+  return {
+    checkId: issue.checkId,
+    checkName: meta ? pickText(meta.name, locale) : String(issue.checkName ?? issue.checkId),
+    message:
+      typeof issue.message === "string"
+        ? dbTextToLocale(issue.message, locale, localizeLegacyDetail) ?? ""
+        : "",
+    url: issue.url,
+    severity,
+    suggestion:
+      typeof issue.suggestion === "string"
+        ? dbTextToLocale(issue.suggestion, locale, localizeLegacySuggestion) ?? ""
+        : "",
+  };
+}
+
+function localizeComparison(
+  comparison: AuditHistoryComparison,
+  locale: UiLocale
+): AuditHistoryComparison {
+  return {
+    ...comparison,
+    newIssues: comparison.newIssues.map((i) => localizeComparisonIssue(i as unknown as ComparisonIssue, locale)),
+    resolvedIssues: comparison.resolvedIssues.map((i) => localizeComparisonIssue(i as unknown as ComparisonIssue, locale)),
+    unchangedIssues: comparison.unchangedIssues.map((i) => localizeComparisonIssue(i as unknown as ComparisonIssue, locale)),
+  };
+}
+
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
@@ -132,11 +188,12 @@ export async function GET(req: Request) {
   const grouped = groupIssues(issues, locale);
   const coverage = computeCheckCoverage(issues, locale);
 
-  // 解析 comparison JSON
+  // 解析 comparison JSON（读取层双语化：checkName/message 按 locale 输出）
   let comparison: AuditHistoryComparison | null = null;
   if (audit.comparison) {
     try {
-      comparison = JSON.parse(audit.comparison) as AuditHistoryComparison;
+      const parsed = JSON.parse(audit.comparison) as AuditHistoryComparison;
+      comparison = localizeComparison(parsed, locale);
     } catch {
       comparison = null;
     }

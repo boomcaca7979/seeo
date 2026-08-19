@@ -974,6 +974,7 @@
     },
     "topbar": {
       "noProject": "未选择项目",
+      "menu": "打开菜单",
       "switchProject": "切换项目",
       "noProjects": "暂无项目",
       "health": "健康",

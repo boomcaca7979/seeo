@@ -18,7 +18,7 @@ export default function ChartEmpty({ message, hint }: ChartEmptyProps) {
         </svg>
       </div>
       <div className="mt-2 text-xs font-medium text-ink-60">{message ?? t("noData")}</div>
-      {hint && <div className="mt-0.5 text-[10px] text-ink-40">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[0.625rem] text-ink-40">{hint}</div>}
     </div>
   );
 }

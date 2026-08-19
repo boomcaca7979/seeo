@@ -171,9 +171,9 @@ export default function ProjectList({
 
   return (
     <div>
-      <div className="mx-auto max-w-7xl px-6 py-8 sm:px-8">
+      <div className="dash-container px-6 py-8 sm:px-8">
         {/* eyebrow 行 */}
-        <div className="flex items-center justify-between font-sans text-[11px] text-ink-40">
+        <div className="flex items-center justify-between font-sans text-[0.6875rem] text-ink-40">
           <span>{todayLabel || "\u00A0"}</span>
           <span>
             {isAuthEnabled ? t("dataUpdatedAt") : t("dataUpdatedAtDemo")}
@@ -234,7 +234,7 @@ export default function ProjectList({
               </div>
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {projects.map((p) => {
                 const score = p.healthScore;
                 const hasScore = score !== null;
@@ -269,7 +269,7 @@ export default function ProjectList({
                         >
                           {p.name}
                         </div>
-                        <div className="mt-0.5 font-mono text-[11px] text-ink-40">
+                        <div className="mt-0.5 font-mono text-[0.6875rem] text-ink-40">
                           {p.domain}
                         </div>
                       </div>
@@ -277,7 +277,7 @@ export default function ProjectList({
                       {/* 健康分 + 标签 */}
                       <div className="mt-4 flex items-end justify-between">
                         <div>
-                          <div className="font-sans text-[10px] tracking-wider uppercase text-ink-40">
+                          <div className="font-sans text-[0.625rem] tracking-wider uppercase text-ink-40">
                             {t("healthScore")}
                           </div>
                           <div className={`mt-0.5 font-sans text-2xl font-bold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
@@ -285,7 +285,7 @@ export default function ProjectList({
                           </div>
                         </div>
                         {hasScore && (
-                          <span className="font-mono text-[10px] text-ink-40">
+                          <span className="font-mono text-[0.625rem] text-ink-40">
                             / 100
                           </span>
                         )}
@@ -304,7 +304,7 @@ export default function ProjectList({
                       {/* 指标行：追踪关键词 / 近 7 天排名 */}
                       <div className="mt-3 flex items-center justify-between">
                         <div>
-                          <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
+                          <div className="font-sans text-[0.625rem] uppercase tracking-wider text-ink-40">
                             {t("trackedKeywords")}
                           </div>
                           <div className="mt-0.5 font-mono text-base font-semibold text-ink">
@@ -312,7 +312,7 @@ export default function ProjectList({
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-sans text-[10px] uppercase tracking-wider text-ink-40">
+                          <div className="font-sans text-[0.625rem] uppercase tracking-wider text-ink-40">
                             {t("rank7d")}
                           </div>
                           <div className="mt-0.5 flex items-center justify-end gap-1.5 font-mono text-xs">
@@ -324,7 +324,7 @@ export default function ProjectList({
 
                       {/* 底部元信息 + 右箭头 */}
                       <div className="mt-4 flex items-center justify-between">
-                        <span className="font-sans text-[10px] text-ink-40">
+                        <span className="font-sans text-[0.625rem] text-ink-40">
                           {t("lastAudit")} {p.lastAuditTime ? formatRelativeTime(p.lastAuditTime, locale, tc) : t("notAudited")} · {t("alertsCount")} {p.alertCount}
                         </span>
                         <span className="font-mono text-sm text-ink-40 opacity-0 group-hover:opacity-100">
@@ -374,7 +374,7 @@ export default function ProjectList({
             <h2 className="font-display text-base font-bold text-ink">{t("alertsSection")}</h2>
             <div className="hairline flex-1" />
             <span
-              className="font-sans text-[10px] font-bold tracking-wider text-brand"
+              className="font-sans text-[0.625rem] font-bold tracking-wider text-brand"
               style={{ border: "1px solid currentColor", borderRadius: 3, padding: "2px 6px" }}
             >
               {tc("rankChange")}
@@ -404,7 +404,7 @@ export default function ProjectList({
                   <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-sans text-sm text-ink">{a.title}</div>
-                    <div className="font-sans text-[10px] text-ink-40">
+                    <div className="font-sans text-[0.625rem] text-ink-40">
                       {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                     </div>
                   </div>
@@ -462,7 +462,7 @@ export default function ProjectList({
               placeholder="example.com"
               className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
-            <p className="mt-1.5 font-sans text-[10px] text-ink-40">
+            <p className="mt-1.5 font-sans text-[0.625rem] text-ink-40">
               {t("domainHint")}
             </p>
           </div>
@@ -497,7 +497,7 @@ export default function ProjectList({
           {t("deleteConfirm", { name: deleteTarget?.name ?? "", domain: deleteTarget?.domain ?? "" })}
         </p>
         {/* 最终核对：完整项目 UUID（与 DELETE 请求 ?id= 参数一致） */}
-        <p className="mt-1.5 font-mono text-[11px] break-all text-ink-40">
+        <p className="mt-1.5 font-mono text-[0.6875rem] break-all text-ink-40">
           ID: {deleteTarget?.id}
         </p>
         <p className="mt-2 font-sans text-xs text-ink-40">

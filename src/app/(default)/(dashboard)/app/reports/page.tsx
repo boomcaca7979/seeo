@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
+import { localizeLegacyDetail, localizeLegacySuggestion } from "@/lib/seo/audit-legacy-text";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
@@ -504,7 +505,7 @@ export default function ReportsPage() {
   const reportTypes: ReportType[] = ["ranking", "audit", "content", "weekly"];
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">08</span>
@@ -571,14 +572,14 @@ export default function ReportsPage() {
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
             <span className="badge-warn">{typeLabel("ranking")}</span>
-            <span className="font-mono text-[10px] text-ink-40">CSV</span>
+            <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
           </div>
           <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvRankingTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvRankingDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[10px] text-ink-40">{t("trackedLabel")}</div>
+            <div className="font-sans text-[0.625rem] text-ink-40">{t("trackedLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
               {loading ? "—" : formatNumber(trackedCount, locale)}
             </div>
@@ -605,14 +606,14 @@ export default function ReportsPage() {
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
             <span className="badge-warn">{typeLabel("content")}</span>
-            <span className="font-mono text-[10px] text-ink-40">CSV</span>
+            <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
           </div>
           <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvContentTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvContentDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[10px] text-ink-40">{t("checksLabel")}</div>
+            <div className="font-sans text-[0.625rem] text-ink-40">{t("checksLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-bold text-ink">
               {loading ? "—" : formatNumber(contentCount, locale)}
             </div>
@@ -681,7 +682,16 @@ export default function ReportsPage() {
                                 if (r.type === "ranking") {
                                   setRankData({ ...data, generatedAt: r.created_at });
                                 } else if (r.type === "audit") {
-                                  setAuditData({ ...data, projectName: data.domain, generatedAt: r.created_at, coverage: data.coverage ?? [] });
+                                  // 历史快照读取层双语化：旧快照 detail/suggestion 为纯中文，按当前 locale 映射
+                                  const localizedIssues = (data.issues ?? []).map(
+                                    (i: { type: string; severity: string; url: string; detail: string; suggestion?: string | null; checkId?: string; checkName?: string }) => ({
+                                      ...i,
+                                      checkId: i.checkId ?? i.type,
+                                      detail: localizeLegacyDetail(i.detail ?? "", locale),
+                                      suggestion: i.suggestion ? localizeLegacySuggestion(i.suggestion, locale) : i.suggestion ?? "",
+                                    })
+                                  );
+                                  setAuditData({ ...data, issues: localizedIssues, projectName: data.domain, generatedAt: r.created_at, coverage: data.coverage ?? [] });
                                 } else if (r.type === "content") {
                                   setContentData({ ...data, generatedAt: r.created_at });
                                 } else if (r.type === "weekly") {

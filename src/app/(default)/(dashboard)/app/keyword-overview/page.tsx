@@ -107,9 +107,9 @@ export default function KeywordOverviewPage() {
   }, [organic]);
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
-      <h1 className="text-[28px] font-semibold leading-tight text-ink">
+      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">
         {t("title")}
       </h1>
       <p className="mt-1 text-sm text-ink-60">
@@ -194,7 +194,7 @@ export default function KeywordOverviewPage() {
           {/* SERP Top 10 */}
           <div className="mt-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-[17px] font-semibold text-ink">SERP Top 10</h2>
+              <h2 className="text-[1.0625rem] font-semibold text-ink">SERP Top 10</h2>
               <span className="text-xs text-ink-40">
                 {t("serpSource")}{serp.data?.fromCache && ` · ${t("cachedTag")}`}
               </span>
@@ -228,7 +228,7 @@ export default function KeywordOverviewPage() {
                             >
                               {r.title}
                             </a>
-                            {r.date && <span className="ml-2 text-[10px] text-ink-40">{r.date}</span>}
+                            {r.date && <span className="ml-2 text-[0.625rem] text-ink-40">{r.date}</span>}
                           </td>
                           <td className="px-4 py-3">
                             <span className="rounded bg-line-soft px-2 py-0.5 font-mono text-xs text-ink-60">{r.domain}</span>
@@ -293,7 +293,7 @@ function OverviewCard({ label, value, sub }: { label: string; value: string; sub
     <div className="card-a p-5">
       <div className="text-xs text-ink-40">{label}</div>
       <div className="mt-1 text-xl font-bold text-ink break-all">{value}</div>
-      <div className="mt-1 text-[11px] text-ink-40">{sub}</div>
+      <div className="mt-1 text-[0.6875rem] text-ink-40">{sub}</div>
     </div>
   );
 }

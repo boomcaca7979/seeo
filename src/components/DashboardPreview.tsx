@@ -68,7 +68,7 @@ function HealthRing({ scoreNote }: { scoreNote: string }) {
       </svg>
       <div className="absolute text-center">
         <div className="font-display text-3xl font-bold text-d-text">75</div>
-        <div className="font-mono text-[10px] text-d-muted">{scoreNote}</div>
+        <div className="font-mono text-[0.625rem] text-d-muted">{scoreNote}</div>
       </div>
     </div>
   );
@@ -102,7 +102,7 @@ function MetricPill({
 }) {
   return (
     <div className="rounded-lg bg-ink-elevated p-3">
-      <div className="font-mono text-[10px] text-d-muted">{label}</div>
+      <div className="font-mono text-[0.625rem] text-d-muted">{label}</div>
       <div className="mt-1 flex items-baseline gap-1.5">
         <span className="font-mono text-lg font-semibold text-d-text">
           {value}
@@ -126,7 +126,7 @@ export default function DashboardPreview() {
 
   return (
     <section id="dashboard" className="bg-station-deep px-5 py-20 sm:px-8 sm:py-28">
-      <div className="mx-auto max-w-7xl">
+      <div className="site-shell">
         {/* 标题 */}
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div className="max-w-2xl">
@@ -169,7 +169,7 @@ export default function DashboardPreview() {
             <div className="mt-6 h-44">
               <RankTrendChart />
             </div>
-            <div className="mt-3 flex justify-between font-mono text-[10px] text-d-muted">
+            <div className="mt-3 flex justify-between font-mono text-[0.625rem] text-d-muted">
               <span>{t("rankTrend.from")}</span>
               <span>{t("rankTrend.to")}</span>
             </div>
@@ -181,7 +181,7 @@ export default function DashboardPreview() {
               <h3 className="font-display text-lg font-bold text-d-text">
                 {t("health.title")}
               </h3>
-              <span className="rounded bg-teal/15 px-2 py-0.5 font-mono text-[10px] text-teal">
+              <span className="rounded bg-teal/15 px-2 py-0.5 font-mono text-[0.625rem] text-teal">
                 {t("sample")}
               </span>
             </div>
@@ -195,19 +195,19 @@ export default function DashboardPreview() {
                   <div className="font-mono text-sm font-semibold text-coral">
                     {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">{t("health.errors")}</div>
+                  <div className="font-mono text-[0.5625rem] text-d-muted">{t("health.errors")}</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-gold">
                     {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">{t("health.warnings")}</div>
+                  <div className="font-mono text-[0.5625rem] text-d-muted">{t("health.warnings")}</div>
                 </div>
                 <div>
                   <div className="font-mono text-sm font-semibold text-d-secondary">
                     {t("sample")}
                   </div>
-                  <div className="font-mono text-[9px] text-d-muted">{t("health.notices")}</div>
+                  <div className="font-mono text-[0.5625rem] text-d-muted">{t("health.notices")}</div>
                 </div>
               </div>
             </div>
@@ -234,7 +234,7 @@ export default function DashboardPreview() {
             <div className="mt-6 h-40">
               <TrafficBars />
             </div>
-            <div className="mt-2 flex justify-between font-mono text-[10px] text-d-muted">
+            <div className="mt-2 flex justify-between font-mono text-[0.625rem] text-d-muted">
               <span>{t("traffic.jan")}</span>
               <span>{t("traffic.jun")}</span>
               <span>{t("traffic.dec")}</span>
@@ -244,7 +244,7 @@ export default function DashboardPreview() {
           {/* 指标卡片堆 */}
           <div className="grid grid-cols-2 gap-4 lg:col-span-5">
             <div className="rounded-2xl bg-ink p-5">
-              <div className="font-mono text-[10px] text-d-muted">{t("metrics.trackedKeywords")}</div>
+              <div className="font-mono text-[0.625rem] text-d-muted">{t("metrics.trackedKeywords")}</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
                 {t("sample")}
               </div>
@@ -262,7 +262,7 @@ export default function DashboardPreview() {
               </div>
             </div>
             <div className="rounded-2xl bg-ink p-5">
-              <div className="font-mono text-[10px] text-d-muted">{t("metrics.referringDomains")}</div>
+              <div className="font-mono text-[0.625rem] text-d-muted">{t("metrics.referringDomains")}</div>
               <div className="mt-2 font-mono text-2xl font-bold text-d-text">
                 {t("sample")}
               </div>

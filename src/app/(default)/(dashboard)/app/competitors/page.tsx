@@ -459,7 +459,7 @@ export default function CompetitorsPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头：编号 + 标题 + 发丝线 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">06</span>
@@ -503,9 +503,9 @@ export default function CompetitorsPage() {
                 />
               </div>
               {usagePercent > 70 && (
-                <span className="font-mono text-[10px] text-neg">{t("quotaTight")}</span>
+                <span className="font-mono text-[0.625rem] text-neg">{t("quotaTight")}</span>
               )}
-              <span className="font-mono text-[10px] text-ink-40">
+              <span className="font-mono text-[0.625rem] text-ink-40">
                 {t("countsSummary", { competitors: formatNumber(competitors.length, locale), keywords: formatNumber(keywords.length, locale) })}
               </span>
             </div>
@@ -684,13 +684,13 @@ export default function CompetitorsPage() {
                             </td>
                             <td className="px-4 py-3">
                               {r.is_self ? (
-                                <span className="font-mono text-[10px] text-ink-40">{t("statusBaseline")}</span>
+                                <span className="font-mono text-[0.625rem] text-ink-40">{t("statusBaseline")}</span>
                               ) : isCompBetter ? (
-                                <span className="font-mono text-[10px] text-neg">{t("statusAhead")}</span>
+                                <span className="font-mono text-[0.625rem] text-neg">{t("statusAhead")}</span>
                               ) : isSelfBetter ? (
-                                <span className="font-mono text-[10px] text-pos">{t("statusBehind")}</span>
+                                <span className="font-mono text-[0.625rem] text-pos">{t("statusBehind")}</span>
                               ) : (
-                                <span className="font-mono text-[10px] text-ink-40">{t("statusTied")}</span>
+                                <span className="font-mono text-[0.625rem] text-ink-40">{t("statusTied")}</span>
                               )}
                             </td>
                           </tr>
@@ -712,7 +712,7 @@ export default function CompetitorsPage() {
 
             {/* 表格底部统计 */}
             {ranks && (
-              <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-ink-40">
+              <div className="mt-3 flex items-center justify-between font-mono text-[0.625rem] text-ink-40">
                 <span>
                   {t("tableKeyword", { keyword: ranks.keyword })} · {ranks.fromCache ? t("cachedHint") : t("liveHint")}
                 </span>
@@ -749,7 +749,7 @@ export default function CompetitorsPage() {
                           style={{ width: `${Math.min(100, mySov.percentage)}%` }}
                         />
                       </div>
-                      <div className="mt-1.5 font-mono text-[10px] text-ink-40">
+                      <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
                         {t("mySovDetail", { score: formatNumber(mySov.score, locale), keywords: formatNumber(mySov.keywordCount, locale) })}
                       </div>
                     </div>
@@ -764,7 +764,7 @@ export default function CompetitorsPage() {
                       return my?.top10Count ?? 0;
                     })()}
                   </div>
-                  <div className="mt-1.5 font-mono text-[10px] text-ink-40">
+                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
                     {t("top10Hint")}
                   </div>
                 </div>
@@ -777,7 +777,7 @@ export default function CompetitorsPage() {
                       return my?.avgRank !== null && my?.avgRank !== undefined ? `#${my.avgRank}` : "—";
                     })()}
                   </div>
-                  <div className="mt-1.5 font-mono text-[10px] text-ink-40">
+                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
                     {t("avgRankHint")}
                   </div>
                 </div>
@@ -787,7 +787,7 @@ export default function CompetitorsPage() {
                   <div className="mt-1 font-mono text-2xl font-bold text-ink">
                     {sov.competitorCount}
                   </div>
-                  <div className="mt-1.5 font-mono text-[10px] text-ink-40">
+                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
                     {t("analyzedKeywords", { analyzed: formatNumber(sov.analyzedKeywords, locale), total: formatNumber(sov.totalKeywords, locale) })}
                   </div>
                 </div>

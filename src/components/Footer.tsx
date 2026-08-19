@@ -56,7 +56,7 @@ export default function Footer() {
 
   return (
     <footer id="footer" className="bg-ink px-5 py-16 sm:px-8">
-      <div className="mx-auto max-w-7xl">
+      <div className="site-shell">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
           {/* Logo + 简介 */}
           <div className="col-span-2 md:col-span-2">

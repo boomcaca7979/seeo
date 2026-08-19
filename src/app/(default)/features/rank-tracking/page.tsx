@@ -50,7 +50,7 @@ export default async function RankTrackingFeaturePage() {
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
       <Navbar />
 
-      <div className="mx-auto max-w-4xl px-6 py-16">
+      <div className="doc-shell px-6 py-16">
         <span className="font-mono text-xs text-brand">{s("eyebrow")}</span>
         <h1 className="mt-3 font-mono text-3xl font-bold text-ink mb-2">
           {t("title")}
@@ -195,7 +195,7 @@ export default async function RankTrackingFeaturePage() {
       </div>
 
       <div className="border-t border-line">
-        <div className="mx-auto max-w-4xl px-6 py-6 text-center">
+        <div className="doc-shell px-6 py-6 text-center">
           <Link
             href={localePath(locale, "/")}
             className="font-mono text-xs text-ink-40 transition-colors hover:text-ink"

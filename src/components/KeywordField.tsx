@@ -141,7 +141,7 @@ export default function KeywordField() {
           <div className="font-display text-base font-bold text-d-text sm:text-lg">
             {t("center")}
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-gold sm:text-xs">
+          <div className="mt-0.5 font-mono text-[0.625rem] text-gold sm:text-xs">
             KD 73 · Vol 1.2M
           </div>
         </div>
@@ -167,10 +167,10 @@ export default function KeywordField() {
                   : "animate-drift-c text-center"
             }
           >
-            <div className="whitespace-nowrap font-sans text-[10px] font-semibold text-d-text sm:text-xs">
+            <div className="whitespace-nowrap font-sans text-[0.625rem] font-semibold text-d-text sm:text-xs">
               {s.kw}
             </div>
-            <div className="whitespace-nowrap font-mono text-[9px] text-d-secondary sm:text-[10px]">
+            <div className="whitespace-nowrap font-mono text-[0.5625rem] text-d-secondary sm:text-[0.625rem]">
               KD {s.kd} · {s.vol}
             </div>
           </div>

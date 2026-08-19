@@ -96,7 +96,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-ink/95 backdrop-blur-sm">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+      <nav className="site-shell flex h-16 items-center justify-between px-5 sm:px-8">
         {/* Logo */}
         <LocaleLink href="/" className="flex items-center gap-2" onClick={closeMobile}>
           <span className="font-display text-2xl font-bold tracking-tight text-d-text">
@@ -208,7 +208,7 @@ export default function Navbar() {
           id="mobile-menu"
           className="border-t border-d-muted/15 bg-ink md:hidden"
         >
-          <ul className="mx-auto flex max-w-7xl flex-col px-5 py-3 sm:px-8">
+          <ul className="site-shell flex flex-col px-5 py-3 sm:px-8">
             {navItems.map((item) => (
               <li key={item.href}>
                 {item.routed ? (

@@ -230,7 +230,7 @@ export default function ContentPage() {
     : 1;
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
+    <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">07</span>
@@ -709,7 +709,7 @@ function StatCard({
     <div className="card-a p-4">
       <div className="font-mono text-xs text-ink-40">{label}</div>
       <div className={`mt-1 font-mono text-2xl font-bold ${valueClass}`}>{value}</div>
-      {sub && <div className={`mt-0.5 font-mono text-[10px] ${subClass}`}>{sub}</div>}
+      {sub && <div className={`mt-0.5 font-mono text-[0.625rem] ${subClass}`}>{sub}</div>}
     </div>
   );
 }
@@ -733,7 +733,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {prev.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-ink-40">
+          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
             {t("wordsUnit", { n: formatNumber(prev.wordCount, locale) })}
           </div>
         </div>
@@ -748,7 +748,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {comparison.scoreChange > 0 ? "↑" : comparison.scoreChange < 0 ? "↓" : "→"}
             {" "}{t("pointsUnit", { n: Math.abs(comparison.scoreChange) })}
           </div>
-          <div className={`mt-0.5 font-mono text-[10px] ${
+          <div className={`mt-0.5 font-mono text-[0.625rem] ${
             comparison.wordCountChange > 0 ? "text-pos" :
             comparison.wordCountChange < 0 ? "text-neg" : "text-ink-40"
           }`}>
@@ -768,7 +768,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {comparison.current.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[10px] text-ink-40">
+          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
             {t("wordsUnit", { n: formatNumber(comparison.current.wordCount, locale) })}
           </div>
         </div>

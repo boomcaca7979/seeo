@@ -401,8 +401,8 @@ export default function PositionTrackingPage() {
   const remaining = trackingLimit - tracked.length;
 
   return (
-    <div className="mx-auto max-w-7xl p-6 lg:p-8">
-      <h1 className="text-[28px] font-semibold leading-tight text-ink">{t("title")}</h1>
+    <div className="dash-container p-6 lg:p-8">
+      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">{t("title")}</h1>
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
@@ -430,8 +430,8 @@ export default function PositionTrackingPage() {
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
             <div className={`h-full rounded-full transition-all ${usagePercent > 80 ? "bg-neg" : "bg-pos"}`} style={{ width: `${Math.min(100, usagePercent)}%` }} />
           </div>
-          {usagePercent > 70 && <span className="text-[10px] text-neg">{t("quotaTight")}</span>}
-          <span className="text-[10px] text-ink-40">{t("trackingCount", { tracked: tracked.length, limit: trackingLimit })}</span>
+          {usagePercent > 70 && <span className="text-[0.625rem] text-neg">{t("quotaTight")}</span>}
+          <span className="text-[0.625rem] text-ink-40">{t("trackingCount", { tracked: tracked.length, limit: trackingLimit })}</span>
         </div>
       )}
 
@@ -476,7 +476,7 @@ export default function PositionTrackingPage() {
           { label: t("statDown"), value: `▼ ${formatNumber(stats.down, locale)}`, color: "text-neg" },
         ].map((m) => (
           <div key={m.label} className="card-a p-4">
-            <div className="text-[10px] text-ink-40">{m.label}</div>
+            <div className="text-[0.625rem] text-ink-40">{m.label}</div>
             <div className={`mt-1 text-lg font-bold ${m.color}`}>{m.value}</div>
           </div>
         ))}
@@ -576,7 +576,7 @@ export default function PositionTrackingPage() {
       {/* 追踪关键词表格 */}
       <div className="mt-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-semibold text-ink">{t("tableTitle")}</h2>
+          <h2 className="text-[1.0625rem] font-semibold text-ink">{t("tableTitle")}</h2>
           <span className="text-xs text-ink-40">
             {groupFilter === "all"
               ? t("tableCountAll", { tracked: tracked.length, limit: trackingLimit, remaining: Math.max(0, remaining) })
@@ -611,7 +611,7 @@ export default function PositionTrackingPage() {
                         {r.groups.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-1">
                             {r.groups.map((g) => (
-                              <span key={g.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-line-soft px-2 py-0.5 text-[10px] text-ink-60">
+                              <span key={g.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-line-soft px-2 py-0.5 text-[0.625rem] text-ink-60">
                                 {g.name}
                                 <button onClick={(e) => handleRemoveFromGroup(g.id, r.id, e)} className="text-ink-40 hover:text-neg" title={t("removeFromGroup")}>×</button>
                               </span>
@@ -628,7 +628,7 @@ export default function PositionTrackingPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {r.change !== null ? <ChangeBadge value={r.change} /> : <span className="text-[10px] text-ink-40">—</span>}
+                        {r.change !== null ? <ChangeBadge value={r.change} /> : <span className="text-[0.625rem] text-ink-40">—</span>}
                       </td>
                       <td className="px-4 py-3 text-xs text-ink-40">{r.last_refreshed_at ? formatRelativeTime(r.last_refreshed_at, locale, tc) : t("neverRefreshed")}</td>
                       <td className="px-4 py-3 text-right">
@@ -637,13 +637,13 @@ export default function PositionTrackingPage() {
                             <button onClick={(e) => { e.stopPropagation(); setGroupMenuId(groupMenuId === r.id ? null : r.id); }} className="text-xs font-medium text-ink-40 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100">{t("addToGroupAction")}</button>
                             {groupMenuId === r.id && (
                               <div onClick={(e) => e.stopPropagation()} className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-lg border border-line bg-card py-1">
-                                <div className="px-3 py-1.5 text-[10px] text-ink-40">{groups.length === 0 ? t("noGroupsYet") : t("addToGroup")}</div>
+                                <div className="px-3 py-1.5 text-[0.625rem] text-ink-40">{groups.length === 0 ? t("noGroupsYet") : t("addToGroup")}</div>
                                 {groups.map((g) => {
                                   const inGroup = r.groups.some((rg) => rg.id === g.id);
                                   return (
                                     <button key={g.id} onClick={() => handleAddToGroup(g.id, r.id)} disabled={inGroup} className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-line-soft ${inGroup ? "cursor-default text-ink-40" : "text-ink"}`}>
                                       <span>{g.name}</span>
-                                      {inGroup && <span className="text-[10px] text-pos">✓</span>}
+                                      {inGroup && <span className="text-[0.625rem] text-pos">✓</span>}
                                     </button>
                                   );
                                 })}
@@ -665,7 +665,7 @@ export default function PositionTrackingPage() {
       {/* 竞品对比区（mock，标注示意数据） */}
       <div className="mt-8">
         <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-semibold text-ink">{t("competitorTitle")}</h2>
+          <h2 className="text-[1.0625rem] font-semibold text-ink">{t("competitorTitle")}</h2>
           <span className="badge-warn">{t("demoData")}</span>
         </div>
         <div className="card-a mt-3 overflow-hidden">
@@ -738,7 +738,7 @@ export default function PositionTrackingPage() {
               </select>
             </div>
           </div>
-          <p className="text-[10px] text-ink-40">{t("addModalHint", { limit: trackingLimit })}</p>
+          <p className="text-[0.625rem] text-ink-40">{t("addModalHint", { limit: trackingLimit })}</p>
         </form>
       </Modal>
 

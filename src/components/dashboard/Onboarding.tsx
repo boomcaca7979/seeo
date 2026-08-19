@@ -29,9 +29,9 @@ export default function Onboarding({ displayName }: OnboardingProps) {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8 sm:px-8">
+    <div className="dash-container px-6 py-8 sm:px-8">
       {/* eyebrow 行 */}
-      <div className="flex items-center justify-between font-sans text-[11px] text-ink-40">
+      <div className="flex items-center justify-between font-sans text-[0.6875rem] text-ink-40">
         <span>{t("eyebrowWelcome")}</span>
         <span>{t("eyebrowUpdated")}</span>
       </div>
@@ -77,7 +77,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
             <Link href="/app/audit" className="btn-primary px-8 py-3 text-base">
               {t("cta")}
             </Link>
-            <p className="font-mono text-[10px] text-ink-40">
+            <p className="font-mono text-[0.625rem] text-ink-40">
               {t("ctaNote")}
             </p>
           </div>
