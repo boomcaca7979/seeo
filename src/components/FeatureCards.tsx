@@ -75,7 +75,7 @@ export default function FeatureCards() {
 
               {/* 底部链接 */}
               <Link
-                href="#cta"
+                href="/app"
                 className="mt-6 inline-flex items-center gap-2 font-sans text-sm font-semibold text-accent transition-colors hover:text-ink"
               >
                 {t("cardLink")}

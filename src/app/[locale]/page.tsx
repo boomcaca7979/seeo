@@ -11,7 +11,6 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import FeatureCards from "@/components/FeatureCards";
 import DashboardPreview from "@/components/DashboardPreview";
-import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 import JsonLd from "@/components/JsonLd";
 import HreflangAlternates from "@/components/HreflangAlternates";
@@ -45,8 +44,6 @@ export default async function LocaleHomePage({ params }: LocaleHomePageProps) {
       <Navbar />
       <main className="flex-1">
         <Hero />
-        {/* 原页面最底部的 CTA 卡片整体上移至此（原顶部 Ticker 动态滚动条位置） */}
-        <CTA />
         <FeatureCards />
         <DashboardPreview />
       </main>

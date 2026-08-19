@@ -182,21 +182,6 @@
       "top10": "TOP10 关键词"
     }
   },
-  "ctaBlock": {
-    "badge": "免费开始使用",
-    "title": "看清你的搜索流量，从今天开始",
-    "subtitle": "输入一个域名，快速拿到第一份审计报告和关键词机会。先用起来，再决定要不要付费。",
-    "placeholder": "输入你的网站域名 example.com",
-    "submit": "开始分析",
-    "browseFeatures": "浏览全部功能 →",
-    "viewPricing": "查看定价方案",
-    "trust": {
-      "daily": "● 每日自动刷新",
-      "google": "● 支持 Google 搜索",
-      "pdf": "● PDF 报告导出（Pro 专属）",
-      "free": "● 免费开始"
-    }
-  },
   "footer": {
     "tagline": "一站式 SEO 数据分析平台，把搜索流量里的每一个机会都摆到你看得到的地方。",
     "dataSource": "基于 SerpApi / DataForSEO 数据服务",

@@ -182,21 +182,6 @@
       "top10": "TOP10 keywords"
     }
   },
-  "ctaBlock": {
-    "badge": "Start free",
-    "title": "Get clarity on your search traffic, starting today",
-    "subtitle": "Enter a domain to run your first audit and surface keyword opportunities. Start free, upgrade when you need more.",
-    "placeholder": "Enter your website domain, e.g. example.com",
-    "submit": "Run your first audit",
-    "browseFeatures": "Browse all features →",
-    "viewPricing": "View pricing",
-    "trust": {
-      "daily": "● Daily auto updates",
-      "google": "● Google search data",
-      "pdf": "● PDF report export with Pro",
-      "free": "● Start free"
-    }
-  },
   "footer": {
     "tagline": "An all-in-one SEO analytics platform that puts every opportunity in your search traffic where you can see it.",
     "dataSource": "Powered by SerpApi / DataForSEO data services",

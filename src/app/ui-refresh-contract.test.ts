@@ -1,8 +1,7 @@
 // ===== UI Refresh contract（字体体系 + 首页 Hero 重构 + Dashboard Logo 返回首页）=====
 // 覆盖：
 // 1. Dashboard Sidebar Logo → localePath(locale, "/")：EN → / · ZH → /zh（不硬编码 href）
-// 2. 首页结构：Ticker 动态卡片彻底移除（组件删除 + 无引用）；
-//    原页面最底部 CTA 卡片整体上移至 Hero 之后（原 Ticker 位置），且全页仅渲染一次
+// 2. 首页结构：Ticker 动态卡片与 CTA 卡片均彻底移除（组件删除 + 无引用 + messages 清理）
 // 3. Hero 信息层级：UrlAuditBox 搜索入口先于次级按钮与深色视觉面板（首屏第一互动 CTA）
 // 4. 文案删除：hint（"输入域名即可快速审计，无需注册" / EN 对应）从中英文 messages 移除
 // 5. UrlAuditBox：输入框与提交按钮一体（同一表单容器内，submit 按钮存在）
@@ -82,31 +81,44 @@ describe("首页顶部动态卡片（Ticker）彻底移除", () => {
   });
 });
 
-describe("原最底部 CTA 卡片整体上移至顶部（原 Ticker 位置）", () => {
-  it("首页渲染顺序：Hero → CTA → FeatureCards → DashboardPreview（CTA 紧随 Hero）", () => {
+describe("首页 CTA 卡片彻底移除（用户后续要求删除上移后的 CTA 卡片）", () => {
+  it("CTA 组件文件已删除", () => {
+    expect(existsSync(join(ROOT, "src/components/CTA.tsx"))).toBe(false);
+  });
+
+  it("首页渲染顺序：Hero → FeatureCards → DashboardPreview（无 CTA 节点）", () => {
     const heroIdx = HOME_PAGE.indexOf("<Hero />");
-    const ctaIdx = HOME_PAGE.indexOf("<CTA />");
     const featureIdx = HOME_PAGE.indexOf("<FeatureCards />");
     const previewIdx = HOME_PAGE.indexOf("<DashboardPreview />");
     expect(heroIdx).toBeGreaterThan(-1);
-    expect(ctaIdx).toBeGreaterThan(-1);
     expect(featureIdx).toBeGreaterThan(-1);
     expect(previewIdx).toBeGreaterThan(-1);
-    expect(heroIdx).toBeLessThan(ctaIdx);
-    expect(ctaIdx).toBeLessThan(featureIdx);
+    expect(heroIdx).toBeLessThan(featureIdx);
     expect(featureIdx).toBeLessThan(previewIdx);
+    expect(HOME_PAGE).not.toContain("<CTA />");
+    expect(HOME_PAGE).not.toContain('from "@/components/CTA"');
   });
 
-  it("CTA 全页仅渲染一次（原底部位置不再重复出现）", () => {
-    const count = (HOME_PAGE.match(/<CTA \/>/g) ?? []).length;
-    expect(count).toBe(1);
+  it("全站源码无 CTA 组件引用与 #cta 锚点（不含注释）", () => {
+    const offenders = collectSources(join(ROOT, "src"))
+      .filter((p) => {
+        let code = readFileSync(p, "utf-8");
+        code = code.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+        code = code
+          .split("\n")
+          .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+          .join("\n");
+        return /components\/CTA|href="#cta"|useTranslations\("ctaBlock"\)/.test(code);
+      })
+      .map((p) => p.replace(ROOT + "/", ""));
+    expect(offenders).toEqual([]);
   });
 
-  it("CTA 组件保留原有功能（域名输入 + submit 跳转审计页）", () => {
-    const cta = readFileSync(join(ROOT, "src/components/CTA.tsx"), "utf-8");
-    expect(cta).toContain('type="text"');
-    expect(cta).toContain('type="submit"');
-    expect(cta).toContain("/app/audit?domain=");
+  it("messages 中 ctaBlock 文案 key 已清理（中英同步，无死键）", () => {
+    expect(EN_MESSAGES).not.toContain('"ctaBlock"');
+    expect(ZH_MESSAGES).not.toContain('"ctaBlock"');
+    expect(EN_MESSAGES).not.toContain("Get clarity on your search traffic");
+    expect(ZH_MESSAGES).not.toContain("看清你的搜索流量");
   });
 });
 
