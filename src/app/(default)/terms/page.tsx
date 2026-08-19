@@ -29,14 +29,14 @@ export default async function TermsPage() {
         )}
       />
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="font-mono text-3xl font-bold text-ink mb-8">{t("title")}</h1>
+        <h1 className="font-mono text-3xl font-semibold text-ink mb-8">{t("title")}</h1>
         <div className="space-y-6 text-ink-60 leading-relaxed">
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.service")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.service")}</h2>
             <p>{t("service")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.responsibilities")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.responsibilities")}</h2>
             <p>{t("responsibilitiesIntro")}</p>
             <ul className="mt-2 list-inside list-disc space-y-1">
               {responsibilities.map((item) => (
@@ -45,15 +45,15 @@ export default async function TermsPage() {
             </ul>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.disclaimer")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.disclaimer")}</h2>
             <p>{t("disclaimer")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.changes")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.changes")}</h2>
             <p>{t("changes")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.disputes")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.disputes")}</h2>
             <p>{t("disputes")}</p>
           </section>
           <p className="pt-8 border-t border-line text-sm text-ink-40">{t("lastUpdated")}</p>

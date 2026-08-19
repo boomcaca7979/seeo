@@ -28,7 +28,7 @@ export default function Hero() {
             <span className="h-1.5 w-1.5 rounded-full bg-teal-yellow" />
             {t("badge")}
           </span>
-          <h1 className="mt-5 font-display text-4xl font-bold leading-tight tracking-tight text-y-text sm:text-6xl">
+          <h1 className="mt-5 font-display text-4xl font-semibold leading-tight tracking-tight text-y-text sm:text-6xl">
             {t("title")}
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-y-secondary sm:text-lg">

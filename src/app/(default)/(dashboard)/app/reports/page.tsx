@@ -509,7 +509,7 @@ export default function ReportsPage() {
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">08</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -538,7 +538,7 @@ export default function ReportsPage() {
                 <div className="flex items-center gap-2">
                   <span className={cfg.badge}>{typeLabel(rt)}</span>
                 </div>
-                <div className="mt-2 font-display text-sm font-bold text-ink">
+                <div className="mt-2 font-display text-sm font-semibold text-ink">
                   {typeName(rt)}
                 </div>
                 <div className="mt-1 font-sans text-xs text-ink-60">{typeDesc(rt)}</div>
@@ -574,13 +574,13 @@ export default function ReportsPage() {
             <span className="badge-warn">{typeLabel("ranking")}</span>
             <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
           </div>
-          <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvRankingTitle")}</h3>
+          <h3 className="mt-3 font-display text-base font-semibold text-ink">{t("csvRankingTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvRankingDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
             <div className="font-sans text-[0.625rem] text-ink-40">{t("trackedLabel")}</div>
-            <div className="mt-1 font-mono text-2xl font-bold text-ink">
+            <div className="mt-1 font-mono text-2xl font-semibold text-ink">
               {loading ? "—" : formatNumber(trackedCount, locale)}
             </div>
           </div>
@@ -608,13 +608,13 @@ export default function ReportsPage() {
             <span className="badge-warn">{typeLabel("content")}</span>
             <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
           </div>
-          <h3 className="mt-3 font-display text-base font-bold text-ink">{t("csvContentTitle")}</h3>
+          <h3 className="mt-3 font-display text-base font-semibold text-ink">{t("csvContentTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvContentDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
             <div className="font-sans text-[0.625rem] text-ink-40">{t("checksLabel")}</div>
-            <div className="mt-1 font-mono text-2xl font-bold text-ink">
+            <div className="mt-1 font-mono text-2xl font-semibold text-ink">
               {loading ? "—" : formatNumber(contentCount, locale)}
             </div>
           </div>
@@ -642,7 +642,7 @@ export default function ReportsPage() {
       <div className="mt-10">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">08-1</span>
-          <h2 className="font-display text-lg font-bold text-ink">{t("historyTitle")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">{t("historyTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
         <div className="card-a mt-4 overflow-hidden">
@@ -670,7 +670,7 @@ export default function ReportsPage() {
                       <td className="px-4 py-3">
                         <span className={typeConfig[r.type].badge}>{typeLabel(r.type)}</span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">{formatTime(r.created_at)}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatTime(r.created_at)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <button
@@ -733,7 +733,7 @@ export default function ReportsPage() {
 
       {/* 说明区 */}
       <div className="card-a mt-8 border-dashed border-line p-5">
-        <h2 className="font-display text-sm font-bold text-ink">{t("aboutTitle")}</h2>
+        <h2 className="font-display text-sm font-semibold text-ink">{t("aboutTitle")}</h2>
         <ul className="mt-2 space-y-1.5 font-sans text-xs text-ink-40">
           <li>{t("aboutPdf")}</li>
           <li>{t("aboutCsv")}</li>
@@ -748,7 +748,7 @@ export default function ReportsPage() {
           <div className="absolute inset-0 bg-black/40" onClick={handleClosePreview} aria-hidden />
           <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl border border-line bg-card">
             <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
-              <h3 className="font-display text-base font-bold text-ink">
+              <h3 className="font-display text-base font-semibold text-ink">
                 {t("previewTitle", { type: typeLabel(selectedType) })}
               </h3>
               <button
@@ -816,7 +816,7 @@ export default function ReportsPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEmailModalOpen(false)} aria-hidden />
           <div className="relative w-full max-w-md rounded-xl border border-line bg-card p-5">
-            <h3 className="font-display text-base font-bold text-ink">{t("emailModalTitle")}</h3>
+            <h3 className="font-display text-base font-semibold text-ink">{t("emailModalTitle")}</h3>
             <div className="mt-4">
               <label className="font-sans text-xs text-ink-40">{t("emailLabel")}</label>
               <input

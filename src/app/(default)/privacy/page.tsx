@@ -27,10 +27,10 @@ export default async function PrivacyPage() {
         )}
       />
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="font-mono text-3xl font-bold text-ink mb-8">{t("title")}</h1>
+        <h1 className="font-mono text-3xl font-semibold text-ink mb-8">{t("title")}</h1>
         <div className="space-y-6 text-ink-60 leading-relaxed">
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.collect")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.collect")}</h2>
             <p>{t("collectIntro")}</p>
             <ul className="mt-2 list-inside list-disc space-y-1">
               {collectItems.map((item) => (
@@ -39,19 +39,19 @@ export default async function PrivacyPage() {
             </ul>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.use")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.use")}</h2>
             <p>{t("use")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.storage")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.storage")}</h2>
             <p>{t("storage")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.cookies")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.cookies")}</h2>
             <p>{t("cookies")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.contact")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.contact")}</h2>
             <p>{t("contact")}</p>
             <span className="mt-2 inline-block rounded border border-line px-3 py-1 font-mono text-xs text-ink-40">
               {t("contactNote")}

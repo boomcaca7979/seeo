@@ -63,14 +63,14 @@ export default async function DocsPage() {
 
       <div className="doc-shell px-6 py-16">
         <span className="font-mono text-xs text-brand">{t("eyebrow")}</span>
-        <h1 className="mt-3 font-mono text-3xl font-bold text-ink mb-2">{t("title")}</h1>
+        <h1 className="mt-3 font-mono text-3xl font-semibold text-ink mb-2">{t("title")}</h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
 
         {/* 产品介绍 */}
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">01</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.intro")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.intro")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-4">
@@ -86,13 +86,13 @@ export default async function DocsPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.features")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.features")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-4">
             {features.map((f) => (
               <div key={f.id} className="card-a p-5">
-                <h3 className="font-mono text-sm font-bold text-ink mb-2">{f.name}</h3>
+                <h3 className="font-mono text-sm font-semibold text-ink mb-2">{f.name}</h3>
                 <p className="font-sans text-sm text-ink-60 mb-3">{f.desc}</p>
                 <div className="flex flex-wrap gap-2">
                   {f.capabilities.map((c) => (
@@ -113,14 +113,14 @@ export default async function DocsPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">03</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.dataSources")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.dataSources")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
             {dataSources.map((s) => (
               <div key={s.name} className="card-a p-4">
                 <div className="flex items-baseline justify-between mb-1">
-                  <h3 className="font-mono text-sm font-bold text-ink">{s.name}</h3>
+                  <h3 className="font-mono text-sm font-semibold text-ink">{s.name}</h3>
                 </div>
                 <p className="font-sans text-sm text-ink-60 mb-1">{s.scope}</p>
                 <p className="font-sans text-xs text-ink-40">{s.note}</p>
@@ -133,7 +133,7 @@ export default async function DocsPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">04</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.faq")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.faq")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
@@ -147,7 +147,7 @@ export default async function DocsPage() {
         </section>
 
         <div className="mt-16 card-a p-6 text-center">
-          <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("contact.title")}</h2>
+          <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("contact.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("contact.body")}</p>
           <span className="inline-block rounded border border-line px-3 py-1 font-mono text-xs text-ink-40">
             {t("contact.note")}

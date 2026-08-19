@@ -69,7 +69,7 @@ export default async function AboutPage() {
 
       <div className="doc-shell px-6 py-16">
         <span className="font-mono text-xs text-brand">{t("eyebrow")}</span>
-        <h1 className="mt-3 font-mono text-3xl font-bold text-ink mb-2">
+        <h1 className="mt-3 font-mono text-3xl font-semibold text-ink mb-2">
           {t("title")}
         </h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
@@ -78,7 +78,7 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">01</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.what")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.what")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-4">
@@ -94,13 +94,13 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.who")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.who")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
             {who.map((item) => (
               <div key={item.who} className="card-a p-4">
-                <h3 className="font-mono text-sm font-bold text-ink mb-1">{item.who}</h3>
+                <h3 className="font-mono text-sm font-semibold text-ink mb-1">{item.who}</h3>
                 <p className="font-sans text-sm text-ink-60">{item.why}</p>
               </div>
             ))}
@@ -111,7 +111,7 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">03</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.how")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.how")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="card-a p-5">
@@ -136,7 +136,7 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">04</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.capabilities")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.capabilities")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
@@ -145,12 +145,12 @@ export default async function AboutPage() {
                 {c.href ? (
                   <Link
                     href={localePath(locale, c.href)}
-                    className="font-mono text-sm font-bold text-ink hover:text-brand"
+                    className="font-mono text-sm font-semibold text-ink hover:text-brand"
                   >
                     {c.name} →
                   </Link>
                 ) : (
-                  <h3 className="font-mono text-sm font-bold text-ink">{c.name}</h3>
+                  <h3 className="font-mono text-sm font-semibold text-ink">{c.name}</h3>
                 )}
                 <p className="mt-1 font-sans text-sm text-ink-60">{c.desc}</p>
               </div>
@@ -162,13 +162,13 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">05</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.dataSources")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.dataSources")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-2">
             {dataSources.map((item) => (
               <div key={item.name} className="card-a p-3">
-                <span className="font-mono text-xs font-bold text-ink">{item.name}</span>
+                <span className="font-mono text-xs font-semibold text-ink">{item.name}</span>
                 <span className="ml-3 font-sans text-xs text-ink-60">{item.scope}</span>
               </div>
             ))}
@@ -179,7 +179,7 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">06</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.notDoing")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.notDoing")}</h2>
             <div className="hairline flex-1" />
           </div>
           <p className="mb-4 font-sans text-sm text-ink-60">{t("notDoingIntro")}</p>
@@ -197,7 +197,7 @@ export default async function AboutPage() {
         <section className="mb-16">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">07</span>
-            <h2 className="font-mono text-lg font-bold text-ink">{t("sections.faq")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink">{t("sections.faq")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
@@ -212,7 +212,7 @@ export default async function AboutPage() {
 
         {/* CTA */}
         <div className="mt-16 card-a p-6 text-center">
-          <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("cta.title")}</h2>
+          <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("cta.subtitle")}</p>
           <div className="flex items-center justify-center gap-3">
             <Link href={localePath(locale, "/pricing")} className="btn-primary inline-block px-6 py-2">

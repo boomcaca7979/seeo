@@ -20,7 +20,7 @@ export default function FeatureCards() {
           <span className="font-mono text-sm text-y-secondary">
             {t("sectionTag")}
           </span>
-          <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-y-text sm:text-5xl">
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-y-text sm:text-5xl">
             {t("sectionTitle")}
           </h2>
           <p className="mt-4 text-base text-y-secondary sm:text-lg">
@@ -53,7 +53,7 @@ export default function FeatureCards() {
               </div>
 
               {/* 标题 + 描述 */}
-              <h3 className="mt-5 font-display text-xl font-bold text-d-text">
+              <h3 className="mt-5 font-display text-xl font-semibold text-d-text">
                 {f.title}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-d-secondary">

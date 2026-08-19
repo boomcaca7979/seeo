@@ -477,7 +477,7 @@ export default function PositionTrackingPage() {
         ].map((m) => (
           <div key={m.label} className="card-a p-4">
             <div className="text-[0.625rem] text-ink-40">{m.label}</div>
-            <div className={`mt-1 text-lg font-bold ${m.color}`}>{m.value}</div>
+            <div className={`mt-1 text-lg font-semibold ${m.color}`}>{m.value}</div>
           </div>
         ))}
       </div>
@@ -537,7 +537,7 @@ export default function PositionTrackingPage() {
             <div className="text-right">
               {selectedKeyword.todayPosition !== null ? (
                 <>
-                  <div className="text-xl font-bold text-ink">#{selectedKeyword.todayPosition}</div>
+                  <div className="text-xl font-semibold text-ink">#{selectedKeyword.todayPosition}</div>
                   <ChangeBadge value={selectedKeyword.change ?? 0} />
                 </>
               ) : (
@@ -552,7 +552,7 @@ export default function PositionTrackingPage() {
               <div className="flex h-full items-center justify-center text-xs text-ink-40">{t("noHistory")}</div>
             ) : trendData.length === 1 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2">
-                <div className="text-2xl font-bold text-ink">#{trendData[0].rank}</div>
+                <div className="text-2xl font-semibold text-ink">#{trendData[0].rank}</div>
                 <div className="text-xs text-ink-40">{t("needTwoDays")}</div>
               </div>
             ) : (
@@ -619,10 +619,10 @@ export default function PositionTrackingPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">{r.domain}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">{r.domain}</td>
                       <td className="px-4 py-3">
                         {r.todayPosition !== null ? (
-                          <span className="text-base font-bold text-ink">{r.todayPosition}</span>
+                          <span className="text-base font-semibold text-ink">{r.todayPosition}</span>
                         ) : (
                           <span className="text-xs text-ink-40">{t("notInTop100")}</span>
                         )}
@@ -630,7 +630,7 @@ export default function PositionTrackingPage() {
                       <td className="px-4 py-3">
                         {r.change !== null ? <ChangeBadge value={r.change} /> : <span className="text-[0.625rem] text-ink-40">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-xs text-ink-40">{r.last_refreshed_at ? formatRelativeTime(r.last_refreshed_at, locale, tc) : t("neverRefreshed")}</td>
+                      <td className="px-4 py-3 text-sm text-ink-40">{r.last_refreshed_at ? formatRelativeTime(r.last_refreshed_at, locale, tc) : t("neverRefreshed")}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="relative">
@@ -684,7 +684,7 @@ export default function PositionTrackingPage() {
                   <tr key={c.domain} className={`border-b border-line-soft/60 ${c.isSelf ? "bg-line-soft/40" : ""}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex h-6 w-6 items-center justify-center rounded bg-ink/10 font-mono text-xs font-bold text-ink">{c.favicon}</span>
+                        <span className="flex h-6 w-6 items-center justify-center rounded bg-ink/10 font-mono text-xs font-semibold text-ink">{c.favicon}</span>
                         <span className={`font-mono text-sm ${c.isSelf ? "font-semibold text-ink" : "text-ink"}`}>{c.domain}</span>
                         {c.isSelf && <span className="badge-info">{t("selfSite")}</span>}
                       </div>

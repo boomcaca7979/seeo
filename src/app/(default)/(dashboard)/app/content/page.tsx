@@ -234,7 +234,7 @@ export default function ContentPage() {
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">07</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -316,7 +316,7 @@ export default function ContentPage() {
       {/* 错误提示 */}
       {!loading && error && (
         <div className="card-a mt-6 border-neg/30 p-6 text-center">
-          <div className="font-display text-base font-bold text-neg">{t("errorTitle")}</div>
+          <div className="font-display text-base font-semibold text-neg">{t("errorTitle")}</div>
           <p className="mt-2 font-sans text-sm text-ink-60">{error}</p>
           <p className="mt-1 font-mono text-xs text-ink-40">{t("errorHint")}</p>
         </div>
@@ -329,7 +329,7 @@ export default function ContentPage() {
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
               <ScoreRing score={contentScore} size={140} thickness={10} showLabel />
-              <div className="mt-3 font-display text-base font-bold text-ink">
+              <div className="mt-3 font-display text-base font-semibold text-ink">
                 {t("contentScore")}
               </div>
               <div className="mt-2">
@@ -397,7 +397,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-1</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("kwTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("kwTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -423,7 +423,7 @@ export default function ContentPage() {
                           <tr key={item.keyword} className="border-b border-line-soft">
                             <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{item.keyword}</td>
                             <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatNumber(item.count, locale)}</td>
-                            <td className="px-4 py-3 font-mono text-sm font-bold text-ink">{item.density}%</td>
+                            <td className="px-4 py-3 font-mono text-sm font-semibold text-ink">{item.density}%</td>
                             <td className="px-4 py-3">
                               <span className={badge.cls}>{t(badge.key)}</span>
                             </td>
@@ -441,7 +441,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-2</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("sugTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("sugTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -471,7 +471,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-3</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("headTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("headTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -510,7 +510,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-4</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("topTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("topTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -550,7 +550,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-5</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("previewTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("previewTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -564,7 +564,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-6</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("cmpTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("cmpTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             {!comparison || comparison.previous === null ? (
@@ -583,7 +583,7 @@ export default function ContentPage() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">07-7</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("checklistTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("checklistTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
             <div className="card-a mt-4 p-5">
@@ -620,7 +620,7 @@ export default function ContentPage() {
       {/* 空状态 */}
       {!loading && !hasResult && !error && (
         <div className="card-a mt-6 border border-dashed border-line p-10 text-center">
-          <div className="font-display text-base font-bold text-ink-40">{t("emptyTitle")}</div>
+          <div className="font-display text-base font-semibold text-ink-40">{t("emptyTitle")}</div>
           <p className="mt-2 font-sans text-sm text-ink-40">
             {t("emptyDesc")}
           </p>
@@ -630,7 +630,7 @@ export default function ContentPage() {
       {/* 最近检测历史 */}
       <div className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink">{t("recentTitle")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">{t("recentTitle")}</h2>
           <button
             onClick={loadHistory}
             className="font-sans text-xs font-medium text-ink-60 hover:text-ink"
@@ -667,17 +667,17 @@ export default function ContentPage() {
                         setTargetKeywordsInput(h.keyword);
                       }}
                     >
-                      <td className="max-w-xs truncate px-4 py-3 font-mono text-xs text-ink">{h.url}</td>
+                      <td className="max-w-xs truncate px-4 py-3 font-mono text-sm text-ink">{h.url}</td>
                       <td className="px-4 py-3 font-sans text-sm text-ink-60">{h.keyword}</td>
                       <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-bold ${
+                        <span className={`font-mono text-sm font-semibold ${
                           (h.content_score ?? h.score) >= 80 ? "text-pos" : (h.content_score ?? h.score) >= 60 ? "text-warn" : "text-neg"
                         }`}>
                           {h.content_score ?? h.score}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">{formatNumber(h.word_count, locale)}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-40">{formatTime(h.created_at, locale, tc)}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatNumber(h.word_count, locale)}</td>
+                      <td className="px-4 py-3 font-mono text-sm text-ink-40">{formatTime(h.created_at, locale, tc)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -708,7 +708,7 @@ function StatCard({
   return (
     <div className="card-a p-4">
       <div className="font-mono text-xs text-ink-40">{label}</div>
-      <div className={`mt-1 font-mono text-2xl font-bold ${valueClass}`}>{value}</div>
+      <div className={`mt-1 font-mono text-2xl font-semibold ${valueClass}`}>{value}</div>
       {sub && <div className={`mt-0.5 font-mono text-[0.625rem] ${subClass}`}>{sub}</div>}
     </div>
   );
@@ -729,7 +729,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
           <div className="mt-1 font-mono text-xs text-ink-60">
             {formatTime(prev.checkedAt, locale, tc)}
           </div>
-          <div className={`mt-2 font-mono text-2xl font-bold ${scoreColorClass(prev.contentScore)}`}>
+          <div className={`mt-2 font-mono text-2xl font-semibold ${scoreColorClass(prev.contentScore)}`}>
             {prev.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>
@@ -741,7 +741,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
         {/* 变化 */}
         <div className="flex flex-col items-center justify-center">
           <div className="font-mono text-xs text-ink-40">{t("changeLabel")}</div>
-          <div className={`mt-1 font-mono text-2xl font-bold ${
+          <div className={`mt-1 font-mono text-2xl font-semibold ${
             comparison.scoreChange > 0 ? "text-pos" :
             comparison.scoreChange < 0 ? "text-neg" : "text-ink-40"
           }`}>
@@ -764,7 +764,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
           <div className="mt-1 font-mono text-xs text-ink-60">
             {formatTime(comparison.current.checkedAt, locale, tc)}
           </div>
-          <div className={`mt-2 font-mono text-2xl font-bold ${scoreColorClass(comparison.current.contentScore)}`}>
+          <div className={`mt-2 font-mono text-2xl font-semibold ${scoreColorClass(comparison.current.contentScore)}`}>
             {comparison.current.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>

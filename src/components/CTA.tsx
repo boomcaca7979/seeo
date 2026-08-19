@@ -63,7 +63,7 @@ export default function CTA() {
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-xs text-gold">
               {t("badge")}
             </span>
-            <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-d-text sm:text-5xl">
+            <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-d-text sm:text-5xl">
               {t("title")}
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base text-d-secondary sm:text-lg">

@@ -313,7 +313,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
             <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden">
               {/* 头部 */}
               <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
-                <span className="text-sm font-bold text-ink">{t("notifications")}</span>
+                <span className="text-sm font-semibold text-ink">{t("notifications")}</span>
                 {unread > 0 && (
                   <span className="font-sans text-[0.625rem] text-ink-40">{t("unread", { count: unread })}</span>
                 )}

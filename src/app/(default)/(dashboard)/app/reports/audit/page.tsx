@@ -125,7 +125,7 @@ export default function AuditReportPrintPage() {
     return (
       <div className="mx-auto max-w-3xl p-6 lg:p-8 print:hidden">
         <div className="card-a border border-dashed border-line p-12 text-center">
-          <div className="font-display text-lg font-bold text-ink">
+          <div className="font-display text-lg font-semibold text-ink">
             {t("emptyTitle")}
           </div>
           <p className="mt-3 font-sans text-sm text-ink-60">
@@ -178,7 +178,7 @@ export default function AuditReportPrintPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="font-mono text-xs text-ink-40 print-mono">{t("reportLabel")}</div>
-            <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink print-title sm:text-3xl">
+            <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink print-title sm:text-3xl">
               {audit.domain}
             </h1>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-ink-60 print-mono">
@@ -192,7 +192,7 @@ export default function AuditReportPrintPage() {
           <div className="flex items-center gap-3 print-score-block">
             <ScoreRing score={healthScore} size={88} thickness={8} />
             <div>
-              <div className="font-display text-base font-bold text-ink print-title">{t("healthLabel")}</div>
+              <div className="font-display text-base font-semibold text-ink print-title">{t("healthLabel")}</div>
               <div className="font-mono text-xs text-ink-40 print-mono">{scoreLevel}</div>
             </div>
           </div>
@@ -206,7 +206,7 @@ export default function AuditReportPrintPage() {
             <span className="h-2 w-2 rounded-full bg-neg print-dot-error" />
             <span className="font-mono text-xs text-ink-40 print-mono">{t("severityError")}</span>
           </div>
-          <div className="mt-2 font-mono text-3xl font-bold text-neg print-num-error">
+          <div className="mt-2 font-mono text-3xl font-semibold text-neg print-num-error">
             {formatNumber(audit.errors, locale)}
           </div>
           <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("errorHint")}</div>
@@ -216,7 +216,7 @@ export default function AuditReportPrintPage() {
             <span className="h-2 w-2 rounded-full bg-warn print-dot-warning" />
             <span className="font-mono text-xs text-ink-40 print-mono">{t("severityWarning")}</span>
           </div>
-          <div className="mt-2 font-mono text-3xl font-bold text-warn print-num-warning">
+          <div className="mt-2 font-mono text-3xl font-semibold text-warn print-num-warning">
             {formatNumber(audit.warnings, locale)}
           </div>
           <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("warningHint")}</div>
@@ -226,7 +226,7 @@ export default function AuditReportPrintPage() {
             <span className="h-2 w-2 rounded-full bg-ink-25 print-dot-notice" />
             <span className="font-mono text-xs text-ink-40 print-mono">{t("severityNotice")}</span>
           </div>
-          <div className="mt-2 font-mono text-3xl font-bold text-ink print-num-notice">
+          <div className="mt-2 font-mono text-3xl font-semibold text-ink print-num-notice">
             {formatNumber(audit.notices, locale)}
           </div>
           <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("noticeHint")}</div>
@@ -236,7 +236,7 @@ export default function AuditReportPrintPage() {
       {/* 问题清单 */}
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink print-title">
+          <h2 className="font-display text-lg font-semibold text-ink print-title">
             {t("issuesTitle")}
           </h2>
           <span className="font-mono text-xs text-ink-40 print-mono">
@@ -246,7 +246,7 @@ export default function AuditReportPrintPage() {
 
         {audit.issues.length === 0 ? (
           <div className="card-a mt-4 border border-dashed border-line p-10 text-center">
-            <div className="font-display text-base font-bold text-ink-40">{t("noIssuesTitle")}</div>
+            <div className="font-display text-base font-semibold text-ink-40">{t("noIssuesTitle")}</div>
             <p className="mt-2 font-sans text-sm text-ink-40">{t("noIssuesHint")}</p>
           </div>
         ) : (
@@ -286,15 +286,15 @@ export default function AuditReportPrintPage() {
                         <td className="px-4 py-3 font-mono text-sm text-ink print-cell">
                           {formatNumber(issue.affectedPages, locale)}
                         </td>
-                        <td className="px-4 py-3 font-sans text-xs text-ink-60 print-cell">
+                        <td className="px-4 py-3 font-sans text-sm text-ink-60 print-cell">
                           {issue.detail}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-ink-60 print-cell">
+                        <td className="px-4 py-3 font-mono text-sm text-ink-60 print-cell">
                           <span className="block max-w-[200px] truncate" title={issue.sampleUrl}>
                             {issue.sampleUrl.replace(/^https?:\/\//, "")}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-sans text-xs text-ink-60 print-cell">
+                        <td className="px-4 py-3 font-sans text-sm text-ink-60 print-cell">
                           {issue.suggestion ?? "—"}
                         </td>
                       </tr>

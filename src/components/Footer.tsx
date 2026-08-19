@@ -61,10 +61,10 @@ export default function Footer() {
           {/* Logo + 简介 */}
           <div className="col-span-2 md:col-span-2">
             <div className="flex items-center gap-1">
-              <span className="font-display text-2xl font-bold text-d-text">
+              <span className="font-display text-2xl font-semibold text-d-text">
                 See
               </span>
-              <span className="font-display text-2xl font-bold text-gold">
+              <span className="font-display text-2xl font-semibold text-gold">
                 O
               </span>
             </div>

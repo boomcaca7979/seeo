@@ -108,15 +108,15 @@ export default function AuthForm({ mode }: AuthFormProps) {
         <div className="rounded-2xl bg-ink p-8">
           {/* Logo */}
           <div className="flex items-center justify-center gap-1">
-            <span className="font-display text-2xl font-bold text-d-text">
+            <span className="font-display text-2xl font-semibold text-d-text">
               See
             </span>
-            <span className="font-display text-2xl font-bold text-gold">
+            <span className="font-display text-2xl font-semibold text-gold">
               O
             </span>
           </div>
 
-          <h1 className="mt-6 text-center font-display text-xl font-bold text-d-text">
+          <h1 className="mt-6 text-center font-display text-xl font-semibold text-d-text">
             {isSignup ? t("signupTitle") : t("loginTitle")}
           </h1>
           <p className="mt-1.5 text-center font-sans text-sm text-d-secondary">

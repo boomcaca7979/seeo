@@ -26,7 +26,7 @@ export default function PlaceholderPage({
       <div className="flex items-start justify-between gap-4">
         <div className="max-w-2xl">
           <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
               {title}
             </h1>
             <span className="badge-warn">{phase}</span>
@@ -45,7 +45,7 @@ export default function PlaceholderPage({
             className="card-a p-5"
           >
             <div className="font-sans text-xs text-ink-40">{m.label}</div>
-            <div className="mt-2 font-display text-2xl font-bold text-ink">
+            <div className="mt-2 font-display text-2xl font-semibold text-ink">
               {m.value}
             </div>
             <div className="mt-2 h-8 rounded-lg bg-line-soft" />
@@ -58,7 +58,7 @@ export default function PlaceholderPage({
 
       {/* 功能预览 */}
       <div className="mt-10">
-        <h2 className="font-display text-lg font-bold text-ink">
+        <h2 className="font-display text-lg font-semibold text-ink">
           {t("plannedTitle")}
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -35,7 +35,7 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
       {/* 模态框：浅色卡片 */}
       <div className="relative w-full max-w-md rounded-xl border border-line bg-card">
         <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
-          <h3 className="font-display text-base font-bold text-ink">
+          <h3 className="font-display text-base font-semibold text-ink">
             {title}
           </h3>
           <button

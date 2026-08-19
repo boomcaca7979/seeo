@@ -138,7 +138,7 @@ export default function KeywordField() {
           className="animate-breathe text-center"
           style={{ transformOrigin: "50% 50%" } as React.CSSProperties}
         >
-          <div className="font-display text-base font-bold text-d-text sm:text-lg">
+          <div className="font-display text-base font-semibold text-d-text sm:text-lg">
             {t("center")}
           </div>
           <div className="mt-0.5 font-mono text-[0.625rem] text-gold sm:text-xs">

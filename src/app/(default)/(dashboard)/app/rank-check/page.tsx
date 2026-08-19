@@ -207,7 +207,7 @@ export default function RankCheckPage() {
               <div className="mt-5 rounded-lg border border-line bg-line-soft/30 px-5 py-6 text-center">
                 {result.rank === null ? (
                   <>
-                    <div className="text-2xl font-bold text-ink-40">{t("notInTop100")}</div>
+                    <div className="text-2xl font-semibold text-ink-40">{t("notInTop100")}</div>
                     <div className="mt-2 text-xs text-ink-40">
                       {t("notInTop100Detail", { domain: result.domain, keyword: result.keyword })}
                     </div>
@@ -220,7 +220,7 @@ export default function RankCheckPage() {
                         <span className="badge-warn">{t("cachedData")}</span>
                       )}
                     </div>
-                    <div className="mt-2 text-5xl font-bold text-ink">#{result.rank}</div>
+                    <div className="mt-2 text-5xl font-semibold text-ink">#{result.rank}</div>
                     {result.matchedUrl && (
                       <a
                         href={result.matchedUrl}

@@ -65,7 +65,7 @@ export default function AuditPassDonut({ passed, failed }: Props) {
       </ResponsiveContainer>
       {/* 中心文字 */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-2xl font-bold text-ink">{Math.round((passed / total) * 100)}%</div>
+        <div className="text-2xl font-semibold text-ink">{Math.round((passed / total) * 100)}%</div>
         <div className="mt-0.5 text-[0.625rem] text-ink-40">
           {passed} / {total} {t("itemsUnit")}
         </div>

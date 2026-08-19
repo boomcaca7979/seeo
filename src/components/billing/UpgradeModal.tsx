@@ -68,7 +68,7 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
         {/* 标题 */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="font-display text-lg font-bold text-ink">
+            <h3 className="font-display text-lg font-semibold text-ink">
               {isTopPlan ? t("topTitle") : t("title")}
             </h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
@@ -113,7 +113,7 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-mono text-xs text-brand">{t("recommended")}</div>
-                <div className="mt-1 font-display text-xl font-bold text-ink">
+                <div className="mt-1 font-display text-xl font-semibold text-ink">
                   {recommendLabel}
                 </div>
               </div>

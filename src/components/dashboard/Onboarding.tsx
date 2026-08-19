@@ -39,7 +39,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
       {/* 主标题 */}
       <div className="mt-3">
         <h1
-          className="font-display font-bold tracking-tight text-ink"
+          className="font-display font-semibold tracking-tight text-ink"
           style={{ fontSize: 32, lineHeight: 1.2 }}
         >
           {t("greeting", { name: displayName })}
@@ -53,7 +53,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
       <section className="mt-10">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">01</span>
-          <h2 className="font-display text-base font-bold text-ink">{t("sectionTitle")}</h2>
+          <h2 className="font-display text-base font-semibold text-ink">{t("sectionTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
 
@@ -62,7 +62,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
             {STEPS.map((s) => (
               <div key={s.n} className="flex flex-col">
                 <span className="font-mono text-xs text-brand">{s.n}</span>
-                <div className="mt-1.5 font-display text-base font-bold text-ink">
+                <div className="mt-1.5 font-display text-base font-semibold text-ink">
                   {s.title}
                 </div>
                 <p className="mt-1.5 font-sans text-sm text-ink-60 leading-relaxed">

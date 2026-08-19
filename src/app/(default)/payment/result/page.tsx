@@ -260,7 +260,7 @@ function PendingCard({
       <div className="card-a p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h1 className="font-mono text-lg font-bold text-ink">等待支付</h1>
+            <h1 className="font-mono text-lg font-semibold text-ink">等待支付</h1>
             <p className="mt-1 font-sans text-xs text-ink-40">
               {planLabel} · 30 天会员{channelLabel ? ` · ${channelLabel}` : ""}
             </p>
@@ -272,7 +272,7 @@ function PendingCard({
           <div className="mb-5 rounded-lg border border-line-soft bg-paper p-4">
             <div className="flex items-center justify-between">
               <span className="font-sans text-sm text-ink-40">支付金额</span>
-              <span className="font-mono text-xl font-bold text-ink">{amountText}</span>
+              <span className="font-mono text-xl font-semibold text-ink">{amountText}</span>
             </div>
           </div>
         )}
@@ -387,7 +387,7 @@ function SuccessCard({
           </svg>
         </div>
 
-        <h1 className="mt-5 font-mono text-xl font-bold text-ink">支付成功</h1>
+        <h1 className="mt-5 font-mono text-xl font-semibold text-ink">支付成功</h1>
         <p className="mt-2 font-sans text-sm text-ink-60">
           {planLabel}会员已开通，感谢你的购买
         </p>
@@ -457,7 +457,7 @@ function ErrorCard({
           </svg>
         </div>
 
-        <h1 className="mt-5 font-mono text-xl font-bold text-ink">{title}</h1>
+        <h1 className="mt-5 font-mono text-xl font-semibold text-ink">{title}</h1>
         <p className="mt-2 font-sans text-sm text-ink-60">{message}</p>
       </div>
 

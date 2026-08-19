@@ -304,7 +304,7 @@ function SettingsContent() {
       {/* 页头：编号 + 标题 + 发丝线 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">09</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -339,14 +339,14 @@ function SettingsContent() {
           {/* 账号信息 */}
           {tab === "account" && (
             <div className="card-a p-6">
-              <h2 className="font-display text-lg font-bold text-ink">{t("accountTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("accountTitle")}</h2>
               {accountLoading ? (
                 <div className="mt-6 font-mono text-xs text-ink-40">{tc("loading")}</div>
               ) : account ? (
                 <>
                   <div className="mt-5 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
                     {/* 头像占位 */}
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/30 bg-brand/15 font-display text-2xl font-bold text-ink">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-brand/30 bg-brand/15 font-display text-2xl font-semibold text-ink">
                       {account.displayName.slice(0, 1)}
                     </div>
                     {editingAccount ? (
@@ -435,7 +435,7 @@ function SettingsContent() {
           {/* 订阅套餐 */}
           {tab === "plan" && (
             <div>
-              <h2 className="font-display text-lg font-bold text-ink">{t("planTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("planTitle")}</h2>
               <p className="mt-1 font-mono text-xs text-ink-40">
                 {usageData
                   ? t("currentLine", { plan: planLabel(usageData.plan, locale) })
@@ -474,19 +474,19 @@ function SettingsContent() {
                       >
                         {/* 推荐 / 当前套餐 标签 */}
                         {p.display.highlighted && !isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-bold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-semibold text-ink">
                             {t("badgeRecommended")}
                           </span>
                         )}
                         {isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-bold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-semibold text-ink">
                             {t("badgeCurrent")}
                           </span>
                         )}
 
-                        <div className="font-display text-base font-bold text-ink">{planName}</div>
+                        <div className="font-display text-base font-semibold text-ink">{planName}</div>
                         <div className="mt-2 flex items-baseline gap-0.5">
-                          <span className="font-display text-3xl font-bold text-ink">
+                          <span className="font-display text-3xl font-semibold text-ink">
                             {p.display.price}
                           </span>
                           <span className="font-mono text-xs text-ink-40">{priceUnitText}</span>
@@ -685,7 +685,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">{t("dailyTitle")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("dailyTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
               {t("dailyDesc")}
             </p>
@@ -710,7 +710,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">{t("weeklyTitle")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("weeklyTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
               {t("weeklyDesc")}
             </p>
@@ -757,7 +757,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
 
       {/* 手动执行 */}
       <div className="card-a p-6">
-        <h2 className="font-display text-lg font-bold text-ink">{t("manualTitle")}</h2>
+        <h2 className="font-display text-lg font-semibold text-ink">{t("manualTitle")}</h2>
         <p className="mt-1 font-mono text-xs text-ink-40">
           {t("manualDesc")}
         </p>
@@ -802,7 +802,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
       {/* 执行历史 */}
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink">{t("historyTitle")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">{t("historyTitle")}</h2>
           <span className="font-mono text-xs text-ink-40">
             {t("recentCount", { n: logs.length })}
           </span>
@@ -832,7 +832,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                       key={log.id}
                       className="border-b border-line-soft transition-colors hover:bg-line-soft/40"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">
                         {log.created_at}
                       </td>
                       <td className="px-4 py-3">
@@ -845,7 +845,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                         {log.status === "failed" && <span className="badge-err">{t("statusFailed")}</span>}
                         {log.status === "running" && <span className="badge-warn">{t("statusRunning")}</span>}
                       </td>
-                      <td className="px-4 py-3 font-sans text-xs text-ink-60">
+                      <td className="px-4 py-3 font-sans text-sm text-ink-60">
                         {log.summary ?? "—"}
                       </td>
                     </tr>
@@ -908,14 +908,14 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
     <div className="card-a p-6">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-display text-lg font-bold text-ink">{t("cacheTitle")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">{t("cacheTitle")}</h2>
           <p className="mt-1 font-mono text-xs text-ink-40">
             {t("cacheDesc")}
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-4">
           <div className="text-right">
-            <div className="font-mono text-2xl font-bold text-ink">
+            <div className="font-mono text-2xl font-semibold text-ink">
               {total === null ? "—" : formatNumber(total, locale)}
             </div>
             <div className="font-mono text-[0.625rem] text-ink-40">{t("cacheEntries")}</div>
@@ -992,7 +992,7 @@ function UsageDashboard({
       <div className="card-a p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-bold text-ink">{t("planUsageTitle")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("planUsageTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
               {t("currentStatusLine", { plan: currentPlanName, status: usageData.subscriptionStatus })}
             </p>
@@ -1045,13 +1045,13 @@ function UsageDashboard({
         <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line-soft pt-5">
           <div>
             <div className="font-mono text-[0.625rem] text-ink-40">{t("limitProjectsMax")}</div>
-            <div className="mt-1 font-mono text-lg font-bold text-ink">
+            <div className="mt-1 font-mono text-lg font-semibold text-ink">
               {isUnlimited(usageData.limits.max_projects) ? t("unlimited") : formatNumber(usageData.limits.max_projects, locale)}
             </div>
           </div>
           <div>
             <div className="font-mono text-[0.625rem] text-ink-40">{t("limitKeywordsMax")}</div>
-            <div className="mt-1 font-mono text-lg font-bold text-ink">
+            <div className="mt-1 font-mono text-lg font-semibold text-ink">
               {isUnlimited(usageData.limits.max_tracked_keywords) ? t("unlimited") : formatNumber(usageData.limits.max_tracked_keywords, locale)}
             </div>
           </div>
@@ -1060,7 +1060,7 @@ function UsageDashboard({
 
       {/* Features 开关展示 */}
       <div className="card-a p-6">
-        <h2 className="font-display text-lg font-bold text-ink">{t("featuresTitle")}</h2>
+        <h2 className="font-display text-lg font-semibold text-ink">{t("featuresTitle")}</h2>
         <p className="mt-1 font-mono text-xs text-ink-40">{t("featuresSubtitle")}</p>
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {Object.keys(FEATURE_LABELS[locale]).map((key) => {

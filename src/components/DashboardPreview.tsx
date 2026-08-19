@@ -67,7 +67,7 @@ function HealthRing({ scoreNote }: { scoreNote: string }) {
         />
       </svg>
       <div className="absolute text-center">
-        <div className="font-display text-3xl font-bold text-d-text">75</div>
+        <div className="font-display text-3xl font-semibold text-d-text">75</div>
         <div className="font-mono text-[0.625rem] text-d-muted">{scoreNote}</div>
       </div>
     </div>
@@ -133,7 +133,7 @@ export default function DashboardPreview() {
             <span className="font-mono text-sm text-y-secondary">
               {t("sectionTag")}
             </span>
-            <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-y-text sm:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-y-text sm:text-5xl">
               {t("sectionTitle")}
             </h2>
             <p className="mt-4 text-base text-y-secondary sm:text-lg">
@@ -152,7 +152,7 @@ export default function DashboardPreview() {
           <div className="rounded-2xl bg-ink p-6 lg:col-span-8">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-display text-lg font-bold text-d-text">
+                <h3 className="font-display text-lg font-semibold text-d-text">
                   {t("rankTrend.title")}
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
@@ -160,7 +160,7 @@ export default function DashboardPreview() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="font-mono text-2xl font-bold text-d-text">
+                <div className="font-mono text-2xl font-semibold text-d-text">
                   #22
                 </div>
                 <div className="font-mono text-xs text-teal">{t("trendIllustration")}</div>
@@ -178,7 +178,7 @@ export default function DashboardPreview() {
           {/* 健康度环 - 小卡 */}
           <div className="rounded-2xl bg-ink p-6 lg:col-span-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold text-d-text">
+              <h3 className="font-display text-lg font-semibold text-d-text">
                 {t("health.title")}
               </h3>
               <span className="rounded bg-teal/15 px-2 py-0.5 font-mono text-[0.625rem] text-teal">
@@ -217,7 +217,7 @@ export default function DashboardPreview() {
           <div className="rounded-2xl bg-ink p-6 lg:col-span-7">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-display text-lg font-bold text-d-text">
+                <h3 className="font-display text-lg font-semibold text-d-text">
                   {t("traffic.title")}
                 </h3>
                 <p className="mt-0.5 font-mono text-xs text-d-muted">
@@ -225,7 +225,7 @@ export default function DashboardPreview() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="font-mono text-2xl font-bold text-d-text">
+                <div className="font-mono text-2xl font-semibold text-d-text">
                   {t("sample")}
                 </div>
                 <div className="font-mono text-xs text-teal">{t("trendIllustration")}</div>
@@ -245,7 +245,7 @@ export default function DashboardPreview() {
           <div className="grid grid-cols-2 gap-4 lg:col-span-5">
             <div className="rounded-2xl bg-ink p-5">
               <div className="font-mono text-[0.625rem] text-d-muted">{t("metrics.trackedKeywords")}</div>
-              <div className="mt-2 font-mono text-2xl font-bold text-d-text">
+              <div className="mt-2 font-mono text-2xl font-semibold text-d-text">
                 {t("sample")}
               </div>
               <div className="mt-1 font-mono text-xs text-teal">
@@ -263,7 +263,7 @@ export default function DashboardPreview() {
             </div>
             <div className="rounded-2xl bg-ink p-5">
               <div className="font-mono text-[0.625rem] text-d-muted">{t("metrics.referringDomains")}</div>
-              <div className="mt-2 font-mono text-2xl font-bold text-d-text">
+              <div className="mt-2 font-mono text-2xl font-semibold text-d-text">
                 {t("sample")}
               </div>
               <div className="mt-1 font-mono text-xs text-coral">

@@ -214,10 +214,10 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
       {/* Logo */}
       <div className="flex h-16 flex-none items-center justify-between border-b border-line px-4">
         <Link href="/app" onClick={onMobileClose} className="flex items-center gap-1.5 overflow-hidden">
-          <span className="text-lg font-bold tracking-tight text-ink">
+          <span className="text-lg font-semibold tracking-tight text-ink">
             See
           </span>
-          <span className="text-lg font-bold tracking-tight text-ink">
+          <span className="text-lg font-semibold tracking-tight text-ink">
             O
           </span>
         </Link>

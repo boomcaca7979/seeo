@@ -493,7 +493,7 @@ function AuditPageInner() {
         {/* BUG-001：audit=null 时 SSR 渲染 new Date() 时间文本，与客户端 hydration 时刻必然不一致，
             触发 React 18 生产模式整树客户端重渲染，期间页面事件未挂载（点击「快速审计」无反应）。
             suppressHydrationWarning 抑制该 mismatch，保持 SSR 树有效。 */}
-        <h1 className="mt-1 font-display text-xl font-bold text-ink" suppressHydrationWarning>
+        <h1 className="mt-1 font-display text-xl font-semibold text-ink" suppressHydrationWarning>
           {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt, locale, tc) : formatTime(new Date().toISOString(), locale, tc)}
         </h1>
       </div>
@@ -501,7 +501,7 @@ function AuditPageInner() {
       {/* 页头 */}
       <div className="flex items-center gap-3 print:hidden">
         <span className="font-mono text-xs text-ink-40">05</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -669,7 +669,7 @@ function AuditPageInner() {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
-              <div className="font-display text-sm font-bold text-neg">{t("failedTitle")}</div>
+              <div className="font-display text-sm font-semibold text-neg">{t("failedTitle")}</div>
               <p className="mt-1 font-sans text-sm text-ink-60">
                 {audit?.error
                   ? audit.error
@@ -693,7 +693,7 @@ function AuditPageInner() {
             {hasResult ? (
               <>
                 <ScoreRing score={healthScore} size={140} thickness={10} showLabel />
-                <div className="mt-3 font-display text-base font-bold text-ink">
+                <div className="mt-3 font-display text-base font-semibold text-ink">
                   {t("healthTitle")}
                 </div>
                 {/* 较上次审计变化 */}
@@ -718,7 +718,7 @@ function AuditPageInner() {
                 <div className="flex h-[140px] w-[140px] items-center justify-center rounded-full border-2 border-dashed border-line">
                   <span className="font-mono text-xs text-ink-40">{t("noData")}</span>
                 </div>
-                <div className="mt-3 font-display text-base font-bold text-ink">
+                <div className="mt-3 font-display text-base font-semibold text-ink">
                   {t("healthTitle")}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-ink-40">
@@ -736,7 +736,7 @@ function AuditPageInner() {
                 <span className="h-2 w-2 rounded-full bg-neg" />
                 <span className="font-mono text-xs text-ink-40">{t("sevError")}</span>
               </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-bold text-neg">
+              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-neg">
                 {formatNumber(audit?.errors ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
@@ -749,7 +749,7 @@ function AuditPageInner() {
                 <span className="h-2 w-2 rounded-full bg-warn" />
                 <span className="font-mono text-xs text-ink-40">{t("sevWarning")}</span>
               </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-bold text-warn">
+              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-warn">
                 {formatNumber(audit?.warnings ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
@@ -762,7 +762,7 @@ function AuditPageInner() {
                 <span className="h-2 w-2 rounded-full bg-ink-25" />
                 <span className="font-mono text-xs text-ink-40">{t("sevNotice")}</span>
               </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-bold text-ink">
+              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-ink">
                 {formatNumber(audit?.notices ?? 0, locale)}
               </div>
               <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
@@ -781,7 +781,7 @@ function AuditPageInner() {
           <div className="mt-10">
             <div className="flex items-center gap-3">
               <span className="font-mono text-xs text-ink-40">05-0</span>
-              <h2 className="font-display text-lg font-bold text-ink">{t("chartsTitle")}</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("chartsTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
 
@@ -831,7 +831,7 @@ function AuditPageInner() {
 
         <div className="mt-10">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg font-bold text-ink">
+            <h2 className="font-display text-lg font-semibold text-ink">
               {t("issuesTitle")}
             </h2>
             <span className="font-mono text-xs text-ink-40">
@@ -899,12 +899,12 @@ function AuditPageInner() {
                             <td className="px-4 py-3 font-mono text-sm text-ink">
                               {formatNumber(issue.affectedPages, locale)}
                             </td>
-                            <td className="px-4 py-3 font-mono text-xs text-ink-60">
+                            <td className="px-4 py-3 font-mono text-sm text-ink-60">
                               <span className="block max-w-[200px] truncate" title={issue.sampleUrl}>
                                 {issue.sampleUrl.replace(/^https?:\/\//, "")}
                               </span>
                             </td>
-                            <td className="px-4 py-3 font-sans text-xs text-ink-60">
+                            <td className="px-4 py-3 font-sans text-sm text-ink-60">
                               <div className="flex items-center gap-1">
                                 <span className="truncate">{issue.detail}</span>
                                 <svg
@@ -936,7 +936,7 @@ function AuditPageInner() {
             </div>
           ) : (
             <div className="card-a mt-4 border border-dashed border-line p-10 text-center">
-              <div className="font-display text-base font-bold text-ink-40">{t("issuesEmptyTitle")}</div>
+              <div className="font-display text-base font-semibold text-ink-40">{t("issuesEmptyTitle")}</div>
               <p className="mt-2 font-sans text-sm text-ink-40">
                 {audit ? t("issuesEmptyRun") : t("issuesEmptyFirst")}
               </p>
@@ -951,7 +951,7 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">05-1</span>
-            <h2 className="font-display text-lg font-bold text-ink">{t("comparisonTitle")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("comparisonTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
 
@@ -972,7 +972,7 @@ function AuditPageInner() {
                   <div className="mt-1 font-mono text-xs text-ink-60">
                     {formatTime(audit.comparison.previous.checkedAt, locale, tc)}
                   </div>
-                  <div className="mt-2 font-mono text-2xl font-bold text-ink-60">
+                  <div className="mt-2 font-mono text-2xl font-semibold text-ink-60">
                     {audit.comparison.previous.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
@@ -984,7 +984,7 @@ function AuditPageInner() {
                 {/* 变化箭头 */}
                 <div className="flex flex-col items-center justify-center">
                   <div className="font-mono text-xs text-ink-40">{t("changeLabel")}</div>
-                  <div className={`mt-1 font-mono text-2xl font-bold ${
+                  <div className={`mt-1 font-mono text-2xl font-semibold ${
                     audit.comparison.scoreChange > 0 ? "text-pos" :
                     audit.comparison.scoreChange < 0 ? "text-neg" : "text-ink-40"
                   }`}>
@@ -1005,7 +1005,7 @@ function AuditPageInner() {
                   <div className="mt-1 font-mono text-xs text-ink-60">
                     {formatTime(audit.comparison.current.checkedAt, locale, tc)}
                   </div>
-                  <div className="mt-2 font-mono text-2xl font-bold text-ink">
+                  <div className="mt-2 font-mono text-2xl font-semibold text-ink">
                     {audit.comparison.current.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
@@ -1105,7 +1105,7 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">05-2</span>
-            <h2 className="font-display text-lg font-bold text-ink">{t("coverageTitle")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("coverageTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
           <p className="mt-1.5 font-mono text-xs text-ink-40">
@@ -1166,7 +1166,7 @@ function AuditPageInner() {
         <div className="mt-10">
           <div className="card-a flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
             <div>
-              <div className="font-display text-base font-bold text-ink">
+              <div className="font-display text-base font-semibold text-ink">
                 {t("nextStepTitle")}
               </div>
               <p className="mt-1 font-sans text-sm text-ink-60">

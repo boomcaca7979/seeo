@@ -184,7 +184,7 @@ export default function ProjectList({
         <div className="mt-3 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <h1
-              className="font-display font-bold tracking-tight text-ink"
+              className="font-display font-semibold tracking-tight text-ink"
               style={{ fontSize: 32, lineHeight: 1.2 }}
             >
               {t("greeting", { name: displayName })}
@@ -207,7 +207,7 @@ export default function ProjectList({
           {/* 区块头：编号 + 标题 + 发丝线 + 计数 */}
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">01</span>
-            <h2 className="font-display text-base font-bold text-ink">{t("myProjects")}</h2>
+            <h2 className="font-display text-base font-semibold text-ink">{t("myProjects")}</h2>
             <div className="hairline flex-1" />
             <span className="font-sans text-xs text-ink-40">{t("total", { count: projects.length })}</span>
           </div>
@@ -264,7 +264,7 @@ export default function ProjectList({
                       {/* 头部：域名 + URL */}
                       <div className="pr-8">
                         <div
-                          className="font-display font-bold text-ink"
+                          className="font-display font-semibold text-ink"
                           style={{ fontSize: "16.5px", lineHeight: 1.3 }}
                         >
                           {p.name}
@@ -280,7 +280,7 @@ export default function ProjectList({
                           <div className="font-sans text-[0.625rem] tracking-wider uppercase text-ink-40">
                             {t("healthScore")}
                           </div>
-                          <div className={`mt-0.5 font-sans text-2xl font-bold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
+                          <div className={`mt-0.5 font-sans text-2xl font-semibold ${hasScore ? scoreColor(score) : "text-ink-40"}`}>
                             {hasScore ? score : t("notAudited")}
                           </div>
                         </div>
@@ -343,7 +343,7 @@ export default function ProjectList({
         <section className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">02</span>
-            <h2 className="font-display text-base font-bold text-ink">{t("overview")}</h2>
+            <h2 className="font-display text-base font-semibold text-ink">{t("overview")}</h2>
             <div className="hairline flex-1" />
           </div>
 
@@ -371,10 +371,10 @@ export default function ProjectList({
         <section className="mt-10">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-ink-40">03</span>
-            <h2 className="font-display text-base font-bold text-ink">{t("alertsSection")}</h2>
+            <h2 className="font-display text-base font-semibold text-ink">{t("alertsSection")}</h2>
             <div className="hairline flex-1" />
             <span
-              className="font-sans text-[0.625rem] font-bold tracking-wider text-brand"
+              className="font-sans text-[0.625rem] font-semibold tracking-wider text-brand"
               style={{ border: "1px solid currentColor", borderRadius: 3, padding: "2px 6px" }}
             >
               {tc("rankChange")}

@@ -28,25 +28,25 @@ export default async function RefundPage() {
         )}
       />
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="font-mono text-3xl font-bold text-ink mb-8">{t("title")}</h1>
+        <h1 className="font-mono text-3xl font-semibold text-ink mb-8">{t("title")}</h1>
         <div className="space-y-6 text-ink-60 leading-relaxed">
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.policy")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.policy")}</h2>
             <p>{t("policy")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.process")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.process")}</h2>
             <p>{t("process")}</p>
             <span className="mt-2 inline-block rounded border border-line px-3 py-1 font-mono text-xs text-ink-40">
               {t("processNote")}
             </span>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.after")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.after")}</h2>
             <p>{t("after")}</p>
           </section>
           <section>
-            <h2 className="font-mono text-lg font-bold text-ink mb-2">{t("sections.banned")}</h2>
+            <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.banned")}</h2>
             <p>{t("banned")}</p>
           </section>
           <p className="pt-8 border-t border-line text-sm text-ink-40">{t("lastUpdated")}</p>

@@ -217,7 +217,7 @@ export default function KeywordOverviewPage() {
                       {serp.data!.organic.map((r) => (
                         <tr key={r.position} className="border-b border-line-soft/60 transition-colors hover:bg-line-soft/40">
                           <td className="px-4 py-3">
-                            <span className="text-sm font-bold text-ink">#{r.position}</span>
+                            <span className="text-sm font-semibold text-ink">#{r.position}</span>
                           </td>
                           <td className="px-4 py-3">
                             <a
@@ -233,7 +233,7 @@ export default function KeywordOverviewPage() {
                           <td className="px-4 py-3">
                             <span className="rounded bg-line-soft px-2 py-0.5 font-mono text-xs text-ink-60">{r.domain}</span>
                           </td>
-                          <td className="px-4 py-3 text-xs text-ink-60 line-clamp-2 max-w-md">{r.snippet || "—"}</td>
+                          <td className="px-4 py-3 text-sm text-ink-60 line-clamp-2 max-w-md">{r.snippet || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -292,7 +292,7 @@ function OverviewCard({ label, value, sub }: { label: string; value: string; sub
   return (
     <div className="card-a p-5">
       <div className="text-xs text-ink-40">{label}</div>
-      <div className="mt-1 text-xl font-bold text-ink break-all">{value}</div>
+      <div className="mt-1 text-xl font-semibold text-ink break-all">{value}</div>
       <div className="mt-1 text-[0.6875rem] text-ink-40">{sub}</div>
     </div>
   );

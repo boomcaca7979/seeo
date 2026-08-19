@@ -34,7 +34,7 @@ export default async function LocaleNotFound() {
       {/* 错误壳模式下 hydration 不修补 html 属性，客户端强制同步 lang */}
       <HtmlLang locale={locale} />
       <div className="text-center">
-        <div className="font-mono text-5xl font-bold tracking-widest text-ink">404</div>
+        <div className="font-mono text-5xl font-semibold tracking-widest text-ink">404</div>
         <h1 className="mt-4 font-mono text-lg font-semibold text-ink">{t("heading")}</h1>
         <p className="mt-2 text-sm text-ink/60">{t("desc")}</p>
         <Link

@@ -463,7 +463,7 @@ export default function CompetitorsPage() {
       {/* 页头：编号 + 标题 + 发丝线 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">06</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -514,7 +514,7 @@ export default function CompetitorsPage() {
           {/* 竞品域名管理区 */}
           <div className="card-a mt-6 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-base font-bold text-ink">
+              <h2 className="font-display text-base font-semibold text-ink">
                 {t("manageTitle")}
               </h2>
               <span className="font-mono text-xs text-ink-40">
@@ -663,7 +663,7 @@ export default function CompetitorsPage() {
                               </div>
                             </td>
                             <td className={`px-4 py-3 ${isCompBetter ? "bg-warn/5" : ""} ${isSelfBetter ? "bg-pos/5" : ""}`}>
-                              <span className={`font-mono text-base font-bold ${rankColor(r.rank)}`}>
+                              <span className={`font-mono text-base font-semibold ${rankColor(r.rank)}`}>
                                 {rankText(r.rank)}
                               </span>
                             </td>
@@ -740,7 +740,7 @@ export default function CompetitorsPage() {
                   return (
                     <div className="card-a p-5">
                       <div className="font-mono text-xs text-ink-40">{t("mySov")}</div>
-                      <div className={`mt-1 font-mono text-2xl font-bold ${sovColor(mySov.percentage)}`}>
+                      <div className={`mt-1 font-mono text-2xl font-semibold ${sovColor(mySov.percentage)}`}>
                         {mySov.percentage}%
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line-soft">
@@ -758,7 +758,7 @@ export default function CompetitorsPage() {
                 {/* Top 1 关键词数 */}
                 <div className="card-a p-5">
                   <div className="font-mono text-xs text-ink-40">{t("top3Keywords")}</div>
-                  <div className="mt-1 font-mono text-2xl font-bold text-pos">
+                  <div className="mt-1 font-mono text-2xl font-semibold text-pos">
                     {(() => {
                       const my = sov.sov.find((s) => s.domain === sov.projectDomain);
                       return my?.top10Count ?? 0;
@@ -771,7 +771,7 @@ export default function CompetitorsPage() {
                 {/* 平均排名 */}
                 <div className="card-a p-5">
                   <div className="font-mono text-xs text-ink-40">{t("myAvgRank")}</div>
-                  <div className="mt-1 font-mono text-2xl font-bold text-ink">
+                  <div className="mt-1 font-mono text-2xl font-semibold text-ink">
                     {(() => {
                       const my = sov.sov.find((s) => s.domain === sov.projectDomain);
                       return my?.avgRank !== null && my?.avgRank !== undefined ? `#${my.avgRank}` : "—";
@@ -784,7 +784,7 @@ export default function CompetitorsPage() {
                 {/* 竞品数量 */}
                 <div className="card-a p-5">
                   <div className="font-mono text-xs text-ink-40">{t("competitorCountLabel")}</div>
-                  <div className="mt-1 font-mono text-2xl font-bold text-ink">
+                  <div className="mt-1 font-mono text-2xl font-semibold text-ink">
                     {sov.competitorCount}
                   </div>
                   <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
@@ -827,7 +827,7 @@ export default function CompetitorsPage() {
           {sov && sov.sov.length > 0 && (
             <div className="card-a mt-6 overflow-hidden">
               <div className="border-b border-line-soft px-5 py-3">
-                <h2 className="font-display text-sm font-bold text-ink">
+                <h2 className="font-display text-sm font-semibold text-ink">
                   {t("sovDetailTitle")}
                 </h2>
               </div>
@@ -863,7 +863,7 @@ export default function CompetitorsPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <span className={`font-mono text-sm font-bold ${sovColor(s.percentage)}`}>
+                              <span className={`font-mono text-sm font-semibold ${sovColor(s.percentage)}`}>
                                 {s.percentage}%
                               </span>
                               <div className="h-1 w-16 overflow-hidden rounded-full bg-line-soft">
@@ -896,7 +896,7 @@ export default function CompetitorsPage() {
             <div className="card-a mt-6 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-display text-base font-bold text-ink">
+                  <h2 className="font-display text-base font-semibold text-ink">
                     {t("sovTrendTitle")}
                   </h2>
                   <p className="mt-0.5 font-mono text-xs text-ink-40">
@@ -957,7 +957,7 @@ export default function CompetitorsPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteId(null)} aria-hidden />
           <div className="relative w-full max-w-sm rounded-xl border border-line bg-card">
             <div className="border-b border-line-soft px-5 py-4">
-              <h3 className="font-display text-base font-bold text-ink">{t("deleteConfirmTitle")}</h3>
+              <h3 className="font-display text-base font-semibold text-ink">{t("deleteConfirmTitle")}</h3>
             </div>
             <div className="px-5 py-4">
               <p className="font-sans text-sm text-ink-60">

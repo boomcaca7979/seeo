@@ -99,10 +99,10 @@ export default function Navbar() {
       <nav className="site-shell flex h-16 items-center justify-between px-5 sm:px-8">
         {/* Logo */}
         <LocaleLink href="/" className="flex items-center gap-2" onClick={closeMobile}>
-          <span className="font-display text-2xl font-bold tracking-tight text-d-text">
+          <span className="font-display text-2xl font-semibold tracking-tight text-d-text">
             See
           </span>
-          <span className="font-display text-2xl font-bold tracking-tight text-gold">
+          <span className="font-display text-2xl font-semibold tracking-tight text-gold">
             O
           </span>
         </LocaleLink>

@@ -194,7 +194,7 @@ function PricingContent() {
       {/* 页头 */}
       <div className="mx-auto max-w-5xl px-6 pt-16 pb-8 text-center">
         <span className="font-mono text-xs text-brand">{t("pricing.eyebrow")}</span>
-        <h1 className="mt-3 font-mono text-3xl font-bold text-ink">{t("pricing.title")}</h1>
+        <h1 className="mt-3 font-mono text-3xl font-semibold text-ink">{t("pricing.title")}</h1>
         <p className="mt-3 font-sans text-sm text-ink-60 max-w-xl mx-auto">
           {t("pricing.subtitle")}
         </p>
@@ -254,11 +254,11 @@ function PricingContent() {
                     </div>
                   )}
                   <div className="mb-5">
-                    <h2 className="font-mono text-lg font-bold text-ink mb-1">{displayName}</h2>
+                    <h2 className="font-mono text-lg font-semibold text-ink mb-1">{displayName}</h2>
                     <p className="font-sans text-xs text-ink-40">{displayTagline}</p>
                   </div>
                   <div className="mb-5">
-                    <span className="font-mono text-2xl font-bold text-ink">{p.display.price}</span>
+                    <span className="font-mono text-2xl font-semibold text-ink">{p.display.price}</span>
                     <span className="font-sans text-xs text-ink-40">{tp("priceUnit")}</span>
                   </div>
                   <ul className="space-y-2 mb-6">
@@ -328,7 +328,7 @@ function PricingContent() {
       <div className="mx-auto max-w-3xl px-6 pb-16">
         <div className="flex items-center gap-3 mb-6">
           <span className="font-mono text-xs text-brand">{t("pricing.faqEyebrow")}</span>
-          <h2 className="font-mono text-xl font-bold text-ink">{t("pricing.faqTitle")}</h2>
+          <h2 className="font-mono text-xl font-semibold text-ink">{t("pricing.faqTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
         <div className="space-y-4">
@@ -393,7 +393,7 @@ function PaymentChannelModal({
       >
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <h3 className="font-display text-lg font-bold text-ink">{t("title")}</h3>
+            <h3 className="font-display text-lg font-semibold text-ink">{t("title")}</h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
               {t("subtitle", { plan: planLabel })}
             </p>
@@ -420,7 +420,7 @@ function PaymentChannelModal({
               <span className="font-mono text-xs">支</span>
             </div>
             <div>
-              <div className="font-display text-sm font-bold text-ink">{t("alipay")}</div>
+              <div className="font-display text-sm font-semibold text-ink">{t("alipay")}</div>
               <div className="font-sans text-xs text-ink-40">{t("alipayDesc")}</div>
             </div>
           </button>
@@ -434,7 +434,7 @@ function PaymentChannelModal({
               <span className="font-mono text-xs">微</span>
             </div>
             <div>
-              <div className="font-display text-sm font-bold text-ink">{t("wxpay")}</div>
+              <div className="font-display text-sm font-semibold text-ink">{t("wxpay")}</div>
               <div className="font-sans text-xs text-ink-40">{t("wxpayDesc")}</div>
             </div>
           </button>

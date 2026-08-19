@@ -109,10 +109,10 @@ function renderDetail(
 
       {/* 项目标题 */}
       <div className="mt-4 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-card font-mono text-base font-bold text-ink">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-card font-mono text-base font-semibold text-ink">
           {mock.favicon}
         </span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {project.name}
         </h1>
         <span className="badge-good">{t("statusActive")}</span>
@@ -130,7 +130,7 @@ function renderDetail(
           <div key={m.label} className="card-a p-5">
             <div className="font-mono text-xs text-ink-40">{m.label}</div>
             <div className="mt-2 flex items-end justify-between">
-              <span className="font-display text-2xl font-bold text-ink">
+              <span className="font-display text-2xl font-semibold text-ink">
                 {m.value}
               </span>
               <Sparkline data={m.spark} width={100} height={32} />
@@ -151,7 +151,7 @@ function renderDetail(
       <div className="mt-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="font-display text-lg font-bold text-ink">
+            <h2 className="font-display text-lg font-semibold text-ink">
               {t("rankOverviewTitle")}
             </h2>
             {/* 表格行数据为示意数据 */}
@@ -224,7 +224,7 @@ function renderDetail(
 
       {/* 快捷入口 */}
       <div className="mt-10">
-        <h2 className="font-display text-lg font-bold text-ink">
+        <h2 className="font-display text-lg font-semibold text-ink">
           {t("quickLinksTitle")}
         </h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -235,7 +235,7 @@ function renderDetail(
               className="card-a group flex flex-col p-5 transition-colors hover:border-ink-25"
             >
               <span className="badge-info w-fit">{q.tag}</span>
-              <h3 className="mt-3 font-display text-base font-bold text-ink">
+              <h3 className="mt-3 font-display text-base font-semibold text-ink">
                 {q.title}
               </h3>
               <p className="mt-1 font-sans text-xs text-ink-60">

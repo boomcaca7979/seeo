@@ -158,7 +158,7 @@ export default function BacklinksPage() {
       <div className="dash-container p-6 lg:p-8">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-ink-40">04</span>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
             {t("title")}
           </h1>
           <div className="hairline flex-1" />
@@ -169,7 +169,7 @@ export default function BacklinksPage() {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2 className="mt-5 font-display text-xl font-bold text-ink">{t("proTitle")}</h2>
+          <h2 className="mt-5 font-display text-xl font-semibold text-ink">{t("proTitle")}</h2>
           <p className="mt-2 font-sans text-sm text-ink-60">
             {t("proDesc")}
           </p>
@@ -186,7 +186,7 @@ export default function BacklinksPage() {
       {/* 页头 */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-xs text-ink-40">04</span>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
         <div className="hairline flex-1" />
@@ -246,7 +246,7 @@ export default function BacklinksPage() {
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
-              <div className="font-display text-sm font-bold text-neg">{t("fetchFailedTitle")}</div>
+              <div className="font-display text-sm font-semibold text-neg">{t("fetchFailedTitle")}</div>
               <p className="mt-1 font-sans text-sm text-ink-60">{error}</p>
               {domain && (
                 <p className="mt-1 font-sans text-xs text-ink-40">{t("domainIs", { domain })}</p>
@@ -265,7 +265,7 @@ export default function BacklinksPage() {
               className={`card-a p-5 ${!hasData ? "opacity-60" : ""}`}
             >
               <div className="font-sans text-xs text-ink-40">{m.label}</div>
-              <div className={`mt-1 font-display text-2xl font-bold ${hasData ? "text-ink" : "text-ink-40"}`}>
+              <div className={`mt-1 font-display text-2xl font-semibold ${hasData ? "text-ink" : "text-ink-40"}`}>
                 {m.value}
               </div>
             </div>
@@ -277,7 +277,7 @@ export default function BacklinksPage() {
       {!loading && !error && hasData && (
         <div className="card-a mt-6 overflow-hidden">
           <div className="border-b border-line-soft px-4 py-3">
-            <span className="font-display text-sm font-bold text-ink">{t("detailsTitle")}</span>
+            <span className="font-display text-sm font-semibold text-ink">{t("detailsTitle")}</span>
             <span className="ml-2 font-mono text-xs text-ink-40">
               {t("detailsMeta", { n: data!.backlinks.length })}
             </span>
@@ -301,10 +301,10 @@ export default function BacklinksPage() {
                 <tbody>
                   {data!.backlinks.map((b, i) => (
                     <tr key={i} className="border-b border-line-soft last:border-0">
-                      <td className="px-4 py-3 font-mono text-xs text-ink break-all max-w-[280px]">
+                      <td className="px-4 py-3 font-mono text-sm text-ink break-all max-w-[280px]">
                         {b.sourceUrl ?? "—"}
                       </td>
-                      <td className="px-4 py-3 font-sans text-xs text-ink-60 max-w-[200px] truncate">
+                      <td className="px-4 py-3 font-sans text-sm text-ink-60 max-w-[200px] truncate">
                         {b.anchor ?? "—"}
                       </td>
                       <td className="px-4 py-3">
@@ -316,10 +316,10 @@ export default function BacklinksPage() {
                           <span className="badge-warn">NoFollow</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">
                         {b.sourceRank ?? "—"}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-ink-60">
+                      <td className="px-4 py-3 font-mono text-sm text-ink-60">
                         {b.firstSeen ?? "—"}
                       </td>
                     </tr>
@@ -338,7 +338,7 @@ export default function BacklinksPage() {
       {/* 空态引导 */}
       {!loading && !error && !hasData && (
         <div className="card-a mt-6 p-10 text-center">
-          <div className="font-display text-sm font-bold text-ink-60">{t("emptyTitle")}</div>
+          <div className="font-display text-sm font-semibold text-ink-60">{t("emptyTitle")}</div>
           <p className="mt-1.5 font-sans text-xs text-ink-40">
             {t("emptyDesc")}
           </p>
