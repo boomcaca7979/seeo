@@ -3,8 +3,8 @@
 
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
-import { allCheckMeta, checkMetaMap, pickText, type CheckMeta, type IssueSeverity, type LText } from "@/lib/seo/audit-checks";
-import { localizeLegacyDetail, localizeLegacySuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
+import { allCheckMeta, checkMetaMap, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
+import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -41,44 +41,31 @@ function readUiLocale(req: Request): UiLocale {
   return /(?:^|;\s*)NEXT_LOCALE=zh(?:;|$)/.test(cookie) ? "zh" : "en";
 }
 
-/** DB 字符串 → 按 locale 文本：新数据为 JSON LText；历史纯文本按旧中文模板映射 */
-function dbTextToLocale(
-  raw: string | null | undefined,
-  locale: UiLocale,
-  legacyMap: (text: string, locale: UiLocale) => string
-): string | null {
-  if (raw === null || raw === undefined) return null;
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("{") && trimmed.includes('"en"') && trimmed.includes('"zh"')) {
-    try {
-      const parsed = JSON.parse(trimmed) as LText;
-      if (parsed && typeof parsed.en === "string" && typeof parsed.zh === "string") {
-        return pickText(parsed, locale);
-      }
-    } catch {
-      // 非 JSON LText，按原文返回
-    }
-  }
-  return legacyMap(raw, locale);
+/** checkId → 按 locale 展示名：catalog 内 → meta.name；catalog 外（如 startpage-unparsed）→ 补充映射；未知 → 原值 */
+function checkIdToName(checkId: string, locale: UiLocale): string {
+  const meta = checkMetaMap[checkId];
+  if (meta) return pickText(meta.name, locale);
+  const extra = nonCatalogCheckNames[checkId];
+  if (extra) return pickText(extra, locale);
+  return checkId;
 }
 
 function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
   const map = new Map<string, IssueGroup>();
   for (const issue of issues) {
     const checkId = issue.type;
-    const meta = checkMetaMap[checkId];
     const existing = map.get(checkId);
     if (existing) {
       existing.affectedPages++;
     } else {
       map.set(checkId, {
         checkId,
-        checkName: meta ? pickText(meta.name, locale) : checkId,
+        checkName: checkIdToName(checkId, locale),
         severity: issue.severity,
         affectedPages: 1,
         sampleUrl: issue.url,
-        detail: dbTextToLocale(issue.detail, locale, localizeLegacyDetail) ?? "",
-        suggestion: dbTextToLocale(issue.suggestion, locale, localizeLegacySuggestion),
+        detail: resolveAuditDetail(issue.detail, locale) ?? "",
+        suggestion: resolveAuditSuggestion(issue.suggestion, locale),
       });
     }
   }
@@ -128,23 +115,22 @@ function localizeComparisonIssue(
   issue: ComparisonIssue,
   locale: UiLocale
 ): { checkId: string; checkName: string; message: string; url: string; severity: IssueSeverity; suggestion: string } {
-  const meta = checkMetaMap[issue.checkId];
   const severity: IssueSeverity =
     issue.severity === "error" || issue.severity === "warning" || issue.severity === "notice"
       ? issue.severity
       : "notice";
   return {
     checkId: issue.checkId,
-    checkName: meta ? pickText(meta.name, locale) : String(issue.checkName ?? issue.checkId),
+    checkName: checkIdToName(issue.checkId, locale),
     message:
       typeof issue.message === "string"
-        ? dbTextToLocale(issue.message, locale, localizeLegacyDetail) ?? ""
+        ? resolveAuditDetail(issue.message, locale) ?? ""
         : "",
     url: issue.url,
     severity,
     suggestion:
       typeof issue.suggestion === "string"
-        ? dbTextToLocale(issue.suggestion, locale, localizeLegacySuggestion) ?? ""
+        ? resolveAuditSuggestion(issue.suggestion, locale) ?? ""
         : "",
   };
 }

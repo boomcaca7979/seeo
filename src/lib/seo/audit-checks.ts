@@ -706,6 +706,22 @@ export const checkMetaMap: Record<string, CheckMeta> = Object.fromEntries(
   allCheckMeta.map((m) => [m.id, m])
 );
 
+/**
+ * 不参与评分、但会以 issue 形式写入 DB 的 checkId（如 startpage-unparsed）。
+ * 仅用于读取层展示名映射，不得加入 allCheckMeta（会改变 MAX_SCORE）。
+ */
+export const nonCatalogCheckNames: Record<string, LText> = {
+  "startpage-unparsed": {
+    en: "Start page could not be parsed",
+    zh: "起始页未能解析",
+  },
+  // 旧版（v1.0）检查项：已从评分 catalog 移除，但历史 DB 行仍会按 checkId 查展示名
+  "js-redirect": {
+    en: "JS redirect",
+    zh: "JS 重定向",
+  },
+};
+
 // ---------- 健康分计算 ----------
 
 /** 所有检查项权重总和 */

@@ -2,12 +2,13 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { formatNumber } from "@/lib/ui-locale";
+import { checkMetaMap, nonCatalogCheckNames, pickText, type LText } from "@/lib/seo/audit-checks";
 
 export interface AuditReportProps {
   projectName: string;
   domain: string;
   healthScore: number;
-  issues: Array<{ type: string; severity: string; url: string; detail: string; suggestion: string }>;
+  issues: Array<{ type: string; severity: string; url: string; detail: string; suggestion: string; checkName?: string }>;
   coverage: Array<{ id: string; name: string; passed: boolean }>;
   generatedAt: string;
 }
@@ -37,6 +38,15 @@ const severityColor = (s: string): string => {
   if (s === "warning") return COLORS.warn;
   return COLORS.ink40;
 };
+
+/** checkId（机器值）→ 当前 locale 的检查项名称；快照自带 checkName 时优先使用 */
+function checkDisplayName(issue: { type: string; checkName?: string }, locale: "en" | "zh"): string {
+  const meta = checkMetaMap[issue.type];
+  if (meta) return pickText(meta.name, locale);
+  const extra: LText | undefined = nonCatalogCheckNames[issue.type];
+  if (extra) return pickText(extra, locale);
+  return issue.checkName ?? issue.type;
+}
 
 export default function AuditReport({ projectName, domain, healthScore, issues, coverage, generatedAt }: AuditReportProps) {
   const t = useTranslations("dashboard.pdf.audit");
@@ -114,7 +124,7 @@ export default function AuditReport({ projectName, domain, healthScore, issues, 
                   <td style={{ padding: "8px 6px", color: severityColor(issue.severity), fontWeight: 600 }}>
                     {severityLabel(issue.severity)}
                   </td>
-                  <td style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10 }}>{issue.type}</td>
+                  <td style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10 }}>{checkDisplayName(issue, locale)}</td>
                   <td style={{ padding: "8px 6px", fontFamily: "monospace", fontSize: 10, color: COLORS.ink60, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {issue.url}
                   </td>

@@ -671,12 +671,15 @@ function AuditPageInner() {
             <div>
               <div className="font-display text-sm font-semibold text-neg">{t("failedTitle")}</div>
               <p className="mt-1 font-sans text-sm text-ink-60">
-                {audit?.error
-                  ? audit.error
-                  : activeDepth === "full"
-                    ? t("failedHintFull")
-                    : t("failedHintDefault")}
+                {activeDepth === "full"
+                  ? t("failedHintFull")
+                  : t("failedHintDefault")}
               </p>
+              {audit?.error ? (
+                <p className="mt-1 font-mono text-xs text-ink-40 break-all">
+                  {audit.error}
+                </p>
+              ) : null}
               <p className="mt-1 font-sans text-xs text-ink-40">
                 {t("domainColon")}{audit?.domain ?? domain} · {formatTime(audit?.finishedAt ?? audit?.startedAt ?? null, locale, tc)}
               </p>

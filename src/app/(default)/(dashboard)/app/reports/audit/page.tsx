@@ -8,7 +8,8 @@ import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { formatNumber, intlLocale } from "@/lib/ui-locale";
 
 interface IssueGroup {
-  type: string;
+  checkId: string;
+  checkName: string;
   severity: "error" | "warning" | "notice";
   affectedPages: number;
   sampleUrl: string;
@@ -268,11 +269,11 @@ export default function AuditReportPrintPage() {
                     const cfg = severityConfig[issue.severity];
                     return (
                       <tr
-                        key={`${issue.type}-${idx}`}
+                        key={`${issue.checkId}-${idx}`}
                         className="border-b border-line-soft print-row"
                       >
                         <td className="px-4 py-3 font-sans text-sm font-medium text-ink print-cell-title">
-                          {issue.type}
+                          {issue.checkName}
                         </td>
                         <td className="px-4 py-3">
                           <span

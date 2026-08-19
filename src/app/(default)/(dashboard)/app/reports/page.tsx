@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
-import { localizeLegacyDetail, localizeLegacySuggestion } from "@/lib/seo/audit-legacy-text";
+import { localizeReportTitle, resolveAuditDetail, resolveAuditSuggestion } from "@/lib/seo/audit-legacy-text";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
@@ -666,7 +666,7 @@ export default function ReportsPage() {
                 <tbody>
                   {reports.map((r) => (
                     <tr key={r.id} className="border-b border-line-soft">
-                      <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{r.title}</td>
+                      <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{localizeReportTitle(r.title, locale)}</td>
                       <td className="px-4 py-3">
                         <span className={typeConfig[r.type].badge}>{typeLabel(r.type)}</span>
                       </td>
@@ -682,13 +682,14 @@ export default function ReportsPage() {
                                 if (r.type === "ranking") {
                                   setRankData({ ...data, generatedAt: r.created_at });
                                 } else if (r.type === "audit") {
-                                  // 历史快照读取层双语化：旧快照 detail/suggestion 为纯中文，按当前 locale 映射
+                                  // 历史快照读取层双语化（双向）：快照 detail/suggestion 为保存时 locale 的纯文本
+                                  // （或更早的纯中文 / LText JSON），统一经 resolver 按当前 locale 输出
                                   const localizedIssues = (data.issues ?? []).map(
                                     (i: { type: string; severity: string; url: string; detail: string; suggestion?: string | null; checkId?: string; checkName?: string }) => ({
                                       ...i,
                                       checkId: i.checkId ?? i.type,
-                                      detail: localizeLegacyDetail(i.detail ?? "", locale),
-                                      suggestion: i.suggestion ? localizeLegacySuggestion(i.suggestion, locale) : i.suggestion ?? "",
+                                      detail: resolveAuditDetail(i.detail ?? "", locale) ?? "",
+                                      suggestion: i.suggestion ? resolveAuditSuggestion(i.suggestion, locale) ?? "" : i.suggestion ?? "",
                                     })
                                   );
                                   setAuditData({ ...data, issues: localizedIssues, projectName: data.domain, generatedAt: r.created_at, coverage: data.coverage ?? [] });
