@@ -95,14 +95,14 @@ export default function Navbar() {
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-ink/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 w-full bg-card/95 backdrop-blur-sm border-b border-line">
       <nav className="site-shell flex h-16 items-center justify-between px-5 sm:px-8">
         {/* Logo */}
         <LocaleLink href="/" className="flex items-center gap-2" onClick={closeMobile}>
-          <span className="font-display text-2xl font-semibold tracking-tight text-d-text">
+          <span className="font-display text-2xl font-semibold tracking-tight text-ink">
             See
           </span>
-          <span className="font-display text-2xl font-semibold tracking-tight text-gold">
+          <span className="font-display text-2xl font-semibold tracking-tight text-accent">
             O
           </span>
         </LocaleLink>
@@ -114,14 +114,14 @@ export default function Navbar() {
               {item.routed ? (
                 <LocaleLink
                   href={item.href}
-                  className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                  className="text-sm font-medium text-ink-60 transition-colors hover:text-ink"
                 >
                   {item.label}
                 </LocaleLink>
               ) : (
                 <Link
                   href={item.href}
-                  className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                  className="text-sm font-medium text-ink-60 transition-colors hover:text-ink"
                 >
                   {item.label}
                 </Link>
@@ -135,7 +135,7 @@ export default function Navbar() {
           {showLangSwitch && (
             <Link
               href={switchHref}
-              className="font-mono text-xs font-medium text-d-secondary transition-colors hover:text-d-text"
+              className="font-mono text-xs font-medium text-ink-60 transition-colors hover:text-ink"
             >
               {t("switchLang")}
             </Link>
@@ -143,14 +143,14 @@ export default function Navbar() {
           {showLogin && (
             <Link
               href="/login"
-              className="text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+              className="text-sm font-medium text-ink-60 transition-colors hover:text-ink"
             >
               {t("login")}
             </Link>
           )}
           <Link
             href={ctaHref}
-            className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
+            className="btn-primary"
           >
             {t("cta")}
           </Link>
@@ -163,7 +163,7 @@ export default function Navbar() {
           aria-expanded={mobileOpen}
           aria-controls="mobile-menu"
           onClick={() => setMobileOpen((v) => !v)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-d-secondary transition-colors hover:text-d-text md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-60 transition-colors hover:text-ink md:hidden"
         >
           {mobileOpen ? (
             <svg
@@ -206,7 +206,7 @@ export default function Navbar() {
       {mobileOpen && (
         <div
           id="mobile-menu"
-          className="border-t border-d-muted/15 bg-ink md:hidden"
+          className="border-t border-line bg-card md:hidden"
         >
           <ul className="site-shell flex flex-col px-5 py-3 sm:px-8">
             {navItems.map((item) => (
@@ -215,7 +215,7 @@ export default function Navbar() {
                   <LocaleLink
                     href={item.href}
                     onClick={closeMobile}
-                    className="block py-3 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                    className="block py-3 text-sm font-medium text-ink-60 transition-colors hover:text-ink"
                   >
                     {item.label}
                   </LocaleLink>
@@ -223,19 +223,19 @@ export default function Navbar() {
                   <Link
                     href={item.href}
                     onClick={closeMobile}
-                    className="block py-3 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                    className="block py-3 text-sm font-medium text-ink-60 transition-colors hover:text-ink"
                   >
                     {item.label}
                   </Link>
                 )}
               </li>
             ))}
-            <li className="mt-2 flex flex-col gap-3 border-t border-d-muted/15 pt-3">
+            <li className="mt-2 flex flex-col gap-3 border-t border-line pt-3">
               {showLangSwitch && (
                 <Link
                   href={switchHref}
                   onClick={closeMobile}
-                  className="block py-2 font-mono text-xs font-medium text-d-secondary transition-colors hover:text-d-text"
+                  className="block py-2 font-mono text-xs font-medium text-ink-60 transition-colors hover:text-ink"
                 >
                   {t("switchLang")}
                 </Link>
@@ -244,7 +244,7 @@ export default function Navbar() {
                 <Link
                   href="/login"
                   onClick={closeMobile}
-                  className="block py-2 text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                  className="block py-2 text-sm font-medium text-ink-60 transition-colors hover:text-ink"
                 >
                   {t("login")}
                 </Link>
@@ -252,7 +252,7 @@ export default function Navbar() {
               <Link
                 href={ctaHref}
                 onClick={closeMobile}
-                className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-ink transition-opacity hover:opacity-90"
+                className="btn-primary w-full"
               >
                 {t("cta")}
               </Link>

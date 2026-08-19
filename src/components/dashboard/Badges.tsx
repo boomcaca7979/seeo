@@ -48,7 +48,7 @@ export function SerpFeatureBadge({ feature }: { feature: string }) {
   };
   return (
     <span
-      className="inline-flex items-center gap-1 rounded bg-line-soft px-1.5 py-0.5 font-sans text-[0.625rem] text-ink-60"
+      className="inline-flex items-center gap-1 rounded bg-line-soft px-2 py-0.5 font-sans text-xs text-ink-60"
       title={feature}
     >
       <span className="text-warn">{icons[feature] ?? "•"}</span>

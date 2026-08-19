@@ -98,7 +98,7 @@ export default async function RootLayout({
       lang={localeToHtmlLang[locale as "en" | "zh"] ?? "en"}
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-station text-y-text font-sans">
+      <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
         <JsonLd schema={organizationSchema()} />
         <JsonLd schema={websiteSchema()} />

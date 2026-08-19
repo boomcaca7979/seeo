@@ -185,7 +185,7 @@ export default function KeywordExpandPage() {
           <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             {KEYWORD_LOCATIONS.map((c) => (
               <option key={c} value={c}>{display(c)}</option>
@@ -194,7 +194,7 @@ export default function KeywordExpandPage() {
           <select
             value={device}
             onChange={(e) => setDevice(e.target.value as Device)}
-            className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             <option value="PC">PC</option>
             <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
@@ -210,7 +210,7 @@ export default function KeywordExpandPage() {
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             placeholder={t("searchPlaceholder")}
-            className="w-full rounded-lg border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="w-full rounded-md border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <button type="submit" disabled={serp.loading} className="btn-primary px-6 py-3">
@@ -349,13 +349,13 @@ function ExpandTag({ query, tracked, onTrack }: { query: string; tracked: boolea
   const t = useTranslations("dashboard.keywords.expand");
   const intent = detectIntent(query);
   return (
-    <div className="group inline-flex items-center gap-1.5 rounded-full border border-line bg-card pl-3 pr-1.5 py-1">
+    <div className="group inline-flex items-center gap-2 rounded-full border border-line bg-card pl-3 pr-2 py-1">
       <span className="text-xs text-ink">{query}</span>
-      <span className="text-[0.625rem] text-ink-40">{intentText(t, intent)}</span>
+      <span className="text-xs text-ink-40">{intentText(t, intent)}</span>
       <button
         onClick={onTrack}
         disabled={tracked}
-        className={`rounded-full px-1.5 py-0.5 text-[0.625rem] transition-colors ${
+        className={`rounded-full px-2 py-0.5 text-xs transition-colors ${
           tracked ? "bg-pos/15 text-pos" : "bg-line-soft text-ink-60 hover:bg-ink hover:text-card"
         }`}
         title={tracked ? t("trackedTitle") : t("trackTitle")}

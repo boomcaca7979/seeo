@@ -31,7 +31,7 @@ const navItems: NavItem[] = [
     labelKey: "overview",
     href: "/app",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
         <rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
         <rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
@@ -43,7 +43,7 @@ const navItems: NavItem[] = [
     labelKey: "keywordOverview",
     href: "/app/keyword-overview",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
         <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
@@ -53,7 +53,7 @@ const navItems: NavItem[] = [
     labelKey: "keywordExpand",
     href: "/app/keyword-expand",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     ),
@@ -62,7 +62,7 @@ const navItems: NavItem[] = [
     labelKey: "positionTracking",
     href: "/app/position-tracking",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M4 19V5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M4 19h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="m7 15 4-5 3 3 5-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -73,7 +73,7 @@ const navItems: NavItem[] = [
     labelKey: "rankCheck",
     href: "/app/rank-check",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
         <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M11 8v3l2 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -84,7 +84,7 @@ const navItems: NavItem[] = [
     labelKey: "audit",
     href: "/app/audit",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M12 3v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M12 18v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M5.6 5.6 7.7 7.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -99,7 +99,7 @@ const navItems: NavItem[] = [
     labelKey: "competitors",
     href: "/app/competitors",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="8" cy="9" r="3" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="17" cy="9" r="3" stroke="currentColor" strokeWidth="1.6" />
         <path d="M3 19c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -111,7 +111,7 @@ const navItems: NavItem[] = [
     labelKey: "content",
     href: "/app/content",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         <path d="M8 9h7M8 13h7M8 17h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
@@ -121,7 +121,7 @@ const navItems: NavItem[] = [
     labelKey: "backlinks",
     href: "/app/backlinks",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M9 15 15 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M11 7l1-1a4 4 0 0 1 6 6l-1 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M13 17l-1 1a4 4 0 0 1-6-6l1-1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -132,7 +132,7 @@ const navItems: NavItem[] = [
     labelKey: "reports",
     href: "/app/reports",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <rect x="4" y="3" width="16" height="18" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
         <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
@@ -142,7 +142,7 @@ const navItems: NavItem[] = [
     labelKey: "settings",
     href: "/app/settings",
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
         <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
@@ -213,7 +213,7 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
     >
       {/* Logo */}
       <div className="flex h-16 flex-none items-center justify-between border-b border-line px-4">
-        <Link href="/app" onClick={onMobileClose} className="flex items-center gap-1.5 overflow-hidden">
+        <Link href="/app" onClick={onMobileClose} className="flex items-center gap-2 overflow-hidden">
           <span className="text-lg font-semibold tracking-tight text-ink">
             See
           </span>
@@ -259,13 +259,13 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
         <div className="flex-none px-3 pb-2">
           <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[0.625rem] text-ink-40">{t("currentPlan")}</span>
+              <span className="font-mono text-xs text-ink-40">{t("currentPlan")}</span>
               <span className="font-sans text-xs font-medium text-ink">{currentPlanLabel}</span>
             </div>
             {showUpgradeCta && (
               <Link
                 href="/pricing"
-                className="mt-2 block w-full rounded-md bg-ink py-1.5 text-center font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
+                className="mt-2 block w-full rounded-md bg-ink h-8 text-center font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
               >
                 {t("upgradeCta")}
               </Link>
@@ -290,7 +290,7 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
       {/* 底部用户区：始终固定底部 */}
       <div className="flex-none border-t border-line px-3 py-3">
         {!collapsed ? (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
               {avatarLetter}
             </span>
@@ -298,7 +298,7 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
               <div className="truncate text-xs font-medium text-ink">
                 {userName}
               </div>
-              <div className="truncate text-[0.625rem] text-ink-40">
+              <div className="truncate text-xs text-ink-40">
                 {userEmail}
               </div>
             </div>

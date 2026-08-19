@@ -53,7 +53,7 @@ export default function KeywordVenn({ selfOnly, compOnly, common }: VennProps) {
       </svg>
 
       {/* 图例 */}
-      <div className="mt-3 flex flex-wrap justify-center gap-3 font-sans text-[0.625rem]">
+      <div className="mt-3 flex flex-wrap justify-center gap-3 font-sans text-xs">
         <span className="flex items-center gap-1 text-ink-60">
           <span className="h-2 w-2 rounded-full" style={{ background: c1.color }} /> {c1.label}
         </span>

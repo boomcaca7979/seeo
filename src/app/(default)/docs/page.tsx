@@ -98,7 +98,7 @@ export default async function DocsPage() {
                   {f.capabilities.map((c) => (
                     <span
                       key={c}
-                      className="rounded border border-line bg-paper px-2 py-0.5 font-mono text-[0.625rem] text-ink-60"
+                      className="rounded border border-line bg-paper px-2 py-0.5 font-mono text-xs text-ink-60"
                     >
                       {c}
                     </span>

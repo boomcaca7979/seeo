@@ -239,7 +239,7 @@ export default function ContentPage() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60">
+      <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
 
@@ -254,14 +254,14 @@ export default function ContentPage() {
             value=""
             onChange={(d) => setUrl(`https://${d}`)}
             placeholder={t("domainPlaceholder")}
-            className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
           <input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/blog/post-1"
-            className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <div className="flex-1">
@@ -271,13 +271,13 @@ export default function ContentPage() {
             value={targetKeywordsInput}
             onChange={(e) => setTargetKeywordsInput(e.target.value)}
             placeholder={t("keywordsPlaceholder")}
-            className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <div className="flex-shrink-0">
           {history.length > 0 && (
             <select
-              className="rounded-lg border border-line bg-card px-3 py-2 font-mono text-xs text-ink-60 focus:border-ink-25 focus:outline-none"
+              className="rounded-md border border-line bg-card px-3 py-2 font-mono text-xs text-ink-60 focus:border-ink-25 focus:outline-none"
               onChange={(e) => {
                 const h = history.find((x) => x.id === Number(e.target.value));
                 if (h) {
@@ -490,7 +490,7 @@ export default function ContentPage() {
                   {t("noHeadings")}
                 </div>
               ) : (
-                <ul className="space-y-1.5">
+                <ul className="space-y-2">
                   {analysis.headingStructure.map((heading, idx) => (
                     <li
                       key={idx}
@@ -709,7 +709,7 @@ function StatCard({
     <div className="card-a p-4">
       <div className="font-mono text-xs text-ink-40">{label}</div>
       <div className={`mt-1 font-mono text-2xl font-semibold ${valueClass}`}>{value}</div>
-      {sub && <div className={`mt-0.5 font-mono text-[0.625rem] ${subClass}`}>{sub}</div>}
+      {sub && <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>}
     </div>
   );
 }
@@ -733,7 +733,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {prev.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
+          <div className="mt-0.5 font-mono text-xs text-ink-40">
             {t("wordsUnit", { n: formatNumber(prev.wordCount, locale) })}
           </div>
         </div>
@@ -748,7 +748,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {comparison.scoreChange > 0 ? "↑" : comparison.scoreChange < 0 ? "↓" : "→"}
             {" "}{t("pointsUnit", { n: Math.abs(comparison.scoreChange) })}
           </div>
-          <div className={`mt-0.5 font-mono text-[0.625rem] ${
+          <div className={`mt-0.5 font-mono text-xs ${
             comparison.wordCountChange > 0 ? "text-pos" :
             comparison.wordCountChange < 0 ? "text-neg" : "text-ink-40"
           }`}>
@@ -768,7 +768,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
             {comparison.current.contentScore}
             <span className="text-sm text-ink-40">{" "}{t("pointSuffix")}</span>
           </div>
-          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
+          <div className="mt-0.5 font-mono text-xs text-ink-40">
             {t("wordsUnit", { n: formatNumber(comparison.current.wordCount, locale) })}
           </div>
         </div>
@@ -784,7 +784,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
                   {t("itemCount", { n: comparison.newSuggestions.length })}
                 </span>
               </div>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-2">
                 {comparison.newSuggestions.map((s, idx) => (
                   <li key={idx} className="rounded-md border border-line-soft bg-card px-3 py-2 font-sans text-xs text-ink">
                     {s}
@@ -801,7 +801,7 @@ function HistoryComparisonView({ comparison }: { comparison: ContentHistoryCompa
                   {t("itemCount", { n: comparison.resolvedSuggestions.length })}
                 </span>
               </div>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-2">
                 {comparison.resolvedSuggestions.map((s, idx) => (
                   <li key={idx} className="rounded-md border border-line-soft bg-card px-3 py-2 font-sans text-xs text-ink-40 line-through">
                     {s}

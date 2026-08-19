@@ -114,7 +114,7 @@ export default function RankCheckPage() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder={t("keywordPlaceholder")}
-              className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+              className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
           <div>
@@ -123,7 +123,7 @@ export default function RankCheckPage() {
               value={domain}
               onChange={setDomain}
               placeholder="example.com"
-              className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+              className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function RankCheckPage() {
             <select
               value={country}
               onChange={(e) => handleRegionChange(e.target.value)}
-              className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
+              className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
             >
               {RANK_LOCATIONS.map((c) => (
                 <option key={c} value={c}>{display(c)}</option>
@@ -143,7 +143,7 @@ export default function RankCheckPage() {
             <select
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
+              className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
             >
               {cities.map((c) => (
                 <option key={c} value={c}>{display(c)}</option>
@@ -174,7 +174,7 @@ export default function RankCheckPage() {
           </button>
         </div>
 
-        <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-[0.6875rem] text-ink-60">
+        <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-xs text-ink-60">
           {t("quotaHint")}
         </div>
       </form>
@@ -236,7 +236,7 @@ export default function RankCheckPage() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-[0.6875rem] text-ink-40">
+              <div className="mt-4 flex items-center justify-between text-xs text-ink-40">
                 <span>{t("regionLabel")}：{display(country)} · {display(city)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
                 <span>{t("queryTime")}：{new Date(result.fetchedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</span>
               </div>

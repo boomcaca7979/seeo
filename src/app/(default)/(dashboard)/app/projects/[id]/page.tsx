@@ -118,7 +118,7 @@ function renderDetail(
         <span className="badge-good">{t("statusActive")}</span>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-mono text-xs text-ink-40">{project.domain}</p>
+      <p className="mt-2 font-mono text-xs text-ink-40">{project.domain}</p>
 
       {/* 核心指标卡片（流量/关键词/外链/健康度为示意数据） */}
       <div className="mt-8 flex items-center gap-2">

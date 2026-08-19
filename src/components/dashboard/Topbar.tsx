@@ -201,7 +201,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
       {onMobileMenuClick && (
         <button
           onClick={onMobileMenuClick}
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-ink-60 hover:bg-line-soft hover:text-ink lg:hidden"
+          className="flex h-9 w-9 flex-none items-center justify-center rounded-md text-ink-60 hover:bg-line-soft hover:text-ink lg:hidden"
           aria-label={t("menu")}
         >
           <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -214,7 +214,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
       <div className="relative min-w-0" ref={projectRef}>
         <button
           onClick={() => setProjectOpen((o) => !o)}
-          className="flex items-center gap-2.5 rounded-lg border border-line bg-card px-3 py-2 hover:border-ink-25"
+          className="flex items-center gap-2 rounded-md border border-line bg-card px-3 py-2 hover:border-ink-25"
         >
           <span className="flex h-6 w-6 flex-none items-center justify-center rounded bg-ink text-xs font-semibold text-card">
             {currentProject ? currentProject.name.charAt(0).toUpperCase() : "—"}
@@ -228,8 +228,8 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
         </button>
 
         {projectOpen && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-1.5">
-            <div className="px-2 py-1.5 font-sans text-[0.625rem] uppercase tracking-wider text-ink-40">
+          <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-2">
+            <div className="px-2 py-1 font-sans text-xs uppercase tracking-wider text-ink-40">
               {t("switchProject")}
             </div>
             {projects.length === 0 ? (
@@ -241,7 +241,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
                 <button
                   key={p.id}
                   onClick={() => handleSelectProject(p.id)}
-                  className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-line-soft"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-line-soft"
                 >
                   <span className="flex h-6 w-6 items-center justify-center rounded bg-ink text-xs font-semibold text-card">
                     {p.name.charAt(0).toUpperCase()}
@@ -250,7 +250,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
                     <div className="font-mono text-sm text-ink truncate">
                       {p.domain}
                     </div>
-                    <div className="font-sans text-[0.625rem] text-ink-40">
+                    <div className="font-sans text-xs text-ink-40">
                       {t("health")} {p.healthScore === null ? t("notAudited") : p.healthScore}
                     </div>
                   </div>
@@ -283,9 +283,9 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
           <input
             type="text"
             placeholder={t("searchPlaceholder")}
-            className="w-full rounded-lg border border-line bg-card py-2 pl-9 pr-14 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="w-full rounded-md border border-line bg-card py-2 pl-9 pr-14 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[0.625rem] text-ink-40">
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-2 py-0.5 font-mono text-xs text-ink-40">
             ⌘K
           </kbd>
         </div>
@@ -297,7 +297,7 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
         <div className="relative" ref={bellRef}>
           <button
             onClick={() => setBellOpen((o) => !o)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-60 hover:bg-card hover:text-ink"
+            className="relative flex h-9 w-9 items-center justify-center rounded-md text-ink-60 hover:bg-card hover:text-ink"
             aria-label={t("notifications")}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -305,17 +305,17 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
               <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
             {unread > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-neg" />
+              <span className="absolute right-1.5 top-2 h-1.5 w-1.5 rounded-full bg-neg" />
             )}
           </button>
 
           {bellOpen && (
             <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden">
               {/* 头部 */}
-              <div className="flex items-center justify-between border-b border-line-soft px-4 py-2.5">
+              <div className="flex items-center justify-between border-b border-line-soft px-4 py-2">
                 <span className="text-sm font-semibold text-ink">{t("notifications")}</span>
                 {unread > 0 && (
-                  <span className="font-sans text-[0.625rem] text-ink-40">{t("unread", { count: unread })}</span>
+                  <span className="font-sans text-xs text-ink-40">{t("unread", { count: unread })}</span>
                 )}
               </div>
 
@@ -329,14 +329,14 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
                   {alerts.map((a, idx) => (
                     <div
                       key={a.id}
-                      className={`flex items-start gap-2.5 px-4 py-3 hover:bg-line-soft ${
+                      className={`flex items-start gap-2 px-4 py-3 hover:bg-line-soft ${
                         idx !== alerts.length - 1 ? "border-b border-line-soft" : ""
                       }`}
                     >
-                      <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
+                      <span className={`mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                       <div className="flex-1 min-w-0">
                         <div className="font-sans text-xs text-ink leading-snug">{a.title}</div>
-                        <div className="mt-0.5 font-sans text-[0.625rem] text-ink-40">
+                        <div className="mt-0.5 font-sans text-xs text-ink-40">
                           {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                         </div>
                       </div>
@@ -346,21 +346,21 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
               )}
 
               {/* 底部操作 */}
-              <div className="flex items-center justify-between border-t border-line-soft px-4 py-2.5">
+              <div className="flex items-center justify-between border-t border-line-soft px-4 py-2">
                 {unread > 0 ? (
                   <button
                     onClick={handleMarkAllRead}
-                    className="font-sans text-[0.6875rem] text-ink-60 hover:text-ink"
+                    className="font-sans text-xs text-ink-60 hover:text-ink"
                   >
                     {t("markAllRead")}
                   </button>
                 ) : (
-                  <span className="font-sans text-[0.6875rem] text-ink-40">{t("allRead")}</span>
+                  <span className="font-sans text-xs text-ink-40">{t("allRead")}</span>
                 )}
                 <Link
                   href="/app"
                   onClick={() => setBellOpen(false)}
-                  className="font-sans text-[0.6875rem] text-accent hover:underline"
+                  className="font-sans text-xs text-accent hover:underline"
                 >
                   {t("viewAll")}
                 </Link>
@@ -373,9 +373,9 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg p-1 hover:bg-line-soft"
+            className="flex items-center gap-2 rounded p-1 hover:bg-line-soft"
           >
-            <span className={`rounded px-2 py-0.5 font-mono text-[0.625rem] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+            <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
               {planLabel(currentPlan, locale)}
             </span>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
@@ -385,19 +385,19 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
 
           {userMenuOpen && (
             <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-line bg-card overflow-hidden">
-              <div className="border-b border-line-soft px-4 py-2.5">
+              <div className="border-b border-line-soft px-4 py-2">
                 <p className="font-sans text-sm font-medium text-ink truncate">
                   {displayName}
                 </p>
-                <p className="font-mono text-[0.625rem] text-ink-40 truncate">
+                <p className="font-mono text-xs text-ink-40 truncate">
                   {email}
                 </p>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className={`rounded px-1.5 py-0.5 font-mono text-[0.625rem] font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
                     {planLabel(currentPlan, locale)}
                   </span>
                   {(currentPlan === "free" || currentPlan === "lite") && (
-                    <span className="font-mono text-[0.625rem] text-ink-40">{t("upgradeHint")}</span>
+                    <span className="font-mono text-xs text-ink-40">{t("upgradeHint")}</span>
                   )}
                 </div>
               </div>
@@ -420,12 +420,12 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
               {isAuthEnabled ? (
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2.5 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"
+                  className="w-full text-left px-4 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"
                 >
                   {t("logout")}
                 </button>
               ) : (
-                <div className="px-4 py-2.5 font-sans text-[0.625rem] text-ink-40">
+                <div className="px-4 py-2 font-sans text-xs text-ink-40">
                   {t("demoMode")}
                 </div>
               )}

@@ -122,7 +122,7 @@ export default function KeywordOverviewPage() {
           <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             {KEYWORD_LOCATIONS.map((c) => (
               <option key={c} value={c}>{display(c)}</option>
@@ -131,7 +131,7 @@ export default function KeywordOverviewPage() {
           <select
             value={device}
             onChange={(e) => setDevice(e.target.value as Device)}
-            className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             <option value="PC">PC</option>
             <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
@@ -147,7 +147,7 @@ export default function KeywordOverviewPage() {
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             placeholder={t("searchPlaceholder")}
-            className="w-full rounded-lg border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            className="w-full rounded-md border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
         <button type="submit" disabled={serp.loading} className="btn-primary px-6 py-3">
@@ -228,7 +228,7 @@ export default function KeywordOverviewPage() {
                             >
                               {r.title}
                             </a>
-                            {r.date && <span className="ml-2 text-[0.625rem] text-ink-40">{r.date}</span>}
+                            {r.date && <span className="ml-2 text-xs text-ink-40">{r.date}</span>}
                           </td>
                           <td className="px-4 py-3">
                             <span className="rounded bg-line-soft px-2 py-0.5 font-mono text-xs text-ink-60">{r.domain}</span>
@@ -267,7 +267,7 @@ export default function KeywordOverviewPage() {
                   {serp.data.relatedSearches.map((r, i) => (
                     <span
                       key={i}
-                      className="inline-flex items-center rounded-full border border-line bg-card px-3 py-1.5 text-xs text-ink-60 transition-colors hover:border-ink-25 hover:text-ink"
+                      className="inline-flex items-center rounded-full border border-line bg-card px-3 py-1 text-xs text-ink-60 transition-colors hover:border-ink-25 hover:text-ink"
                     >
                       {r.query}
                     </span>
@@ -293,7 +293,7 @@ function OverviewCard({ label, value, sub }: { label: string; value: string; sub
     <div className="card-a p-5">
       <div className="text-xs text-ink-40">{label}</div>
       <div className="mt-1 text-xl font-semibold text-ink break-all">{value}</div>
-      <div className="mt-1 text-[0.6875rem] text-ink-40">{sub}</div>
+      <div className="mt-1 text-xs text-ink-40">{sub}</div>
     </div>
   );
 }

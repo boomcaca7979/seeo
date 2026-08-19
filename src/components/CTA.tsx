@@ -40,33 +40,17 @@ export default function CTA() {
   };
 
   return (
-    <section id="cta" className="bg-station px-5 py-20 sm:px-8 sm:py-28">
+    <section id="cta" className="bg-paper px-5 py-20 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-5xl">
-        <div className="relative overflow-hidden rounded-2xl bg-ink p-8 sm:p-14">
-          {/* 背景极光装饰 */}
-          <div
-            className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full opacity-20 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(circle, #6c4cff 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full opacity-20 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(circle, #2f8cff 0%, transparent 70%)",
-            }}
-          />
-
+        <div className="card-a relative overflow-hidden p-8 sm:p-14">
           <div className="relative text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-xs text-gold">
+            <span className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/5 px-3 py-1 font-mono text-xs text-accent">
               {t("badge")}
             </span>
-            <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-d-text sm:text-5xl">
+            <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
               {t("title")}
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-d-secondary sm:text-lg">
+            <p className="mx-auto mt-4 max-w-2xl text-base text-ink-60 sm:text-lg">
               {t("subtitle")}
             </p>
 
@@ -80,11 +64,11 @@ export default function CTA() {
                 value={domainInput}
                 onChange={(e) => setDomainInput(e.target.value)}
                 placeholder={t("placeholder")}
-                className="w-full rounded-lg border border-d-muted/30 bg-ink-elevated px-4 py-3 font-sans text-sm text-d-text placeholder:text-d-muted focus:border-gold focus:outline-none"
+                className="h-12 w-full rounded-md border border-line bg-card px-4 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
               <button
                 type="submit"
-                className="rounded-lg bg-gold px-6 py-3 font-sans text-sm font-semibold text-ink transition-opacity hover:opacity-90"
+                className="btn-primary btn-lg flex-none"
               >
                 {t("submit")}
               </button>
@@ -94,23 +78,23 @@ export default function CTA() {
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="#features"
-                className="font-sans text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
               >
                 {t("browseFeatures")}
               </Link>
-              <span className="hidden font-mono text-xs text-d-muted sm:inline">
+              <span className="hidden font-mono text-xs text-ink-25 sm:inline">
                 ·
               </span>
               <Link
                 href="/pricing"
-                className="font-sans text-sm font-medium text-d-secondary transition-colors hover:text-d-text"
+                className="font-sans text-sm font-medium text-ink-60 transition-colors hover:text-ink"
               >
                 {t("viewPricing")}
               </Link>
             </div>
 
             {/* 信任标识 */}
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-xs text-d-muted">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-xs text-ink-40">
               <span>{t("trust.daily")}</span>
               <span>{t("trust.google")}</span>
               {/* PDF 导出为 Pro 专属功能，文案明确标注（Fake Claim #6 修复） */}

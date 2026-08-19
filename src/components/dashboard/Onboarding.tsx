@@ -31,7 +31,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
   return (
     <div className="dash-container px-6 py-8 sm:px-8">
       {/* eyebrow 行 */}
-      <div className="flex items-center justify-between font-sans text-[0.6875rem] text-ink-40">
+      <div className="flex items-center justify-between font-sans text-xs text-ink-40">
         <span>{t("eyebrowWelcome")}</span>
         <span>{t("eyebrowUpdated")}</span>
       </div>
@@ -44,7 +44,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
         >
           {t("greeting", { name: displayName })}
         </h1>
-        <p className="mt-1.5 font-sans text-sm text-ink-60">
+        <p className="mt-2 font-sans text-sm text-ink-60">
           {t("subtitle")}
         </p>
       </div>
@@ -62,10 +62,10 @@ export default function Onboarding({ displayName }: OnboardingProps) {
             {STEPS.map((s) => (
               <div key={s.n} className="flex flex-col">
                 <span className="font-mono text-xs text-brand">{s.n}</span>
-                <div className="mt-1.5 font-display text-base font-semibold text-ink">
+                <div className="mt-2 font-display text-base font-semibold text-ink">
                   {s.title}
                 </div>
-                <p className="mt-1.5 font-sans text-sm text-ink-60 leading-relaxed">
+                <p className="mt-2 font-sans text-sm text-ink-60 leading-relaxed">
                   {s.desc}
                 </p>
               </div>
@@ -77,7 +77,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
             <Link href="/app/audit" className="btn-primary px-8 py-3 text-base">
               {t("cta")}
             </Link>
-            <p className="font-mono text-[0.625rem] text-ink-40">
+            <p className="font-mono text-xs text-ink-40">
               {t("ctaNote")}
             </p>
           </div>

@@ -21,7 +21,7 @@ export default function LoginPage() {
           { name: "Login", url: "/login" },
         ])}
       />
-      <Suspense fallback={<div className="min-h-screen bg-station" />}>
+      <Suspense fallback={<div className="min-h-screen bg-paper" />}>
         <AuthForm mode="login" />
       </Suspense>
     </>

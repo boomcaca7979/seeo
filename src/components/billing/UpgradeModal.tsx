@@ -62,7 +62,7 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-line bg-card p-6 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-line bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 */}
@@ -117,7 +117,7 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
                   {recommendLabel}
                 </div>
               </div>
-              <span className="badge-warn px-2.5 py-1 text-xs">{t("recommendedBadge")}</span>
+              <span className="badge-warn px-3 py-1 text-xs">{t("recommendedBadge")}</span>
             </div>
             <p className="mt-2 font-sans text-xs text-ink-60">
               {t("recommendDesc")}
@@ -129,14 +129,14 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 btn-secondary py-2.5 text-sm"
+            className="flex-1 btn-secondary"
           >
             {t("later")}
           </button>
           <Link
             href="/pricing"
             onClick={onClose}
-            className="flex-1 btn-primary py-2.5 text-center text-sm"
+            className="flex-1 btn-primary"
           >
             {isTopPlan ? t("viewDetails") : t("viewPlans")}
           </Link>

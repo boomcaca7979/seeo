@@ -3,6 +3,16 @@
 /* ===== SeeO 设计系统 V4 (Semrush 风格 · Tailwind v4 @theme) ===== */
 /* V4：白底/极浅灰画布、深灰文字、黑色主按钮、克制品牌强调 */
 @theme {
+  /* ---------- 圆角 token（组件类别 → 固定 radius） ----------
+   * sm  4px   badge / chip / 微型元素
+   * md  8px   Button / Input / Select / Tabs
+   * lg  12px  Card / Modal / Dropdown / 大容器
+   * xl  16px  Hero / 大型营销容器 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
   /* ---------- 画布 / 卡片 ---------- */
   --color-paper: #f7f8fa; /* 内容区画布主底色 */
   --color-card: #ffffff; /* 卡片底色 */
@@ -25,25 +35,6 @@
   --color-pos: #16a34a; /* 正向 */
   --color-neg: #dc2626; /* 负向 */
   --color-warn: #d97706; /* 警告橙 */
-
-  /* ---------- V2/V3 过渡期保留（营销页 / 老深色卡片使用） ---------- */
-  --color-station: #ffd400;
-  --color-station-deep: #f5c400;
-  --color-ink-elevated: #1d1b26;
-  --color-gold: #ffd400;
-  --color-aurora-violet: #6c4cff;
-  --color-aurora-blue: #2f8cff;
-  --color-aurora-gold: #ffd400;
-  --color-teal: #21d19f;
-  --color-teal-yellow: #0e7c5e;
-  --color-coral: #ff5c5c;
-  --color-coral-yellow: #b23b34;
-  --color-y-text: #14121a;
-  --color-y-secondary: #6b5a00;
-  --color-y-muted: #8a7a2e;
-  --color-d-text: #f5f6fa;
-  --color-d-secondary: #9aa3b8;
-  --color-d-muted: #6b7280;
 
   /* ---------- 字体栈 ----------
    * 拉丁：Inter（next/font 自托管变量字体，全 weight 轴）
@@ -111,14 +102,12 @@
 /* ===== 关键帧（营销页保留） ===== */
 @keyframes breathe {
   0%, 100% {
-    filter: drop-shadow(0 0 12px rgba(255, 212, 0, 0.35))
-      drop-shadow(0 0 28px rgba(108, 76, 255, 0.25));
+    filter: drop-shadow(0 0 12px rgba(37, 99, 235, 0.35));
     transform: scale(1);
     opacity: 1;
   }
   50% {
-    filter: drop-shadow(0 0 24px rgba(255, 212, 0, 0.65))
-      drop-shadow(0 0 52px rgba(47, 140, 255, 0.45));
+    filter: drop-shadow(0 0 24px rgba(37, 99, 235, 0.6));
     transform: scale(1.04);
     opacity: 0.95;
   }
@@ -202,28 +191,17 @@ body {
   letter-spacing: normal;
 }
 
-/* 极光渐变工具类（营销页保留） */
-.bg-aurora {
-  background-image: linear-gradient(90deg, #6c4cff 0%, #2f8cff 50%, #ffd400 100%);
-}
-.text-aurora {
-  background-image: linear-gradient(90deg, #6c4cff 0%, #2f8cff 50%, #ffd400 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 /* 滚动条隐藏 */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ===== V4 工具类 ===== */
 
-/* 标准卡片：白底 + 细边框 + 圆角 8px */
+/* 标准卡片：白底 + 细边框 + 圆角 12px（Card 类固定 radius） */
 .card-a {
   background-color: var(--color-card);
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 /* 发丝分割线 */
@@ -261,16 +239,18 @@ body {
 .badge-good, .badge-pos { color: var(--color-pos); }
 .badge-info { color: var(--color-ink-40); }
 
-/* 主按钮：黑底白字（Semrush Create SEO project 风格） */
+/* 主按钮：黑底白字（Semrush Create SEO project 风格）
+ * 统一规格：radius 8px / 高度 40px（标准）· 小 32px(.btn-sm) · 大 48px(.btn-lg) */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 16px;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
   background-color: var(--color-brand);
   color: #ffffff;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: 0.875rem;
   font-weight: 600;
@@ -286,17 +266,18 @@ body {
   cursor: not-allowed;
 }
 
-/* 次按钮：白底描边 */
+/* 次按钮：白底描边（与主按钮同规格） */
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 16px;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
   background-color: var(--color-card);
   color: var(--color-ink);
   border: 1px solid var(--color-line);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: 0.875rem;
   font-weight: 500;
@@ -306,6 +287,17 @@ body {
 .btn-secondary:hover {
   border-color: var(--color-ink-25);
   background-color: var(--color-line-soft);
+}
+
+/* 小号按钮（32px）与大号按钮（48px）：配合 .btn-primary / .btn-secondary */
+.btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+}
+.btn-lg {
+  height: 48px;
+  padding: 0 24px;
 }
 
 /* 健康分颜色辅助类 */

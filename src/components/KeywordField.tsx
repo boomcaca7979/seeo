@@ -48,7 +48,7 @@ export default function KeywordField() {
           cy={cy}
           r="22"
           fill="none"
-          stroke="#2a2837"
+          stroke="#1f2937"
           strokeWidth="0.2"
         />
         <circle
@@ -56,7 +56,7 @@ export default function KeywordField() {
           cy={cy}
           r="34"
           fill="none"
-          stroke="#221f2e"
+          stroke="#111827"
           strokeWidth="0.2"
         />
 
@@ -76,17 +76,16 @@ export default function KeywordField() {
 
         <defs>
           <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#6c4cff" />
-            <stop offset="50%" stopColor="#2f8cff" />
-            <stop offset="100%" stopColor="#ffd400" />
+            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#2563eb" stopOpacity="0.15" />
           </linearGradient>
           <radialGradient id="centerGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#2a2640" />
-            <stop offset="100%" stopColor="#14121a" />
+            <stop offset="0%" stopColor="#1f2937" />
+            <stop offset="100%" stopColor="#030712" />
           </radialGradient>
           <linearGradient id="satFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1f1d2b" />
-            <stop offset="100%" stopColor="#16141f" />
+            <stop offset="0%" stopColor="#111827" />
+            <stop offset="100%" stopColor="#0b0f1a" />
           </linearGradient>
         </defs>
 
@@ -100,11 +99,11 @@ export default function KeywordField() {
             cy={cy}
             r="13"
             fill="url(#centerGrad)"
-            stroke="#ffd400"
+            stroke="#2563eb"
             strokeWidth="0.4"
-            strokeOpacity="0.6"
+            strokeOpacity="0.7"
           />
-          <circle cx={cx} cy={cy} r="8" fill="none" stroke="#2f8cff" strokeWidth="0.2" strokeOpacity="0.5" />
+          <circle cx={cx} cy={cy} r="8" fill="none" stroke="#2563eb" strokeWidth="0.2" strokeOpacity="0.5" />
         </g>
 
         {/* 卫星节点 */}
@@ -125,7 +124,7 @@ export default function KeywordField() {
               cy={s.y}
               r="5.5"
               fill="url(#satFill)"
-              stroke="#3a374a"
+              stroke="#374151"
               strokeWidth="0.2"
             />
           </g>
@@ -138,10 +137,10 @@ export default function KeywordField() {
           className="animate-breathe text-center"
           style={{ transformOrigin: "50% 50%" } as React.CSSProperties}
         >
-          <div className="font-display text-base font-semibold text-d-text sm:text-lg">
+          <div className="font-display text-base font-semibold text-white sm:text-lg">
             {t("center")}
           </div>
-          <div className="mt-0.5 font-mono text-[0.625rem] text-gold sm:text-xs">
+          <div className="mt-0.5 font-mono text-xs text-[#60a5fa] sm:text-xs">
             KD 73 · Vol 1.2M
           </div>
         </div>
@@ -167,10 +166,10 @@ export default function KeywordField() {
                   : "animate-drift-c text-center"
             }
           >
-            <div className="whitespace-nowrap font-sans text-[0.625rem] font-semibold text-d-text sm:text-xs">
+            <div className="whitespace-nowrap font-sans text-xs font-semibold text-white sm:text-xs">
               {s.kw}
             </div>
-            <div className="whitespace-nowrap font-mono text-[0.5625rem] text-d-secondary sm:text-[0.625rem]">
+            <div className="whitespace-nowrap font-mono text-[0.5625rem] text-white/60 sm:text-xs">
               KD {s.kd} · {s.vol}
             </div>
           </div>

@@ -173,7 +173,7 @@ export default function BacklinksPage() {
           <p className="mt-2 font-sans text-sm text-ink-60">
             {t("proDesc")}
           </p>
-          <Link href="/pricing" className="mt-5 inline-block btn-primary px-6 py-2.5 text-sm">
+          <Link href="/pricing" className="mt-5 inline-block btn-primary text-sm">
             {t("upgradeToPro")}
           </Link>
         </div>
@@ -191,7 +191,7 @@ export default function BacklinksPage() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60">
+      <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
 
@@ -206,7 +206,7 @@ export default function BacklinksPage() {
                 setDomain(d);
                 try { localStorage.setItem("seeo:last-backlink-domain", d); } catch { /* ignore */ }
               }}
-              className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+              className="mt-2 w-48 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
           <button type="submit" className="btn-secondary">
@@ -339,7 +339,7 @@ export default function BacklinksPage() {
       {!loading && !error && !hasData && (
         <div className="card-a mt-6 p-10 text-center">
           <div className="font-display text-sm font-semibold text-ink-60">{t("emptyTitle")}</div>
-          <p className="mt-1.5 font-sans text-xs text-ink-40">
+          <p className="mt-2 font-sans text-xs text-ink-40">
             {t("emptyDesc")}
           </p>
         </div>

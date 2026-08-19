@@ -8,15 +8,15 @@ export default function Ticker() {
   const loop = [...items, ...items];
 
   return (
-    <section className="w-full overflow-hidden border-y border-ink/20 bg-ink py-3">
+    <section className="w-full overflow-hidden border-y border-line bg-card py-3">
       <div className="flex w-max animate-ticker">
         {loop.map((item, idx) => (
           <div key={idx} className="flex items-center gap-2 px-6">
-            <span className="font-mono text-sm font-medium text-gold">
+            <span className="font-mono text-sm font-medium text-ink-60">
               {item.label}
             </span>
-            <span className="font-mono text-sm text-d-text">{item.value}</span>
-            <span className="ml-4 text-d-muted">·</span>
+            <span className="font-mono text-sm text-ink">{item.value}</span>
+            <span className="ml-4 text-ink-25">·</span>
           </div>
         ))}
       </div>

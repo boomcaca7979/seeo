@@ -514,7 +514,7 @@ export default function ReportsPage() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60">
+      <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
 
@@ -572,14 +572,14 @@ export default function ReportsPage() {
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
             <span className="badge-warn">{typeLabel("ranking")}</span>
-            <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
+            <span className="font-mono text-xs text-ink-40">CSV</span>
           </div>
           <h3 className="mt-3 font-display text-base font-semibold text-ink">{t("csvRankingTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvRankingDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[0.625rem] text-ink-40">{t("trackedLabel")}</div>
+            <div className="font-sans text-xs text-ink-40">{t("trackedLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-semibold text-ink">
               {loading ? "—" : formatNumber(trackedCount, locale)}
             </div>
@@ -594,7 +594,7 @@ export default function ReportsPage() {
               {downloading === "rankings" ? t("generating") : t("downloadCsv")}
             </button>
           ) : (
-            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
+            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-2">
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -606,14 +606,14 @@ export default function ReportsPage() {
         <div className="card-a flex flex-col p-5">
           <div className="flex items-center gap-2">
             <span className="badge-warn">{typeLabel("content")}</span>
-            <span className="font-mono text-[0.625rem] text-ink-40">CSV</span>
+            <span className="font-mono text-xs text-ink-40">CSV</span>
           </div>
           <h3 className="mt-3 font-display text-base font-semibold text-ink">{t("csvContentTitle")}</h3>
           <p className="mt-1 font-sans text-xs text-ink-60">
             {t("csvContentDesc")}
           </p>
           <div className="mt-3 rounded-lg border border-line bg-card p-3">
-            <div className="font-sans text-[0.625rem] text-ink-40">{t("checksLabel")}</div>
+            <div className="font-sans text-xs text-ink-40">{t("checksLabel")}</div>
             <div className="mt-1 font-mono text-2xl font-semibold text-ink">
               {loading ? "—" : formatNumber(contentCount, locale)}
             </div>
@@ -628,7 +628,7 @@ export default function ReportsPage() {
               {downloading === "content" ? t("generating") : t("downloadCsv")}
             </button>
           ) : (
-            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-1.5">
+            <Link href="/pricing" className="btn-secondary inline-flex items-center justify-center gap-2">
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -703,7 +703,7 @@ export default function ReportsPage() {
                                 show(t("parseFailed"), "error");
                               }
                             }}
-                            className="rounded-md p-1.5 text-ink-40 hover:bg-paper hover:text-ink"
+                            className="rounded-md p-2 text-ink-40 hover:bg-paper hover:text-ink"
                             aria-label={t("viewLabel")}
                           >
                             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
@@ -713,7 +713,7 @@ export default function ReportsPage() {
                           </button>
                           <button
                             onClick={() => handleDeleteReport(r.id)}
-                            className="rounded-md p-1.5 text-ink-40 hover:bg-neg/10 hover:text-neg"
+                            className="rounded-md p-2 text-ink-40 hover:bg-neg/10 hover:text-neg"
                             aria-label={t("deleteLabel")}
                           >
                             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
@@ -734,7 +734,7 @@ export default function ReportsPage() {
       {/* 说明区 */}
       <div className="card-a mt-8 border-dashed border-line p-5">
         <h2 className="font-display text-sm font-semibold text-ink">{t("aboutTitle")}</h2>
-        <ul className="mt-2 space-y-1.5 font-sans text-xs text-ink-40">
+        <ul className="mt-2 space-y-2 font-sans text-xs text-ink-40">
           <li>{t("aboutPdf")}</li>
           <li>{t("aboutCsv")}</li>
           <li>{t("aboutEmail")}</li>
@@ -746,7 +746,7 @@ export default function ReportsPage() {
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={handleClosePreview} aria-hidden />
-          <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-xl border border-line bg-card">
+          <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg border border-line bg-card">
             <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
               <h3 className="font-display text-base font-semibold text-ink">
                 {t("previewTitle", { type: typeLabel(selectedType) })}
@@ -782,7 +782,7 @@ export default function ReportsPage() {
                     {t("downloadPdfBtn")}
                   </button>
                 ) : (
-                  <Link href="/pricing" className="btn-primary inline-flex items-center gap-1.5">
+                  <Link href="/pricing" className="btn-primary inline-flex items-center gap-2">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -798,7 +798,7 @@ export default function ReportsPage() {
                     {t("sendEmailBtn")}
                   </button>
                 ) : (
-                  <Link href="/pricing" className="btn-secondary inline-flex items-center gap-1.5">
+                  <Link href="/pricing" className="btn-secondary inline-flex items-center gap-2">
                     <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                       <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -815,7 +815,7 @@ export default function ReportsPage() {
       {emailModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEmailModalOpen(false)} aria-hidden />
-          <div className="relative w-full max-w-md rounded-xl border border-line bg-card p-5">
+          <div className="relative w-full max-w-md rounded-lg border border-line bg-card p-5">
             <h3 className="font-display text-base font-semibold text-ink">{t("emailModalTitle")}</h3>
             <div className="mt-4">
               <label className="font-sans text-xs text-ink-40">{t("emailLabel")}</label>
@@ -824,7 +824,7 @@ export default function ReportsPage() {
                 value={emailToSend}
                 onChange={(e) => setEmailToSend(e.target.value)}
                 placeholder="recipient@example.com"
-                className="mt-1.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+                className="mt-2 w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">

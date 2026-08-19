@@ -425,13 +425,13 @@ export default function PositionTrackingPage() {
 
       {/* API 用量条 */}
       {usage && (
-        <div className="card-a mt-4 flex items-center gap-3 px-4 py-2.5">
+        <div className="card-a mt-4 flex items-center gap-3 px-4 py-2">
           <span className="text-xs font-semibold text-ink">{t("apiUsage", { used: usage.used, limit: usage.limit })}</span>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
             <div className={`h-full rounded-full transition-all ${usagePercent > 80 ? "bg-neg" : "bg-pos"}`} style={{ width: `${Math.min(100, usagePercent)}%` }} />
           </div>
-          {usagePercent > 70 && <span className="text-[0.625rem] text-neg">{t("quotaTight")}</span>}
-          <span className="text-[0.625rem] text-ink-40">{t("trackingCount", { tracked: tracked.length, limit: trackingLimit })}</span>
+          {usagePercent > 70 && <span className="text-xs text-neg">{t("quotaTight")}</span>}
+          <span className="text-xs text-ink-40">{t("trackingCount", { tracked: tracked.length, limit: trackingLimit })}</span>
         </div>
       )}
 
@@ -439,10 +439,10 @@ export default function PositionTrackingPage() {
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs text-ink-40">{t("region")}</label>
-          <select value={country} onChange={(e) => handleRegionChange(e.target.value)} className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
+          <select value={country} onChange={(e) => handleRegionChange(e.target.value)} className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
             {RANK_LOCATIONS.map((c) => (<option key={c} value={c}>{display(c)}</option>))}
           </select>
-          <select value={city} onChange={(e) => setCity(e.target.value)} className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
+          <select value={city} onChange={(e) => setCity(e.target.value)} className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
             {cities.map((c) => (<option key={c} value={c}>{display(c)}</option>))}
           </select>
         </div>
@@ -456,7 +456,7 @@ export default function PositionTrackingPage() {
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-ink-40">{t("group")}</label>
-          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
+          <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
             <option value="all">{t("allGroups")}</option>
             <option value="ungrouped">{t("ungrouped")}</option>
             {groups.map((g) => (<option key={g.id} value={`group-${g.id}`}>{g.name}</option>))}
@@ -476,7 +476,7 @@ export default function PositionTrackingPage() {
           { label: t("statDown"), value: `▼ ${formatNumber(stats.down, locale)}`, color: "text-neg" },
         ].map((m) => (
           <div key={m.label} className="card-a p-4">
-            <div className="text-[0.625rem] text-ink-40">{m.label}</div>
+            <div className="text-xs text-ink-40">{m.label}</div>
             <div className={`mt-1 text-lg font-semibold ${m.color}`}>{m.value}</div>
           </div>
         ))}
@@ -609,9 +609,9 @@ export default function PositionTrackingPage() {
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-ink">{r.keyword}</div>
                         {r.groups.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
                             {r.groups.map((g) => (
-                              <span key={g.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-line-soft px-2 py-0.5 text-[0.625rem] text-ink-60">
+                              <span key={g.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-line-soft px-2 py-0.5 text-xs text-ink-60">
                                 {g.name}
                                 <button onClick={(e) => handleRemoveFromGroup(g.id, r.id, e)} className="text-ink-40 hover:text-neg" title={t("removeFromGroup")}>×</button>
                               </span>
@@ -628,7 +628,7 @@ export default function PositionTrackingPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {r.change !== null ? <ChangeBadge value={r.change} /> : <span className="text-[0.625rem] text-ink-40">—</span>}
+                        {r.change !== null ? <ChangeBadge value={r.change} /> : <span className="text-xs text-ink-40">—</span>}
                       </td>
                       <td className="px-4 py-3 text-sm text-ink-40">{r.last_refreshed_at ? formatRelativeTime(r.last_refreshed_at, locale, tc) : t("neverRefreshed")}</td>
                       <td className="px-4 py-3 text-right">
@@ -637,13 +637,13 @@ export default function PositionTrackingPage() {
                             <button onClick={(e) => { e.stopPropagation(); setGroupMenuId(groupMenuId === r.id ? null : r.id); }} className="text-xs font-medium text-ink-40 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100">{t("addToGroupAction")}</button>
                             {groupMenuId === r.id && (
                               <div onClick={(e) => e.stopPropagation()} className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-lg border border-line bg-card py-1">
-                                <div className="px-3 py-1.5 text-[0.625rem] text-ink-40">{groups.length === 0 ? t("noGroupsYet") : t("addToGroup")}</div>
+                                <div className="px-3 py-2 text-xs text-ink-40">{groups.length === 0 ? t("noGroupsYet") : t("addToGroup")}</div>
                                 {groups.map((g) => {
                                   const inGroup = r.groups.some((rg) => rg.id === g.id);
                                   return (
-                                    <button key={g.id} onClick={() => handleAddToGroup(g.id, r.id)} disabled={inGroup} className={`flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-line-soft ${inGroup ? "cursor-default text-ink-40" : "text-ink"}`}>
+                                    <button key={g.id} onClick={() => handleAddToGroup(g.id, r.id)} disabled={inGroup} className={`flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-line-soft ${inGroup ? "cursor-default text-ink-40" : "text-ink"}`}>
                                       <span>{g.name}</span>
-                                      {inGroup && <span className="text-[0.625rem] text-pos">✓</span>}
+                                      {inGroup && <span className="text-xs text-pos">✓</span>}
                                     </button>
                                   );
                                 })}
@@ -683,7 +683,7 @@ export default function PositionTrackingPage() {
                 {rankCompetitors.map((c) => (
                   <tr key={c.domain} className={`border-b border-line-soft/60 ${c.isSelf ? "bg-line-soft/40" : ""}`}>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded bg-ink/10 font-mono text-xs font-semibold text-ink">{c.favicon}</span>
                         <span className={`font-mono text-sm ${c.isSelf ? "font-semibold text-ink" : "text-ink"}`}>{c.domain}</span>
                         {c.isSelf && <span className="badge-info">{t("selfSite")}</span>}
@@ -717,28 +717,28 @@ export default function PositionTrackingPage() {
         <form id="add-keyword-form" onSubmit={handleAdd} className="space-y-4">
           <div>
             <label className="text-xs text-ink-40">{t("keyword")}</label>
-            <input type="text" value={addKeyword} onChange={(e) => setAddKeyword(e.target.value)} required placeholder={t("keywordPlaceholder")} className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
+            <input type="text" value={addKeyword} onChange={(e) => setAddKeyword(e.target.value)} required placeholder={t("keywordPlaceholder")} className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
           </div>
           <div>
             <label className="text-xs text-ink-40">{t("targetDomain")}</label>
-            <DomainSelect value={addDomain} onChange={setAddDomain} placeholder={t("domainPlaceholder")} className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
+            <DomainSelect value={addDomain} onChange={setAddDomain} placeholder={t("domainPlaceholder")} className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-40">{t("region")}</label>
-              <select value={country} onChange={(e) => handleRegionChange(e.target.value)} className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
+              <select value={country} onChange={(e) => handleRegionChange(e.target.value)} className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
                 {RANK_LOCATIONS.map((c) => (<option key={c} value={c}>{display(c)}</option>))}
               </select>
             </div>
             <div>
               <label className="text-xs text-ink-40">{t("device")}</label>
-              <select value={device} onChange={(e) => setDevice(e.target.value as Device)} className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
+              <select value={device} onChange={(e) => setDevice(e.target.value as Device)} className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
                 <option value="PC">PC</option>
                 <option value="移动端">{t("deviceMobile")}</option>
               </select>
             </div>
           </div>
-          <p className="text-[0.625rem] text-ink-40">{t("addModalHint", { limit: trackingLimit })}</p>
+          <p className="text-xs text-ink-40">{t("addModalHint", { limit: trackingLimit })}</p>
         </form>
       </Modal>
 
@@ -749,7 +749,7 @@ export default function PositionTrackingPage() {
         footer={
           <>
             <button onClick={() => setDeleteId(null)} className="btn-secondary">{tc("cancel")}</button>
-            <button onClick={() => { if (deleteId) handleDelete(deleteId); setDeleteId(null); }} className="rounded-lg bg-neg px-4 py-2 text-sm font-semibold text-card transition-opacity hover:opacity-90">{t("confirmDelete")}</button>
+            <button onClick={() => { if (deleteId) handleDelete(deleteId); setDeleteId(null); }} className="rounded-md bg-neg px-4 py-2 text-sm font-semibold text-card transition-opacity hover:opacity-90">{t("confirmDelete")}</button>
           </>
         }
       >
@@ -770,11 +770,11 @@ export default function PositionTrackingPage() {
         <form id="create-group-form" onSubmit={handleCreateGroup} className="space-y-4">
           <div>
             <label className="text-xs text-ink-40">{t("groupName")}</label>
-            <input type="text" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} required maxLength={50} placeholder={t("groupNamePlaceholder")} className="mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
+            <input type="text" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} required maxLength={50} placeholder={t("groupNamePlaceholder")} className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
           </div>
           <div>
             <label className="text-xs text-ink-40">{t("groupDesc")}</label>
-            <textarea value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} rows={3} maxLength={200} placeholder={t("groupDescPlaceholder")} className="mt-1.5 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
+            <textarea value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} rows={3} maxLength={200} placeholder={t("groupDescPlaceholder")} className="mt-2 w-full resize-none rounded-md border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none" />
           </div>
         </form>
       </Modal>

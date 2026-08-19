@@ -75,21 +75,21 @@ export default function UrlAuditBox() {
             if (error) setError(null);
           }}
           placeholder={t("placeholder")}
-          className="flex-1 rounded-lg border border-ink/40 bg-station-deep/60 px-4 py-3 text-sm text-y-text placeholder:text-y-muted/60 focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal/40"
+          className="h-12 flex-1 rounded-md border border-line bg-card px-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           aria-label={t("label")}
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-ink px-6 py-3 text-sm font-semibold text-d-text transition-opacity hover:opacity-90 disabled:opacity-50 sm:whitespace-nowrap"
+          className="btn-primary btn-lg flex-none sm:whitespace-nowrap"
         >
           {loading ? t("submitting") : t("submit")}
         </button>
       </form>
       {error && (
-        <p className="mt-2 text-left font-mono text-xs text-coral">{error}</p>
+        <p className="mt-2 text-left font-mono text-xs text-neg">{error}</p>
       )}
-      <p className="mt-2 text-left font-mono text-[0.625rem] text-y-muted/60">
+      <p className="mt-2 text-left font-mono text-xs text-ink-40">
         {t("hint")}
       </p>
     </div>

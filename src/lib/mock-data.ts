@@ -170,9 +170,6 @@ export const auditSummary = {
   lastCrawl: "2 小时前",
 };
 
-// 通用：生成极光渐变 URL（用于 SVG / recharts defs 引用名）
-export const auroraGradientId = "seeo-aurora";
-
 // ===== 排名追踪（PRD 4.2）=====
 
 export type SerpFeature = "精选摘要" | "PAA" | "视频轮播" | "知识面板" | "图片包" | "本地包";

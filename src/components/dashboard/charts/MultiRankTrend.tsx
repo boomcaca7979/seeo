@@ -104,8 +104,8 @@ export default function MultiRankTrend({ series, max = 5 }: Props) {
         </LineChart>
       </ResponsiveContainer>
       {hidden.size > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[0.625rem] text-ink-40">{t("hiddenLabel")}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-40">{t("hiddenLabel")}</span>
           {Array.from(hidden).map((kw) => (
             <button
               key={kw}
@@ -114,14 +114,14 @@ export default function MultiRankTrend({ series, max = 5 }: Props) {
                 next.delete(kw);
                 setHidden(next);
               }}
-              className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.625rem] text-ink-60 hover:bg-line-soft"
+              className="rounded-full border border-line bg-card px-2 py-0.5 text-xs text-ink-60 hover:bg-line-soft"
             >
               + {kw}
             </button>
           ))}
         </div>
       )}
-      <div className="mt-1 text-right text-[0.625rem] text-ink-40">
+      <div className="mt-1 text-right text-xs text-ink-40">
         {t("legendHint", { max })}
       </div>
     </div>

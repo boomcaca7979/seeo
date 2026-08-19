@@ -72,7 +72,7 @@ export default function DomainSelect({ value, onChange, placeholder, className }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const baseClass = className ?? "mt-1.5 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none";
+  const baseClass = className ?? "mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none";
 
   if (loading) {
     return (
@@ -97,13 +97,13 @@ export default function DomainSelect({ value, onChange, placeholder, className }
           <button
             type="button"
             onClick={() => setManual(false)}
-            className="mt-1 font-sans text-[0.625rem] text-ink-40 hover:text-ink-60"
+            className="mt-1 font-sans text-xs text-ink-40 hover:text-ink-60"
           >
             {t("backToSelect")}
           </button>
         )}
         {projects.length === 0 && (
-          <p className="mt-1 font-sans text-[0.625rem] text-ink-40">
+          <p className="mt-1 font-sans text-xs text-ink-40">
             {t("noProjectsHint")}
           </p>
         )}

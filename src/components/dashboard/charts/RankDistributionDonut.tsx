@@ -80,7 +80,7 @@ export default function RankDistributionDonut({
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-2xl font-semibold text-ink">{total}</div>
-        <div className="mt-0.5 text-[0.625rem] text-ink-40">{t("trackedTotal")}</div>
+        <div className="mt-0.5 text-xs text-ink-40">{t("trackedTotal")}</div>
       </div>
     </div>
   );

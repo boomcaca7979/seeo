@@ -28,7 +28,7 @@ function ToastView({ toast, onClose }: { toast: ToastState | null; onClose: () =
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <div
-        className={`flex items-center gap-2.5 rounded-lg border bg-card px-4 py-3 ${color}`}
+        className={`flex items-center gap-2 rounded-lg border bg-card px-4 py-3 ${color}`}
       >
         <span className="font-mono text-sm">
           {toast.type === "success" ? "✓" : toast.type === "error" ? "✕" : "ℹ"}

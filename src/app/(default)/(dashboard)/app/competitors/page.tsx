@@ -468,7 +468,7 @@ export default function CompetitorsPage() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60">
+      <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
 
@@ -492,7 +492,7 @@ export default function CompetitorsPage() {
         <>
           {/* API 用量条 */}
           {usage && (
-            <div className="card-a mt-4 flex items-center gap-3 px-4 py-2.5">
+            <div className="card-a mt-4 flex items-center gap-3 px-4 py-2">
               <span className="font-mono text-xs font-semibold text-ink">
                 {t("usageBar", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
               </span>
@@ -503,9 +503,9 @@ export default function CompetitorsPage() {
                 />
               </div>
               {usagePercent > 70 && (
-                <span className="font-mono text-[0.625rem] text-neg">{t("quotaTight")}</span>
+                <span className="font-mono text-xs text-neg">{t("quotaTight")}</span>
               )}
-              <span className="font-mono text-[0.625rem] text-ink-40">
+              <span className="font-mono text-xs text-ink-40">
                 {t("countsSummary", { competitors: formatNumber(competitors.length, locale), keywords: formatNumber(keywords.length, locale) })}
               </span>
             </div>
@@ -528,14 +528,14 @@ export default function CompetitorsPage() {
                 value={addDomain}
                 onChange={(e) => setAddDomain(e.target.value)}
                 placeholder={t("domainPlaceholder")}
-                className="flex-1 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+                className="flex-1 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
               <input
                 type="text"
                 value={addName}
                 onChange={(e) => setAddName(e.target.value)}
                 placeholder={t("namePlaceholder")}
-                className="sm:w-40 rounded-lg border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+                className="sm:w-40 rounded-md border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
               />
               <button
                 type="submit"
@@ -563,7 +563,7 @@ export default function CompetitorsPage() {
                   {competitors.map((c) => (
                     <span
                       key={c.id}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-line-soft px-3 py-1 font-mono text-xs text-ink-60"
+                      className="inline-flex items-center gap-2 rounded-full border border-line bg-line-soft px-3 py-1 font-mono text-xs text-ink-60"
                     >
                       {c.domain}
                       {c.name && (
@@ -591,7 +591,7 @@ export default function CompetitorsPage() {
                 <select
                   value={selectedKeywordId ?? ""}
                   onChange={(e) => setSelectedKeywordId(Number(e.target.value))}
-                  className="rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                  className="rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
                 >
                   {keywords.length === 0 ? (
                     <option value="">{t("noKeywords")}</option>
@@ -684,13 +684,13 @@ export default function CompetitorsPage() {
                             </td>
                             <td className="px-4 py-3">
                               {r.is_self ? (
-                                <span className="font-mono text-[0.625rem] text-ink-40">{t("statusBaseline")}</span>
+                                <span className="font-mono text-xs text-ink-40">{t("statusBaseline")}</span>
                               ) : isCompBetter ? (
-                                <span className="font-mono text-[0.625rem] text-neg">{t("statusAhead")}</span>
+                                <span className="font-mono text-xs text-neg">{t("statusAhead")}</span>
                               ) : isSelfBetter ? (
-                                <span className="font-mono text-[0.625rem] text-pos">{t("statusBehind")}</span>
+                                <span className="font-mono text-xs text-pos">{t("statusBehind")}</span>
                               ) : (
-                                <span className="font-mono text-[0.625rem] text-ink-40">{t("statusTied")}</span>
+                                <span className="font-mono text-xs text-ink-40">{t("statusTied")}</span>
                               )}
                             </td>
                           </tr>
@@ -712,7 +712,7 @@ export default function CompetitorsPage() {
 
             {/* 表格底部统计 */}
             {ranks && (
-              <div className="mt-3 flex items-center justify-between font-mono text-[0.625rem] text-ink-40">
+              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-40">
                 <span>
                   {t("tableKeyword", { keyword: ranks.keyword })} · {ranks.fromCache ? t("cachedHint") : t("liveHint")}
                 </span>
@@ -749,7 +749,7 @@ export default function CompetitorsPage() {
                           style={{ width: `${Math.min(100, mySov.percentage)}%` }}
                         />
                       </div>
-                      <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
+                      <div className="mt-2 font-mono text-xs text-ink-40">
                         {t("mySovDetail", { score: formatNumber(mySov.score, locale), keywords: formatNumber(mySov.keywordCount, locale) })}
                       </div>
                     </div>
@@ -764,7 +764,7 @@ export default function CompetitorsPage() {
                       return my?.top10Count ?? 0;
                     })()}
                   </div>
-                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-2 font-mono text-xs text-ink-40">
                     {t("top10Hint")}
                   </div>
                 </div>
@@ -777,7 +777,7 @@ export default function CompetitorsPage() {
                       return my?.avgRank !== null && my?.avgRank !== undefined ? `#${my.avgRank}` : "—";
                     })()}
                   </div>
-                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-2 font-mono text-xs text-ink-40">
                     {t("avgRankHint")}
                   </div>
                 </div>
@@ -787,7 +787,7 @@ export default function CompetitorsPage() {
                   <div className="mt-1 font-mono text-2xl font-semibold text-ink">
                     {sov.competitorCount}
                   </div>
-                  <div className="mt-1.5 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-2 font-mono text-xs text-ink-40">
                     {t("analyzedKeywords", { analyzed: formatNumber(sov.analyzedKeywords, locale), total: formatNumber(sov.totalKeywords, locale) })}
                   </div>
                 </div>
@@ -955,7 +955,7 @@ export default function CompetitorsPage() {
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteId(null)} aria-hidden />
-          <div className="relative w-full max-w-sm rounded-xl border border-line bg-card">
+          <div className="relative w-full max-w-sm rounded-lg border border-line bg-card">
             <div className="border-b border-line-soft px-5 py-4">
               <h3 className="font-display text-base font-semibold text-ink">{t("deleteConfirmTitle")}</h3>
             </div>
@@ -976,7 +976,7 @@ export default function CompetitorsPage() {
                   if (deleteId) handleDeleteCompetitor(deleteId);
                   setDeleteId(null);
                 }}
-                className="rounded-lg bg-neg px-4 py-2 font-sans text-sm font-semibold text-paper transition-opacity hover:opacity-90"
+                className="rounded-md bg-neg px-4 py-2 font-sans text-sm font-semibold text-paper transition-opacity hover:opacity-90"
               >
                 {t("deleteConfirmBtn")}
               </button>

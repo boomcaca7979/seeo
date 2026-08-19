@@ -209,7 +209,7 @@ export default function AuditReportPrintPage() {
           <div className="mt-2 font-mono text-3xl font-semibold text-neg print-num-error">
             {formatNumber(audit.errors, locale)}
           </div>
-          <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("errorHint")}</div>
+          <div className="mt-1 font-mono text-xs text-ink-40 print-mono">{t("errorHint")}</div>
         </div>
         <div className="card-a p-5 print-card">
           <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export default function AuditReportPrintPage() {
           <div className="mt-2 font-mono text-3xl font-semibold text-warn print-num-warning">
             {formatNumber(audit.warnings, locale)}
           </div>
-          <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("warningHint")}</div>
+          <div className="mt-1 font-mono text-xs text-ink-40 print-mono">{t("warningHint")}</div>
         </div>
         <div className="card-a p-5 print-card">
           <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export default function AuditReportPrintPage() {
           <div className="mt-2 font-mono text-3xl font-semibold text-ink print-num-notice">
             {formatNumber(audit.notices, locale)}
           </div>
-          <div className="mt-1 font-mono text-[0.625rem] text-ink-40 print-mono">{t("noticeHint")}</div>
+          <div className="mt-1 font-mono text-xs text-ink-40 print-mono">{t("noticeHint")}</div>
         </div>
       </div>
 
@@ -308,7 +308,7 @@ export default function AuditReportPrintPage() {
       </div>
 
       {/* 页脚（打印时显示） */}
-      <div className="mt-8 hidden border-t border-line-soft pt-4 font-mono text-[0.625rem] text-ink-40 print-footer">
+      <div className="mt-8 hidden border-t border-line-soft pt-4 font-mono text-xs text-ink-40 print-footer">
         {t("footer", { time: formatTime(audit.finishedAt ?? audit.startedAt, locale), domain: audit.domain })}
       </div>
     </div>

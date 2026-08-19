@@ -55,24 +55,24 @@ export default function Footer() {
   const icp = t("icp");
 
   return (
-    <footer id="footer" className="bg-ink px-5 py-16 sm:px-8">
+    <footer id="footer" className="border-t border-line bg-paper px-5 py-16 sm:px-8">
       <div className="site-shell">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
           {/* Logo + 简介 */}
           <div className="col-span-2 md:col-span-2">
             <div className="flex items-center gap-1">
-              <span className="font-display text-2xl font-semibold text-d-text">
+              <span className="font-display text-2xl font-semibold text-ink">
                 See
               </span>
-              <span className="font-display text-2xl font-semibold text-gold">
+              <span className="font-display text-2xl font-semibold text-accent">
                 O
               </span>
             </div>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-d-secondary">
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-60">
               {t("tagline")}
             </p>
-            <div className="mt-4 flex items-center gap-2 font-mono text-xs text-d-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-teal" />
+            <div className="mt-4 flex items-center gap-2 font-mono text-xs text-ink-40">
+              <span className="h-1.5 w-1.5 rounded-full bg-pos" />
               {t("dataSource")}
             </div>
           </div>
@@ -80,15 +80,15 @@ export default function Footer() {
           {/* 链接列 */}
           {cols.map((col) => (
             <div key={col.title}>
-              <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-gold">
+              <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-40">
                 {col.title}
               </h4>
-              <ul className="mt-4 space-y-2.5">
+              <ul className="mt-4 space-y-3">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <Link
                       href={l.href}
-                      className="font-sans text-sm text-d-secondary transition-colors hover:text-d-text"
+                      className="font-sans text-sm text-ink-60 transition-colors hover:text-ink"
                     >
                       {l.label}
                     </Link>
@@ -100,15 +100,15 @@ export default function Footer() {
         </div>
 
         {/* 底栏 */}
-        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-d-muted/15 pt-6 sm:flex-row sm:items-center">
-          <div className="font-mono text-xs text-d-muted">
+        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-line pt-6 sm:flex-row sm:items-center">
+          <div className="font-mono text-xs text-ink-40">
             {t("copyright")}
           </div>
-          <div className="flex items-center gap-4 font-mono text-xs text-d-muted">
+          <div className="flex items-center gap-4 font-mono text-xs text-ink-40">
             {icp && (
               <>
                 <span>{icp}</span>
-                <span className="text-d-muted/50">·</span>
+                <span className="text-ink-25">·</span>
               </>
             )}
             <span>v1.0.0</span>

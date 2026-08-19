@@ -21,7 +21,7 @@ export default function SignupPage() {
           { name: "Sign Up", url: "/signup" },
         ])}
       />
-      <Suspense fallback={<div className="min-h-screen bg-station" />}>
+      <Suspense fallback={<div className="min-h-screen bg-paper" />}>
         <AuthForm mode="signup" />
       </Suspense>
     </>

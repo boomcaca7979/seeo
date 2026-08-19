@@ -31,7 +31,7 @@ export default function PlaceholderPage({
             </h1>
             <span className="badge-warn">{phase}</span>
           </div>
-          <p className="mt-1.5 font-sans text-sm text-ink-60">
+          <p className="mt-2 font-sans text-sm text-ink-60">
             {description}
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function PlaceholderPage({
               {m.value}
             </div>
             <div className="mt-2 h-8 rounded-lg bg-line-soft" />
-            <div className="mt-2 font-sans text-[0.625rem] text-ink-40">
+            <div className="mt-2 font-sans text-xs text-ink-40">
               {m.hint}
             </div>
           </div>
@@ -82,7 +82,7 @@ export default function PlaceholderPage({
       </div>
 
       {/* 提示条 */}
-      <div className="mt-10 flex flex-col items-start justify-between gap-4 rounded-xl border border-dashed border-brand/30 bg-brand/5 p-5 sm:flex-row sm:items-center">
+      <div className="mt-10 flex flex-col items-start justify-between gap-4 rounded-lg border border-dashed border-brand/30 bg-brand/5 p-5 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-brand/30 bg-brand/15 font-mono text-sm text-ink">
             ⏱

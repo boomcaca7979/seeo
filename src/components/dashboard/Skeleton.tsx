@@ -28,7 +28,7 @@ export function TableSkeleton({ rows = 5, className = "" }: SkeletonProps) {
 
 export function ChartSkeleton({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-end gap-1.5 ${className}`}>
+    <div className={`flex items-end gap-2 ${className}`}>
       {Array.from({ length: 30 }).map((_, i) => (
         <div
           key={i}

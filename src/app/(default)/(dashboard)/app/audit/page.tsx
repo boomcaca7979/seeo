@@ -506,7 +506,7 @@ function AuditPageInner() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60 print:hidden">
+      <p className="mt-2 font-sans text-sm text-ink-60 print:hidden">
         {t("subtitle")}
       </p>
 
@@ -520,7 +520,7 @@ function AuditPageInner() {
               onChange={(d) => {
                 setDomain(d);
               }}
-              className="mt-1.5 w-48 rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+              className="mt-2 w-48 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
             />
           </div>
           <button type="submit" className="btn-secondary">
@@ -573,7 +573,7 @@ function AuditPageInner() {
             <Link
               href="/pricing"
               title={t("fullAuditProTip")}
-              className="btn-secondary inline-flex items-center gap-1.5"
+              className="btn-secondary inline-flex items-center gap-2"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -646,7 +646,7 @@ function AuditPageInner() {
               style={{ width: activeDepth === "quick" ? "100%" : "50%" }}
             />
           </div>
-          <p className="mt-2 font-sans text-[0.625rem] text-ink-40">
+          <p className="mt-2 font-sans text-xs text-ink-40">
             {activeDepth === "quick"
               ? t("etaQuick")
               : t("etaFull")
@@ -739,7 +739,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-neg">
                 {formatNumber(audit?.errors ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
                 {t("errCaption")}
               </div>
             </div>
@@ -752,7 +752,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-warn">
                 {formatNumber(audit?.warnings ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
                 {t("warnCaption")}
               </div>
             </div>
@@ -765,7 +765,7 @@ function AuditPageInner() {
               <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-ink">
                 {formatNumber(audit?.notices ?? 0, locale)}
               </div>
-              <div className="mt-1 pl-2 font-mono text-[0.625rem] text-ink-40">
+              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
                 {t("noticeCaption")}
               </div>
             </div>
@@ -851,7 +851,7 @@ function AuditPageInner() {
                 <button
                   key={btn.key}
                   onClick={() => setFilter(btn.key)}
-                  className={`rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${
+                  className={`rounded-md border h-8 px-3 font-mono text-xs transition-colors ${
                     filter === btn.key
                       ? "border-ink-25 bg-ink text-paper"
                       : "border-line bg-card text-ink-60 hover:border-ink-25 hover:text-ink"
@@ -976,7 +976,7 @@ function AuditPageInner() {
                     {audit.comparison.previous.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
-                  <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-0.5 font-mono text-xs text-ink-40">
                     {t("issuesUnit", { n: audit.comparison.previous.issues })}
                   </div>
                 </div>
@@ -991,7 +991,7 @@ function AuditPageInner() {
                     {audit.comparison.scoreChange > 0 ? "↑" : audit.comparison.scoreChange < 0 ? "↓" : "→"}
                     {" "}{Math.abs(audit.comparison.scoreChange)}{" "}{t("pointsUnit")}
                   </div>
-                  <div className={`mt-0.5 font-mono text-[0.625rem] ${
+                  <div className={`mt-0.5 font-mono text-xs ${
                     audit.comparison.issuesChange < 0 ? "text-pos" :
                     audit.comparison.issuesChange > 0 ? "text-neg" : "text-ink-40"
                   }`}>
@@ -1009,7 +1009,7 @@ function AuditPageInner() {
                     {audit.comparison.current.score}
                     <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
                   </div>
-                  <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-0.5 font-mono text-xs text-ink-40">
                     {t("issuesUnit", { n: audit.comparison.current.issues })}
                   </div>
                 </div>
@@ -1025,7 +1025,7 @@ function AuditPageInner() {
                       {t("newIssuesCount", { n: audit.comparison.newIssues.length })}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1.5">
+                  <div className="mt-2 space-y-2">
                     {audit.comparison.newIssues.length === 0 ? (
                       <div className="font-mono text-xs text-ink-40 py-2">{t("noNewIssues")}</div>
                     ) : (
@@ -1034,7 +1034,7 @@ function AuditPageInner() {
                           <div className="font-sans text-xs text-ink">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1051,7 +1051,7 @@ function AuditPageInner() {
                       {t("resolvedCount", { n: audit.comparison.resolvedIssues.length })}
                     </span>
                   </div>
-                  <div className="mt-2 space-y-1.5">
+                  <div className="mt-2 space-y-2">
                     {audit.comparison.resolvedIssues.length === 0 ? (
                       <div className="font-mono text-xs text-ink-40 py-2">{t("noResolvedIssues")}</div>
                     ) : (
@@ -1060,7 +1060,7 @@ function AuditPageInner() {
                           <div className="font-sans text-xs text-ink">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1080,13 +1080,13 @@ function AuditPageInner() {
                     {showUnchanged ? "▼" : "▶"}{" "}{t("unchangedToggle", { n: audit.comparison.unchangedIssues.length })}
                   </button>
                   {showUnchanged && (
-                    <div className="mt-2 space-y-1.5">
+                    <div className="mt-2 space-y-2">
                       {audit.comparison.unchangedIssues.map((issue, idx) => (
                         <div key={`unchanged-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
                           <div className="font-sans text-xs text-ink-60">
                             {issue.checkName}
                           </div>
-                          <div className="mt-0.5 font-mono text-[0.625rem] text-ink-40 truncate">
+                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
                             {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
                           </div>
                         </div>
@@ -1108,7 +1108,7 @@ function AuditPageInner() {
             <h2 className="font-display text-lg font-semibold text-ink">{t("coverageTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
-          <p className="mt-1.5 font-mono text-xs text-ink-40">
+          <p className="mt-2 font-mono text-xs text-ink-40">
             {t("coverageSummary", {
               total: audit.coverage.length,
               passed: audit.coverage.filter((c) => c.passed).length,
@@ -1143,14 +1143,14 @@ function AuditPageInner() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 font-mono text-[0.625rem] text-ink-40">
+                  <div className="mt-1 font-mono text-xs text-ink-40">
                     {check.description}
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className={`badge-${check.category === "critical" ? "err" : check.category === "warning" ? "warn" : "info"}`}>
                       {categoryLabel[check.category]}
                     </span>
-                    <span className="font-mono text-[0.625rem] text-ink-40">
+                    <span className="font-mono text-xs text-ink-40">
                       {check.passed ? t("checkPassed") : t("checkAffected", { n: check.affectedPages })}
                     </span>
                   </div>
@@ -1218,14 +1218,14 @@ function AuditPageInner() {
             })}
           </p>
           {pendingDepth === "quick" ? (
-            <ul className="space-y-1.5 font-mono text-xs text-ink-40">
+            <ul className="space-y-2 font-mono text-xs text-ink-40">
               <li>{t("quickPoint1")}</li>
               <li>{t("quickPoint2")}</li>
               <li>{t("quickPoint3")}</li>
               <li>{t("rateLimitPoint")}</li>
             </ul>
           ) : (
-            <ul className="space-y-1.5 font-mono text-xs text-ink-40">
+            <ul className="space-y-2 font-mono text-xs text-ink-40">
               <li>{t("fullPoint1")}</li>
               <li>{t("fullPoint2")}</li>
               <li>{t("fullPoint3")}</li>
@@ -1256,7 +1256,7 @@ function AuditPageInner() {
                 {exporting ? t("generating") : t("downloadPdf")}
               </button>
             ) : (
-              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-1.5">
+              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-2">
                 <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
                   <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -1271,7 +1271,7 @@ function AuditPageInner() {
               {saving ? t("saving") : t("saveToReports")}
             </button>
           </div>
-          <p className="font-sans text-[0.625rem] text-ink-40">
+          <p className="font-sans text-xs text-ink-40">
             {t("exportNote1")}<br />
             {t("exportNote2")}
           </p>
