@@ -11,6 +11,8 @@ import {
   setCache as dbSetCache,
   getUserApiUsage,
   tryIncrementUserApiUsage,
+  getApiDailyUsage,
+  tryIncrementApiDailyUsage,
   type ApiType,
 } from "@/lib/db";
 import type { PlanTier } from "@/lib/auth";
@@ -35,6 +37,15 @@ export async function getPlanLimit(plan: PlanTier, apiType: ApiType): Promise<nu
   return typeof val === "number" ? val : 0;
 }
 
+/**
+ * 获取某套餐 SerpApi 每日限额（0 = 无日度限制）
+ * 仅 SerpApi 支持日度限额（Free 套餐 3 次/天）
+ */
+export async function getSerpApiDailyLimit(plan: PlanTier): Promise<number> {
+  const limits = await getPlanLimits(plan);
+  return typeof limits.serpapi_daily_limit === "number" ? limits.serpapi_daily_limit : 0;
+}
+
 interface CacheEntry<T> {
   data: T;
   savedAt: number; // epoch ms
@@ -44,6 +55,13 @@ interface CacheEntry<T> {
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function todayStr(): string {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60_000);
+  return local.toISOString().slice(0, 10);
 }
 
 function hashKey(...parts: string[]): string {
@@ -67,6 +85,9 @@ async function ensureDir(): Promise<void> {
  * 真实调用外部 API 前检查 + 计数 +1（按用户 + API 类型隔离）
  * 超过套餐限额时抛出 QuotaExceededError
  *
+ * SerpApi 双 guard：每日限额（serpapi_daily_limit > 0 时）+ 月度限额。
+ * 每日先消耗（次日重置，超限时对用户伤害更小），再消耗月度。
+ *
  * 原子化：检查与递增在同一条 SQL 中完成，消除 TOCTOU 竞态
  */
 export async function consumeQuota(
@@ -77,6 +98,28 @@ export async function consumeQuota(
   const month = currentMonth();
   const limit = await getPlanLimit(plan, apiType);
 
+  // ---- SerpApi 每日限额 guard（0 = 无日度限制） ----
+  if (apiType === "serpapi") {
+    const dailyLimit = await getSerpApiDailyLimit(plan);
+    if (dailyLimit > 0) {
+      const today = todayStr();
+      try {
+        const daily = await tryIncrementApiDailyUsage(userId, apiType, today, dailyLimit);
+        if (!daily.ok) {
+          throw new QuotaExceededError(daily.used, daily.limit, apiType, month, "daily");
+        }
+      } catch (e) {
+        if (e instanceof QuotaExceededError) throw e;
+        // DB 不可用时兜底：读当前日用量做应用层检查
+        const existing = await getApiDailyUsage(userId, apiType, today);
+        if ((existing?.used ?? 0) >= dailyLimit) {
+          throw new QuotaExceededError(existing?.used ?? dailyLimit, dailyLimit, apiType, month, "daily");
+        }
+      }
+    }
+  }
+
+  // ---- 月度限额 guard（原有逻辑） ----
   // 原子化消耗：DB 层 UPSERT + WHERE used < limit + RETURNING
   try {
     const result = await tryIncrementUserApiUsage(userId, apiType, month, limit);
@@ -126,15 +169,22 @@ export class QuotaExceededError extends Error {
   readonly limit: number;
   readonly apiType: ApiType;
   readonly month: string;
+  /** 超限维度：monthly（月度）/ daily（每日） */
+  readonly scope: "monthly" | "daily";
 
-  constructor(used: number, limit: number, apiType: ApiType, month: string) {
+  constructor(used: number, limit: number, apiType: ApiType, month: string, scope: "monthly" | "daily" = "monthly") {
     const apiLabel = apiType === "dataforseo" ? "DataForSEO" : "SerpApi";
-    super(`本月${apiLabel}额度已用尽（${used}/${limit}），下月 1 日自动重置`);
+    super(
+      scope === "daily"
+        ? `今日${apiLabel}额度已用尽（${used}/${limit}），明日自动重置`
+        : `本月${apiLabel}额度已用尽（${used}/${limit}），下月 1 日自动重置`
+    );
     this.name = "QuotaExceededError";
     this.used = used;
     this.limit = limit;
     this.apiType = apiType;
     this.month = month;
+    this.scope = scope;
   }
 }
 

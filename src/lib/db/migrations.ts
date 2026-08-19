@@ -364,6 +364,25 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_audit_usage_per_user_date
       ON audit_usage_per_user(date);
 
+    -- API 每日用量表（Free 额度调整：SerpApi 每日限额）
+    -- 按 (user_id, api_type, date) 隔离，每日归零；与月度 api_usage_per_user 互补
+    CREATE TABLE IF NOT EXISTS api_usage_daily_per_user (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      api_type TEXT NOT NULL CHECK (api_type IN ('serpapi', 'dataforseo', 'content_check')),
+      date TEXT NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0,
+      "limit" INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, api_type, date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_api_usage_daily_per_user_user
+      ON api_usage_daily_per_user(user_id);
+    CREATE INDEX IF NOT EXISTS idx_api_usage_daily_per_user_date
+      ON api_usage_daily_per_user(date);
+
     CREATE TABLE IF NOT EXISTS backlink_summaries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       domain TEXT NOT NULL,

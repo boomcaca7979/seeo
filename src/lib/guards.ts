@@ -101,13 +101,20 @@ export async function requireQuota(
   } catch (e) {
     // 将 cache.ts 的 QuotaExceededError 转换为 billing-errors 的统一格式
     if (e instanceof Error && e.name === "QuotaExceededError") {
-      const cacheErr = e as unknown as { used: number; limit: number; apiType: ApiType; month: string };
+      const cacheErr = e as unknown as {
+        used: number;
+        limit: number;
+        apiType: ApiType;
+        month: string;
+        scope?: "monthly" | "daily";
+      };
       throw new QuotaExceededError(
         cacheErr.used,
         cacheErr.limit,
         cacheErr.apiType,
         cacheErr.month,
-        effectivePlan
+        effectivePlan,
+        cacheErr.scope ?? "monthly"
       );
     }
     throw e;

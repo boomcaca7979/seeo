@@ -32,6 +32,7 @@ interface PlanInfo {
   audit_daily_limit: number;
   audit_max_depth: number;
   serpapi_monthly_limit: number;
+  serpapi_daily_limit: number;
   content_check_monthly_limit: number;
   // feature flags
   can_export_pdf: boolean;
@@ -71,6 +72,7 @@ function PricingContent() {
       },
       { text: tp("features.contentChecks", { count: fmt(p.content_check_monthly_limit) }), included: p.content_check_monthly_limit > 0 },
       { text: tp("features.serpapi", { count: fmt(p.serpapi_monthly_limit) }), included: p.serpapi_monthly_limit > 0 },
+      { text: tp("features.serpapiDaily", { count: p.serpapi_daily_limit }), included: p.serpapi_daily_limit > 0 },
       { text: tp("features.pdf"), included: p.can_export_pdf },
       { text: tp("features.excel"), included: p.can_export_excel },
       { text: tp("features.email"), included: p.can_email_report },
@@ -278,7 +280,7 @@ function PricingContent() {
                   {card.kind === "link" ? (
                     <Link
                       href={card.ctaHref ?? "/app"}
-                      className={`block w-full text-center py-2.5 ${
+                      className={`block w-full h-10 text-center ${
                         card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
                       }`}
                     >
@@ -288,7 +290,7 @@ function PricingContent() {
                     <button
                       onClick={() => card.checkoutPlan && setSelectedPlan(card.checkoutPlan)}
                       disabled={card.disabled}
-                      className={`block w-full text-center py-2.5 ${
+                      className={`block w-full h-10 text-center ${
                         card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
                       }`}
                     >
@@ -388,7 +390,7 @@ function PaymentChannelModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-line bg-card p-6 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-line bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between">

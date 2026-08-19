@@ -190,6 +190,66 @@ export async function setUserApiLimit(
   `, [userId, apiType, month, limit]);
 }
 
+// ========== API 每日用量（Free 额度调整：SerpApi 每日限额） ==========
+
+export interface ApiDailyUsageRow {
+  user_id: string;
+  api_type: ApiType;
+  date: string;
+  used: number;
+  limit: number;
+}
+
+/** 读取某用户某 API 某日用量 */
+export async function getApiDailyUsage(
+  userId: string,
+  apiType: ApiType,
+  date: string
+): Promise<{ used: number; limit: number } | null> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `SELECT used, "limit" FROM api_usage_daily_per_user WHERE user_id = ? AND api_type = ? AND date = ?`,
+    [userId, apiType, date]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
+
+/**
+ * 原子性消耗 API 每日用量（UPSERT + WHERE used < limit）。
+ * 与月度 tryIncrementUserApiUsage 同模式，消除 TOCTOU 竞态。
+ */
+export async function tryIncrementApiDailyUsage(
+  userId: string,
+  apiType: ApiType,
+  date: string,
+  defaultLimit: number
+): Promise<{ ok: boolean; used: number; limit: number }> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `INSERT INTO api_usage_daily_per_user (user_id, api_type, date, used, "limit", created_at, updated_at)
+    VALUES (?, ?, ?, 1, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(user_id, api_type, date) DO UPDATE SET
+      used = used + 1,
+      updated_at = datetime('now')
+    WHERE api_usage_daily_per_user.used < ?
+    RETURNING used, "limit"`,
+    [userId, apiType, date, defaultLimit, defaultLimit]
+  ) as { used: number; limit: number } | undefined;
+
+  if (row) {
+    return { ok: true, used: Number(row.used), limit: Number(row.limit) };
+  }
+  const existing = await db.get(
+    `SELECT used, "limit" FROM api_usage_daily_per_user WHERE user_id = ? AND api_type = ? AND date = ?`,
+    [userId, apiType, date]
+  ) as { used: number; limit: number } | undefined;
+  return {
+    ok: false,
+    used: existing ? Number(existing.used) : 0,
+    limit: existing ? Number(existing.limit) : defaultLimit,
+  };
+}
+
 // ========== 审计每日用量（P2 商业化改造） ==========
 
 export interface AuditUsagePerUserRow {

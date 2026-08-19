@@ -46,15 +46,22 @@ export class QuotaExceededError extends Error {
   readonly limit: number;
   readonly plan: PlanTier;
   readonly apiType: string;
+  /** 超限维度：monthly（月度）/ daily（每日） */
+  readonly scope: "monthly" | "daily";
 
-  constructor(used: number, limit: number, apiType: string, month: string, plan: PlanTier) {
+  constructor(used: number, limit: number, apiType: string, month: string, plan: PlanTier, scope: "monthly" | "daily" = "monthly") {
     const apiLabel = apiType === "dataforseo" ? "DataForSEO" : "SerpApi";
-    super(`本月${apiLabel}额度已用尽（${used}/${limit}），下月 1 日自动重置`);
+    super(
+      scope === "daily"
+        ? `今日${apiLabel}额度已用尽（${used}/${limit}），明日自动重置`
+        : `本月${apiLabel}额度已用尽（${used}/${limit}），下月 1 日自动重置`
+    );
     this.name = "QuotaExceededError";
     this.used = used;
     this.limit = limit;
     this.plan = plan;
     this.apiType = apiType;
+    this.scope = scope;
   }
 
   toJSON(): BillingErrorBody {

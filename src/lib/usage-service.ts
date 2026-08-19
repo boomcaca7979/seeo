@@ -2,7 +2,7 @@
 // 统一查询用户当前用量，供 Settings 页面、/api/account/usage 等调用
 // 不消耗额度，只读
 
-import { getUserApiUsage, getAuditDailyUsage, type ApiType } from "@/lib/db";
+import { getUserApiUsage, getAuditDailyUsage, getApiDailyUsage, type ApiType } from "@/lib/db";
 import { getUserPlan } from "@/lib/billing";
 import { getPlanLimits } from "@/lib/billing";
 
@@ -31,6 +31,8 @@ export interface AuditUsageInfo {
 /** 用户完整用量信息 */
 export interface UserUsageResult {
   serpapi: ApiUsageInfo;
+  /** SerpApi 每日用量（Free 套餐 3 次/天；limit=0 表示无日度限制） */
+  serpapiDaily: ApiUsageInfo;
   dataforseo: ApiUsageInfo;
   content_check: ApiUsageInfo;
   audit: AuditUsageInfo;
@@ -60,8 +62,9 @@ export async function getCurrentUsage(userId: string): Promise<UserUsageResult> 
   const month = currentMonth();
   const today = todayStr();
 
-  const [serpapiUsage, dataforseoUsage, contentCheckUsage, auditDaily] = await Promise.all([
+  const [serpapiUsage, serpapiDailyUsage, dataforseoUsage, contentCheckUsage, auditDaily] = await Promise.all([
     safeGetUserApiUsage(userId, "serpapi", month),
+    safeGetApiDailyUsage(userId, "serpapi", today),
     safeGetUserApiUsage(userId, "dataforseo", month),
     safeGetUserApiUsage(userId, "content_check", month),
     safeGetAuditDailyUsage(userId, today),
@@ -71,6 +74,11 @@ export async function getCurrentUsage(userId: string): Promise<UserUsageResult> 
     serpapi: buildApiUsageInfo(
       serpapiUsage?.used ?? 0,
       limits.serpapi_monthly_limit,
+      month
+    ),
+    serpapiDaily: buildApiUsageInfo(
+      serpapiDailyUsage?.used ?? 0,
+      limits.serpapi_daily_limit,
       month
     ),
     dataforseo: buildApiUsageInfo(
@@ -116,18 +124,32 @@ async function safeGetAuditDailyUsage(
   }
 }
 
+/** 安全查询用户 API 日用量，DB 不可用时返回 null */
+async function safeGetApiDailyUsage(
+  userId: string,
+  apiType: ApiType,
+  date: string
+): Promise<{ used: number; limit: number } | null> {
+  try {
+    return await getApiDailyUsage(userId, apiType, date);
+  } catch {
+    return null;
+  }
+}
+
 /** 构造 ApiUsageInfo */
 function buildApiUsageInfo(
   used: number,
   limit: number,
   month: string
 ): ApiUsageInfo {
-  // limit 为无限（int32 max 或 MAX_SAFE_INTEGER）时不计算百分比
-  const isUnlimited = limit >= 2147483647;
+  // limit 为无限（int32 max 或 MAX_SAFE_INTEGER）时不计算百分比；
+  // limit <= 0（如 serpapi_daily_limit=0 表示无日度限制）同样不计
+  const isUnlimited = limit >= 2147483647 || limit <= 0;
   return {
     used,
     limit,
-    remaining: Math.max(0, limit - used),
+    remaining: isUnlimited ? 0 : Math.max(0, limit - used),
     usedPct: isUnlimited ? 0 : Math.min(100, Math.round((used / limit) * 100)),
     month,
   };

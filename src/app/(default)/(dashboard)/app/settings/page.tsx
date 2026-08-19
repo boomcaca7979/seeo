@@ -33,6 +33,7 @@ interface PlanInfo {
   audit_daily_limit: number;
   audit_max_depth: number;
   serpapi_monthly_limit: number;
+  serpapi_daily_limit: number;
   content_check_monthly_limit: number;
   can_export_pdf: boolean;
   can_export_excel: boolean;
@@ -53,6 +54,8 @@ function buildPlanLimits(p: PlanInfo, locale: Locale, t: SettingsTranslator): { 
     { label: t("limitProjects"), value: formatLimitValue(p.max_projects, locale, t) },
     { label: t("limitKeywords"), value: formatLimitValue(p.max_tracked_keywords, locale, t) },
     { label: t("limitDailyAudit"), value: p.audit_daily_limit >= UNLIMITED ? t("unlimited") : t("timesCount", { n: p.audit_daily_limit }) },
+    { label: t("limitSerpapiMonthly"), value: p.serpapi_monthly_limit >= UNLIMITED ? t("unlimited") : t("timesCount", { n: p.serpapi_monthly_limit }) },
+    { label: t("limitSerpapiDaily"), value: p.serpapi_daily_limit > 0 ? t("timesCount", { n: p.serpapi_daily_limit }) : "—" },
     { label: t("limitExport"), value: p.can_export_pdf ? "PDF / Excel" : "—" },
   ];
 }
@@ -92,6 +95,7 @@ interface UsageData {
   subscriptionStatus: string;
   usage: {
     serpapi: { used: number; limit: number; usedPct: number };
+    serpapiDaily: { used: number; limit: number; usedPct: number };
     dataforseo: { used: number; limit: number; usedPct: number };
     content_check: { used: number; limit: number; usedPct: number };
     audit: { used: number; limit: number; usedPct: number };
@@ -309,19 +313,19 @@ function SettingsContent() {
         </h1>
         <div className="hairline flex-1" />
       </div>
-      <p className="mt-1.5 font-sans text-sm text-ink-60">
+      <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* 左侧 Tab */}
         <nav className="lg:col-span-3">
-          <ul className="flex gap-1 overflow-x-auto rounded-xl border border-line bg-card p-1.5 lg:flex-col lg:overflow-visible">
+          <ul className="flex gap-1 overflow-x-auto rounded-lg border border-line bg-card p-2 lg:flex-col lg:overflow-visible">
             {tabs.map((t) => (
               <li key={t.key} className="flex-shrink-0">
                 <button
                   onClick={() => setTab(t.key)}
-                  className={`w-full whitespace-nowrap rounded-lg px-3 py-2 text-left font-sans text-sm font-medium transition-colors ${
+                  className={`w-full whitespace-nowrap rounded-md px-3 py-2 text-left font-sans text-sm font-medium transition-colors ${
                     tab === t.key
                       ? "bg-brand/15 text-ink"
                       : "text-ink-60 hover:bg-line-soft hover:text-ink"
@@ -362,7 +366,7 @@ function SettingsContent() {
                           maxLength={50}
                           onChange={(e) => setEditName(e.target.value)}
                           disabled={savingName}
-                          className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-1.5 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none disabled:opacity-60"
+                          className="mt-1 w-full rounded-md border border-line bg-card h-8 px-3 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none disabled:opacity-60"
                         />
                         <div className="mt-2 flex gap-2">
                           <button
@@ -474,12 +478,12 @@ function SettingsContent() {
                       >
                         {/* 推荐 / 当前套餐 标签 */}
                         {p.display.highlighted && !isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-semibold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-xs font-semibold text-ink">
                             {t("badgeRecommended")}
                           </span>
                         )}
                         {isCurrent && (
-                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-[0.625rem] font-semibold text-ink">
+                          <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 font-mono text-xs font-semibold text-ink">
                             {t("badgeCurrent")}
                           </span>
                         )}
@@ -699,7 +703,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               type="time"
               value={dailyTime}
               onChange={(e) => setDailyTime(e.target.value)}
-              className="rounded-lg border border-line bg-card px-3 py-1.5 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+              className="rounded-md border border-line bg-card h-8 px-3 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
             />
             <span className="font-mono text-xs text-ink-40">{t("everyDay")}</span>
           </div>
@@ -724,7 +728,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               <select
                 value={weeklyDay}
                 onChange={(e) => setWeeklyDay(Number(e.target.value))}
-                className="rounded-lg border border-line bg-card px-3 py-1.5 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none"
+                className="rounded-md border border-line bg-card h-8 px-3 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none"
               >
                 {WEEK_DAYS[locale].map((d, i) => (
                   <option key={i} value={i}>{d}</option>
@@ -737,7 +741,7 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
                 type="time"
                 value={weeklyTime}
                 onChange={(e) => setWeeklyTime(e.target.value)}
-                className="rounded-lg border border-line bg-card px-3 py-1.5 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                className="rounded-md border border-line bg-card h-8 px-3 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
               />
             </div>
           </div>
@@ -918,7 +922,7 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
             <div className="font-mono text-2xl font-semibold text-ink">
               {total === null ? "—" : formatNumber(total, locale)}
             </div>
-            <div className="font-mono text-[0.625rem] text-ink-40">{t("cacheEntries")}</div>
+            <div className="font-mono text-xs text-ink-40">{t("cacheEntries")}</div>
           </div>
           <button
             onClick={handleCleanup}
@@ -976,13 +980,14 @@ function UsageDashboard({
 
   const currentPlanName = planLabel(usageData.plan, locale);
 
-  // 用量项列表
+  // 用量项列表（serpapiDaily 仅在套餐配置了每日限额时展示，limit=0 表示无日度限制）
   const usageItems = [
     { label: t("usageSerpapi"), key: "serpapi" as const, unit: t("unitTimes") },
-    { label: t("usageDataforseo"), key: "dataforseo" as const, unit: t("unitTimes") },
-    { label: t("usageContentCheck"), key: "content_check" as const, unit: t("unitTimes") },
+    { label: t("usageSerpapiDaily"), key: "serpapiDaily" as const, unit: t("unitTimes"), show: usageData.usage.serpapiDaily?.limit > 0 },
+    { label: t("usageDataforseo"), key: "dataforseo" as const, unit: t("unitTimes"), show: usageData.usage.dataforseo.limit > 0 },
+    { label: t("usageContentCheck"), key: "content_check" as const, unit: t("unitTimes"), show: usageData.usage.content_check.limit > 0 },
     { label: t("usageAudit"), key: "audit" as const, unit: t("unitTimes") },
-  ];
+  ].filter((item) => item.show !== false);
 
   const isUnlimited = (limit: number) => limit >= 2147483647;
 
@@ -1032,7 +1037,7 @@ function UsageDashboard({
                     style={{ width: `${Math.min(ratio * 100, 100)}%` }}
                   />
                 </div>
-                <div className="mt-1 font-mono text-[0.625rem] text-ink-40">
+                <div className="mt-1 font-mono text-xs text-ink-40">
                   {unlimited ? t("unlimitedNote") : t("usedPct", { n: Math.round(ratio * 100) })}
                   {!unlimited && isNearLimit && <span className="ml-2 text-neg">· {t("nearLimit")}</span>}
                 </div>
@@ -1044,13 +1049,13 @@ function UsageDashboard({
         {/* 项目 / 关键词限额 */}
         <div className="mt-6 grid grid-cols-2 gap-4 border-t border-line-soft pt-5">
           <div>
-            <div className="font-mono text-[0.625rem] text-ink-40">{t("limitProjectsMax")}</div>
+            <div className="font-mono text-xs text-ink-40">{t("limitProjectsMax")}</div>
             <div className="mt-1 font-mono text-lg font-semibold text-ink">
               {isUnlimited(usageData.limits.max_projects) ? t("unlimited") : formatNumber(usageData.limits.max_projects, locale)}
             </div>
           </div>
           <div>
-            <div className="font-mono text-[0.625rem] text-ink-40">{t("limitKeywordsMax")}</div>
+            <div className="font-mono text-xs text-ink-40">{t("limitKeywordsMax")}</div>
             <div className="mt-1 font-mono text-lg font-semibold text-ink">
               {isUnlimited(usageData.limits.max_tracked_keywords) ? t("unlimited") : formatNumber(usageData.limits.max_tracked_keywords, locale)}
             </div>

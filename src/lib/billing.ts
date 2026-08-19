@@ -34,6 +34,8 @@ export interface PlanLimits {
   max_competitors: number;
   max_keyword_groups: number;
   serpapi_monthly_limit: number;
+  /** SerpApi 每日限额（0 = 无日度限制，仅月度限制；0011 迁移新增列） */
+  serpapi_daily_limit: number;
   dataforseo_monthly_limit: number;
   content_check_monthly_limit: number;
   audit_daily_limit: number;
@@ -204,18 +206,19 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
 /** 套餐展示顺序 */
 export const PLAN_ORDER: PlanTier[] = ["free", "lite", "pro"];
 
-// ---------- 默认套餐限制（与 0004_plan_limits.sql 保持一致） ----------
+// ---------- 默认套餐限制（与 0004 + 0011_free_quota_update.sql 保持一致） ----------
 // 当 Supabase 不可用、未配置、或查询失败时 fallback 使用
 // 用 Number.MAX_SAFE_INTEGER 表示"无限"
 
 export const DEFAULT_PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
     plan: "free",
-    max_projects: 1,
-    max_tracked_keywords: 5,
+    max_projects: 2,
+    max_tracked_keywords: 3,
     max_competitors: 3,
     max_keyword_groups: 3,
-    serpapi_monthly_limit: 50,
+    serpapi_monthly_limit: 30,
+    serpapi_daily_limit: 3,
     dataforseo_monthly_limit: 0,
     content_check_monthly_limit: 10,
     audit_daily_limit: 3,
@@ -234,6 +237,7 @@ export const DEFAULT_PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     max_competitors: 10,
     max_keyword_groups: 10,
     serpapi_monthly_limit: 300,
+    serpapi_daily_limit: 0,
     dataforseo_monthly_limit: 5,
     content_check_monthly_limit: 50,
     audit_daily_limit: 10,
@@ -252,6 +256,7 @@ export const DEFAULT_PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     max_competitors: 50,
     max_keyword_groups: 50,
     serpapi_monthly_limit: 2000,
+    serpapi_daily_limit: 0,
     dataforseo_monthly_limit: 30,
     content_check_monthly_limit: 300,
     audit_daily_limit: 50,
@@ -609,6 +614,11 @@ function rowToPlanLimits(row: Record<string, unknown>, plan: PlanTier): PlanLimi
     max_competitors: num(row.max_competitors),
     max_keyword_groups: num(row.max_keyword_groups),
     serpapi_monthly_limit: num(row.serpapi_monthly_limit),
+    // 0011 迁移新增列：DB 列缺失 / null 时回退 DEFAULT_PLAN_LIMITS（保证代码默认值生效）
+    serpapi_daily_limit:
+      row.serpapi_daily_limit === null || row.serpapi_daily_limit === undefined
+        ? DEFAULT_PLAN_LIMITS[plan].serpapi_daily_limit
+        : num(row.serpapi_daily_limit),
     dataforseo_monthly_limit: num(row.dataforseo_monthly_limit),
     content_check_monthly_limit: num(row.content_check_monthly_limit),
     audit_daily_limit: num(row.audit_daily_limit),
