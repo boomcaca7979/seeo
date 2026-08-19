@@ -210,6 +210,15 @@ describe("6. Dashboard 不进入 /zh/app（locale 路由白名单）", () => {
     vi.doUnmock("next-intl/middleware");
     vi.doUnmock("@/lib/supabase/middleware");
   });
+
+  it("proxy matcher：sitemap.xml / robots.txt / llms.txt 完全绕过 middleware（crawler-safe）", async () => {
+    const PROXY_SRC = readFileSync(fileURLToPath(new URL("../proxy.ts", import.meta.url)), "utf-8");
+    // matcher 负向前瞻必须包含三个爬虫文件，任何配置下不进入 locale 路由 / auth session
+    const matcherLine = PROXY_SRC.split("\n").find((l) => l.includes("(?!_next/static")) ?? "";
+    expect(matcherLine).toContain("sitemap");
+    expect(matcherLine).toContain("robots");
+    expect(matcherLine).toContain("llms");
+  });
 });
 
 // ---------- 7. login redirect 保持原路径 ----------

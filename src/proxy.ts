@@ -42,7 +42,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // 排除静态资源,只处理页面路由
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // 排除静态资源与爬虫文件（sitemap/robots/llms），只处理页面路由。
+    // 爬虫文件必须完全绕过 middleware（含 locale 路由与 auth session），
+    // 保证搜索引擎在任何配置下都能拿到 deterministic 响应。
+    "/((?!_next/static|_next/image|favicon\\.ico|sitemap\\.xml|robots\\.txt|llms\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
