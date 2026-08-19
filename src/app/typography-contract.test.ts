@@ -1,10 +1,13 @@
-// ===== Typography contract（Semrush/Intergalactic 风格 Inter 体系）=====
-// 覆盖：字体注册（next/font Inter 变量字体）、字体栈（拉丁 Inter + CJK 系统回退）、
+// ===== Typography contract（Montserrat + 阿里巴巴普惠体 双语体系）=====
+// 覆盖：字体注册（next/font Montserrat 变量字体 + JetBrains Mono）、
+// 中文自托管 webfont（Alibaba PuHuiTi 3.0 官方分片）、
+// 字体栈（拉丁 Montserrat + CJK PuHuiTi + 系统回退）、
 // 字号 scale（12/14/16/20/24/32/36/48）、行高层级（小字 1.45–1.5 / 正文 1.5–1.6 / 标题 1.08–1.3）、
-// 大标题负 tracking + 中文覆写、按钮/徽章最小字号、全站 weight 统一 600 层级（无 700）。
+// 大标题负 tracking + 中文覆写、按钮/徽章最小字号、全站 weight 统一 600 层级（无 700）、
+// 文字颜色三级层级（ink/ink-60/ink-40 高对比深色体系）。
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +15,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const GLOBALS = readFileSync(join(ROOT, "src/app/globals.css"), "utf-8");
 const DEFAULT_LAYOUT = readFileSync(join(ROOT, "src/app/(default)/layout.tsx"), "utf-8");
 const LOCALE_LAYOUT = readFileSync(join(ROOT, "src/app/[locale]/layout.tsx"), "utf-8");
+const PUHUITI_CSS = readFileSync(join(ROOT, "src/app/fonts/alibaba-puhuiti.css"), "utf-8");
 
 /** 递归收集 src 下所有 .tsx 源码（不含测试） */
 function collectTsx(dir: string): string[] {
@@ -25,31 +29,76 @@ function collectTsx(dir: string): string[] {
   return out;
 }
 
-describe("字体注册（next/font/google Inter）", () => {
-  it("两个 root layout 均以 next/font/google 注册 Inter 变量字体（--font-inter，display swap，单实例）", () => {
+describe("字体注册（next/font/google Montserrat + JetBrains Mono）", () => {
+  it("两个 root layout 均以 next/font/google 注册 Montserrat 变量字体（--font-montserrat，display swap，单实例）", () => {
     for (const src of [DEFAULT_LAYOUT, LOCALE_LAYOUT]) {
-      expect(src).toContain("Inter");
-      expect(src).toMatch(/Inter\(\s*\{[\s\S]*?variable:\s*"--font-inter"/);
-      expect(src).toMatch(/Inter\(\s*\{[\s\S]*?display:\s*"swap"/);
+      expect(src).toContain("Montserrat");
+      expect(src).toMatch(/Montserrat\(\s*\{[\s\S]*?variable:\s*"--font-montserrat"/);
+      expect(src).toMatch(/Montserrat\(\s*\{[\s\S]*?display:\s*"swap"/);
     }
   });
 
-  it("不再加载未使用的 Space Grotesk（消除双 display 字体的不一致视觉）", () => {
-    expect(DEFAULT_LAYOUT).not.toContain("Space_Grotesk");
-    expect(LOCALE_LAYOUT).not.toContain("Space_Grotesk");
+  it("不再加载 Inter（英文主字体已由 Montserrat 取代）与 Space Grotesk", () => {
+    for (const src of [DEFAULT_LAYOUT, LOCALE_LAYOUT]) {
+      expect(src).not.toMatch(/\bInter\b/);
+      expect(src).not.toContain("Space_Grotesk");
+    }
+    expect(GLOBALS).not.toContain("var(--font-inter)");
     expect(GLOBALS).not.toContain("space-grotesk");
+  });
+
+  it("两个 root layout 均注册 JetBrains Mono（--font-jetbrains-mono，技术字段等宽）", () => {
+    for (const src of [DEFAULT_LAYOUT, LOCALE_LAYOUT]) {
+      expect(src).toMatch(/JetBrains_Mono\(\s*\{[\s\S]*?variable:\s*"--font-jetbrains-mono"/);
+    }
   });
 });
 
-describe("字体栈（拉丁 Inter + CJK 系统回退）", () => {
-  it("--font-sans / --font-display 均为 Inter 栈且含 PingFang SC 与 Microsoft YaHei 回退", () => {
+describe("中文 webfont（阿里巴巴普惠体 3.0 官方分片自托管）", () => {
+  it("globals.css 引入 alibaba-puhuiti.css", () => {
+    expect(GLOBALS).toContain('@import "./fonts/alibaba-puhuiti.css"');
+  });
+
+  it("普惠体声明 400/500/600 三个字重且 font-family 统一为 Alibaba PuHuiTi", () => {
+    expect(PUHUITI_CSS).toMatch(/font-family:\s*"Alibaba PuHuiTi"/);
+    expect(PUHUITI_CSS).toMatch(/font-weight:\s*400/);
+    expect(PUHUITI_CSS).toMatch(/font-weight:\s*500/);
+    expect(PUHUITI_CSS).toMatch(/font-weight:\s*600/);
+    expect(PUHUITI_CSS).not.toMatch(/font-weight:\s*700/);
+  });
+
+  it("每个字重的 woff2 分片文件均存在（55→400 / 65→500 / 75→600）", () => {
+    const urls = [...PUHUITI_CSS.matchAll(/url\("([^"]+\.woff2)"\)/g)].map((m) => m[1]);
+    expect(urls.length).toBeGreaterThanOrEqual(18);
+    for (const u of urls) {
+      // css 中为 "/fonts/puhuiti/..." 站点绝对路径 → public/ 下
+      expect(existsSync(join(ROOT, "public", u.replace(/^\//, "")))).toBe(true);
+    }
+  });
+
+  it("分片带 unicode-range（CJK 按需懒加载）且 font-display swap", () => {
+    expect(PUHUITI_CSS).toMatch(/unicode-range:/);
+    expect(PUHUITI_CSS).toMatch(/font-display:\s*swap/);
+  });
+});
+
+describe("字体栈（拉丁 Montserrat + CJK Alibaba PuHuiTi + 系统回退）", () => {
+  it("--font-sans / --font-display 均为 Montserrat+PuHuiTi 栈且含 PingFang SC 与 Microsoft YaHei 回退", () => {
     const sans = GLOBALS.match(/--font-sans:\s*([^;]+);/)?.[1] ?? "";
-    expect(sans).toContain("var(--font-inter)");
+    expect(sans).toContain("var(--font-montserrat)");
+    expect(sans).toContain('"Alibaba PuHuiTi"');
     expect(sans).toContain("system-ui");
     expect(sans).toContain("PingFang SC");
     expect(sans).toContain("Microsoft YaHei");
     const display = GLOBALS.match(/--font-display:\s*([^;]+);/)?.[1] ?? "";
     expect(display).toBe(sans);
+    // Montserrat 在 PuHuiTi 之前：拉丁/数字走 Montserrat，CJK 回退 PuHuiTi（中英各用其主字体）
+    expect(sans.indexOf("var(--font-montserrat)")).toBeLessThan(sans.indexOf('"Alibaba PuHuiTi"'));
+  });
+
+  it("--font-mono 为 JetBrains Mono 栈（URL / code / 技术数字等宽）", () => {
+    const mono = GLOBALS.match(/--font-mono:\s*([^;]+);/)?.[1] ?? "";
+    expect(mono).toContain("var(--font-jetbrains-mono)");
   });
 
   it("body 使用 --font-sans 且显式 16px / 1.6 行高", () => {
@@ -57,6 +106,41 @@ describe("字体栈（拉丁 Inter + CJK 系统回退）", () => {
     expect(body).toContain("font-family: var(--font-sans)");
     expect(body).toContain("font-size: var(--text-base)");
     expect(body).toContain("line-height: var(--text-base--line-height)");
+  });
+});
+
+describe("文字颜色三级层级（高对比深色体系，无浅灰正文）", () => {
+  it("ink / ink-60 / ink-40 / ink-25 token 值符合契约", () => {
+    expect(GLOBALS).toContain("--color-ink: #111827;");
+    expect(GLOBALS).toContain("--color-ink-60: #374151;");
+    expect(GLOBALS).toContain("--color-ink-40: #4b5563;");
+    expect(GLOBALS).toContain("--color-ink-25: #6b7280;");
+  });
+
+  it("禁止的极浅灰 token 不存在于设计系统（#9ca3af / #94a3b8 / #9aa0a6）", () => {
+    expect(GLOBALS).not.toContain("#9ca3af");
+    expect(GLOBALS).not.toContain("#94a3b8");
+    expect(GLOBALS).not.toContain("#9aa0a6");
+  });
+
+  it("全站 tsx 不使用 text-gray/slate/zinc/neutral/stone-400|500 类作为文字颜色", () => {
+    const offenders = collectTsx(join(ROOT, "src"))
+      .filter((p) => /text-(gray|slate|zinc|neutral|stone)-(400|500)/.test(readFileSync(p, "utf-8")))
+      .map((p) => p.replace(ROOT + "/", ""));
+    expect(offenders).toEqual([]);
+  });
+
+  it("ink-25 不作为正文文字色使用（仅边框/focus 描边/装饰性符号）", () => {
+    // 允许的例外：分隔符 "·"、装饰性 404 大数字等纯符号场景
+    const offenders = collectTsx(join(ROOT, "src"))
+      .map((p) => {
+        const src = readFileSync(p, "utf-8");
+        const hits = [...src.matchAll(/<[^>]*\btext-ink-25\b[^>]*>([^<]*)</g)].map((m) => m[1].trim());
+        const realText = hits.filter((h) => h.length > 0 && !"·●|—".includes(h));
+        return realText.length > 0 ? p.replace(ROOT + "/", "") : null;
+      })
+      .filter((p): p is string => p !== null);
+    expect(offenders).toEqual([]);
   });
 });
 

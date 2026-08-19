@@ -65,33 +65,34 @@ export default function UrlAuditBox() {
   }
 
   return (
-    <div className="mx-auto mt-8 max-w-xl">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            if (error) setError(null);
-          }}
-          placeholder={t("placeholder")}
-          className="h-12 flex-1 rounded-md border border-line bg-card px-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-          aria-label={t("label")}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary btn-lg flex-none sm:whitespace-nowrap"
-        >
-          {loading ? t("submitting") : t("submit")}
-        </button>
+    <div className="mx-auto mt-8 w-full max-w-2xl px-0">
+      {/* 域名审计主 CTA：输入框与提交按钮一体成型（radius 12px 卡片级容器，
+          focus 时边框加深为 ink，submit 走黑色主按钮，视觉上不可忽视） */}
+      <form onSubmit={handleSubmit}>
+        <div className="flex h-14 flex-col overflow-hidden rounded-lg border border-line bg-card transition-colors focus-within:border-ink sm:flex-row sm:items-stretch">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              if (error) setError(null);
+            }}
+            placeholder={t("placeholder")}
+            className="h-full min-w-0 flex-1 bg-transparent px-4 text-base text-ink placeholder:text-ink-40 focus:outline-none"
+            aria-label={t("label")}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="h-14 w-full flex-none rounded-none border-0 bg-brand px-6 text-sm font-semibold text-white transition-colors hover:bg-brand-deep disabled:opacity-50 sm:h-auto sm:w-auto sm:whitespace-nowrap"
+          >
+            {loading ? t("submitting") : t("submit")}
+          </button>
+        </div>
       </form>
       {error && (
         <p className="mt-2 text-left font-mono text-xs text-neg">{error}</p>
       )}
-      <p className="mt-2 text-left font-mono text-xs text-ink-40">
-        {t("hint")}
-      </p>
     </div>
   );
 }

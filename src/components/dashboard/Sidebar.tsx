@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
+import { localePath } from "@/i18n/seo";
 import { useToast } from "@/components/dashboard/Toast";
 import { planLabel } from "@/lib/plan-labels";
 
@@ -211,13 +212,18 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      {/* Logo */}
+      {/* Logo：点击返回营销首页（EN → / · ZH → /zh，复用 localePath） */}
       <div className="flex h-16 flex-none items-center justify-between border-b border-line px-4">
-        <Link href="/app" onClick={onMobileClose} className="flex items-center gap-2 overflow-hidden">
+        <Link
+          href={localePath(locale, "/")}
+          onClick={onMobileClose}
+          aria-label="SeeO home"
+          className="flex items-center gap-2 overflow-hidden"
+        >
           <span className="text-lg font-semibold tracking-tight text-ink">
             See
           </span>
-          <span className="text-lg font-semibold tracking-tight text-ink">
+          <span className="text-lg font-semibold tracking-tight text-accent">
             O
           </span>
         </Link>

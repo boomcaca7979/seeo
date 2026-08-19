@@ -29,7 +29,6 @@
       "placeholder": "输入你的网站域名，如 example.com",
       "submit": "开始 SEO 审计",
       "submitting": "跳转中…",
-      "hint": "输入域名即可快速审计，无需注册",
       "errEmpty": "请输入网站域名",
       "errInvalid": "域名格式无效，如 example.com",
       "errPrivate": "不支持审计本地或私有网络地址",
@@ -61,42 +60,6 @@
         }
       ]
     }
-  },
-  "ticker": {
-    "items": [
-      {
-        "label": "关键词研究",
-        "value": "搜索量 / 难度 / 意图"
-      },
-      {
-        "label": "排名追踪",
-        "value": "每日自动刷新"
-      },
-      {
-        "label": "技术审计",
-        "value": "20+ 项检查"
-      },
-      {
-        "label": "竞品分析",
-        "value": "SOV 份额"
-      },
-      {
-        "label": "内容优化",
-        "value": "SERP Top10 对比"
-      },
-      {
-        "label": "外链分析",
-        "value": "DataForSEO 接入"
-      },
-      {
-        "label": "搜索引擎",
-        "value": "Google"
-      },
-      {
-        "label": "数据导出",
-        "value": "PDF / Excel（Pro）"
-      }
-    ]
   },
   "features": {
     "sectionTag": "06 / 核心模块",

@@ -29,7 +29,6 @@
       "placeholder": "Enter your website domain, e.g. example.com",
       "submit": "Run SEO audit",
       "submitting": "Redirecting…",
-      "hint": "Enter a domain to start an audit — no sign-up required",
       "errEmpty": "Please enter a website domain",
       "errInvalid": "Invalid domain format, e.g. example.com",
       "errPrivate": "Local or private network addresses are not supported",
@@ -61,42 +60,6 @@
         }
       ]
     }
-  },
-  "ticker": {
-    "items": [
-      {
-        "label": "Keyword research",
-        "value": "Volume / difficulty / intent"
-      },
-      {
-        "label": "Rank tracking",
-        "value": "Daily auto updates"
-      },
-      {
-        "label": "Technical audits",
-        "value": "20+ checks"
-      },
-      {
-        "label": "Competitor analysis",
-        "value": "Share of voice"
-      },
-      {
-        "label": "Content optimization",
-        "value": "SERP Top 10 comparison"
-      },
-      {
-        "label": "Backlink analysis",
-        "value": "DataForSEO powered"
-      },
-      {
-        "label": "Search engine",
-        "value": "Google"
-      },
-      {
-        "label": "Data export",
-        "value": "PDF / Excel (Pro)"
-      }
-    ]
   },
   "features": {
     "sectionTag": "06 / Core modules",

@@ -34,10 +34,15 @@ export default function Hero() {
           <p className="mx-auto mt-5 max-w-2xl text-base text-ink-60 sm:text-lg">
             {t("subtitle")}
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+
+          {/* URL 快速审计入口：Hero 区第一互动 CTA（首屏可见，先于按钮与视觉面板） */}
+          <UrlAuditBox />
+
+          {/* 次级操作（不再与搜索框争夺主入口视觉） */}
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href={primaryHref}
-              className="btn-primary btn-lg w-full sm:w-auto"
+              className="btn-secondary btn-lg w-full sm:w-auto"
             >
               {t("primaryCta")}
             </Link>
@@ -48,9 +53,6 @@ export default function Hero() {
               {t("secondaryCta")}
             </Link>
           </div>
-
-          {/* URL 快速审计入口 */}
-          <UrlAuditBox />
         </div>
 
         {/* 深色面板 - 引力场 */}
@@ -63,10 +65,10 @@ export default function Hero() {
                 <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
                 <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
               </div>
-              <div className="font-mono text-xs text-white/40 sm:text-xs">
+              <div className="font-mono text-xs text-white/60 sm:text-xs">
                 seeo.asia / keyword-gravity-field
               </div>
-              <div className="font-mono text-xs text-white/40 sm:text-xs">
+              <div className="font-mono text-xs text-white/60 sm:text-xs">
                 ● {t("panel.sample")}
               </div>
             </div>
@@ -76,11 +78,11 @@ export default function Hero() {
               <KeywordField />
 
               {/* 面板角标信息 */}
-              <div className="absolute left-3 top-3 hidden font-mono text-xs text-white/40 sm:block">
+              <div className="absolute left-3 top-3 hidden font-mono text-xs text-white/60 sm:block">
                 <div>NODES: 8</div>
                 <div>EDGES: 7</div>
               </div>
-              <div className="absolute right-3 top-3 hidden font-mono text-xs text-white/40 sm:block">
+              <div className="absolute right-3 top-3 hidden font-mono text-xs text-white/60 sm:block">
                 <div>{t("panel.sampleNote")}</div>
               </div>
               <div className="absolute bottom-3 left-3 hidden font-mono text-xs text-white/60 sm:block">

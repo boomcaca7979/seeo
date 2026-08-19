@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* 阿里巴巴普惠体 3.0 官方 webfont 分片（自托管 /fonts/puhuiti/，按 unicode-range 懒加载） */
+@import "./fonts/alibaba-puhuiti.css";
 
 /* ===== SeeO 设计系统 V4 (Semrush 风格 · Tailwind v4 @theme) ===== */
 /* V4：白底/极浅灰画布、深灰文字、黑色主按钮、克制品牌强调 */
@@ -17,11 +19,15 @@
   --color-paper: #f7f8fa; /* 内容区画布主底色 */
   --color-card: #ffffff; /* 卡片底色 */
 
-  /* 文字（深灰系，主文字 #111，次级递减） */
+  /* 文字三级层级（高对比深色体系，全站禁用浅灰正文）
+   * primary   ink     #111827  标题 / 正文 / 导航 / 核心内容
+   * secondary ink-60  #374151  说明文字 / 次要内容
+   * muted     ink-40  #4b5563  少量 metadata / caption / placeholder
+   * ink-25    #6b7280 仅用于边框 / focus 描边 / 装饰性符号，不作为正文 */
   --color-ink: #111827; /* 主文字 / 侧边栏深色文字 */
-  --color-ink-60: rgba(17, 24, 39, 0.62); /* 次级文字 */
-  --color-ink-40: rgba(17, 24, 39, 0.45); /* 元信息 */
-  --color-ink-25: rgba(17, 24, 39, 0.22); /* 弱提示 / hover 边框 */
+  --color-ink-60: #374151; /* 次级文字 */
+  --color-ink-40: #4b5563; /* 元信息 */
+  --color-ink-25: #6b7280; /* 边框 / focus 描边 / 装饰符号 */
 
   --color-line: #e5e7eb; /* 卡片边框 */
   --color-line-soft: #f3f4f6; /* 内部分割线 / 表格行线 */
@@ -36,16 +42,17 @@
   --color-neg: #dc2626; /* 负向 */
   --color-warn: #d97706; /* 警告橙 */
 
-  /* ---------- 字体栈 ----------
-   * 拉丁：Inter（next/font 自托管变量字体，全 weight 轴）
-   * CJK 回退：PingFang SC（macOS）/ Microsoft YaHei（Windows）等系统字体，
-   * 由浏览器按字形逐字回退，中英混排不会出现整段换字体。 */
-  --font-display: var(--font-inter), system-ui, -apple-system,
-    "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    sans-serif;
-  --font-sans: var(--font-inter), system-ui, -apple-system,
-    "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    sans-serif;
+  /* ---------- 字体栈（按字形逐字回退，中英混排各用其主字体） ----------
+   * 拉丁 / 数字：Montserrat（next/font 自托管变量字体，全 weight 轴）
+   * CJK：Alibaba PuHuiTi（官方 webfont 分片自托管，见 fonts/alibaba-puhuiti.css；
+   *      未命中分片时回退 PingFang SC / Microsoft YaHei 等系统字体）
+   * 技术字段：JetBrains Mono（URL / code / mono 数字） */
+  --font-display: var(--font-montserrat), "Alibaba PuHuiTi", system-ui,
+    -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --font-sans: var(--font-montserrat), "Alibaba PuHuiTi", system-ui,
+    -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono",
     Menlo, monospace;
 
@@ -91,12 +98,11 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
-  /* 动效（营销页保留） */
+  /* 动效（营销页保留；ticker 滚动条已随 Ticker 组件移除） */
   --animate-breathe: breathe 3s ease-in-out infinite;
   --animate-drift-a: drift-a 6s ease-in-out infinite;
   --animate-drift-b: drift-b 7s ease-in-out infinite;
   --animate-drift-c: drift-c 8s ease-in-out infinite;
-  --animate-ticker: ticker 40s linear infinite;
 }
 
 /* ===== 关键帧（营销页保留） ===== */
@@ -115,7 +121,6 @@
 @keyframes drift-a { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, -5px); } }
 @keyframes drift-b { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5px, 6px); } }
 @keyframes drift-c { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(4px, 5px); } }
-@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
 /* ===== 基础样式 ===== */
 :root {

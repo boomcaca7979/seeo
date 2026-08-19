@@ -6,7 +6,7 @@
 //   - 静态渲染：generateStaticParams + setRequestLocale（不使用 headers()）
 
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Montserrat, JetBrains_Mono } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
@@ -17,8 +17,9 @@ import { defaultLocale, localeToOgLocale, type Locale } from "@/i18n/config";
 import { localeUrl } from "@/i18n/seo";
 import "../globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// 英文主字体：Montserrat（变量字体，build 时经 next/font 自托管）
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
   display: "swap",
 });
@@ -129,7 +130,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   return (
     <html
       lang={loc === "zh" ? "zh-CN" : "en"}
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}

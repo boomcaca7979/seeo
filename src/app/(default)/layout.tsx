@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Montserrat, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
@@ -8,8 +8,9 @@ import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { localeToHtmlLang } from "@/i18n/config";
 import "../globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// 英文主字体：Montserrat（变量字体，build 时经 next/font 自托管）
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
   display: "swap",
 });
@@ -96,7 +97,7 @@ export default async function RootLayout({
   return (
     <html
       lang={localeToHtmlLang[locale as "en" | "zh"] ?? "en"}
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
