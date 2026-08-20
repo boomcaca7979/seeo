@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
-import { allCheckMeta, checkMetaMap, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
+import { allCheckMeta, checkMetaMap, getExecutedCheckIds, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
 import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -73,26 +73,35 @@ function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
   return Array.from(map.values()).sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
-/** 计算检查项覆盖：哪些通过、哪些未通过（name/description 按 locale 输出纯文本） */
+/** 计算检查项覆盖：哪些通过、哪些未通过（name/description 按 locale 输出纯文本）。
+ *  统计口径与 runAudit 健康分一致：只统计该 depth 实际执行的检查项
+ *  （quick 仅单页检查；full 为单页 + 跨页），未执行的检查项不得计为"通过"。 */
 type CheckCoverageEntry = Omit<CheckMeta, "name" | "description"> & {
   name: string;
   description: string;
   passed: boolean;
   affectedPages: number;
 };
-function computeCheckCoverage(issues: AuditIssueRow[], locale: UiLocale): CheckCoverageEntry[] {
+function computeCheckCoverage(
+  issues: AuditIssueRow[],
+  locale: UiLocale,
+  depth: "quick" | "full"
+): CheckCoverageEntry[] {
   const hitMap = new Map<string, number>();
   for (const issue of issues) {
     const checkId = issue.type;
     hitMap.set(checkId, (hitMap.get(checkId) ?? 0) + 1);
   }
-  return allCheckMeta.map((meta) => ({
-    ...meta,
-    name: pickText(meta.name, locale),
-    description: pickText(meta.description, locale),
-    passed: !hitMap.has(meta.id),
-    affectedPages: hitMap.get(meta.id) ?? 0,
-  }));
+  const executed = getExecutedCheckIds(depth);
+  return allCheckMeta
+    .filter((meta) => executed.has(meta.id))
+    .map((meta) => ({
+      ...meta,
+      name: pickText(meta.name, locale),
+      description: pickText(meta.description, locale),
+      passed: !hitMap.has(meta.id),
+      affectedPages: hitMap.get(meta.id) ?? 0,
+    }));
 }
 
 /** comparison 快照中的 issue 结构（写入时序列化，message/checkName 为存储原值） */
@@ -172,7 +181,7 @@ export async function GET(req: Request) {
   const issues = audit.status === "completed" ? await getAuditIssues(userId, audit.id) : [];
   const locale = readUiLocale(req);
   const grouped = groupIssues(issues, locale);
-  const coverage = computeCheckCoverage(issues, locale);
+  const coverage = computeCheckCoverage(issues, locale, audit.depth);
 
   // 解析 comparison JSON（读取层双语化：checkName/message 按 locale 输出）
   let comparison: AuditHistoryComparison | null = null;

@@ -706,6 +706,46 @@ export const checkMetaMap: Record<string, CheckMeta> = Object.fromEntries(
   allCheckMeta.map((m) => [m.id, m])
 );
 
+/** 跨页检查项 ID 集合（重复标题/描述/H1、sitemap、死链需要多页交叉） */
+export const crossPageCheckIds: Set<string> = new Set(
+  crossPageChecks.map((c) => c.id)
+);
+
+/**
+ * 某审计深度下实际执行的检查项 ID 集合。
+ * quick：只执行单页检查（爬首页 1 页）；full：单页 + 跨页检查全部执行。
+ * runAudit 的健康分与 /api/audit/latest 的检查项覆盖共用此定义，
+ * 保证 score 与 coverage 统计口径一致（coverage 不得把未执行的检查项计为"通过"）。
+ */
+export function getExecutedCheckIds(depth: "quick" | "full"): Set<string> {
+  return depth === "full"
+    ? new Set(allCheckMeta.map((c) => c.id))
+    : new Set(perPageChecks.map((c) => c.id));
+}
+
+/**
+ * 从 issues（checkId 列表）重建检查项覆盖（用于缺失 coverage 的历史报告快照回退）。
+ * passed = 该检查项未命中任何 issue；name 按 locale 输出。
+ * depth 已知时按实际执行范围过滤；未知（历史快照）时按全部检查项处理。
+ */
+export function buildCoverageFromIssues(
+  issueCheckIds: string[],
+  locale: "en" | "zh",
+  depth?: "quick" | "full"
+): Array<{ id: string; name: string; passed: boolean }> {
+  const hit = new Set(issueCheckIds);
+  const executed = depth
+    ? getExecutedCheckIds(depth)
+    : new Set(allCheckMeta.map((c) => c.id));
+  return allCheckMeta
+    .filter((m) => executed.has(m.id))
+    .map((m) => ({
+      id: m.id,
+      name: pickText(m.name, locale),
+      passed: !hit.has(m.id),
+    }));
+}
+
 /**
  * 不参与评分、但会以 issue 形式写入 DB 的 checkId（如 startpage-unparsed）。
  * 仅用于读取层展示名映射，不得加入 allCheckMeta（会改变 MAX_SCORE）。
@@ -755,6 +795,9 @@ export function calculateHealthScore(
     : MAX_SCORE;
   let deduction = 0;
   for (const id of hitCheckIds) {
+    // 未执行的检查项不得扣分（与 coverage 口径一致：
+    // quick 深度下即使存在历史跨页 issue，也不应按 quick 的分母扣分）
+    if (executedCheckIds && !executedCheckIds.has(id)) continue;
     const meta = checkMetaMap[id];
     if (meta) deduction += meta.weight;
   }

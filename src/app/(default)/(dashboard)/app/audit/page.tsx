@@ -390,6 +390,8 @@ function AuditPageInner() {
           data_json: JSON.stringify({
             healthScore: audit.healthScore,
             issues: audit.issues,
+            // coverage 一并存入快照：否则历史预览按全量检查集重建，与本次审计深度的口径不一致
+            coverage: audit.coverage,
           }),
           project_id: null,
         }),

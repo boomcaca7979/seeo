@@ -5,8 +5,9 @@ import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
-  title: "Log In · SeeO",
-  description: "Log in to SeeO — SEO audits, rank tracking, and keyword research.",
+  title: "Log In to SeeO — SEO Audits & Rank Tracking",
+  description:
+    "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
   alternates: { canonical: "/login" },
 };
 

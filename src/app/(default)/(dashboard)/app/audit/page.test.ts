@@ -37,3 +37,18 @@ describe("BUG-001：audit 页 hydration 安全与快速审计按钮反馈", () =
     expect(EN.dashboard.audit.auditInProgress.length).toBeGreaterThan(0);
   });
 });
+
+describe("「保存到报告」快照：coverage 一并写入（防 0/0 回归）", () => {
+  it("handleSaveToReports 的 data_json 同时包含 healthScore / issues / coverage", () => {
+    // 与 reports/page.tsx 保存链路口径一致：快照带 coverage，
+    // 历史预览无需回退重建（回退按全量检查集，与本次审计深度口径不一致）
+    const match = PAGE_SRC.match(
+      /data_json: JSON\.stringify\(\{([\s\S]*?)\}\),/
+    );
+    expect(match).toBeTruthy();
+    const fields = match![1];
+    for (const field of ["healthScore:", "issues:", "coverage:"]) {
+      expect(fields).toContain(field);
+    }
+  });
+});

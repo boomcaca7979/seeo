@@ -178,6 +178,18 @@ function normalizeLink(href: string): string | null {
   }
 }
 
+/** URL 去重键：去 hash、去末尾斜杠（根路径保留），用于重定向别名比对 */
+function urlDedupKey(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    const pathname =
+      u.pathname.length > 1 ? u.pathname.replace(/\/+$/, "") : u.pathname;
+    return `${u.protocol}//${u.host}${pathname}${u.search}`;
+  } catch {
+    return rawUrl;
+  }
+}
+
 /** LText 序列化为 JSON 字符串存库；历史纯文本 string 原样存储 */
 function serializeLocalized(t: LocalizedText): string {
   return typeof t === "string" ? t : JSON.stringify(t);
@@ -311,6 +323,10 @@ export async function runAudit(
   const robotsRules = parseRobotsRules(robotsText);
 
   const visited = new Set<string>();
+  // 已审计页面的最终 URL 键（跟随重定向后）：同一最终页面只会被审计一次。
+  // 修复重定向别名误报：如 / → /zh、/docs → /zh/docs 互为别名时，
+  // 旧逻辑按"入队 URL"判重，会把同一页面当两个页面，触发重复 title/description/H1 误报。
+  const resolvedUrls = new Set<string>();
   const queue: string[] = [baseUrl.toString()];
   const crawledPages: PageData[] = [];
   const brokenLinks: Array<{ url: string; statusCode: number }> = [];
@@ -450,6 +466,25 @@ export async function runAudit(
         }
 
         const { result, pageData } = r.value;
+
+        // 重定向别名去重：以最终 URL（跟随重定向后）为准。
+        // 例：起始页 https://x.com 重定向到 https://x.com/zh，随后站内链接又入队
+        // https://x.com/zh —— 两次抓取内容完全相同，若都计入 crawledPages，
+        // 跨页检查会误报重复标题/描述/H1。此处跳过已审计过的最终页面。
+        const finalKey = urlDedupKey(result.url);
+        if (resolvedUrls.has(finalKey)) {
+          pagesDetail.push({
+            url,
+            responseTimeMs: result.responseTimeMs,
+            status: result.status,
+            ok: true,
+          });
+          continue;
+        }
+        resolvedUrls.add(finalKey);
+        // 同步登记到 visited：后续其他页面再链接到该最终 URL 时直接跳过，避免重复抓取
+        visited.add(result.url);
+
         crawledPages.push(pageData);
         pagesDetail.push({
           url,

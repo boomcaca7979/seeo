@@ -18,15 +18,15 @@ interface LocalePricingPageProps {
 
 const pricingMeta = {
   en: {
-    title: "Pricing · SeeO",
+    title: "SeeO Pricing: Free, Lite & Pro Plans",
     description:
       "SeeO pricing: Free, Lite, and Pro plans. Start free, upgrade anytime — rank tracking, technical SEO audits, keyword research, and content optimization.",
     ogAlt: "SeeO Pricing",
   },
   zh: {
-    title: "定价 · SeeO",
+    title: "SeeO 定价方案：免费版、Lite 版与专业版套餐额度对比",
     description:
-      "SeeO 定价方案：免费版、Lite 版、专业版。按需选择关键词追踪、技术审计与竞品分析功能。",
+      "SeeO 定价方案：免费版适合起步验证，Lite 版与专业版解锁更多关键词追踪、技术审计、内容检查与竞品分析额度，专业版另含外链分析与报告导出能力。按需选择套餐，随时升级或续费，支持支付宝与微信支付，购买前可免费试用全部核心功能，再决定是否付费升级。",
     ogAlt: "SeeO 定价",
   },
 } as const;

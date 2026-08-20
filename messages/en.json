@@ -330,7 +330,7 @@
   "seoAudit": {
     "meta": {
       "title": "Technical SEO Audit Tool · SeeO",
-      "description": "Run a technical SEO audit with SeeO: crawl your site, execute 20+ technical checks, and get a health score with prioritized fixes. Quick single-page checks and full-site audits."
+      "description": "Run a technical SEO audit with SeeO: crawl your site, run 20+ technical checks, and get a health score with prioritized fixes for every page."
     },
     "title": "Technical SEO Audit",
     "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority",
@@ -422,8 +422,8 @@
   },
   "rankTracking": {
     "meta": {
-      "title": "Rank Tracking Tool · SeeO",
-      "description": "Track Google keyword rankings by keyword, location, and device with SeeO. Daily automatic refreshes, history trends, and volatility alerts. Powered by SerpApi."
+      "title": "Google Rank Tracking Tool · SeeO",
+      "description": "Track Google keyword rankings by keyword, location, and device with SeeO. Daily refreshes, history trends, URL matching, and alerts. Powered by SerpApi."
     },
     "title": "Keyword Rank Tracking",
     "subtitle": "Your real Google positions recorded automatically every day — know immediately when rankings move",
@@ -498,8 +498,8 @@
   },
   "backlinks": {
     "meta": {
-      "title": "Backlink Analysis Tool · SeeO",
-      "description": "Analyze backlinks with SeeO: total backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text distribution. Powered by DataForSEO. Pro plan, 7-day cache."
+      "title": "Backlink Analysis Tool: Links & Anchor Text · SeeO",
+      "description": "Analyze backlinks with SeeO: total backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text to assess link quality. Available on Pro."
     },
     "title": "Backlink Analysis",
     "subtitle": "See the scale, quality, and composition of links pointing to your site",
@@ -569,8 +569,8 @@
   },
   "docsPage": {
     "meta": {
-      "title": "Docs · SeeO",
-      "description": "SeeO product docs: what SeeO is, its core features, data sources, and how to use them."
+      "title": "SeeO Documentation: Features, Data Sources & Guides",
+      "description": "SeeO product docs: what SeeO is, how the six core features work, where the data comes from, plan limits, and common questions to get you started."
     },
     "eyebrow": "DOCS",
     "title": "Product Docs",
@@ -702,7 +702,7 @@
   "aboutPage": {
     "meta": {
       "title": "About SeeO · SEO Analytics Platform",
-      "description": "What SeeO is: an all-in-one SEO analytics platform for site owners and SEO practitioners. Learn about SeeO's positioning, real capabilities, data sources, who it's for, and what it doesn't do."
+      "description": "What SeeO is: an all-in-one SEO analytics platform for site owners and practitioners — its positioning, real capabilities, data sources, and who it's for."
     },
     "eyebrow": "ABOUT",
     "title": "About SeeO",
@@ -830,8 +830,8 @@
   },
   "privacyPage": {
     "meta": {
-      "title": "Privacy Policy · SeeO",
-      "description": "SeeO privacy policy: how we collect, use, and protect your personal information."
+      "title": "Privacy Policy: How SeeO Handles Your Data",
+      "description": "The SeeO privacy policy explains what personal information we collect, how we use and store it, security measures, your data rights, and how to contact us."
     },
     "title": "Privacy Policy",
     "sections": {
@@ -856,8 +856,8 @@
   },
   "termsPage": {
     "meta": {
-      "title": "Terms of Service · SeeO",
-      "description": "SeeO terms of service: the terms and conditions for using the SeeO platform."
+      "title": "Terms of Service: Rules for Using SeeO",
+      "description": "SeeO terms of service cover account registration, plan subscription and renewal, fair-use limits, service availability, intellectual property, and liability."
     },
     "title": "Terms of Service",
     "sections": {
@@ -882,8 +882,8 @@
   },
   "refundPage": {
     "meta": {
-      "title": "Refund Policy · SeeO",
-      "description": "SeeO refund policy: conditions and process for refunds on one-time plan purchases."
+      "title": "Refund Policy: Conditions & Process for SeeO",
+      "description": "The SeeO refund policy explains conditions and time limits for refunding one-time plan purchases, eligible and excluded cases, and how to contact support."
     },
     "title": "Refund Policy",
     "sections": {

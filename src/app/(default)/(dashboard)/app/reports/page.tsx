@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { localizeReportTitle, resolveAuditDetail, resolveAuditSuggestion } from "@/lib/seo/audit-legacy-text";
+import { buildCoverageFromIssues } from "@/lib/seo/audit-checks";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
@@ -409,7 +410,13 @@ export default function ReportsPage() {
         dataJson = JSON.stringify(rankData);
       } else if (selectedType === "audit" && auditData) {
         title = t("saveTitleAudit", { domain: auditData.domain });
-        dataJson = JSON.stringify({ healthScore: auditData.healthScore, issues: auditData.issues });
+        // coverage 一并存入快照：否则历史报告预览回退为空数组，显示"0/0 通过"
+        dataJson = JSON.stringify({
+          domain: auditData.domain,
+          healthScore: auditData.healthScore,
+          issues: auditData.issues,
+          coverage: auditData.coverage,
+        });
       } else if (selectedType === "content" && contentData) {
         title = t("saveTitleContent", { url: contentData.url.slice(0, 40) });
         dataJson = JSON.stringify({ contentScore: contentData.contentScore, url: contentData.url });
@@ -692,7 +699,15 @@ export default function ReportsPage() {
                                       suggestion: i.suggestion ? resolveAuditSuggestion(i.suggestion, locale) ?? "" : i.suggestion ?? "",
                                     })
                                   );
-                                  setAuditData({ ...data, issues: localizedIssues, projectName: data.domain, generatedAt: r.created_at, coverage: data.coverage ?? [] });
+                                  // 旧快照未保存 coverage：从 issues（checkId）按当前 locale 重建，
+                                  // 覆盖检查项全集，避免"检查项覆盖（0/0 通过）"
+                                  const coverage = Array.isArray(data.coverage) && data.coverage.length > 0
+                                    ? data.coverage
+                                    : buildCoverageFromIssues(
+                                        localizedIssues.map((i: { checkId: string }) => i.checkId),
+                                        locale
+                                      );
+                                  setAuditData({ ...data, issues: localizedIssues, projectName: data.domain, generatedAt: r.created_at, coverage });
                                 } else if (r.type === "content") {
                                   setContentData({ ...data, generatedAt: r.created_at });
                                 } else if (r.type === "weekly") {

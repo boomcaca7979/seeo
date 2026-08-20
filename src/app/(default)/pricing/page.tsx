@@ -46,10 +46,29 @@ const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
 export default function PricingPage() {
   return (
-    <Suspense fallback={null}>
+    <>
+      {/* Checkout 取消回流提示单独包 Suspense：useSearchParams 会触发 CSR bailout，
+          若包住整页会导致 SSR 输出空 body（缺 H1/H2/H3，技术审计误报） */}
+      <Suspense fallback={null}>
+        <CheckoutCancelToast />
+      </Suspense>
       <PricingContent />
-    </Suspense>
+    </>
   );
+}
+
+/** Checkout 取消回流提示（?payment=cancel）：唯一依赖 useSearchParams 的部分 */
+function CheckoutCancelToast() {
+  const t = useTranslations();
+  const searchParams = useSearchParams();
+  const { show, Toast } = useToast();
+  const isCheckoutCancel = searchParams.get("payment") === "cancel";
+  useEffect(() => {
+    if (isCheckoutCancel) {
+      show(t("pricing.cancelToast"), "info");
+    }
+  }, [isCheckoutCancel, show, t]);
+  return <Toast />;
 }
 
 function PricingContent() {
@@ -81,7 +100,6 @@ function PricingContent() {
 
   const router = useRouter();
   const { show, Toast } = useToast();
-  const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -115,14 +133,6 @@ function PricingContent() {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  // Checkout 取消回流提示
-  const isCheckoutCancel = searchParams.get("payment") === "cancel";
-  useEffect(() => {
-    if (isCheckoutCancel) {
-      show(t("pricing.cancelToast"), "info");
-    }
-  }, [isCheckoutCancel, show, t]);
 
   // 从 /api/plans 拉取套餐数据（统一数据源）
   useEffect(() => {

@@ -23,9 +23,11 @@ const jetbrainsMono = JetBrains_Mono({
 
 const SITE_URL = "https://www.seeo.asia";
 
-const siteTitle = "SeeO · SEO 数据分析、排名追踪与审计平台";
+// (default) 组承载工作台（/app）、支付结果与登录注册页（均自带或 robots 禁抓）；
+// 此处为兜底 metadata，须与 [locale]/layout.tsx 营销首页的 title/description 区分
+const siteTitle = "SeeO SEO 工作台：关键词研究、排名追踪与技术审计工具平台";
 const siteDescription =
-  "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。每日自动刷新排名数据，生成可视化审计报告，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。";
+  "SeeO 工作台整合关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心模块。登录后可管理多个项目、监控关键词排名的每日变化、执行站点技术审计并导出可视化报告，所有数据集中在一个后台，方便你与团队协作完成日常 SEO 优化与数据复盘工作。";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
