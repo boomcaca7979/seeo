@@ -62,7 +62,6 @@
     }
   },
   "features": {
-    "sectionTag": "06 / Core modules",
     "sectionTitle": "One workbench, six dimensions",
     "sectionSubtitle": "Every step of the SEO workflow — from keyword research to content optimization — lives inside SeeO. Data flows between modules automatically, with no repeated imports and exports.",
     "cardLink": "Try this module",
@@ -148,8 +147,8 @@
     ]
   },
   "preview": {
-    "sectionTag": "Dashboard preview",
-    "sectionTitle": "See what changes every day",
+    "sectionHeading": "Dashboard preview",
+    "sectionSubheading": "See what changes every day",
     "sectionSubtitle": "Core metrics from all your projects in one dashboard — rankings up or down, site health recovering, where traffic comes from — at a glance.",
     "demoBadge": "Sample data · for demo",
     "sample": "Sample",

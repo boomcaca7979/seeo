@@ -113,18 +113,18 @@ export default function DashboardPreview() {
   const t = useTranslations("preview");
 
   return (
-    <section id="dashboard" className="bg-paper px-5 py-20 sm:px-8 sm:py-28">
+    <section id="dashboard" className="bg-paper px-5 py-10 sm:px-8 sm:py-12">
       <div className="site-shell">
-        {/* 标题 */}
+        {/* 标题（U3：「工作台预览」升级为主 H2，副标题 L2 20-28px，正文 L3 14-16px） */}
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div className="max-w-2xl">
-            <span className="font-mono text-sm text-ink-40">
-              {t("sectionTag")}
-            </span>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
-              {t("sectionTitle")}
+            <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
+              {t("sectionHeading")}
             </h2>
-            <p className="mt-4 text-base text-ink-60 sm:text-lg">
+            <p className="mt-3 font-display text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+              {t("sectionSubheading")}
+            </p>
+            <p className="mt-4 text-sm text-ink-60 sm:text-base">
               {t("sectionSubtitle")}
             </p>
           </div>

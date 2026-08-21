@@ -462,7 +462,6 @@ export default function CompetitorsPage() {
     <div className="dash-container p-6 lg:p-8">
       {/* 页头：编号 + 标题 + 发丝线 */}
       <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-ink-40">06</span>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>

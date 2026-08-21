@@ -10,7 +10,7 @@ export default function Hero() {
   const primaryHref = isAuthEnabled ? "/signup" : "/app";
 
   return (
-    <section className="relative overflow-hidden bg-card px-5 py-16 sm:px-8 sm:py-24">
+    <section className="relative overflow-hidden bg-card px-5 pt-16 pb-10 sm:px-8 sm:pt-24 sm:pb-12">
       {/* 背景装饰网格 */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.05]"

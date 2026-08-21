@@ -52,7 +52,6 @@ export default function Onboarding({ displayName }: OnboardingProps) {
       {/* Onboarding 区块 */}
       <section className="mt-10">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs text-ink-40">01</span>
           <h2 className="font-display text-base font-semibold text-ink">{t("sectionTitle")}</h2>
           <div className="hairline flex-1" />
         </div>

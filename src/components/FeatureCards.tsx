@@ -13,14 +13,11 @@ export default function FeatureCards() {
   }>;
 
   return (
-    <section id="features" className="bg-paper px-5 py-20 sm:px-8 sm:py-28">
+    <section id="features" className="bg-paper px-5 py-10 sm:px-8 sm:py-12">
       <div className="site-shell">
-        {/* 标题 */}
+        {/* 标题（U2：删除 06/核心模块 eyebrow，仅保留 sectionTitle） */}
         <div className="max-w-2xl">
-          <span className="font-mono text-sm text-ink-40">
-            {t("sectionTag")}
-          </span>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
+          <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
             {t("sectionTitle")}
           </h2>
           <p className="mt-4 text-base text-ink-60 sm:text-lg">

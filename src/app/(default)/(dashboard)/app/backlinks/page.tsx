@@ -157,7 +157,6 @@ export default function BacklinksPage() {
     return (
       <div className="dash-container p-6 lg:p-8">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs text-ink-40">04</span>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
             {t("title")}
           </h1>
@@ -185,7 +184,6 @@ export default function BacklinksPage() {
     <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-ink-40">04</span>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>

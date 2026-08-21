@@ -62,7 +62,6 @@
     }
   },
   "features": {
-    "sectionTag": "06 / 核心模块",
     "sectionTitle": "一张工作台，看懂六个维度",
     "sectionSubtitle": "从挖词到内容优化，SEO 工作流的每一步都在 SeeO 里打通，数据在模块之间自动流转，不用反复导入导出。",
     "cardLink": "试用这个模块",
@@ -148,8 +147,8 @@
     ]
   },
   "preview": {
-    "sectionTag": "工作台预览",
-    "sectionTitle": "看到每一天的变化",
+    "sectionHeading": "工作台预览",
+    "sectionSubheading": "看到每一天的变化",
     "sectionSubtitle": "所有项目的核心指标汇总在一个仪表盘里，排名涨了还是掉了、健康度有没有回升、流量从哪来，一眼看完。",
     "demoBadge": "示例数据 · 演示用",
     "sample": "示例",

@@ -233,7 +233,6 @@ export default function ContentPage() {
     <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-ink-40">07</span>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
@@ -396,7 +395,6 @@ export default function ContentPage() {
           {/* 关键词密度 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-1</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("kwTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -440,7 +438,6 @@ export default function ContentPage() {
           {/* 标题建议 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-2</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("sugTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -470,7 +467,6 @@ export default function ContentPage() {
           {/* 标题结构 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-3</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("headTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -509,7 +505,6 @@ export default function ContentPage() {
           {/* 高频词 TOP 10 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-4</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("topTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -549,7 +544,6 @@ export default function ContentPage() {
           {/* 内容预览 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-5</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("previewTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -563,7 +557,6 @@ export default function ContentPage() {
           {/* 历史对比 */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-6</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("cmpTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -582,7 +575,6 @@ export default function ContentPage() {
           {/* SEO 检测清单（保留原有） */}
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">07-7</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("checklistTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
