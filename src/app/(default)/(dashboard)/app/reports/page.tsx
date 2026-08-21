@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { localizeReportTitle, resolveAuditDetail, resolveAuditSuggestion } from "@/lib/seo/audit-legacy-text";
-import { buildCoverageFromIssues } from "@/lib/seo/audit-checks";
+import { buildCoverageFromIssues, checkMetaMap, nonCatalogCheckNames, pickText } from "@/lib/seo/audit-checks";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
@@ -515,7 +515,6 @@ export default function ReportsPage() {
     <div className="dash-container p-6 lg:p-8">
       {/* 页头 */}
       <div className="flex items-center gap-3">
-        <span className="font-mono text-xs text-ink-40">08</span>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
@@ -648,7 +647,6 @@ export default function ReportsPage() {
       {/* 历史报告列表 */}
       <div className="mt-10">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs text-ink-40">08-1</span>
           <h2 className="font-display text-lg font-semibold text-ink">{t("historyTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
@@ -694,6 +692,9 @@ export default function ReportsPage() {
                                   const localizedIssues = (data.issues ?? []).map(
                                     (i: { type: string; severity: string; url: string; detail: string; suggestion?: string | null; checkId?: string; checkName?: string }) => ({
                                       ...i,
+                                      // R1：补 type（checkId 机器值），AuditReport 用它查 catalog
+                                      // 按当前 locale 输出检查项名称，不回退保存时的 checkName
+                                      type: i.type ?? i.checkId,
                                       checkId: i.checkId ?? i.type,
                                       detail: resolveAuditDetail(i.detail ?? "", locale) ?? "",
                                       suggestion: i.suggestion ? resolveAuditSuggestion(i.suggestion, locale) ?? "" : i.suggestion ?? "",
@@ -701,8 +702,24 @@ export default function ReportsPage() {
                                   );
                                   // 旧快照未保存 coverage：从 issues（checkId）按当前 locale 重建，
                                   // 覆盖检查项全集，避免"检查项覆盖（0/0 通过）"
+                                  // R1：快照自带的 coverage.name 为保存时 locale 文本，
+                                  // 读取时按 id → checkMetaMap / nonCatalogCheckNames 重新本地化，
+                                  // 未知 id 回退快照原值（历史兼容）
                                   const coverage = Array.isArray(data.coverage) && data.coverage.length > 0
-                                    ? data.coverage
+                                    ? data.coverage.map((c: { id?: string; name?: string; passed: boolean }) => {
+                                        const cid = typeof c.id === "string" ? c.id : "";
+                                        const meta = checkMetaMap[cid];
+                                        const extra = nonCatalogCheckNames[cid];
+                                        return {
+                                          ...c,
+                                          id: cid,
+                                          name: meta
+                                            ? pickText(meta.name, locale)
+                                            : extra
+                                              ? pickText(extra, locale)
+                                              : c.name ?? cid,
+                                        };
+                                      })
                                     : buildCoverageFromIssues(
                                         localizedIssues.map((i: { checkId: string }) => i.checkId),
                                         locale

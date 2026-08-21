@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
@@ -8,6 +8,9 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
 import { planLabel } from "@/lib/plan-labels";
 import { formatRelativeTime } from "@/lib/relative-time";
+import { useCreateProject } from "@/components/dashboard/CreateProjectContext";
+import { triggerUpgradeModal } from "@/components/billing/UpgradeModal";
+import { resolveApiErrorMessage } from "@/lib/billing-error-client";
 
 interface TopbarProps {
   displayName: string;
@@ -59,19 +62,23 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
   const [unread, setUnread] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string>("free");
+  const [maxProjects, setMaxProjects] = useState<number | null>(null);
+  const { openCreateProject } = useCreateProject();
   const bellRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // 拉取当前用户套餐（用于 plan badge 展示）
+  // 拉取当前用户套餐 + 项目额度上限（用于 plan badge 展示 + 新建项目额度校验）
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const res = await fetch("/api/account/usage", { cache: "no-store" });
         const json = await res.json();
-        if (!cancelled && res.ok && json?.data?.plan) {
-          setCurrentPlan(json.data.plan as string);
+        if (!cancelled && res.ok && json?.data) {
+          if (json.data.plan) setCurrentPlan(json.data.plan as string);
+          const limit = json.data.limits?.max_projects;
+          if (typeof limit === "number") setMaxProjects(limit);
         }
       } catch {
         // ignore
@@ -81,46 +88,46 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
   }, []);
 
   // 拉取真实项目列表 + 从 localStorage 恢复选中项
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        const list: ProjectItem[] = (data.data ?? []).map((p: ProjectItem) => ({
-          id: p.id,
-          name: p.name,
-          domain: p.domain,
-          healthScore: p.healthScore,
-        }));
-        setProjects(list);
+  // （下拉打开时也会调用：创建/删除项目后刷新，保证额度校验不用旧数据）
+  const loadProjects = useCallback(async () => {
+    try {
+      const res = await fetch("/api/projects", { cache: "no-store" });
+      const data = await res.json();
+      const list: ProjectItem[] = (data.data ?? []).map((p: ProjectItem) => ({
+        id: p.id,
+        name: p.name,
+        domain: p.domain,
+        healthScore: p.healthScore,
+      }));
+      setProjects(list);
 
-        // 恢复 localStorage 选中项（string id；旧版本遗留数字 id / 已删项目会校验失败 → fallback 第一个）
-        const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
-        const storedId = validStoredProjectId(stored, list.map((p) => p.id));
-        let initialId: string | null = null;
-        if (storedId !== null) {
-          initialId = storedId;
-          setSelectedId(storedId);
-        } else if (list.length > 0) {
-          // 默认选第一个
-          initialId = list[0].id;
-          setSelectedId(list[0].id);
-          window.localStorage.setItem(SELECTED_PROJECT_KEY, list[0].id);
-        } else {
-          setSelectedId(null);
-        }
-        // 通知同 tab 的页面（如 competitors）初始项目已就绪
-        if (initialId !== null) {
-          window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId } }));
-        }
-      } catch {
-        // ignore
+      // 恢复 localStorage 选中项（string id；旧版本遗留数字 id / 已删项目会校验失败 → fallback 第一个）
+      const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
+      const storedId = validStoredProjectId(stored, list.map((p) => p.id));
+      let initialId: string | null = null;
+      if (storedId !== null) {
+        initialId = storedId;
+        setSelectedId(storedId);
+      } else if (list.length > 0) {
+        // 默认选第一个
+        initialId = list[0].id;
+        setSelectedId(list[0].id);
+        window.localStorage.setItem(SELECTED_PROJECT_KEY, list[0].id);
+      } else {
+        setSelectedId(null);
       }
-    })();
-    return () => { cancelled = true; };
+      // 通知同 tab 的页面（如 competitors）初始项目已就绪
+      if (initialId !== null) {
+        window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId } }));
+      }
+    } catch {
+      // ignore
+    }
   }, []);
+
+  useEffect(() => {
+    void (async () => { await loadProjects(); })();
+  }, [loadProjects]);
 
   // 拉取预警
   useEffect(() => {
@@ -178,6 +185,25 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
     setProjectOpen(false);
   };
 
+  // F1：新建项目入口（额度校验后打开创建弹窗或升级提示）
+  const handleNewProject = () => {
+    setProjectOpen(false);
+    if (maxProjects !== null && projects.length >= maxProjects) {
+      triggerUpgradeModal({
+        currentPlan,
+        reason: resolveApiErrorMessage(
+          { code: "PROJECT_LIMIT_REACHED", plan: planLabel(currentPlan, locale), limit: maxProjects },
+          locale,
+          t("upgradeHint")
+        ),
+        limit: maxProjects,
+        used: projects.length,
+      });
+      return;
+    }
+    openCreateProject();
+  };
+
   const handleLogout = async () => {
     if (!isAuthEnabled) {
       setUserMenuOpen(false);
@@ -213,7 +239,11 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
       {/* 项目切换器：描边 chip */}
       <div className="relative min-w-0" ref={projectRef}>
         <button
-          onClick={() => setProjectOpen((o) => !o)}
+          onClick={() => {
+            // 打开下拉时刷新项目列表（创建/删除后额度校验数据保持新鲜）
+            if (!projectOpen) void loadProjects();
+            setProjectOpen((o) => !o);
+          }}
           className="flex items-center gap-2 rounded-md border border-line bg-card px-3 py-2 hover:border-ink-25"
         >
           <span className="flex h-6 w-6 flex-none items-center justify-center rounded bg-ink text-xs font-semibold text-card">
@@ -261,13 +291,12 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
               ))
             )}
             <div className="mt-1 border-t border-line-soft pt-1">
-              <Link
-                href="/app"
-                onClick={() => setProjectOpen(false)}
+              <button
+                onClick={handleNewProject}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft hover:text-ink"
               >
                 <span className="text-ink">+</span> {t("newProject")}
-              </Link>
+              </button>
             </div>
           </div>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
 import Link from "next/link";
@@ -158,6 +158,7 @@ function AuditPageInner() {
   const canFullAudit = entitlementsLoading ? false : features.full_audit;
   const canExportPdf = entitlementsLoading ? false : features.pdf_export;
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [domain, setDomain] = useState("");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -207,10 +208,20 @@ function AuditPageInner() {
           healthScore: p.healthScore,
         }));
         setProjects(list);
-        // 优先级：URL ?domain= 参数 > 项目列表第一个 > 空
+        // 优先级：URL ?domain= 参数 > localStorage 上次审计域名 > 项目列表第一个 > 空
+        // （F2：审计完成写入 seeo:last-audit-domain 后刷新，必须恢复同一域名，
+        //   否则回退到项目列表第一个，刚审计的结果看起来"消失"）
         const queryDomain = searchParams.get("domain")?.trim();
+        let lastAuditDomain = "";
+        try {
+          lastAuditDomain = window.localStorage.getItem("seeo:last-audit-domain")?.trim() ?? "";
+        } catch {
+          lastAuditDomain = "";
+        }
         if (queryDomain) {
           setDomain(queryDomain);
+        } else if (lastAuditDomain) {
+          setDomain(lastAuditDomain);
         } else if (list.length > 0) {
           setDomain(list[0].domain);
         } else {
@@ -414,7 +425,12 @@ function AuditPageInner() {
   const handleDomainChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuditing(false);
-    await loadLatest(domain.trim());
+    // 手动切换后同步 URL query（replace 不产生历史记录），刷新保持当前选中域名
+    const d = domain.trim();
+    if (d && searchParams.get("domain") !== d) {
+      router.replace(`/app/audit?domain=${encodeURIComponent(d)}`, { scroll: false });
+    }
+    await loadLatest(d);
   };
 
   const hasResult = audit && audit.status === "completed";
@@ -502,7 +518,6 @@ function AuditPageInner() {
 
       {/* 页头 */}
       <div className="flex items-center gap-3 print:hidden">
-        <span className="font-mono text-xs text-ink-40">05</span>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {t("title")}
         </h1>
@@ -517,13 +532,19 @@ function AuditPageInner() {
         <form onSubmit={handleDomainChange} className="flex items-end gap-2">
           <div>
             <label className="font-sans text-xs text-ink-40">{t("domainLabel")}</label>
-            <DomainSelect
-              value={domain}
-              onChange={(d) => {
-                setDomain(d);
-              }}
-              className="mt-2 w-48 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-            />
+            {/* R2：等页面初始化（URL > localStorage > 项目一）确定 domain 后再挂载，
+                避免 DomainSelect 的"无值→选第一个项目"先于初始化生效，出现瞬态覆盖 */}
+            {projectsLoading ? (
+              <div className="mt-2 h-10 w-48 animate-pulse rounded-md border border-line bg-paper" />
+            ) : (
+              <DomainSelect
+                value={domain}
+                onChange={(d) => {
+                  setDomain(d);
+                }}
+                className="mt-2 w-48 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+              />
+            )}
           </div>
           <button type="submit" className="btn-secondary">
             {t("viewBtn")}
@@ -785,7 +806,6 @@ function AuditPageInner() {
         {hasResult && (
           <div className="mt-10">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs text-ink-40">05-0</span>
               <h2 className="font-display text-lg font-semibold text-ink">{t("chartsTitle")}</h2>
               <div className="hairline flex-1" />
             </div>
@@ -955,7 +975,6 @@ function AuditPageInner() {
       {!loading && hasResult && audit?.comparison && (
         <div className="mt-10">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-ink-40">05-1</span>
             <h2 className="font-display text-lg font-semibold text-ink">{t("comparisonTitle")}</h2>
             <div className="hairline flex-1" />
           </div>
@@ -1109,7 +1128,6 @@ function AuditPageInner() {
       {!loading && hasResult && audit?.coverage && audit.coverage.length > 0 && (
         <div className="mt-10">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-ink-40">05-2</span>
             <h2 className="font-display text-lg font-semibold text-ink">{t("coverageTitle")}</h2>
             <div className="hairline flex-1" />
           </div>

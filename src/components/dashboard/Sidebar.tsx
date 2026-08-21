@@ -271,7 +271,7 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
             {showUpgradeCta && (
               <Link
                 href="/pricing"
-                className="mt-2 block w-full rounded-md bg-ink h-8 text-center font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
+                className="mt-2 flex h-8 w-full items-center justify-center rounded-md bg-ink font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
               >
                 {t("upgradeCta")}
               </Link>

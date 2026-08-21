@@ -5,6 +5,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import { useUpgradeModalProvider } from "@/components/billing/UpgradeModal";
 import { EntitlementsProvider, useEntitlements } from "@/components/billing/EntitlementsContext";
+import { CreateProjectProvider } from "@/components/dashboard/CreateProjectContext";
 
 interface DashboardShellProps {
   displayName: string;
@@ -14,11 +15,13 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ displayName, email, children }: DashboardShellProps) {
   return (
-    <EntitlementsProvider>
-      <DashboardShellInner displayName={displayName} email={email}>
-        {children}
-      </DashboardShellInner>
-    </EntitlementsProvider>
+    <CreateProjectProvider>
+      <EntitlementsProvider>
+        <DashboardShellInner displayName={displayName} email={email}>
+          {children}
+        </DashboardShellInner>
+      </EntitlementsProvider>
+    </CreateProjectProvider>
   );
 }
 

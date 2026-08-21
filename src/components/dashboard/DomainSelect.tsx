@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 interface Project {
@@ -27,6 +27,15 @@ export default function DomainSelect({ value, onChange, placeholder, className }
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [manual, setManual] = useState(false);
+  // R2：effect 闭包里的 value 是挂载时的旧值（常为 ""）。
+  // 若用闭包 value 判断"无值"，会在 URL ?domain= / localStorage 恢复已生效后
+  // 仍用第一个项目域名覆盖选中值（deep-link 竞态）。用 ref 读取最新 value。
+  const valueRef = useRef(value);
+
+  // 渲染期禁止写 ref（react-compiler 规则），在 effect 中同步
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -42,8 +51,8 @@ export default function DomainSelect({ value, onChange, placeholder, className }
         const json = await res.json();
         if (!settled && res.ok && Array.isArray(json.data)) {
           setProjects(json.data as Project[]);
-          // 无值且项目存在时，默认选中第一个
-          if (!value && json.data.length > 0) {
+          // 无值且项目存在时，默认选中第一个（读最新 value，避免覆盖 URL/localStorage 恢复值）
+          if (!valueRef.current && json.data.length > 0) {
             onChange((json.data[0] as Project).domain);
           }
           // 无项目时切到手动输入

@@ -40,3 +40,26 @@ describe("预览历史快照：缺失 coverage 时重建", () => {
     expect(src).toMatch(/localizedIssues\.map\(\(i: \{ checkId: string \}\) => i\.checkId\)/);
   });
 });
+
+describe("R1：历史快照跨语言预览按当前 locale 重新本地化", () => {
+  it("快照自带的 coverage 按 id → checkMetaMap/nonCatalogCheckNames 重新输出当前 locale 名称", () => {
+    // 不得原样使用快照 coverage（保存时 locale 的 name）
+    expect(src).toContain("checkMetaMap[cid]");
+    expect(src).toContain("pickText(meta.name, locale)");
+    expect(src).toContain("nonCatalogCheckNames[cid]");
+  });
+
+  it("未知 coverage id 回退快照原 name（历史兼容，不返回空白）", () => {
+    expect(src).toContain("c.name ?? cid");
+  });
+
+  it("issues 补 type（checkId 机器值）：AuditReport 用 type 查 catalog，不回退保存时 checkName", () => {
+    expect(src).toContain("type: i.type ?? i.checkId");
+    expect(src).toContain("checkId: i.checkId ?? i.type");
+  });
+
+  it("detail/suggestion 读取层经 resolver 双向映射（跨语言快照回读）", () => {
+    expect(src).toContain("resolveAuditDetail(i.detail ?? \"\", locale)");
+    expect(src).toContain("resolveAuditSuggestion(i.suggestion, locale)");
+  });
+});
