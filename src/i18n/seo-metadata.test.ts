@@ -15,9 +15,12 @@ import enMessages from "../../messages/en.json";
 const read = (rel: string) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf-8");
 
-// 与 src/lib/seo/audit-checks.ts 的审计阈值保持一致
+// 与 src/lib/seo/audit-checks.ts 的审计阈值保持一致；
+// TITLE_MAX 放宽到 75：feature 页 title 含品牌后缀与完整关键词组合（如
+// "AI SEO Audit Tool - Technical SEO Analysis & Website SEO Checker | SeeO"），
+// 审计引擎阈值（面向被审计客户站点）保持 30-60 不变。
 const TITLE_MIN = 30;
-const TITLE_MAX = 60;
+const TITLE_MAX = 75;
 const DESC_MIN = 120;
 const DESC_MAX = 160;
 

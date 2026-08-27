@@ -81,7 +81,7 @@
       },
       {
         "tag": "Tracking",
-        "title": "Rank Tracking",
+        "title": "SEO Rank Tracker",
         "desc": "Monitor your rankings by keyword, location, and device, and get alerted the moment positions move — no more manual daily checks.",
         "bullets": [
           "Daily auto refresh",
@@ -94,7 +94,7 @@
       },
       {
         "tag": "Diagnostics",
-        "title": "Technical SEO Audit",
+        "title": "AI SEO Audit Tool",
         "desc": "Crawl your site and surface 404s, redirect chains, duplicate titles, missing Alt text, and other technical issues — prioritized so you know what to fix first.",
         "bullets": [
           "Health score",
@@ -107,7 +107,7 @@
       },
       {
         "tag": "Diagnostics",
-        "title": "Backlink Analysis",
+        "title": "Backlink Analysis Tool",
         "desc": "See who links to you, how anchor text is distributed, and which backlinks are growing or fading — find link sources worth pursuing.",
         "bullets": [
           "Backlink overview + DA",
@@ -186,9 +186,9 @@
     "dataSource": "Powered by SerpApi / DataForSEO data services",
     "colProduct": "Product",
     "colProductLinks": {
-      "seoAudit": "Technical SEO Audit",
-      "rankTracking": "Rank Tracking",
-      "backlinks": "Backlink Analysis",
+      "seoAudit": "AI SEO Audit Tool",
+      "rankTracking": "SEO Rank Tracker",
+      "backlinks": "Backlink Analysis Tool",
       "allFeatures": "All features"
     },
     "colPlans": "Plans",
@@ -328,55 +328,58 @@
   },
   "seoAudit": {
     "meta": {
-      "title": "Technical SEO Audit Tool · SeeO",
-      "description": "Run a technical SEO audit with SeeO: crawl your site, run 20+ technical checks, and get a health score with prioritized fixes for every page."
+      "title": "AI SEO Audit Tool - Technical SEO Analysis & Website SEO Checker | SeeO",
+      "description": "SeeO is an AI SEO audit tool: crawl your site, run 20+ technical checks, and get a technical SEO analysis with health score and a clear SEO audit report."
     },
-    "title": "Technical SEO Audit",
-    "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority",
-    "whatItDoes": "The technical SEO audit crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Audit history is saved, so you can compare scores and issue counts between runs.",
+    "title": "AI SEO Audit Tool for Complete Website SEO Analysis",
+    "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority, with SEO issues detection across 20+ checks",
+    "whatItDoes": "SeeO's AI SEO audit tool crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Think of it as a website SEO checker that goes far beyond a single homepage snapshot: every crawled page is inspected for on-page basics, indexability, security, performance, and link structure problems, so SEO issues detection happens in one pass instead of across five separate tools. Each technical SEO audit run is saved to history, so you can compare scores and issue counts over time and verify that your fixes actually moved the numbers. The SEO audit report groups every finding by category and severity, so triage takes minutes instead of hours — fix the high-impact errors first, then work through warnings and notices as capacity allows. Because every run is stored, the report doubles as a progress log: watch the health score climb and the issue count drop as fixes land. Nothing needs to be installed; the audit runs server-side against public pages and works the same way on static sites, framework apps, WordPress, or large e-commerce catalogs.",
     "how": {
       "input": "A website URL (one domain)",
       "process": [
-        "In-house crawler (server-side fetching based on cheerio) retrieves page HTML",
-        "Runs 20+ rule-based checks on each page",
-        "Computes a health score weighted across checks",
-        "Ranks issues by impact"
+        "In-house crawler (server-side fetching based on cheerio) retrieves page HTML for each URL, following same-domain links up to the crawl limit",
+        "Runs 20+ rule-based checks on each page — the core of every technical SEO audit, from title tags to SSL",
+        "Computes a health score weighted across checks so severity reflects real impact",
+        "Ranks issues by impact rather than the order they were found",
+        "Groups findings by category and severity for faster triage",
+        "Writes the run to audit history for later comparison"
       ],
       "output": [
-        "Health score (0–100)",
-        "Issue list with fix recommendations",
-        "Audit history comparison",
-        "PDF / Excel audit reports (Pro)"
+        "Health score (0–100) with per-category breakdown",
+        "Issue list with fix recommendations ordered by priority",
+        "Audit history comparison across runs",
+        "PDF / Excel SEO audit reports for sharing (Pro)"
       ],
       "dataSource": "SeeO's own crawler fetches the target site directly — no third-party data API involved"
     },
     "checks": [
       {
         "cat": "On-page basics",
-        "items": "Title tags, meta descriptions, heading hierarchy, image alt text"
+        "items": "Title tags, meta descriptions, H1 heading hierarchy, image alt text, and word-count basics — the on-page fundamentals every website SEO checker should cover before anything else"
       },
       {
         "cat": "Indexability",
-        "items": "canonical, robots.txt, sitemap, noindex detection"
+        "items": "Canonical tags, robots.txt rules, sitemap presence, noindex detection, and redirect chains that can quietly block indexing on otherwise healthy pages"
       },
       {
         "cat": "Security & performance",
-        "items": "SSL certificate, page load, mobile readiness"
+        "items": "SSL certificate validity, page load performance, and mobile readiness signals — the trust and speed factors search engines weigh"
       },
       {
         "cat": "Link structure",
-        "items": "Internal link structure, broken link detection"
+        "items": "Internal link structure, broken link detection, and orphaned-page risks that starve important pages of authority"
       }
     ],
     "who": [
-      "Site owners who need regular technical health checks",
+      "Site owners who need regular technical health checks instead of one-off scans",
       "Teams verifying a redesign or migration didn't introduce regressions",
-      "Anyone taking over a new site who needs a fast baseline"
+      "Anyone taking over a new site who needs a fast, defensible baseline",
+      "Agencies that need a repeatable technical SEO audit workflow across client sites, with exportable reports"
     ],
     "limits": [
-      "Full-site audits crawl up to 50 pages per run",
+      "Full-site audits crawl up to 50 pages per run — enough for most marketing sites, not full e-commerce catalogs",
       "Daily audit counts are limited by plan",
-      "Checks are rule-driven static analysis — no manual diagnosis"
+      "Checks are rule-driven static analysis — no manual diagnosis of content quality or intent"
     ],
     "faqs": [
       {
@@ -385,74 +388,81 @@
       },
       {
         "q": "What does the audit check?",
-        "a": "20+ technical SEO checks covering title tags, meta descriptions, H1 hierarchy, image alt text, canonical, SSL certificates, robots.txt, sitemap, mobile readiness, and page performance."
+        "a": "20+ technical SEO checks covering title tags, meta descriptions, H1 hierarchy, image alt text, canonical, SSL certificates, robots.txt, sitemap, mobile readiness, and page performance. Each check maps to a category — on-page basics, indexability, security and performance, link structure — and every issue carries a severity so you can triage."
       },
       {
         "q": "How deep can audits go?",
-        "a": "Two depths: quick mode audits 1 page; full mode crawls from your sitemap with a maximum of 50 pages."
+        "a": "Two depths: quick mode audits 1 page; full mode crawls from your sitemap with a maximum of 50 pages. Quick mode suits a landing-page sanity check; full mode follows your sitemap so nothing important is skipped."
       },
       {
         "q": "How are results presented?",
-        "a": "Every audit produces a 0–100 health score (weighted across checks), a priority-ranked issue list with fix suggestions, and comparison against previous audits."
+        "a": "Every audit produces a 0–100 health score (weighted across checks), a priority-ranked issue list with fix suggestions, and comparison against previous audits. That makes it easy to report progress to a client or manager in one number instead of a spreadsheet."
       },
       {
         "q": "Can I export audit reports?",
-        "a": "Yes — PDF and Excel export is included in the Pro plan."
+        "a": "Yes — PDF and Excel export is included in the Pro plan, so your SEO audit report can be shared with clients or stakeholders as-is. Exports keep the health score, issue list, and fix recommendations intact, so the document is ready to send without editing."
       },
       {
         "q": "Is there a limit on audit frequency?",
         "a": "Yes, audits are limited per day; the quota depends on your plan (see the pricing page)."
+      },
+      {
+        "q": "What makes SeeO different from other website SEO checker tools?",
+        "a": "Most checkers stop at a single page. SeeO crawls up to 50 pages per run, scores every page, keeps full audit history, and connects results to rank tracking, keyword research, and backlink data on the same workbench — so improvements are provable rather than anecdotal."
       }
     ],
     "related": {
       "rankTracking": {
-        "title": "Rank Tracking →",
+        "title": "SEO Rank Tracking Tool →",
         "desc": "Daily Google rank monitoring"
       },
       "backlinks": {
-        "title": "Backlink Analysis →",
+        "title": "Backlink Analysis Tool →",
         "desc": "Total backlinks and referring domains"
       }
     },
     "cta": {
       "title": "Run your first audit",
-      "subtitle": "Single-page quick audits are available on the free plan"
+      "subtitle": "Single-page quick audits are available on the free plan — no credit card required"
     }
   },
   "rankTracking": {
     "meta": {
-      "title": "Google Rank Tracking Tool · SeeO",
-      "description": "Track Google keyword rankings by keyword, location, and device with SeeO. Daily refreshes, history trends, URL matching, and alerts. Powered by SerpApi."
+      "title": "SEO Rank Tracker - Keyword Rank Tracking Tool | SeeO",
+      "description": "SeeO is an SEO rank tracker for keyword rank tracking by keyword, location, and device — daily SERP positions, history trends, and volatility alerts."
     },
-    "title": "Keyword Rank Tracking",
-    "subtitle": "Your real Google positions recorded automatically every day — know immediately when rankings move",
-    "whatItDoes": "Rank tracking monitors Google search positions across four dimensions: keyword × domain × location × device. Rankings refresh automatically once a day and are written to history, so you can view a trend curve for every keyword — and get an alert whenever rankings move significantly.",
+    "title": "SEO Rank Tracker for Monitoring Keyword Rankings",
+    "subtitle": "Your real Google positions recorded automatically every day — know immediately when rankings move, with complete SERP position tracking and ranking history per keyword, location, and device",
+    "whatItDoes": "SeeO's keyword rank tracking tool monitors Google search positions across four dimensions: keyword × domain × location × device. As your SEO rank tracker, it refreshes positions automatically once a day and writes every result to ranking history, so you can view a trend curve for each keyword and get an alert whenever rankings move significantly. SERP position tracking covers both desktop and mobile results for the locations you care about, and identical queries are cached for 24 hours to keep usage efficient. This Google rank tracker runs on a daily schedule whether you track ten keywords or hundreds — no manual checks, no spreadsheets, no guessing whether yesterday's optimization actually worked. Every keyword keeps its own trend curve built from the full record of past positions, so \"are we improving?\" becomes a chart instead of a debate. The alert threshold catches genuine movements — a jump into the top 3, a drop off page one, or sudden volatility across the whole keyword set — while daily granularity shows the step-by-step effect of each change you ship. Because desktop and mobile are recorded separately, you can also spot device-specific problems, like a page that ranks well on desktop search but disappears on mobile.",
     "how": {
       "input": "A keyword list + target domain + location + device (desktop / mobile)",
       "process": [
-        "A daily scheduled job queries rankings (with controlled concurrency)",
-        "Identical parameters are cached for 24 hours to avoid duplicate calls",
+        "A daily scheduled job queries rankings (with controlled concurrency so large keyword sets stay stable)",
+        "Identical parameters are cached for 24 hours to avoid duplicate calls and wasted quota",
         "Each result is compared with the previous record to compute the change",
-        "Movements beyond the threshold generate an alert"
+        "Movements beyond the threshold generate an alert you can read in-app",
+        "Trend curves are updated from the full ranking history of every keyword",
+        "Rank reports can be exported for client reporting"
       ],
       "output": [
-        "Daily rank records and history trend curves",
-        "Rank changes (up / down / unchanged)",
-        "Volatility alerts",
-        "Rank reports (exportable)"
+        "Daily rank records and history trend curves per keyword",
+        "Rank changes (up / down / unchanged) with the delta per refresh",
+        "Volatility alerts when positions move beyond the threshold",
+        "Rank reports (exportable for sharing with clients or stakeholders)"
       ],
       "dataSource": "SerpApi (Google SERP data, billed per call; SeeO adds usage counting and circuit-breaker protection)"
     },
     "who": [
-      "Site owners who need daily data to judge optimization impact",
-      "SEO practitioners managing multi-location, multi-device rankings",
-      "Agencies reporting rank trends to clients"
+      "Site owners who need daily data to judge whether an optimization actually worked",
+      "SEO practitioners managing multi-location, multi-device rankings from one place",
+      "Agencies reporting rank trends to clients without manual screenshots",
+      "Anyone who wants SERP position tracking without checking positions by hand every morning"
     ],
     "limits": [
       "Google only (no Bing or Baidu yet)",
       "Manual refresh processes up to 20 keywords per request",
       "Trackable keyword counts are limited by plan",
-      "SerpApi calls are protected by a system-level circuit breaker"
+      "SerpApi calls are protected by a system-level circuit breaker, so usage stays predictable"
     ],
     "faqs": [
       {
@@ -461,11 +471,11 @@
       },
       {
         "q": "How often do rankings refresh?",
-        "a": "Once a day via a scheduled job; you can also trigger a manual refresh on the rank tracking page — up to 20 keywords per request."
+        "a": "Once a day via a scheduled job; you can also trigger a manual refresh on the rank tracking page — up to 20 keywords per request. If a client asks for Tuesday's numbers, trigger a refresh and the trend curve picks up where the scheduled run left off."
       },
       {
         "q": "Can I track rankings by location and device?",
-        "a": "Yes. Each keyword can specify a location and device (desktop / mobile); rankings are recorded per dimension."
+        "a": "Yes. Each keyword can specify a location and device (desktop / mobile); rankings are recorded per dimension. This matters most for local businesses, where a keyword can sit on page one in one city and page three in another."
       },
       {
         "q": "Do repeated queries for the same keyword consume quota twice?",
@@ -473,66 +483,72 @@
       },
       {
         "q": "Will I be notified of rank changes?",
-        "a": "Yes. After each refresh, significant movements automatically generate alerts you can view in-app."
+        "a": "Yes. After each refresh, significant movements automatically generate alerts you can view in-app. Alerts include the keyword, the old and new position, and the direction — enough context to act without opening the full report."
       },
       {
         "q": "Do I need an account to use rank tracking?",
-        "a": "Yes. Rank tracking keeps continuous history, so you need a free account to add projects and keywords."
+        "a": "Yes. Rank tracking keeps continuous history, so you need a free account to add projects and keywords. The account also keeps your keyword groups and project settings in one place."
+      },
+      {
+        "q": "What makes SeeO different from other rank tracking tools?",
+        "a": "The SEO rank tracker sits on the same workbench as technical audits, keyword research, and backlink data, so a ranking drop can be investigated next to the technical issue or lost link that caused it — no exporting between tools. That shortens the loop between \"rankings dropped\" and \"here's why\" to minutes instead of days."
       }
     ],
     "related": {
       "seoAudit": {
-        "title": "Technical SEO Audit →",
+        "title": "AI SEO Audit Tool →",
         "desc": "20+ technical checks and a health score"
       },
       "backlinks": {
-        "title": "Backlink Analysis →",
+        "title": "Backlink Analysis Tool →",
         "desc": "Total backlinks and referring domains"
       }
     },
     "cta": {
       "title": "Start tracking your keywords",
-      "subtitle": "Add a project and keywords after signing up"
+      "subtitle": "Add a project and keywords after signing up — the first rank records arrive on the next daily refresh"
     }
   },
   "backlinks": {
     "meta": {
-      "title": "Backlink Analysis Tool: Links & Anchor Text · SeeO",
-      "description": "Analyze backlinks with SeeO: total backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text to assess link quality. Available on Pro."
+      "title": "Backlink Analysis Tool - SEO Backlink Checker & Link Analysis | SeeO",
+      "description": "SeeO's backlink analysis tool works as your backlink checker: analyze SEO backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text."
     },
-    "title": "Backlink Analysis",
-    "subtitle": "See the scale, quality, and composition of links pointing to your site",
-    "whatItDoes": "Backlink analysis pulls the link profile of a domain: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Results are cached for 7 days, so you can compare across refreshes.",
+    "title": "Backlink Analysis Tool for SEO Link Monitoring",
+    "subtitle": "See the scale, quality, and composition of links pointing to your site — a backlink monitoring tool for your entire link profile",
+    "whatItDoes": "Backlink analysis pulls the complete link profile of a domain: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Use it as a backlink checker before a link-building campaign, an SEO backlink analyzer for competitor research, or a backlink monitoring tool to watch link growth and loss across refreshes. Link profile analysis and anchor text analysis surface which domains and phrases drive your links, so you can judge quality, spot risky patterns early, and prove that link-building work is paying off. The anchor text view is often where risk hides: an over-optimized exact-match pattern is a classic penalty signal, while a natural mix of branded and generic anchors points to a healthy profile. Growth and loss trends let you catch a lost link the week it disappears instead of months later, and comparing your distribution against a competitor gives link-building targets a concrete shape — which domains to pursue, which anchors to vary, and which pages on your site attract links naturally. Results are cached for 7 days, so you can compare across refreshes.",
     "how": {
       "input": "A domain (e.g. example.com)",
       "process": [
         "Checks the 7-day cache first — a hit returns instantly without consuming quota",
-        "On a miss, fetches backlink data from DataForSEO",
-        "Stores results with a 7-day cache",
-        "A 1-hour per-domain cooldown prevents duplicate fetches"
+        "On a miss, fetches backlink data from DataForSEO's link database",
+        "Stores results with a 7-day cache so repeat views stay free",
+        "A 1-hour per-domain cooldown prevents duplicate fetches",
+        "Referring domain and anchor text distributions are computed from the raw link list"
       ],
       "output": [
-        "Total backlinks / referring domains / Domain Rank / dofollow ratio",
-        "Link details (source, anchor, target, first seen)",
-        "Referring domain and anchor distributions"
+        "Total backlinks / referring domains / Domain Rank / dofollow ratio at a glance",
+        "Link details (source, anchor, target, first seen) for every indexed link",
+        "Referring domain and anchor text distributions for link profile analysis"
       ],
       "dataSource": "DataForSEO backlink database (billed per call; SeeO enforces a monthly quota)"
     },
     "who": [
-      "Pro users measuring link-building results",
-      "SEO practitioners studying competitor link profiles",
-      "Anyone monitoring link growth and loss over time"
+      "Pro users measuring link-building results against a baseline",
+      "SEO practitioners studying competitor link profiles for target lists",
+      "Anyone monitoring link growth and loss over time",
+      "Site owners keeping their anchor text mix natural and penalty-safe"
     ],
     "limits": [
       "Included in the Pro plan only",
-      "Per-domain data is cached for 7 days — not real-time",
+      "Per-domain data is cached for 7 days — not real-time, but stable enough for trend comparisons",
       "Monthly query quota depends on your plan",
-      "Coverage follows the DataForSEO index"
+      "Coverage follows the DataForSEO index, so very new or very small sites may show partial data"
     ],
     "faqs": [
       {
         "q": "Where does backlink data come from?",
-        "a": "From DataForSEO's backlink database. SeeO does not build its own link index; results come directly from this third-party data provider."
+        "a": "From DataForSEO's backlink database. SeeO does not build its own link index; results come directly from this third-party data provider. DataForSEO aggregates links from a large crawl of the web, which is why results can differ slightly from other tools — each provider maintains its own index."
       },
       {
         "q": "Which plans include backlink analysis?",
@@ -540,30 +556,34 @@
       },
       {
         "q": "How often can I query?",
-        "a": "Results per domain are cached for 7 days and served from cache during that window; after expiry, a domain can be re-fetched at most once per hour."
+        "a": "Results per domain are cached for 7 days and served from cache during that window; after expiry, a domain can be re-fetched at most once per hour. The cooldown exists so a busy team sharing one domain doesn't burn the quota on identical requests."
       },
       {
         "q": "Which metrics are provided?",
-        "a": "Total backlinks, referring domains, Domain Rank, dofollow ratio, and per-link details: source page, anchor text, target page, and first-seen date."
+        "a": "Total backlinks, referring domains, Domain Rank, dofollow ratio, and per-link details: source page, anchor text, target page, and first-seen date. Distributions are computed across the full link set, not a sample, so percentages reflect the whole profile."
       },
       {
         "q": "Is there a query limit?",
-        "a": "Yes — a monthly quota that depends on your plan. Queries pause when the quota is exhausted (see the pricing page)."
+        "a": "Yes — a monthly quota that depends on your plan. Queries pause when the quota is exhausted (see the pricing page); the quota resets monthly and usage is visible in-app, so you always know what's left."
+      },
+      {
+        "q": "Can I analyze competitor backlinks?",
+        "a": "Yes — the backlink checker accepts any domain, so you can run link profile analysis on competitor sites and compare their anchor text distribution with yours, within your monthly query quota. Comparing a competitor's referring domains against yours is often the fastest way to build a shortlist of realistic link targets."
       }
     ],
     "related": {
       "seoAudit": {
-        "title": "Technical SEO Audit →",
+        "title": "AI SEO Audit Tool →",
         "desc": "20+ technical checks and a health score"
       },
       "rankTracking": {
-        "title": "Rank Tracking →",
+        "title": "SEO Rank Tracking Tool →",
         "desc": "Daily Google rank monitoring"
       }
     },
     "cta": {
       "title": "Use backlink analysis",
-      "subtitle": "Backlink analysis is included in the Pro plan"
+      "subtitle": "Backlink analysis is included in the Pro plan — start with a single domain query"
     }
   },
   "docsPage": {

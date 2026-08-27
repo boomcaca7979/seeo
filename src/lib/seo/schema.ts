@@ -93,6 +93,70 @@ export function softwareApplicationSchema(locale: "en" | "zh" = "zh") {
   };
 }
 
+// SoftwareApplication 按 feature 页输出的文案（en/zh 双语，文案硬编码与 APP_TEXT 同源管理）
+const FEATURE_APP_TEXT = {
+  seoAudit: {
+    en: {
+      name: "SeeO SEO Audit Tool",
+      description:
+        "AI SEO audit tool that crawls your site, runs 20+ technical checks, and generates a prioritized SEO audit report with a 0-100 health score.",
+    },
+    zh: {
+      name: "SeeO SEO 审计工具",
+      description:
+        "SeeO SEO 审计工具：自动抓取网站、运行 20+ 项技术检查，生成带 0-100 健康分与优先级修复建议的 SEO 审计报告。",
+    },
+  },
+  rankTracking: {
+    en: {
+      name: "SeeO Rank Tracker",
+      description:
+        "SEO rank tracker with daily keyword rank tracking by keyword, location, and device — SERP positions, ranking history, and volatility alerts.",
+    },
+    zh: {
+      name: "SeeO 排名追踪器",
+      description:
+        "SeeO 排名追踪器：按关键词、地区与设备每日追踪 Google 排名，记录排名历史并在排名波动时自动提醒。",
+    },
+  },
+  backlinks: {
+    en: {
+      name: "SeeO Backlink Analysis Tool",
+      description:
+        "Backlink analysis tool and SEO backlink checker: total backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text analysis.",
+    },
+    zh: {
+      name: "SeeO 外链分析工具",
+      description:
+        "SeeO 外链分析工具：查询总外链、引用域、Domain Rank、dofollow 比例与锚文本分布，评估外链质量。",
+    },
+  },
+} as const;
+
+export type FeatureAppKey = keyof typeof FEATURE_APP_TEXT;
+
+/**
+ * SoftwareApplication（feature 能力页）：每个 /features/* 页输出对应模块的 SoftwareApplication，
+ * 与 WebPage / BreadcrumbList / FAQPage 并存。url 传 locale 相对路径（含 /zh 前缀）。
+ */
+export function featureAppSchema(
+  page: FeatureAppKey,
+  url: string,
+  locale: "en" | "zh"
+) {
+  const text = FEATURE_APP_TEXT[page][locale];
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: text.name,
+    url: `${SITE_URL}${url}`,
+    applicationCategory: "SEO Software",
+    operatingSystem: "Web",
+    description: text.description,
+    inLanguage: locale === "zh" ? "zh-CN" : "en",
+  };
+}
+
 /** BreadcrumbList：items 为 [首页, ...层级页面]，url 传相对路径（以 / 开头） */
 export function breadcrumbSchema(
   items: Array<{ name: string; url: string }>,

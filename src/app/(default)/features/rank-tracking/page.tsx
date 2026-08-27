@@ -8,6 +8,7 @@ import {
   breadcrumbSchema,
   webPageSchema,
   faqPageSchema,
+  featureAppSchema,
 } from "@/lib/seo/schema";
 
 // ===== /features/rank-tracking 内容组件（en: /features/rank-tracking · zh: /zh/features/rank-tracking）=====
@@ -48,6 +49,7 @@ export default async function RankTrackingFeaturePage() {
         )}
       />
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
+      <JsonLd schema={featureAppSchema("rankTracking", lpath, locale)} />
       <Navbar />
 
       <div className="doc-shell px-6 py-16">

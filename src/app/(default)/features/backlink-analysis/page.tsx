@@ -8,6 +8,7 @@ import {
   breadcrumbSchema,
   webPageSchema,
   faqPageSchema,
+  featureAppSchema,
 } from "@/lib/seo/schema";
 
 // ===== /features/backlink-analysis 内容组件（en: /features/backlink-analysis · zh: /zh/features/backlink-analysis）=====
@@ -48,6 +49,7 @@ export default async function BacklinkAnalysisFeaturePage() {
         )}
       />
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
+      <JsonLd schema={featureAppSchema("backlinks", lpath, locale)} />
       <Navbar />
 
       <div className="doc-shell px-6 py-16">

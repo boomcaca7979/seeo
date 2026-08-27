@@ -8,6 +8,7 @@ import {
   breadcrumbSchema,
   webPageSchema,
   faqPageSchema,
+  featureAppSchema,
 } from "@/lib/seo/schema";
 
 // ===== /features/seo-audit 内容组件（en: /features/seo-audit · zh: /zh/features/seo-audit）=====
@@ -49,6 +50,7 @@ export default async function SeoAuditFeaturePage() {
         )}
       />
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
+      <JsonLd schema={featureAppSchema("seoAudit", lpath, locale)} />
       <Navbar />
 
       <div className="doc-shell px-6 py-16">
