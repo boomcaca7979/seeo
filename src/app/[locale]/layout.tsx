@@ -133,6 +133,13 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
       className={`${montserrat.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
+        {/* Google AdSense publisher code（React 19 将 async script 提升至 <head>，SSR 原始 HTML 可见；
+            next/script 的 beforeInteractive 在本项目 Next 16 下仅输出 preload link，无法通过 AdSense 验证） */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4267926791604017"
+          crossOrigin="anonymous"
+        />
         {/* 全站实体：Organization + WebSite（真实字段，无编造数据） */}
         <JsonLd schema={organizationSchema(loc)} />
         <JsonLd schema={websiteSchema(loc)} />
