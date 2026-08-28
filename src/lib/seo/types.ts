@@ -24,6 +24,18 @@ export interface RelatedQuestion {
   title?: string;
 }
 
+/** SERP feature 块（仅记录 provider 真实返回的块，绝不推测） */
+export interface SerpFeature {
+  /** provider 原始块名，如 featured_snippet / local_pack / ai_overview */
+  featureType: string;
+  /** provider 块位置（部分块 provider 不提供则为 null） */
+  position: number | null;
+  /** 块主标题（如 featured snippet 标题、knowledge panel 名称） */
+  title: string | null;
+  /** 块主链接（如 featured snippet 来源 URL） */
+  url: string | null;
+}
+
 /** 单次 SERP 查询的聚合结果 */
 export interface SerpResult {
   keyword: string;
@@ -33,6 +45,10 @@ export interface SerpResult {
   organic: OrganicResult[];
   relatedSearches: RelatedSearch[];
   relatedQuestions: RelatedQuestion[];
+  /** SERP feature 块（P0-02-B 起提供；旧缓存条目可能缺失，读取端须容忍 undefined） */
+  features?: SerpFeature[];
+  /** SerpApi hl 语言码（P0-02-B 起提供；缺省 zh-cn 保持既有行为） */
+  language?: string;
   /** 是否命中本地缓存（不消耗 API 额度） */
   fromCache?: boolean;
 }

@@ -7,6 +7,8 @@ export interface SeoQueryParams {
   keyword: string;
   location: string; // 国家名，如「中国」「美国」
   device: "PC" | "移动端";
+  /** SerpApi hl 语言码（如 zh-cn / en / ja），缺省 zh-cn 保持既有行为 */
+  language?: string;
 }
 
 export interface RankQueryParams extends SeoQueryParams {

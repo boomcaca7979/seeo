@@ -19,8 +19,8 @@ vi.mock("./cache", () => ({
   peekUsage: (...args: unknown[]) => peekUsageMock(...args),
   QuotaExceededError: class QuotaExceededError extends Error {
     readonly code = "QUOTA_EXCEEDED";
-    constructor(_used: number, _limit: number, apiType: string) {
-      super(`本月${apiType}额度已用尽`);
+    constructor(used: number, limit: number, apiType: string, month: string) {
+      super(`本月${apiType}额度已用尽（${used}/${limit}，${month}）`);
     }
   },
 }));
@@ -206,7 +206,7 @@ describe("researchKeywords", () => {
 
   it("dataforseo 配额超限时优雅降级：扩词结果不受影响、指标为 null", async () => {
     consumeQuotaMock.mockRejectedValue(
-      new QuotaExceededError(5, 5, "dataforseo")
+      new QuotaExceededError(5, 5, "dataforseo", "2026-08")
     );
 
     const result = await researchKeywords("user-1", "free", { keyword: "seo 工具", location: "中国", device: "PC" });

@@ -4,7 +4,7 @@ import { AddressInfo } from "node:net";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { normalizeMcpError, McpNormalizedError } from "./errors";
-import { backlinkOutputSchema, keywordOutputSchema } from "./output-schemas";
+import { backlinkOutputSchema, keywordOutputSchema, serpOutputSchema } from "./output-schemas";
 import { keywordInputSchema, serpInputSchema } from "./schemas";
 import { SeoProviderError } from "@/lib/seo/provider";
 
@@ -220,6 +220,15 @@ describe("SeeO MCP standard Streamable HTTP compatibility", () => {
     expect(serpInputSchema.safeParse({ projectId: "p", keyword: "seo" }).success).toBe(true);
     expect(backlinkOutputSchema.safeParse({ summary: { totalBacklinks: null, referringDomains: null, domainRank: null, dofollowPct: null }, rows: [], page: 1, pageSize: 25, totalCount: 0, hasMore: false, cachedAt: null, fromCache: false, limitations: [] }).success).toBe(true);
     expect(keywordOutputSchema.safeParse({ data: { keywords: [] }, meta: { count: 0, source: "serpapi", unavailableMetrics: [] } }).success).toBe(true);
+    // P0-02-B：serp 输出新增 features / summary / isProjectDomain / market meta，既有字段保持必填
+    expect(serpOutputSchema.safeParse({
+      data: {
+        organic: [{ rank: 1, title: "t", url: "https://a.example.com/", domain: "example.com", snippet: "s", featureType: null, isProjectDomain: true }],
+        features: [{ featureType: "featured_snippet", position: 1, title: "f", url: "https://a.example.com/" }],
+        summary: { organicCount: 1, featureCount: 1, featureTypes: ["featured_snippet"], projectPresent: true, projectRank: 1, projectRankingUrl: "https://a.example.com/", topDomains: [{ domain: "example.com", count: 1 }], domainFrequency: { "example.com": 1 } },
+      },
+      meta: { count: 1, source: "serpapi", fromCache: false, language: "zh-cn", location: "中国", device: "desktop" },
+    }).success).toBe(true);
     expect(JSON.stringify(normalized)).not.toMatch(/secret|api[_ -]?key|stack|\/Users\//i);
   });
 

@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { getSerpUsage, searchSerp } from "@/lib/seo/serp-service";
+import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service";
 import { QuotaExceededError } from "@/lib/seo/cache";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -54,15 +54,26 @@ export async function GET(req: Request) {
   const keyword = (searchParams.get("keyword") ?? "").trim();
   const location = (searchParams.get("location") ?? "中国").trim();
   const device = (searchParams.get("device") ?? "PC").trim() as "PC" | "移动端";
+  // P0-02-B 新增（可选）：SerpApi hl 语言码；缺省行为不变（zh-cn）
+  const languageRaw = (searchParams.get("language") ?? "").trim();
 
   if (!keyword) return badParams("keyword 参数不能为空");
   if (device !== "PC" && device !== "移动端") return badParams("device 必须是 PC 或 移动端");
 
-  const params = { keyword, location, device };
+  const params = {
+    keyword,
+    location,
+    device,
+    ...(languageRaw ? { language: languageRaw } : {}),
+  };
 
   try {
     const { result } = await searchSerp(userId, plan, params);
-    return NextResponse.json({ data: result, usage: await getSerpUsage(userId, plan) });
+    // summary 为 P0-02-B 新增字段；既有 data.* 字段全部原样保留
+    return NextResponse.json({
+      data: { ...result, summary: summarizeSerp(result) },
+      usage: await getSerpUsage(userId, plan),
+    });
   } catch (e) {
     return mapError(e);
   }
