@@ -68,4 +68,25 @@ export const gscInspectOutputSchema = z.object({
   meta: z.object({ source: z.string(), operation: z.string() }),
 }).passthrough();
 
+export const aiSearchBrandLookupOutputSchema = z.object({
+  data: z.object({
+    target: z.object({ type: z.enum(["brand", "domain"]), value: z.string() }),
+    platforms: z.array(z.object({
+      platform: z.string(),
+      status: z.enum(["success", "error"]),
+      totalMentions: z.number().nullable(),
+      totalAiSearchVolume: z.number().nullable(),
+      samplePrompts: z.array(z.object({ question: z.string().nullable(), aiSearchVolume: z.number().nullable(), brandEntities: z.array(z.string()) })),
+    })),
+    mentionsTotal: z.number().nullable(),
+    citations: z.array(z.object({ url: z.string(), domain: z.string(), platform: z.string(), title: z.string().nullable(), sourceType: z.string() })),
+    topCitedDomains: z.array(z.object({ domain: z.string(), citationCount: z.number() })),
+    aiShareOfVoice: z.array(z.object({ label: z.string(), isTarget: z.boolean(), mentions: z.number().nullable(), aiSharePct: z.number().nullable() })).nullable(),
+    warnings: z.array(z.string()),
+    hasData: z.boolean(),
+    runId: z.number().nullable(),
+  }),
+  meta: z.object({ source: z.string(), providerCostUsd: z.number().nullable() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

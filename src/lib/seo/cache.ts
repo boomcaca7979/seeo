@@ -238,11 +238,13 @@ export async function readCache<T>(
 export async function writeCache<T>(
   namespace: string,
   params: Record<string, string>,
-  data: T
+  data: T,
+  /** 可选自定义 TTL（ms）；缺省 CACHE_TTL_MS。调用方按数据时效性选择（如 AI prompt 响应 7 天） */
+  ttlMs: number = CACHE_TTL_MS
 ): Promise<void> {
   const key = hashKey(namespace, ...Object.entries(params).map(([k, v]) => `${k}=${v}`));
   const entry: CacheEntry<T> = { data, savedAt: Date.now(), params };
-  const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
 
   // 写入 DB（主存储）
   try {

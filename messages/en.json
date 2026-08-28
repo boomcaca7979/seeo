@@ -2120,7 +2120,14 @@
     "GSC_AUTH_REQUIRED": "Search Console access was denied. Reconnect the property in settings.",
     "GSC_QUOTA_EXCEEDED": "Search Console API rate limit reached. Please retry shortly.",
     "GSC_PROPERTY_NOT_FOUND": "That Search Console property was not found on the connected Google account.",
-    "GSC_PROVIDER_ERROR": "The Search Console request failed. Please retry."
+    "GSC_PROVIDER_ERROR": "The Search Console request failed. Please retry.",
+    "AI_SEARCH_INVALID_MODEL": "The requested AI model is not on the verified provider whitelist. The request was rejected before any provider cost was incurred.",
+    "AI_SEARCH_UNSUPPORTED_PLATFORM": "The requested AI Search platform is not supported.",
+    "AI_SEARCH_PROVIDER_ERROR": "The AI Search provider request failed. Please retry.",
+    "AI_SEARCH_PROVIDER_QUOTA": "Your DataForSEO quota for AI Search is exhausted.",
+    "AI_SEARCH_BILLING_ISSUE": "The connected DataForSEO account has a billing or balance issue.",
+    "AI_SEARCH_NOT_CONFIGURED": "AI Search is not configured (DataForSEO credentials missing).",
+    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search requires a SeeO account with DataForSEO quota. Sign in and upgrade to use it."
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

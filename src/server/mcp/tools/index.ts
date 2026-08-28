@@ -1,14 +1,15 @@
 import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service";
 import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-research-service";
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
+import { aiBrandLookup } from "@/lib/seo/ai-search-service";
 import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
+import { aiSearchInputSchema, backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 /** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
 function gscTodayMinusLag(): string {
@@ -67,6 +68,17 @@ const tools: RegisteredTool[] = [
       : summary.keywords;
     const keywords = filtered.slice(0, parsed.limit);
     return validateOutput(rankHistoryOutputSchema, { data: { domain: summary.domain, keywords, distribution: summary.distribution }, meta: { count: keywords.length, source: "db", days: parsed.days } });
+  } },
+  { name: "ai_search_brand_lookup", description: "AI Search (GEO) brand lookup via DataForSEO AI Optimization: how often a brand/domain is mentioned by ChatGPT and Google AI Overview, which pages get cited, and AI Share of Voice versus competitors. Persists a run record for history/trend (SeeO-specific). ChatGPT mentions data is US/en only per the provider — other locales degrade with an explicit warning. Consumes DataForSEO quota per platform batch.", inputSchema: { type: "object", properties: { ...projectProperty, target: { type: "string", description: "Brand name or domain (no https://, no www.)." }, competitors: { type: "array", items: stringProperty, maxItems: 9 }, locationCode: { type: "integer" }, languageCode: stringProperty }, required: ["projectId", "target"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = aiSearchInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);
+    const result = await aiBrandLookup({
+      userId: ctx.userId, plan: ctx.plan, projectId: project.sqliteId,
+      target: parsed.target,
+      ...(parsed.competitors ? { competitors: parsed.competitors } : {}),
+      ...(parsed.locationCode !== undefined ? { locationCode: parsed.locationCode } : {}),
+      ...(parsed.languageCode ? { languageCode: parsed.languageCode } : {}),
+    });
+    return validateOutput(aiSearchBrandLookupOutputSchema, { data: { target: result.target, platforms: result.platforms.map((bundle) => ({ platform: bundle.platform, status: bundle.status, totalMentions: bundle.totalMentions, totalAiSearchVolume: bundle.totalAiSearchVolume, samplePrompts: bundle.mentions.filter((mention) => mention.question).slice(0, 5).map((mention) => ({ question: mention.question, aiSearchVolume: mention.aiSearchVolume, brandEntities: mention.brandEntities })) })), mentionsTotal: result.mentionsTotal, citations: result.citations.slice(0, 25), topCitedDomains: result.topCitedDomains, aiShareOfVoice: result.aiShareOfVoice, warnings: result.warnings, hasData: result.hasData, runId: result.runId }, meta: { source: "dataforseo-ai-optimization", providerCostUsd: result.providerCostUsd } });
   } },
   { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);

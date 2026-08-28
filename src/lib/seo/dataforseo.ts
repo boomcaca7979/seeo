@@ -63,6 +63,8 @@ function getAuthHeader(): string {
 interface DfsTask<T> {
   status_code: number;
   status_message: string;
+  /** DataForSEO 每任务真实成本（USD），AI Optimization 响应携带，用于 run 记录 */
+  cost?: number;
   result?: T[];
 }
 
@@ -455,3 +457,369 @@ export async function fetchKeywordMetrics(
   );
   return { rows, difficultyAvailable, warnings: difficultyWarnings };
 }
+
+// ===== AI Optimization（P0-03-B AI Search Intelligence） =====
+// 数据来源：DataForSEO AI Optimization API（LLM Mentions 库 + 实时 LLM Responses）。
+// 端点路径 Verified at 2026-08-29（官方文档）：
+//   - /ai_optimization/llm_mentions/search_mentions/live      （~$0.103/task，legacy search/live 的当前版）
+//   - /ai_optimization/llm_mentions/target_metrics/live        （~$0.101/task，legacy aggregated_metrics 的当前版）
+//   - /ai_optimization/llm_mentions/top_mentioned_pages/live   （~$0.101/task，legacy top_pages 的当前版）
+//   - /ai_optimization/llm_mentions/multi_target_metrics/live  （2-10 targets 同场对比，~$0.101/task）
+//   - /ai_optimization/{platform}/llm_responses/live           （实时 LLM 回答，成本 = base + token 费）
+// 平台限制（官方文档明确）：llm_mentions 的 chat_gpt 数据仅 US(2840)/en；
+// platform 只支持 "chat_gpt" | "google"（google = Google AI Overview）。
+// 本节只做 HTTP + 归一 + 错误分类；缓存/配额/持久化在 ai-search-service。
+
+/** AI Search 稳定错误码（进 api-error-catalog / MCP normalizeMcpError） */
+export type AiSearchErrorCode =
+  | "AI_SEARCH_INVALID_MODEL"          // model_name 不在白名单——派发前拦截，避免失败任务扣费
+  | "AI_SEARCH_UNSUPPORTED_PLATFORM"
+  | "AI_SEARCH_PROVIDER_ERROR"
+  | "AI_SEARCH_BILLING_ISSUE";         // 余额/计费类致命错误，不可被平台降级吞掉
+
+export class AiSearchProviderError extends Error {
+  code: AiSearchErrorCode;
+  constructor(code: AiSearchErrorCode, message: string) {
+    super(message);
+    this.name = "AiSearchProviderError";
+    this.code = code;
+  }
+}
+
+/**
+ * 实时 LLM Responses 模型白名单（官方 /models 端点目录，Verified at 2026-08-29）。
+ * DataForSEO 对 `Invalid Field: 'model_name'` 的失败任务也扣费——任何 model_name
+ * 必须先过此白名单再派发。更新方式：核对 /v3/ai_optimization/{platform}/llm_responses/models。
+ */
+export const AI_SEARCH_MODEL_WHITELIST: Record<string, ReadonlySet<string>> = {
+  chat_gpt: new Set(["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]),
+  perplexity: new Set(["sonar-reasoning-pro", "sonar-pro", "sonar"]),
+};
+
+/** reasoning 模型的 max_output_tokens 下限（隐藏思维链计入预算） */
+const AI_REASONING_MODELS = new Set(["gpt-5", "gpt-5-mini", "gpt-5-nano", "sonar-reasoning-pro"]);
+
+export type AiSearchPlatform = "chat_gpt" | "google";
+export const AI_SEARCH_PLATFORMS: readonly AiSearchPlatform[] = ["chat_gpt", "google"];
+
+export interface AiSearchTargetEntity {
+  /** domain（不含 https:// 和 www.）或 keyword（≤250 字符） */
+  domain?: string;
+  keyword?: string;
+  include_subdomains?: boolean;
+  match_type?: "word_match" | "partial_match";
+}
+
+/** provider 原始 mention 源引用（URL 在 service 层做安全过滤） */
+export interface AiMentionSource {
+  url: string | null;
+  domain: string | null;
+  title: string | null;
+  position: number | null;
+}
+
+export interface AiMentionItem {
+  platform: string;
+  modelName: string | null;
+  question: string | null;
+  aiSearchVolume: number | null;
+  monthlySearches: Array<{ year: number; month: number; searchVolume: number }>;
+  sources: AiMentionSource[];
+  brandEntities: string[];
+  isWebSearchBased: boolean | null;
+}
+
+export interface AiGroupElement {
+  key: string;
+  mentions: number | null;
+  aiSearchVolume: number | null;
+}
+
+export interface AiTopPageItem {
+  url: string;
+  platformGroups: AiGroupElement[];
+}
+
+export interface AiMultiTargetItem {
+  key: string;
+  totalMentions: number | null;
+  totalAiSearchVolume: number | null;
+  platformGroups: AiGroupElement[];
+}
+
+export interface AiProviderCost {
+  /** 本次任务 DataForSEO 真实成本（USD，响应 cost 字段），缺失为 null */
+  usd: number | null;
+}
+
+function aiTaskCost(raw: DfsResponse<unknown>): number | null {
+  const cost = raw.tasks?.[0]?.cost;
+  return typeof cost === "number" ? cost : null;
+}
+
+function num(value: unknown): number | null {
+  return typeof value === "number" ? value : null;
+}
+
+function str(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function normalizeMentionItem(item: any): AiMentionItem {
+  return {
+    platform: str(item?.platform) ?? "unknown",
+    modelName: str(item?.model_name),
+    question: str(item?.question),
+    aiSearchVolume: num(item?.ai_search_volume),
+    monthlySearches: Array.isArray(item?.monthly_searches)
+      ? item.monthly_searches.map((entry: any) => ({
+          year: num(entry?.year) ?? 0,
+          month: num(entry?.month) ?? 0,
+          searchVolume: num(entry?.search_volume) ?? 0,
+        }))
+      : [],
+    sources: Array.isArray(item?.sources)
+      ? item.sources.map((source: any) => ({
+          url: str(source?.url),
+          domain: str(source?.domain),
+          title: str(source?.title),
+          position: num(source?.position),
+        }))
+      : [],
+    brandEntities: Array.isArray(item?.brand_entities)
+      ? item.brand_entities.map((entity: any) => str(entity?.title)).filter((title: string | null): title is string => Boolean(title))
+      : [],
+    isWebSearchBased: typeof item?.is_web_search_based === "boolean" ? item.is_web_search_based : null,
+  };
+}
+
+function normalizeGroupElements(value: any): AiGroupElement[] {
+  return Array.isArray(value)
+    ? value.map((entry: any) => ({
+        key: str(entry?.key) ?? "",
+        mentions: num(entry?.mentions),
+        aiSearchVolume: num(entry?.ai_search_volume),
+      }))
+    : [];
+}
+
+function buildTargetPayload(entities: AiSearchTargetEntity[]): unknown[] {
+  return entities.map((entity) =>
+    entity.domain !== undefined
+      ? { domain: entity.domain, search_filter: "include", include_subdomains: entity.include_subdomains ?? false }
+      : { keyword: entity.keyword, search_filter: "include", match_type: entity.match_type ?? "word_match" }
+  );
+}
+
+async function assertAiTaskOk(raw: DfsResponse<unknown>, endpoint: string): Promise<void> {
+  const message = str((raw as { status_message?: unknown }).status_message) ?? "";
+  // 余额/计费类错误必须上抛为 fatal（不可被 per-platform 降级吞掉）
+  if (/balance|billing|money/i.test(message)) {
+    throw new AiSearchProviderError("AI_SEARCH_BILLING_ISSUE", `DataForSEO AI Search 计费问题：${message}`);
+  }
+  void endpoint;
+}
+
+/** Mentions Search（当前端点 search_mentions/live）：目标相关的 LLM 答案行 */
+export async function fetchAiMentionsSearch(params: {
+  entities: AiSearchTargetEntity[];
+  platform: AiSearchPlatform;
+  locationCode: number;
+  languageCode: string;
+  limit?: number;
+}): Promise<{ items: AiMentionItem[]; cost: AiProviderCost }> {
+  const raw = await dfsFetch<any>("/ai_optimization/llm_mentions/search_mentions/live", {
+    target: buildTargetPayload(params.entities),
+    platform: params.platform,
+    location_code: params.locationCode,
+    language_code: params.languageCode,
+    limit: Math.min(1000, Math.max(1, params.limit ?? 100)),
+  });
+  await assertAiTaskOk(raw, "search_mentions");
+  const items = Array.isArray(raw.tasks?.[0]?.result?.[0]?.items)
+    ? raw.tasks[0].result[0].items.map(normalizeMentionItem)
+    : [];
+  return { items, cost: { usd: aiTaskCost(raw) } };
+}
+
+/** Target Metrics（当前端点）：单目标 mention 总量/平台分组/被引域名 */
+export async function fetchAiTargetMetrics(params: {
+  entities: AiSearchTargetEntity[];
+  platform: AiSearchPlatform;
+  locationCode: number;
+  languageCode: string;
+}): Promise<{ platformGroups: AiGroupElement[]; totalMentions: number | null; totalAiSearchVolume: number | null; cost: AiProviderCost }> {
+  const raw = await dfsFetch<any>("/ai_optimization/llm_mentions/target_metrics/live", {
+    target: buildTargetPayload(params.entities),
+    platform: params.platform,
+    location_code: params.locationCode,
+    language_code: params.languageCode,
+    internal_list_limit: 10,
+  });
+  await assertAiTaskOk(raw, "target_metrics");
+  const result = raw.tasks?.[0]?.result?.[0] ?? {};
+  const total = result.total ?? {};
+  return {
+    platformGroups: normalizeGroupElements(result.aggregated_metrics?.platform),
+    totalMentions: num(total?.mentions),
+    totalAiSearchVolume: num(total?.ai_search_volume),
+    cost: { usd: aiTaskCost(raw) },
+  };
+}
+
+/** Top Mentioned Pages（当前端点）：被引用最多的页面（citation 排名行） */
+export async function fetchAiTopMentionedPages(params: {
+  entities: AiSearchTargetEntity[];
+  platform: AiSearchPlatform;
+  locationCode: number;
+  languageCode: string;
+  itemsListLimit?: number;
+}): Promise<{ items: AiTopPageItem[]; cost: AiProviderCost }> {
+  const raw = await dfsFetch<any>("/ai_optimization/llm_mentions/top_mentioned_pages/live", {
+    target: buildTargetPayload(params.entities),
+    platform: params.platform,
+    location_code: params.locationCode,
+    language_code: params.languageCode,
+    links_scope: "sources",
+    items_list_limit: Math.min(10, Math.max(1, params.itemsListLimit ?? 10)),
+    internal_list_limit: 5,
+  });
+  await assertAiTaskOk(raw, "top_mentioned_pages");
+  const items = Array.isArray(raw.tasks?.[0]?.result?.[0]?.items)
+    ? raw.tasks[0].result[0].items.map((item: any) => ({
+        url: str(item?.key) ?? "",
+        platformGroups: normalizeGroupElements(item?.platform),
+      }))
+    : [];
+  return { items, cost: { usd: aiTaskCost(raw) } };
+}
+
+/** Multi-Target Metrics（当前端点）：2-10 个 target 同场对比（AI SOV 基础） */
+export async function fetchAiMultiTargetMetrics(params: {
+  groups: Array<{ key: string; entities: AiSearchTargetEntity[] }>;
+  platform: AiSearchPlatform;
+  locationCode: number;
+  languageCode: string;
+}): Promise<{ items: AiMultiTargetItem[]; cost: AiProviderCost }> {
+  if (params.groups.length < 2 || params.groups.length > 10) {
+    throw new AiSearchProviderError("AI_SEARCH_PROVIDER_ERROR", "multi_target_metrics 需要 2-10 个 target 组");
+  }
+  const raw = await dfsFetch<any>("/ai_optimization/llm_mentions/multi_target_metrics/live", {
+    targets: params.groups.map((group) => ({
+      key: group.key,
+      target: buildTargetPayload(group.entities),
+    })),
+    platform: params.platform,
+    location_code: params.locationCode,
+    language_code: params.languageCode,
+    internal_list_limit: 5,
+  });
+  await assertAiTaskOk(raw, "multi_target_metrics");
+  const items = Array.isArray(raw.tasks?.[0]?.result?.[0]?.items)
+    ? raw.tasks[0].result[0].items.map((item: any) => ({
+        key: str(item?.key) ?? "",
+        totalMentions: num(item?.total?.mentions),
+        totalAiSearchVolume: num(item?.total?.ai_search_volume),
+        platformGroups: normalizeGroupElements(item?.platform),
+      }))
+    : [];
+  return { items, cost: { usd: aiTaskCost(raw) } };
+}
+
+// ===== 实时 LLM Responses（Prompt Explorer） =====
+
+export interface AiLlmCitation {
+  url: string;
+  title: string | null;
+}
+
+export interface AiLlmResponseResult {
+  platform: string;
+  modelName: string | null;
+  /** 答案可见文本（拼接 message sections） */
+  text: string;
+  citations: AiLlmCitation[];
+  fanOutQueries: string[];
+  outputTokens: number | null;
+  webSearch: boolean;
+  cost: AiProviderCost;
+}
+
+/** 白名单校验：不通过直接拒绝，绝不派发（避免失败任务扣费） */
+export function assertAiModelAllowed(platform: string, modelName: string): void {
+  const allowed = AI_SEARCH_MODEL_WHITELIST[platform];
+  if (!allowed) {
+    throw new AiSearchProviderError("AI_SEARCH_UNSUPPORTED_PLATFORM", `不支持的 AI Search platform：${platform}`);
+  }
+  if (!allowed.has(modelName)) {
+    throw new AiSearchProviderError("AI_SEARCH_INVALID_MODEL", `model "${modelName}" 不在 ${platform} 白名单中（白名单来自 DataForSEO /models 目录，Verified 2026-08-29）`);
+  }
+}
+
+export async function fetchAiLlmResponse(params: {
+  platform: "chat_gpt" | "perplexity";
+  modelName: string;
+  userPrompt: string;
+  webSearch?: boolean;
+  webSearchCountryCode?: string;
+}): Promise<AiLlmResponseResult> {
+  // 白名单硬门槛：invalid model 不产生 provider task
+  assertAiModelAllowed(params.platform, params.modelName);
+
+  const prompt = params.userPrompt.trim();
+  if (!prompt) {
+    throw new AiSearchProviderError("AI_SEARCH_PROVIDER_ERROR", "prompt 不能为空");
+  }
+  if (prompt.length > 500) {
+    throw new AiSearchProviderError("AI_SEARCH_PROVIDER_ERROR", "prompt 长度不能超过 500 字符（DataForSEO 限制）");
+  }
+  const reasoning = AI_REASONING_MODELS.has(params.modelName);
+  const fields: Record<string, unknown> = {
+    user_prompt: prompt,
+    model_name: params.modelName,
+    web_search: params.webSearch ?? true,
+    // reasoning 模型（gpt-5 等）的隐藏思维链计入预算，1024 经常只剩空文本 → 给足 4096
+    max_output_tokens: reasoning ? 4096 : 2048,
+  };
+  if (params.webSearchCountryCode) {
+    fields.web_search_country_iso_code = params.webSearchCountryCode;
+  }
+
+  const raw = await dfsFetch<any>(`/ai_optimization/${params.platform}/llm_responses/live`, [fields]);
+  await assertAiTaskOk(raw, "llm_responses");
+  const result = raw.tasks?.[0]?.result?.[0] ?? {};
+
+  const textParts: string[] = [];
+  const citations: AiLlmCitation[] = [];
+  const seenUrls = new Set<string>();
+  if (Array.isArray(result.items)) {
+    for (const item of result.items) {
+      if (item?.type !== "message") continue;
+      for (const section of item.sections ?? []) {
+        if (typeof section?.text === "string" && section.text) textParts.push(section.text);
+        for (const annotation of section?.annotations ?? []) {
+          const url = str(annotation?.url);
+          if (url && !seenUrls.has(url)) {
+            seenUrls.add(url);
+            citations.push({ url, title: str(annotation?.title) });
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    platform: params.platform,
+    modelName: str(result.model_name) ?? params.modelName,
+    text: textParts.join("\n\n").trim(),
+    citations,
+    fanOutQueries: Array.isArray(result.fan_out_queries)
+      ? result.fan_out_queries.filter((q: unknown): q is string => typeof q === "string").slice(0, 20)
+      : [],
+    outputTokens: num(result.output_tokens),
+    webSearch: result.web_search === true,
+    cost: { usd: aiTaskCost(raw) },
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

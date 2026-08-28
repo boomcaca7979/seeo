@@ -15,7 +15,7 @@ SeeO is an SEO software platform for keyword research, rank tracking, technical 
 
 SeeO is a web-based SEO analytics platform. Users add projects (websites), track keyword rankings, run technical SEO audits, analyze competitors, optimize content, and review backlink data. SeeO does not build its own search index; SERP data comes from SerpApi and backlink data from DataForSEO. Technical audits use SeeO's own crawler.
 
-SeeO does NOT provide: AI citation tracking, LLM rank tracking, GEO scoring, or team collaboration. Only Google search data is supported.
+SeeO provides AI Search (GEO) brand visibility via DataForSEO: brand mentions in ChatGPT / Google AI Overview answers, citation pages, and AI Share of Voice versus competitors. SeeO does NOT provide: LLM content generation, GEO scoring, or team collaboration.
 
 ## Core Capabilities
 

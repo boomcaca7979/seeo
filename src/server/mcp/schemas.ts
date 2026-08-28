@@ -38,4 +38,15 @@ export const rankHistoryInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
 });
 
-export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history";
+export const aiSearchInputSchema = z.object({
+  projectId: z.string().min(1),
+  /** 品牌名或域名（自动检测；域名不含 https:// 和 www.） */
+  target: z.string().min(1).max(250),
+  /** 竞品（品牌名或域名），最多 9 个 */
+  competitors: z.array(z.string().min(1).max(250)).max(9).optional(),
+  /** DataForSEO location_code（默认 2840 US；chat_gpt mentions 库仅 US/en，会显式降级并给出 warning） */
+  locationCode: z.number().int().optional(),
+  languageCode: z.string().min(1).optional(),
+});
+
+export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup";

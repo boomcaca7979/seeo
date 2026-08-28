@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { createMcpContext, requireProviderAccess, requireScope, type ToolAuthContext } from "./context";
 import { errorResult } from "./errors";
-import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema } from "./schemas";
+import { aiSearchInputSchema, backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema } from "./schemas";
 import { getRegisteredTools } from "./tools";
 
 const providerBackedTools = new Set(["research_keywords", "get_serp_results", "get_backlinks_profile"]);
@@ -18,6 +18,7 @@ export function createMcpServer(request: Request) {
     get_backlinks_profile: backlinkInputSchema,
     search_console_tools: gscInputSchema,
     get_rank_history: rankHistoryInputSchema,
+    ai_search_brand_lookup: aiSearchInputSchema,
   } as const;
 
   // The registry intentionally stores heterogeneous Zod schemas. The SDK's

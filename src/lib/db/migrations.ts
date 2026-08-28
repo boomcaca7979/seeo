@@ -130,6 +130,31 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_gsc_connections_user
       ON gsc_connections(user_id);
 
+    CREATE TABLE IF NOT EXISTS ai_search_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      run_type TEXT NOT NULL,
+      target TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      platforms_json TEXT NOT NULL DEFAULT '[]',
+      models_json TEXT NOT NULL DEFAULT '[]',
+      requested_location_code INTEGER,
+      requested_language TEXT,
+      effective_location_code INTEGER,
+      effective_language TEXT,
+      summary_json TEXT NOT NULL DEFAULT '{}',
+      provider_cost_usd REAL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_search_runs_user
+      ON ai_search_runs(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_ai_search_runs_project
+      ON ai_search_runs(project_id, created_at);
+
     CREATE TABLE IF NOT EXISTS content_checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,

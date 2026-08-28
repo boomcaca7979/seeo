@@ -2100,7 +2100,14 @@
     "GSC_AUTH_REQUIRED": "Search Console 拒绝了访问。请在设置中重新连接该 property。",
     "GSC_QUOTA_EXCEEDED": "Search Console API 配额已达上限，请稍后重试。",
     "GSC_PROPERTY_NOT_FOUND": "在该 Google 账号的 Search Console 中未找到该 property。",
-    "GSC_PROVIDER_ERROR": "Search Console 请求失败，请重试。"
+    "GSC_PROVIDER_ERROR": "Search Console 请求失败，请重试。",
+    "AI_SEARCH_INVALID_MODEL": "请求的 AI 模型不在已验证的 provider 白名单中。请求已在产生任何 provider 成本前被拒绝。",
+    "AI_SEARCH_UNSUPPORTED_PLATFORM": "请求的 AI Search 平台不受支持。",
+    "AI_SEARCH_PROVIDER_ERROR": "AI Search provider 请求失败，请重试。",
+    "AI_SEARCH_PROVIDER_QUOTA": "你的 DataForSEO AI Search 配额已用尽。",
+    "AI_SEARCH_BILLING_ISSUE": "连接的 DataForSEO 账号存在计费或余额问题。",
+    "AI_SEARCH_NOT_CONFIGURED": "AI Search 尚未配置（缺少 DataForSEO 凭证）。",
+    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search 需要拥有 DataForSEO 配额的 SeeO 账号。请登录并升级后使用。"
   },
   "notFoundPage": {
     "title": "页面不存在 | SeeO",
