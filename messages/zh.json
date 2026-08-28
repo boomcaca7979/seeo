@@ -2094,7 +2094,13 @@
     "TIMEOUT": "抓取超时：{detail}",
     "INVALID_URL": "URL 无效：{detail}",
     "HTTP_ERROR": "页面返回错误：{detail}",
-    "UNKNOWN": "抓取失败：{detail}"
+    "UNKNOWN": "抓取失败：{detail}",
+    "GSC_NOT_CONFIGURED": "Google Search Console 尚未配置。请设置 GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET 与 GSC_TOKEN_ENCRYPTION_KEY 后重新连接。",
+    "GSC_NOT_CONNECTED": "该项目尚未连接 Google Search Console。请先在设置中连接已验证的 property。",
+    "GSC_AUTH_REQUIRED": "Search Console 拒绝了访问。请在设置中重新连接该 property。",
+    "GSC_QUOTA_EXCEEDED": "Search Console API 配额已达上限，请稍后重试。",
+    "GSC_PROPERTY_NOT_FOUND": "在该 Google 账号的 Search Console 中未找到该 property。",
+    "GSC_PROVIDER_ERROR": "Search Console 请求失败，请重试。"
   },
   "notFoundPage": {
     "title": "页面不存在 | SeeO",

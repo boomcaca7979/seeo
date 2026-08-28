@@ -2114,7 +2114,13 @@
     "TIMEOUT": "Crawl timed out: {detail}",
     "INVALID_URL": "Invalid URL: {detail}",
     "HTTP_ERROR": "Page returned an error: {detail}",
-    "UNKNOWN": "Crawl failed: {detail}"
+    "UNKNOWN": "Crawl failed: {detail}",
+    "GSC_NOT_CONFIGURED": "Google Search Console is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GSC_TOKEN_ENCRYPTION_KEY, then reconnect.",
+    "GSC_NOT_CONNECTED": "This project is not connected to Google Search Console yet. Connect a verified property in settings.",
+    "GSC_AUTH_REQUIRED": "Search Console access was denied. Reconnect the property in settings.",
+    "GSC_QUOTA_EXCEEDED": "Search Console API rate limit reached. Please retry shortly.",
+    "GSC_PROPERTY_NOT_FOUND": "That Search Console property was not found on the connected Google account.",
+    "GSC_PROVIDER_ERROR": "The Search Console request failed. Please retry."
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

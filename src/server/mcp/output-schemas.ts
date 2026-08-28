@@ -42,4 +42,30 @@ export const rankHistoryOutputSchema = z.object({
   meta: z.object({ count: z.number(), source: z.string(), days: z.number() }),
 }).passthrough();
 
+export const gscPerformanceOutputSchema = z.object({
+  data: z.object({
+    property: z.string(),
+    dateRange: z.object({ start: z.string(), end: z.string() }),
+    rows: z.array(z.object({ key: z.string(), clicks: z.number(), impressions: z.number(), ctr: z.number(), position: z.number() })),
+    summary: z.object({ clicks: z.number(), impressions: z.number(), ctr: z.number().nullable(), position: z.number().nullable() }),
+  }),
+  meta: z.object({ source: z.string(), operation: z.string(), cached: z.boolean().optional(), rowCount: z.number().optional() }),
+}).passthrough();
+export const gscCompareOutputSchema = z.object({
+  data: z.object({
+    property: z.string(),
+    current: z.object({ dateRange: z.object({ start: z.string(), end: z.string() }), summary: z.object({ clicks: z.number(), impressions: z.number(), ctr: z.number().nullable(), position: z.number().nullable() }) }),
+    previous: z.object({ dateRange: z.object({ start: z.string(), end: z.string() }), summary: z.object({ clicks: z.number(), impressions: z.number(), ctr: z.number().nullable(), position: z.number().nullable() }) }),
+  }),
+  meta: z.object({ source: z.string(), operation: z.string(), cached: z.boolean().optional() }),
+}).passthrough();
+export const gscInspectOutputSchema = z.object({
+  data: z.object({
+    property: z.string(),
+    url: z.string(),
+    result: z.record(z.string(), z.unknown()).nullable(),
+  }),
+  meta: z.object({ source: z.string(), operation: z.string() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

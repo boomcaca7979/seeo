@@ -1,13 +1,26 @@
 import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service";
 import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-research-service";
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
+import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
 import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, backlinkOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+
+/** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
+function gscTodayMinusLag(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 3);
+  return d.toISOString().slice(0, 10);
+}
+function gscDaysBefore(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
 
 export interface RegisteredTool { name: ToolName; description: string; inputSchema: Record<string, unknown>; execute: (ctx: ToolAuthContext, input: unknown) => Promise<unknown>; }
 
@@ -55,7 +68,35 @@ const tools: RegisteredTool[] = [
     const keywords = filtered.slice(0, parsed.limit);
     return validateOutput(rankHistoryOutputSchema, { data: { domain: summary.domain, keywords, distribution: summary.distribution }, meta: { count: keywords.length, source: "db", days: parsed.days } });
   } },
-  { name: "search_console_tools", description: "Expose SeeO Search Console operations. SeeO does not have a GSC integration configured yet.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" } }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => { const parsed = gscInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId); throw new McpNormalizedError("NOT_CONFIGURED", `Search Console operation '${parsed.operation}' is not configured in SeeO.`); } },
+  { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);
+    const perfInput = {
+      userId: ctx.userId, projectId: project.sqliteId,
+      ...(parsed.startDate ? { startDate: parsed.startDate } : {}),
+      ...(parsed.endDate ? { endDate: parsed.endDate } : {}),
+      ...(parsed.rowLimit ? { rowLimit: parsed.rowLimit } : {}),
+      ...(parsed.keyword ? { filters: [{ dimension: "query", operator: "equals", expression: parsed.keyword }] } : {}),
+      ...(parsed.page && !parsed.keyword ? { filters: [{ dimension: "page", operator: "equals", expression: parsed.page }] } : {}),
+    };
+    if (parsed.operation === "inspect_url") {
+      if (!parsed.url) throw new McpNormalizedError("BAD_REQUEST", "inspect_url requires the url argument.");
+      const inspection = await inspectUrl({ userId: ctx.userId, projectId: project.sqliteId, url: parsed.url });
+      return validateOutput(gscInspectOutputSchema, { data: { property: inspection.propertyUrl, url: parsed.url, result: inspection.result as Record<string, unknown> | null }, meta: { source: "google-search-console", operation: parsed.operation } });
+    }
+    if (parsed.operation === "compare_periods") {
+      const end = parsed.endDate ?? gscTodayMinusLag();
+      const start = parsed.startDate ?? gscDaysBefore(end, 28);
+      const span = Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000));
+      const [current, previous] = await Promise.all([
+        searchAnalytics({ ...perfInput, projectId: project.sqliteId, dimensions: ["query"], startDate: start, endDate: end }),
+        searchAnalytics({ ...perfInput, projectId: project.sqliteId, dimensions: ["query"], startDate: gscDaysBefore(start, span + 1), endDate: gscDaysBefore(start, 1) }),
+      ]);
+      return validateOutput(gscCompareOutputSchema, { data: { property: current.propertyUrl, current: { dateRange: current.dateRange, summary: current.summary }, previous: { dateRange: previous.dateRange, summary: previous.summary } }, meta: { source: "google-search-console", operation: parsed.operation, cached: current.fromCache && previous.fromCache } });
+    }
+    const dimensionByOperation = { performance_summary: ["date"], top_queries: ["query"], top_pages: ["page"] } as const;
+    const performance = await searchAnalytics({ ...perfInput, projectId: project.sqliteId, dimensions: [...dimensionByOperation[parsed.operation]] });
+    return validateOutput(gscPerformanceOutputSchema, { data: { property: performance.propertyUrl, dateRange: performance.dateRange, rows: performance.rows.slice(0, 50).map((row) => ({ key: row.keys.join(" / "), clicks: row.clicks, impressions: row.impressions, ctr: row.ctr, position: row.position })), summary: performance.summary }, meta: { source: "google-search-console", operation: parsed.operation, cached: performance.fromCache, rowCount: performance.rows.length } });
+  } },
 ];
 
 export function getRegisteredTools() { return tools; }

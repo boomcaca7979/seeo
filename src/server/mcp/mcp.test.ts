@@ -4,7 +4,8 @@ import { AddressInfo } from "node:net";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { normalizeMcpError, McpNormalizedError } from "./errors";
-import { backlinkOutputSchema, keywordOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "./output-schemas";
+import { backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "./output-schemas";
+import { gscInputSchema } from "./schemas";
 import { keywordInputSchema, serpInputSchema } from "./schemas";
 import { SeoProviderError } from "@/lib/seo/provider";
 
@@ -237,6 +238,22 @@ describe("SeeO MCP standard Streamable HTTP compatibility", () => {
         distribution: { trackedCount: 1, rankedCount: 1, top3Count: 0, top10Count: 1, top20Count: 1, top50Count: 1, notRankingCount: 0, averageRank: 8, medianRank: 8 },
       },
       meta: { count: 1, source: "db", days: 30 },
+    }).success).toBe(true);
+    // P0-02-E：search_console_tools 升级后的输入/输出 schema
+    expect(gscInputSchema.safeParse({ projectId: "p", operation: "top_queries", rowLimit: 25 }).success).toBe(true);
+    expect(gscInputSchema.safeParse({ projectId: "p", operation: "bogus" }).success).toBe(false);
+    const gscSummary = { clicks: 12, impressions: 340, ctr: 0.035, position: 8.7 };
+    expect(gscPerformanceOutputSchema.safeParse({
+      data: { property: "sc-domain:example.com", dateRange: { start: "2026-08-01", end: "2026-08-25" }, rows: [{ key: "seo audit", clicks: 12, impressions: 340, ctr: 0.035, position: 8.7 }], summary: gscSummary },
+      meta: { source: "google-search-console", operation: "top_queries", cached: false, rowCount: 1 },
+    }).success).toBe(true);
+    expect(gscCompareOutputSchema.safeParse({
+      data: { property: "p", current: { dateRange: { start: "a", end: "b" }, summary: gscSummary }, previous: { dateRange: { start: "c", end: "d" }, summary: gscSummary } },
+      meta: { source: "google-search-console", operation: "compare_periods" },
+    }).success).toBe(true);
+    expect(gscInspectOutputSchema.safeParse({
+      data: { property: "p", url: "https://example.com/", result: { indexStatusResult: { verdict: "PASS" } } },
+      meta: { source: "google-search-console", operation: "inspect_url" },
     }).success).toBe(true);
     expect(JSON.stringify(normalized)).not.toMatch(/secret|api[_ -]?key|stack|\/Users\//i);
   });

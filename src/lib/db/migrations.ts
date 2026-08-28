@@ -113,6 +113,23 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_rank_history_user
       ON rank_history(user_id);
 
+    CREATE TABLE IF NOT EXISTS gsc_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      property_url TEXT NOT NULL,
+      property_type TEXT NOT NULL,
+      google_email TEXT,
+      encrypted_credentials TEXT NOT NULL,
+      connected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (project_id),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_gsc_connections_user
+      ON gsc_connections(user_id);
+
     CREATE TABLE IF NOT EXISTS content_checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,

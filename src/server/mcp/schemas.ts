@@ -15,7 +15,19 @@ export const backlinkInputSchema = z.object({
   filters: z.object({ sourceUrl: z.string().optional(), targetUrl: z.string().optional(), anchor: z.string().optional(), dofollow: z.boolean().optional() }).default({}),
   onePerDomain: z.boolean().default(false), asIs: z.boolean().default(false),
 });
-export const gscInputSchema = z.object({ projectId: z.string().min(1), operation: z.enum(["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"]), url: z.string().url().optional() });
+export const gscInputSchema = z.object({
+  projectId: z.string().min(1),
+  operation: z.enum(["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"]),
+  url: z.string().url().optional(),
+  /** Search Analytics 日期（YYYY-MM-DD）；compare_periods 默认最近 28 天 */
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** 行数上限（1-1000，默认 25；GSC API 上限内由 service 再收紧） */
+  rowLimit: z.number().int().min(1).max(1000).optional(),
+  /** 维度过滤：query/page 精确匹配（top_queries/top_pages 用） */
+  keyword: z.string().min(1).optional(),
+  page: z.string().min(1).optional(),
+});
 export const rankHistoryInputSchema = z.object({
   projectId: z.string().min(1),
   /** 可选：按关键词文本过滤（精确匹配 tracked keyword） */

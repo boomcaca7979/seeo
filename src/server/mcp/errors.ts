@@ -1,6 +1,8 @@
 import { ZodError } from "zod";
 import { DataForSeoApiError, DataForSeoNotConfiguredError } from "@/lib/seo/dataforseo";
 import { SeoProviderError } from "@/lib/seo/provider";
+import { GscNotConfiguredError, GscProviderError } from "@/lib/seo/gsc-provider";
+import { GscNotConnectedError } from "@/lib/seo/gsc-service";
 import { FeatureNotAllowedError, PlanLimitError, QuotaExceededError } from "@/lib/errors/billing-errors";
 
 export type McpErrorCode =
@@ -22,6 +24,14 @@ export function normalizeMcpError(error: unknown): McpNormalizedError {
   if (error instanceof ZodError) return new McpNormalizedError("BAD_REQUEST", "The tool input is invalid.", false, { issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })) });
   if (error instanceof DataForSeoNotConfiguredError) return new McpNormalizedError("NOT_CONFIGURED", "The DataForSEO provider is not configured.");
   if (error instanceof DataForSeoApiError) return new McpNormalizedError("PROVIDER_ERROR", "The backlink provider returned an error.", error.status_code >= 500);
+  if (error instanceof GscNotConfiguredError) return new McpNormalizedError("NOT_CONFIGURED", "Google Search Console is not configured for this SeeO deployment.");
+  if (error instanceof GscNotConnectedError) return new McpNormalizedError("NOT_CONFIGURED", "Search Console is not connected for this project. Connect a property in SeeO first.");
+  if (error instanceof GscProviderError) {
+    if (error.code === "GSC_AUTH_REQUIRED") return new McpNormalizedError("PROVIDER_ACCESS_DENIED", "Search Console access was denied. Reconnect the property in SeeO.");
+    if (error.code === "GSC_QUOTA_EXCEEDED") return new McpNormalizedError("PROVIDER_QUOTA", "The Search Console API rate limit was reached. Retry shortly.", true);
+    if (error.code === "GSC_PROPERTY_NOT_FOUND") return new McpNormalizedError("PROJECT_NOT_FOUND", "The Search Console property was not found.");
+    return new McpNormalizedError("PROVIDER_ERROR", "The Search Console request failed.", true);
+  }
   if (error instanceof FeatureNotAllowedError || error instanceof PlanLimitError) return new McpNormalizedError("PLAN_LIMIT_REACHED", "This operation is not available on the current plan.");
   if (error instanceof QuotaExceededError) return new McpNormalizedError("PLAN_LIMIT_REACHED", "The SeeO quota for this operation is exhausted.");
   if (error instanceof SeoProviderError) {
