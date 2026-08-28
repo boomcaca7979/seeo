@@ -120,13 +120,58 @@ export function computeUnavailableMetrics(rows: KeywordIntelligenceKeyword[]): s
   );
 }
 
-function metricsCacheKey(keywords: { keyword: string }[], location: string, language: string): Record<string, string> {
+function metricsCacheKey(keywords: string[], location: string, language: string): Record<string, string> {
   return {
     provider: "dfs-v1",
-    keywords: keywords.map((k) => normalizeKeywordForDedup(k.keyword)).sort().join("\n"),
+    keywords: keywords.map((k) => normalizeKeywordForDedup(k)).sort().join("\n"),
     location,
     language,
   };
+}
+
+/** 指标补全结果（供 Competitor Gap 等下游复用 P0-02-A 的 Keyword Intelligence） */
+export interface KeywordMetricsEnrichment {
+  rows: KeywordMetricRow[];
+  source: "dataforseo" | null;
+  fromCache: boolean;
+  warnings: string[];
+}
+
+/**
+ * 为精确关键词列表补全 DataForSEO 指标（kw-metrics 缓存优先，配额不足时优雅降级为 null）。
+ * CompetitorService 等下游直接复用本函数，禁止自建第二套 metrics provider。
+ */
+export async function enrichKeywordMetrics(
+  userId: string,
+  plan: PlanTier,
+  keywords: string[],
+  location: string,
+  language?: string
+): Promise<KeywordMetricsEnrichment> {
+  const warnings: string[] = [];
+  if (keywords.length === 0) {
+    return { rows: [], source: null, fromCache: false, warnings };
+  }
+  const cacheParams = metricsCacheKey(keywords, location, language ?? "");
+  const cached = await readCache<KeywordMetricRow[]>(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams);
+  if (cached) {
+    return { rows: cached, source: "dataforseo", fromCache: true, warnings };
+  }
+  try {
+    // DataForSEO 补全批次按 1 个 dataforseo 单位计费（与 backlink-service 的 fetchBacklinks 同惯例），
+    // 计费只发生在 provider 真实调用前的这一处；MCP/API 层不再重复记账。
+    await consumeQuota(userId, "dataforseo", plan);
+    const result = await fetchKeywordMetrics(keywords, { location, language });
+    try {
+      await writeCache(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams, result.rows);
+    } catch {
+      // 缓存写失败不影响结果
+    }
+    return { rows: result.rows, source: "dataforseo", fromCache: false, warnings: [...warnings, ...result.warnings] };
+  } catch (e) {
+    // 优雅降级：指标保持 null，不使调用方失败
+    return { rows: [], source: null, fromCache: false, warnings: [...warnings, `keyword metrics 不可用：${(e as Error).message}`] };
+  }
 }
 
 function applyMetrics(
@@ -175,39 +220,22 @@ export async function researchKeywords(
   });
   const candidates = mergeKeywordCandidates(params.keyword, expansion.related, expansion.paa, limit);
 
-  // 2. 指标补全：DataForSEO（缓存优先 → 配额 → provider → 归一化）
+  // 2. 指标补全：DataForSEO（缓存优先 → 配额 → provider → 归一化，见 enrichKeywordMetrics）
   let metricsSource: "dataforseo" | null = null;
   let metricsFromCache = false;
   let metricRows: KeywordMetricRow[] = [];
   if (enrichMetrics && candidates.length > 0) {
-    const cacheParams = metricsCacheKey(candidates, params.location, params.language ?? "");
-    const cached = await readCache<KeywordMetricRow[]>(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams);
-    if (cached) {
-      metricRows = cached;
-      metricsSource = "dataforseo";
-      metricsFromCache = true;
-    } else {
-      try {
-        // DataForSEO 补全批次按 1 个 dataforseo 单位计费（与 backlink-service 的 fetchBacklinks 同惯例），
-        // 计费只发生在 provider 真实调用前的这一处；MCP/API 层不再重复记账。
-        await consumeQuota(userId, "dataforseo", plan);
-        const result = await fetchKeywordMetrics(
-          candidates.map((c) => c.keyword),
-          { location: params.location, language: params.language }
-        );
-        metricRows = result.rows;
-        metricsSource = "dataforseo";
-        warnings.push(...result.warnings);
-        try {
-          await writeCache(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams, metricRows);
-        } catch {
-          // 缓存写失败不影响结果
-        }
-      } catch (e) {
-        // 优雅降级：指标保持 null，不使扩词结果失败
-        warnings.push(`keyword metrics 不可用：${(e as Error).message}`);
-      }
-    }
+    const enrichment = await enrichKeywordMetrics(
+      userId,
+      plan,
+      candidates.map((c) => c.keyword),
+      params.location,
+      params.language
+    );
+    metricRows = enrichment.rows;
+    metricsSource = enrichment.source;
+    metricsFromCache = enrichment.fromCache;
+    warnings.push(...enrichment.warnings);
   } else if (!enrichMetrics) {
     warnings.push("keyword metrics 未启用（enrichMetrics=false）");
   }

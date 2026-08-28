@@ -84,11 +84,16 @@ export interface SerpSummary {
   domainFrequency: Record<string, number>;
 }
 
-/** 项目域名匹配口径：registrable domain 相等或互为子域（与 checkRank 一致） */
-function isDomainMatch(domainA: string, domainB: string): boolean {
+/** 域名匹配口径：registrable/hostname 相等或互为子域（与 checkRank、competitor 解析一致） */
+export function domainsMatch(domainA: string, domainB: string): boolean {
   const a = domainA.toLowerCase();
   const b = domainB.toLowerCase();
   return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+
+/** 项目域名匹配口径：registrable domain 相等或互为子域（与 checkRank 一致） */
+function isDomainMatch(domainA: string, domainB: string): boolean {
+  return domainsMatch(domainA, domainB);
 }
 
 /**

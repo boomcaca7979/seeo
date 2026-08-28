@@ -1,10 +1,9 @@
 // ===== 竞品排名查询 =====
-// 复用 serp 命名空间缓存（24h TTL）+ consumeQuota 计数
-// 与 /api/seo/serp、/api/keywords/expand 共享缓存，避免重复扣额度
+// P0-02-C：SERP 获取统一走 serp-service.searchSerp（provider 缓存 + serpapi 计费单点），
+// 不再自带一套 cache/quota 逻辑——修复与 /api/seo/serp 缓存 key 不一致导致的重复扣费。
 
-import { serpApiProvider } from "@/lib/seo/serpapi";
-import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, readCache, writeCache, peekUsage, QuotaExceededError } from "@/lib/seo/cache";
+import { searchSerp } from "@/lib/seo/serp-service";
+import { peekUsage } from "@/lib/seo/cache";
 import type { SerpResult, ApiUsage } from "@/lib/seo/types";
 import type { PlanTier } from "@/lib/auth";
 import type { ApiType } from "@/lib/db";
@@ -32,9 +31,10 @@ function normalizeDomain(d: string): string {
 }
 
 /**
- * 查一个关键词的 SERP，解析出所有竞品排名
- * 复用 serp 命名空间缓存：与 /api/seo/serp 共享，避免重复扣额度
- * P0 商业化改造：按 userId + plan 计量，禁止匿名消耗公共额度
+ * 查一个关键词的 SERP，解析出所有竞品排名。
+ * SERP 缓存/额度由 searchSerp 统一处理（serp 命名空间，provider+keyword+location+language+device key），
+ * 与 /api/seo/serp、/api/keywords/expand 共享同一份快照，不重复扣额度。
+ * apiType 参数保留（ranks route 语义），实际计费始终在 searchSerp 内按 serpapi 记账。
  */
 export async function checkCompetitorRanks(params: {
   keyword: string;
@@ -45,57 +45,21 @@ export async function checkCompetitorRanks(params: {
   plan?: PlanTier;
   apiType?: ApiType;
 }): Promise<CheckResult> {
-  const { keyword, location, device, competitors, userId, plan = "free", apiType = "serpapi" } = params;
-  const cacheParams = { keyword, location, device };
+  const { keyword, location, device, competitors, userId, plan = "free" } = params;
 
-  // 1. 先读 serp 命名空间缓存
-  let cached: SerpResult | null = null;
-  try {
-    cached = await readCache<SerpResult>("serp", cacheParams);
-  } catch {
-    // 缓存读取失败不阻塞
-  }
+  const { result, fromCache } = await searchSerp(userId, plan, { keyword, location, device });
+  const usage = await peekUsage(userId, params.apiType ?? "serpapi", plan);
 
-  let serpResult: SerpResult;
-  let fromCache: boolean;
-  let usage: ApiUsage;
-
-  if (cached) {
-    serpResult = cached;
-    fromCache = true;
-    usage = await peekUsage(userId, apiType, plan);
-  } else {
-    // 2. 真实调用：先消耗额度（用户级隔离）
-    try {
-      usage = await consumeQuota(userId, apiType, plan);
-    } catch (e) {
-      if (e instanceof QuotaExceededError) throw e;
-      if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-        throw e;
-      }
-      throw e;
-    }
-    // 3. 调 SerpApi
-    try {
-      serpResult = await serpApiProvider.searchSerp({ keyword, location, device });
-    } catch (e) {
-      if (e instanceof SeoProviderError) throw e;
-      throw e;
-    }
-    // 写缓存（与 /api/seo/serp 共享命名空间）
-    try {
-      await writeCache("serp", cacheParams, serpResult);
-    } catch {
-      // 缓存写入失败不阻塞
-    }
-    fromCache = false;
-  }
-
-  const results = parseSerpForCompetitors(serpResult, competitors);
+  const results = parseSerpForCompetitors(result, competitors);
   return { results, fromCache, usage };
 }
 
-function parseSerpForCompetitors(
+/**
+ * 在 SERP organic 结果中定位各竞品排名。
+ * 域名匹配口径：registrable/hostname 相等或互为子域（与 checkRank 一致）。
+ * 不做 link.includes(compDomain) 的模糊匹配——URL 路径或参数中出现竞品域名不算排名。
+ */
+export function parseSerpForCompetitors(
   data: SerpResult,
   competitors: CompetitorInput[]
 ): CompetitorRankResult[] {
@@ -105,12 +69,10 @@ function parseSerpForCompetitors(
     let foundRank: number | null = null;
     let foundUrl: string | null = null;
 
-    for (let i = 0; i < organic.length; i++) {
-      const item = organic[i];
-      const link = (item.link ?? "").toLowerCase();
-      const domain = normalizeDomain(item.domain ?? link);
-      if (domain === compDomain || domain.endsWith(`.${compDomain}`) || link.includes(compDomain)) {
-        foundRank = i + 1;
+    for (const item of organic) {
+      const domain = normalizeDomain(item.domain ?? "");
+      if (domain === compDomain || domain.endsWith(`.${compDomain}`)) {
+        foundRank = item.position;
         foundUrl = item.link ?? null;
         break;
       }
