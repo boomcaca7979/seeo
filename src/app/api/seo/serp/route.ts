@@ -3,10 +3,10 @@
 // 关键词 SERP Top 10 + 相关搜索 + 相关问题
 
 import { NextResponse } from "next/server";
-import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
-import type { SeoApiError, SerpResult } from "@/lib/seo/types";
+import { getSerpUsage, searchSerp } from "@/lib/seo/serp-service";
+import { QuotaExceededError } from "@/lib/seo/cache";
+import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -60,38 +60,9 @@ export async function GET(req: Request) {
 
   const params = { keyword, location, device };
 
-  // 1. 先读缓存（不计费）
   try {
-    const cached = await readCache<SerpResult>("serp", params);
-    if (cached) {
-      const usage = await peekUsage(userId, "serpapi", plan);
-      return NextResponse.json({
-        data: { ...cached, fromCache: true },
-        usage,
-      });
-    }
-  } catch {
-    // 缓存读取失败不阻塞主流程
-  }
-
-  // 2. 真实调用：先消耗额度（用户级隔离）
-  let usage;
-  try {
-    usage = await consumeQuota(userId, "serpapi", plan);
-  } catch (e) {
-    return mapError(e);
-  }
-
-  // 3. 调用 SerpApi
-  try {
-    const result = await serpApiProvider.searchSerp(params);
-    // 写缓存
-    try {
-      await writeCache("serp", params, result);
-    } catch {
-      // 缓存写入失败不阻塞返回
-    }
-    return NextResponse.json({ data: result, usage });
+    const { result } = await searchSerp(userId, plan, params);
+    return NextResponse.json({ data: result, usage: await getSerpUsage(userId, plan) });
   } catch (e) {
     return mapError(e);
   }

@@ -3,10 +3,10 @@
 // 复用 serp 命名空间缓存 + 用量计数
 
 import { NextResponse } from "next/server";
-import { serpApiProvider } from "@/lib/seo/serpapi";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
-import type { SeoApiError, SerpResult } from "@/lib/seo/types";
+import { getSerpUsage, expandKeyword } from "@/lib/seo/serp-service";
+import { QuotaExceededError } from "@/lib/seo/cache";
+import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -73,53 +73,10 @@ export async function POST(req: Request) {
   if (!seed) return badParams("seed 不能为空");
   if (device !== "PC" && device !== "移动端") return badParams("device 必须是 PC 或 移动端");
 
-  const params = { keyword: seed, location, device };
-
-  // 1. 先读 serp 命名空间缓存（与 /api/seo/serp 共享，避免重复扣额度）
   try {
-    const cached = await readCache<SerpResult>("serp", params);
-    if (cached) {
-      const usage = await peekUsage(userId, "serpapi", plan);
-      const resp: ExpandResponse = {
-        seed,
-        related: cached.relatedSearches.map((r) => r.query),
-        paa: cached.relatedQuestions.map((q) => q.question),
-        location,
-        device: device === "PC" ? "desktop" : "mobile",
-        fromCache: true,
-      };
-      return NextResponse.json({ data: resp, usage });
-    }
-  } catch {
-    // 缓存读取失败不阻塞主流程
-  }
-
-  // 2. 真实调用：先消耗额度（用户级隔离）
-  let usage;
-  try {
-    usage = await consumeQuota(userId, "serpapi", plan);
-  } catch (e) {
-    return mapError(e);
-  }
-
-  // 3. 调用 SerpApi
-  try {
-    const result = await serpApiProvider.searchSerp(params);
-    // 写缓存（与 /api/seo/serp 共享命名空间）
-    try {
-      await writeCache("serp", params, result);
-    } catch {
-      // 缓存写入失败不阻塞返回
-    }
-    const resp: ExpandResponse = {
-      seed,
-      related: result.relatedSearches.map((r) => r.query),
-      paa: result.relatedQuestions.map((q) => q.question),
-      location,
-      device: device === "PC" ? "desktop" : "mobile",
-      fromCache: false,
-    };
-    return NextResponse.json({ data: resp, usage });
+    const data = await expandKeyword(userId, plan, { keyword: seed, location, device });
+    const resp: ExpandResponse = { ...data };
+    return NextResponse.json({ data: resp, usage: await getSerpUsage(userId, plan) });
   } catch (e) {
     return mapError(e);
   }

@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party distribution and local screenshot tooling are not
+    // application source and must not be linted by the repository command.
+    "vendor/**",
+    ".p5-tmp/**",
   ]),
 ]);
 

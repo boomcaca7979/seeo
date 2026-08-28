@@ -4,10 +4,10 @@
 // 防滥用：同域名 1 小时内只允许一次真实拉取（拉取失败不写库，自然不触发冷却，可重试）
 
 import { NextResponse } from "next/server";
-import { getBacklinkSummary, listBacklinks, saveBacklinks } from "@/lib/db";
-import { fetchBacklinks, isDataForSeoConfigured, DataForSeoNotConfiguredError } from "@/lib/seo/dataforseo";
+import { getBacklinkSummary, listBacklinks } from "@/lib/db";
+import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { requireAuthOrDemo } from "@/lib/auth";
-import { consumeQuota, peekUsage, QuotaExceededError } from "@/lib/seo/cache";
+import { peekUsage } from "@/lib/seo/cache";
 import { requireFeature, FeatureNotAllowedError, billingErrorToResponse } from "@/lib/guards";
 
 export const runtime = "nodejs";
@@ -15,7 +15,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
-const COOLDOWN_MS = 60 * 60 * 1000; // 1 小时
 
 interface BacklinkApiResponse {
   summary: {
@@ -148,116 +147,51 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "请求体格式错误，需要 JSON", code: "INVALID_JSON" }, { status: 400 });
   }
 
-  const domain = normalizeDomain(String(body.domain ?? ""));
+  const domain = normalizeBacklinkDomain(String(body.domain ?? ""));
   if (!domain) {
     return NextResponse.json({ error: "域名格式无效，如 example.com", code: "INVALID_DOMAIN" }, { status: 400 });
   }
 
-  // P5：backlinks Feature 权限校验（Pro 专属，free/lite 拒绝）
-  // 必须在 consumeQuota 之前，否则 Lite 用户会因 dataforseo_monthly_limit=5 而绕过 Feature Gate
   try {
-    await requireFeature(userId, "backlinks");
-  } catch (e) {
-    if (e instanceof FeatureNotAllowedError) {
-      const { status, body } = billingErrorToResponse(e);
-      return NextResponse.json(body, { status });
-    }
-    throw e;
-  }
-
-  // 未配置凭证
-  if (!isDataForSeoConfigured()) {
-    return NextResponse.json(
-      { error: "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）", code: "DATAFORSEO_NOT_CONFIGURED" },
-      { status: 503 }
-    );
-  }
-
-  // 查 7 天缓存，命中直接返回（不扣额度）
-  const cached = await getBacklinkSummary(userId, domain);
-  if (cached) {
-    const fetchedAtMs = parseFetchedAt(cached.fetched_at);
-    const age = Date.now() - fetchedAtMs;
-    if (age <= CACHE_TTL_MS) {
-      const rows = await listBacklinks(userId, domain, 100);
-      const usage = await peekUsage(userId, "dataforseo", plan);
-      return NextResponse.json({
-        data: toResponse(cached, rows, cached.fetched_at, true),
-        usage,
-      });
-    }
-    // 缓存过期但 1 小时内不重复拉取
-    if (age <= COOLDOWN_MS) {
-      const remainingMin = Math.max(1, Math.round((COOLDOWN_MS - age) / 60_000));
-      const usage = await peekUsage(userId, "dataforseo", plan);
-      return NextResponse.json({
-        error: `该域名外链数据冷却中，请约 ${remainingMin} 分钟后再试（1 小时内仅允许拉取一次）`,
-        code: "BACKLINK_COOLDOWN",
-        usage,
-      }, { status: 429 });
-    }
-  }
-
-  // 真实调用 DataForSEO 前：用户级额度检查 + 计数
-  // free: 0/月，lite: 5/月，pro: 30/月（详见 billing.ts DEFAULT_PLAN_LIMITS）
-  // 超限时返回 DATAFORSEO_QUOTA_EXCEEDED，不继续调用第三方 API
-  let usage;
-  try {
-    usage = await consumeQuota(userId, "dataforseo", plan);
-  } catch (e) {
-    if (e instanceof QuotaExceededError) {
-      // P3：统一为 billingErrorToResponse 格式
-      const planTier = plan;
-      const billingErr = {
-        code: "QUOTA_EXCEEDED" as const,
-        message: e.message,
-        plan: planTier,
-        limit: e.limit,
-        used: e.used,
-      };
-      return NextResponse.json(billingErr, { status: 429 });
-    }
-    const msg = (e as Error)?.message ?? String(e);
-    return NextResponse.json({ error: msg, code: "UPSTREAM_ERROR" }, { status: 500 });
-  }
-
-  // 调 DataForSEO 拉取（失败不写库，可重试）
-  try {
-    const data = await fetchBacklinks(domain, { limit: 100 });
-    await saveBacklinks(userId, {
-      domain,
-      summary: {
-        total_backlinks: data.summary.total_backlinks,
-        referring_domains: data.summary.referring_domains,
-        domain_rank: data.summary.domain_rank,
-        dofollow_pct: data.summary.dofollow_pct,
-        raw_json: JSON.stringify(data.rawJson),
-      },
-      rows: data.backlinks,
+    // BacklinkService owns feature checks, cache/cooldown, quota consumption,
+    // provider access, persistence, and bounded result shaping.
+    const profile = await getBacklinkProfile(userId, plan, domain, {
+      page: 1,
+      pageSize: 100,
+      sort: "sourceRankDesc",
     });
-
-    // 读回刚写入的记录（拿 fetched_at）
-    const fresh = await getBacklinkSummary(userId, domain);
-    const fetchedAt = fresh?.fetched_at ?? new Date().toISOString();
     return NextResponse.json({
-      data: toResponse(
-        {
-          total_backlinks: data.summary.total_backlinks,
-          referring_domains: data.summary.referring_domains,
-          domain_rank: data.summary.domain_rank,
-          dofollow_pct: data.summary.dofollow_pct,
-        },
-        data.backlinks,
-        fetchedAt,
-        false
-      ),
-      usage,
+      data: {
+        summary: profile.summary,
+        backlinks: profile.rows.map((row) => ({
+          sourceUrl: row.sourceUrl,
+          anchor: row.anchor,
+          targetUrl: row.targetUrl,
+          dofollow: row.dofollow,
+          sourceRank: row.sourceRank,
+          firstSeen: row.firstSeen,
+        })),
+        cachedAt: profile.cachedAt ?? new Date().toISOString(),
+        fromCache: profile.fromCache,
+      },
+      usage: await peekUsage(userId, "dataforseo", plan),
     });
-  } catch (err) {
-    if (err instanceof DataForSeoNotConfiguredError) {
-      return NextResponse.json({ error: err.message, code: "UPSTREAM_ERROR" }, { status: 503 });
+  } catch (error) {
+    // Preserve the existing route's public response shape while keeping all
+    // provider/database/billing orchestration inside the shared service.
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith("NOT_CONFIGURED:")) {
+      return NextResponse.json({ error: message.slice(14).trim(), code: "DATAFORSEO_NOT_CONFIGURED" }, { status: 503 });
     }
-    const msg = (err as Error)?.message ?? String(err);
-    return NextResponse.json({ error: msg, code: "UPSTREAM_ERROR" }, { status: 500 });
+    if (message.startsWith("RATE_LIMITED:")) {
+      return NextResponse.json({ error: message.slice(12).trim(), code: "BACKLINK_COOLDOWN", usage: await peekUsage(userId, "dataforseo", plan) }, { status: 429 });
+    }
+    if (message.includes("QuotaExceeded") || message.includes("QUOTA_EXCEEDED") || error instanceof Error && error.name === "QuotaExceededError") {
+      return NextResponse.json({ error: message, code: "QUOTA_EXCEEDED" }, { status: 429 });
+    }
+    if (error instanceof Error && error.name === "FeatureNotAllowedError") {
+      return NextResponse.json({ error: message, code: "FEATURE_NOT_AVAILABLE" }, { status: 403 });
+    }
+    return NextResponse.json({ error: message, code: "UPSTREAM_ERROR" }, { status: 500 });
   }
 }

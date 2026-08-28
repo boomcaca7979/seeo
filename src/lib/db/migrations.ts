@@ -417,6 +417,23 @@ async function migrate(db: DBAdapter): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_backlinks_user
       ON backlinks(user_id);
+
+    CREATE TABLE IF NOT EXISTS mcp_api_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      key_prefix TEXT NOT NULL,
+      scopes_json TEXT NOT NULL DEFAULT '["mcp:read"]',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT,
+      revoked_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_lookup
+      ON mcp_api_keys(key_hash);
+    CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_user
+      ON mcp_api_keys(user_id);
   `);
 
   // projects 表升级：旧表 domain 是全局 UNIQUE，多用户下同域名冲突，重建为 (user_id, domain) 联合唯一
