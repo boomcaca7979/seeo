@@ -16,9 +16,9 @@ import {
   getRankHistory,
   type TrackedKeyword,
 } from "@/lib/db";
-import { serpApiProvider } from "@/lib/seo/serpapi";
+import { searchRank } from "@/lib/seo/serp-service";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
+import { QuotaExceededError } from "@/lib/seo/cache";
 import { generateRankAlert } from "@/lib/seo/alerts";
 import type { RankResult } from "@/lib/seo/types";
 import type { PlanTier } from "@/lib/auth";
@@ -117,115 +117,104 @@ async function refreshSingleKeyword(
   today: string,
   cronCtx?: CronRunContext
 ): Promise<RefreshItem> {
-  const params = {
-    keyword: tk.keyword,
-    domain: tk.domain,
-    location: tk.location,
-    device: tk.device,
-  };
-
   let rankResult: RankResult | null = null;
   let fromCache = false;
   let consumed = false;
   let errMsg: string | undefined;
 
   try {
-    // 1. 先查本地 rank 缓存（24h TTL）
-    const cached = await readCache<RankResult>("rank", params);
-    if (cached) {
-      rankResult = cached;
-      fromCache = true;
-    } else {
-      // 2. DB 中今日是否已有记录（避免同日重复扣额度）
-      const dbHasToday = await hasTodayHistory(userId, tk.id);
-      if (dbHasToday) {
-        const history = await getRankHistory(userId, tk.id, 1);
-        const todayRow = history.find((h) => h.date === today);
-        if (todayRow) {
-          rankResult = {
-            keyword: tk.keyword,
-            domain: tk.domain,
-            location: tk.location,
-            device: tk.device,
-            fetchedAt: todayRow.created_at,
-            rank: todayRow.position,
-            matchedUrl: todayRow.url,
-            fromCache: true,
-          };
-          fromCache = true;
-        }
+    // 1. DB 中今日是否已有记录（避免同日重复扣额度）
+    //    （rank 缓存与额度由 serp-service.searchRank 统一管理，此处先看今日快照）
+    const dbHasToday = await hasTodayHistory(userId, tk.id);
+    if (dbHasToday) {
+      const history = await getRankHistory(userId, tk.id, 1);
+      const todayRow = history.find((h) => h.date === today);
+      if (todayRow) {
+        rankResult = {
+          keyword: tk.keyword,
+          domain: tk.domain,
+          location: tk.location,
+          device: tk.device,
+          fetchedAt: todayRow.created_at,
+          rank: todayRow.position,
+          matchedUrl: todayRow.url,
+          fromCache: true,
+        };
+        fromCache = true;
       }
+    }
 
-      // 3. 真实调用 SerpApi（用户级额度扣减）
-      if (!rankResult) {
-        // 系统级保险丝：再次检查（可能在并发批次中途触及上限）
-        if (cronCtx && cronCtx.serpApiCalls >= cronCtx.maxSerpApiCalls) {
-          cronCtx.stoppedByCostLimit = true;
-          return {
-            id: tk.id,
-            keyword: tk.keyword,
-            domain: tk.domain,
-            location: tk.location,
-            device: tk.device,
-            position: null,
-            url: null,
-            fromCache: false,
-            skipped: true,
-            error: "系统级 SerpApi 上限已触及，跳过",
-          };
-        }
-        // 运行时间保险丝：达到时间上限后不再发起 SerpApi 请求
-        if (cronCtx && hasCronRuntimeExpired(cronCtx)) {
-          cronCtx.stoppedByTimeLimit = true;
-          return {
-            id: tk.id,
-            keyword: tk.keyword,
-            domain: tk.domain,
-            location: tk.location,
-            device: tk.device,
-            position: null,
-            url: null,
-            fromCache: false,
-            skipped: true,
-            error: "运行时间已达上限，跳过",
-          };
-        }
-        try {
-          await consumeQuota(userId, "serpapi", plan);
-          consumed = true;
-          // 用户级扣费成功后，系统级计数 +1
-          if (cronCtx) cronCtx.serpApiCalls++;
-          rankResult = await serpApiProvider.checkRank(params);
-          try {
-            await writeCache("rank", params, rankResult);
-          } catch {
-            // ignore
-          }
-        } catch (e) {
-          if (e instanceof SeoProviderError) {
-            errMsg = e.message;
-          } else if (e instanceof QuotaExceededError) {
-            errMsg = e.message;
-          } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-            errMsg = "本月额度已用尽，下月 1 日自动重置";
-          } else {
-            errMsg = (e as Error).message;
-          }
+    // 2. 真实调用（searchRank：rank 缓存命中则零扣费；miss 时 consumeQuota 单点计费）
+    if (!rankResult) {
+      // 系统级保险丝：再次检查（可能在并发批次中途触及上限）
+      if (cronCtx && cronCtx.serpApiCalls >= cronCtx.maxSerpApiCalls) {
+        cronCtx.stoppedByCostLimit = true;
+        return {
+          id: tk.id,
+          keyword: tk.keyword,
+          domain: tk.domain,
+          location: tk.location,
+          device: tk.device,
+          position: null,
+          url: null,
+          fromCache: false,
+          skipped: true,
+          error: "系统级 SerpApi 上限已触及，跳过",
+        };
+      }
+      // 运行时间保险丝：达到时间上限后不再发起 SerpApi 请求
+      if (cronCtx && hasCronRuntimeExpired(cronCtx)) {
+        cronCtx.stoppedByTimeLimit = true;
+        return {
+          id: tk.id,
+          keyword: tk.keyword,
+          domain: tk.domain,
+          location: tk.location,
+          device: tk.device,
+          position: null,
+          url: null,
+          fromCache: false,
+          skipped: true,
+          error: "运行时间已达上限，跳过",
+        };
+      }
+      try {
+        const rank = await searchRank(userId, plan, {
+          keyword: tk.keyword,
+          domain: tk.domain,
+          location: tk.location,
+          device: tk.device,
+        });
+        rankResult = rank.result;
+        fromCache = rank.fromCache;
+        consumed = !fromCache;
+        // 用户级扣费发生在 searchRank 内部；这里只做系统级计数
+        if (consumed && cronCtx) cronCtx.serpApiCalls++;
+      } catch (e) {
+        if (e instanceof SeoProviderError) {
+          errMsg = e.message;
+        } else if (e instanceof QuotaExceededError) {
+          errMsg = e.message;
+        } else if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
+          errMsg = "本月额度已用尽，下月 1 日自动重置";
+        } else {
+          errMsg = (e as Error).message;
         }
       }
     }
 
-    // 4. 写入 DB
+    // 3. 写入 DB（含 SERP feature types，P0-02-D 起保留）
     if (rankResult) {
       await upsertRankHistory(userId, {
         keyword_id: tk.id,
         date: today,
         position: rankResult.rank,
         url: rankResult.matchedUrl,
+        featureTypes: rankResult.features?.map((feature) => feature.featureType),
       });
       await updateLastRefreshed(userId, tk.id);
 
-      // 5. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
+      // 4. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
       if (consumed) {
         await generateRankAlert(userId, tk, rankResult.rank, today);
       }

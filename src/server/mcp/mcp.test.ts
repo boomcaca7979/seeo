@@ -4,7 +4,7 @@ import { AddressInfo } from "node:net";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { normalizeMcpError, McpNormalizedError } from "./errors";
-import { backlinkOutputSchema, keywordOutputSchema, serpOutputSchema } from "./output-schemas";
+import { backlinkOutputSchema, keywordOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "./output-schemas";
 import { keywordInputSchema, serpInputSchema } from "./schemas";
 import { SeoProviderError } from "@/lib/seo/provider";
 
@@ -132,11 +132,11 @@ async function officialClient() {
 }
 
 describe("SeeO MCP standard Streamable HTTP compatibility", () => {
-  it("connects with the official MCP client and lists exactly six tools", async () => {
+  it("connects with the official MCP client and lists exactly seven tools", async () => {
     const { client } = await officialClient();
     const listed = await client.listTools();
     expect(listed.tools.map((tool) => tool.name)).toEqual([
-      "list_projects", "project_context", "research_keywords", "get_serp_results", "get_backlinks_profile", "search_console_tools",
+      "list_projects", "project_context", "research_keywords", "get_serp_results", "get_backlinks_profile", "get_rank_history", "search_console_tools",
     ]);
     await client.close();
   });
@@ -228,6 +228,15 @@ describe("SeeO MCP standard Streamable HTTP compatibility", () => {
         summary: { organicCount: 1, featureCount: 1, featureTypes: ["featured_snippet"], projectPresent: true, projectRank: 1, projectRankingUrl: "https://a.example.com/", topDomains: [{ domain: "example.com", count: 1 }], domainFrequency: { "example.com": 1 } },
       },
       meta: { count: 1, source: "serpapi", fromCache: false, language: "zh-cn", location: "中国", device: "desktop" },
+    }).success).toBe(true);
+    // P0-02-D：get_rank_history 输出 schema（status 枚举 + distribution）
+    expect(rankHistoryOutputSchema.safeParse({
+      data: {
+        domain: "me.site",
+        keywords: [{ keyword: "seo", location: "中国", device: "PC", currentRank: 8, previousRank: 12, change: 4, status: "improved", rankingUrl: "https://me.site/a", featureTypes: ["featured_snippet"] }],
+        distribution: { trackedCount: 1, rankedCount: 1, top3Count: 0, top10Count: 1, top20Count: 1, top50Count: 1, notRankingCount: 0, averageRank: 8, medianRank: 8 },
+      },
+      meta: { count: 1, source: "db", days: 30 },
     }).success).toBe(true);
     expect(JSON.stringify(normalized)).not.toMatch(/secret|api[_ -]?key|stack|\/Users\//i);
   });

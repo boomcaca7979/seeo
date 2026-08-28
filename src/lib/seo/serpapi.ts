@@ -329,6 +329,8 @@ export class SerpApiProvider implements SeoProvider {
       rank,
       matchedUrl: hit?.link ?? null,
       matchedTitle: hit?.title ?? null,
+      // Top-100 响应同样包含 SERP feature 块——排名变化时可解释「是不是 SERP 结构变了」
+      features: extractFeatures(raw),
     };
   }
 }

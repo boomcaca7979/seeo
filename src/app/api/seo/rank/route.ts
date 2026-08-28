@@ -2,10 +2,10 @@
 // 服务端路由：查某域名在某关键词 SERP 前 100 名中的真实位置
 
 import { NextResponse } from "next/server";
-import { serpApiProvider } from "@/lib/seo/serpapi";
+import { searchRank } from "@/lib/seo/serp-service";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { consumeQuota, peekUsage, readCache, writeCache, QuotaExceededError } from "@/lib/seo/cache";
-import type { RankResult, SeoApiError } from "@/lib/seo/types";
+import { peekUsage, QuotaExceededError } from "@/lib/seo/cache";
+import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -61,37 +61,13 @@ export async function GET(req: Request) {
 
   const params = { keyword, domain, location, device };
 
-  // 1. 缓存优先
+  // P0-02-D：缓存与计费统一在 serp-service.searchRank（rank 命名空间，provider 版本 + language 参与 key）
   try {
-    const cached = await readCache<RankResult>("rank", params);
-    if (cached) {
-      const usage = await peekUsage(userId, "serpapi", plan);
-      return NextResponse.json({
-        data: { ...cached, fromCache: true },
-        usage,
-      });
-    }
-  } catch {
-    // ignore
-  }
-
-  // 2. 消耗额度（用户级隔离）
-  let usage;
-  try {
-    usage = await consumeQuota(userId, "serpapi", plan);
-  } catch (e) {
-    return mapError(e);
-  }
-
-  // 3. 调用 SerpApi
-  try {
-    const result = await serpApiProvider.checkRank(params);
-    try {
-      await writeCache("rank", params, result);
-    } catch {
-      // ignore
-    }
-    return NextResponse.json({ data: result, usage });
+    const { result, fromCache } = await searchRank(userId, plan, params);
+    return NextResponse.json({
+      data: { ...result, fromCache },
+      usage: await peekUsage(userId, "serpapi", plan),
+    });
   } catch (e) {
     return mapError(e);
   }

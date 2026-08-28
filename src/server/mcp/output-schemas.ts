@@ -13,4 +13,33 @@ export const serpOutputSchema = z.object({
 }).passthrough();
 export const keywordOutputSchema = z.object({ data: z.object({ keywords: z.array(z.object({ keyword: z.string(), source: z.string() }).passthrough()) }), meta: z.object({ count: z.number(), source: z.string(), unavailableMetrics: z.array(z.string()), metricsSource: z.string().optional(), warnings: z.array(z.string()).optional() }) }).passthrough();
 
+export const rankHistoryOutputSchema = z.object({
+  data: z.object({
+    domain: z.string(),
+    keywords: z.array(z.object({
+      keyword: z.string(),
+      location: z.string(),
+      device: z.string(),
+      currentRank: z.number().nullable(),
+      previousRank: z.number().nullable(),
+      change: z.number().nullable(),
+      status: z.enum(["improved", "declined", "stable", "new", "lost", "not_ranked"]),
+      rankingUrl: z.string().nullable(),
+      featureTypes: z.array(z.string()),
+    })),
+    distribution: z.object({
+      trackedCount: z.number(),
+      rankedCount: z.number(),
+      top3Count: z.number(),
+      top10Count: z.number(),
+      top20Count: z.number(),
+      top50Count: z.number(),
+      notRankingCount: z.number(),
+      averageRank: z.number().nullable(),
+      medianRank: z.number().nullable(),
+    }),
+  }),
+  meta: z.object({ count: z.number(), source: z.string(), days: z.number() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

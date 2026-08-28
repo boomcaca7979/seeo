@@ -69,6 +69,13 @@ async function migrate(db: DBAdapter): Promise<void> {
     }
   }
 
+  // P0-02-D：rank_history 补 feature_types 列（旧库已存在表，需 ALTER；新库由 CREATE TABLE 建出）
+  try {
+    await db.run(`ALTER TABLE rank_history ADD COLUMN feature_types TEXT`);
+  } catch {
+    // 表不存在或列已存在，忽略
+  }
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_keywords (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,6 +100,7 @@ async function migrate(db: DBAdapter): Promise<void> {
       date TEXT NOT NULL,
       position INTEGER,
       url TEXT,
+      feature_types TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       user_id TEXT NOT NULL DEFAULT 'demo-user',
       FOREIGN KEY (keyword_id) REFERENCES tracked_keywords(id) ON DELETE CASCADE,

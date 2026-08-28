@@ -1,6 +1,6 @@
 import { serpApiProvider } from "./serpapi";
 import { readCache, writeCache, consumeQuota, peekUsage } from "./cache";
-import type { SerpResult } from "./types";
+import type { RankResult, SerpResult } from "./types";
 import type { PlanTier } from "@/lib/auth";
 
 export interface SerpServiceParams {
@@ -49,6 +49,53 @@ export async function searchSerp(
 
 export async function getSerpUsage(userId: string, plan: PlanTier) {
   return peekUsage(userId, "serpapi", plan);
+}
+
+// ===== Rank check（P0-02-D Rank Tracking Intelligence） =====
+// Top-100 排名检查与 Top-10 SERP 是两种 provider 调用（num=100 vs num=10），
+// 但缓存与计费必须统一在 service 层单点完成：
+// P0-02-D 之前 refresh.ts 与 /api/seo/rank 各自复制了一套 cache/quota 逻辑，
+// 本函数是唯一的 rank 检查入口（key 含 provider 版本 + language 维度）。
+
+/** rank 缓存 key 成分：domain 是匹配目标而非市场维度，但不同 domain 的结果不同，须参与 key */
+const RANK_PROVIDER_VERSION = "serpapi-v1";
+
+export interface RankServiceParams {
+  keyword: string;
+  domain: string;
+  location: string;
+  device: "PC" | "移动端";
+  /** SerpApi hl 语言码（可选）；缺省 zh-cn 保持既有行为 */
+  language?: string;
+}
+
+export async function searchRank(
+  userId: string,
+  plan: PlanTier,
+  params: RankServiceParams,
+): Promise<{ result: RankResult; fromCache: boolean }> {
+  const cacheParams = {
+    provider: RANK_PROVIDER_VERSION,
+    keyword: params.keyword,
+    domain: params.domain,
+    location: params.location,
+    language: params.language ?? "",
+    device: params.device,
+  };
+  const cached = await readCache<RankResult>("rank", cacheParams);
+  if (cached) {
+    return { result: { ...cached, fromCache: true }, fromCache: true };
+  }
+  await consumeQuota(userId, "serpapi", plan);
+  const result = await serpApiProvider.checkRank({
+    keyword: params.keyword,
+    domain: params.domain,
+    location: params.location,
+    device: params.device,
+    ...(params.language ? { language: params.language } : {}),
+  });
+  try { await writeCache("rank", cacheParams, result); } catch { /* cache failure does not fail a provider result */ }
+  return { result, fromCache: false };
 }
 
 export async function expandKeyword(

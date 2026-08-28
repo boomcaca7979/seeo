@@ -65,6 +65,8 @@ export interface RankResult {
   /** 命中页面的 URL */
   matchedUrl: string | null;
   matchedTitle?: string | null;
+  /** SERP feature 块（P0-02-D 起随排名检查捕获；旧缓存条目可能缺失） */
+  features?: SerpFeature[];
   fromCache?: boolean;
 }
 

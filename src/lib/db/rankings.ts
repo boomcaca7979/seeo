@@ -8,7 +8,22 @@ export interface RankHistoryRow {
   date: string; // YYYY-MM-DD
   position: number | null;
   url: string | null;
+  /** 该次快照时的 SERP feature 类型列表（P0-02-D 起；旧记录为空数组） */
+  featureTypes: string[];
   created_at: string;
+}
+
+function parseFeatureTypes(raw: unknown): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === "string");
+    }
+  } catch {
+    // 损坏数据按无 feature 处理
+  }
+  return [];
 }
 
 /** 同一天只记一条：position 为 null 表示查询了但未进前 100 */
@@ -17,15 +32,22 @@ export async function upsertRankHistory(userId: string, params: {
   date: string; // YYYY-MM-DD
   position: number | null;
   url: string | null;
+  /** SERP feature 类型列表（可选；P0-02-D 起由排名刷新写入） */
+  featureTypes?: string[];
 }): Promise<void> {
   const db = await getAdapter();
   await db.run(`
-    INSERT INTO rank_history (keyword_id, date, position, url, user_id)
-    VALUES (@keyword_id, @date, @position, @url, @user_id)
+    INSERT INTO rank_history (keyword_id, date, position, url, feature_types, user_id)
+    VALUES (@keyword_id, @date, @position, @url, @feature_types, @user_id)
     ON CONFLICT(keyword_id, date) DO UPDATE SET
       position = excluded.position,
-      url = excluded.url
-  `, [{ ...params, user_id: userId }]);
+      url = excluded.url,
+      feature_types = excluded.feature_types
+  `, [{
+    ...params,
+    feature_types: params.featureTypes && params.featureTypes.length > 0 ? JSON.stringify(params.featureTypes) : null,
+    user_id: userId,
+  }]);
 }
 
 export async function getRankHistory(userId: string, keywordId: number, days = 30): Promise<RankHistoryRow[]> {
@@ -40,8 +62,9 @@ export async function getRankHistory(userId: string, keywordId: number, days = 3
     id: Number(r.id),
     keyword_id: Number(r.keyword_id),
     date: String(r.date),
-    position: r.position === null ? null : Number(r.position),
+    position: r.position === null || r.position === undefined ? null : Number(r.position),
     url: r.url ? String(r.url) : null,
+    featureTypes: parseFeatureTypes(r.feature_types),
     created_at: String(r.created_at),
   }));
 }
@@ -78,8 +101,9 @@ export async function getPreviousRankHistory(userId: string, keywordId: number, 
     id: Number(row.id),
     keyword_id: Number(row.keyword_id),
     date: String(row.date),
-    position: row.position === null ? null : Number(row.position),
+    position: row.position === null || row.position === undefined ? null : Number(row.position),
     url: row.url ? String(row.url) : null,
+    featureTypes: parseFeatureTypes(row.feature_types),
     created_at: String(row.created_at),
   };
 }
@@ -187,4 +211,101 @@ export async function countActiveKeywords(userId: string): Promise<number> {
     WHERE date >= date('now', 'localtime', '-7 day') AND user_id = ?
   `, [userId]) as { c: number };
   return row.c;
+}
+
+// ---------- Rank Tracking Intelligence（P0-02-D） ----------
+
+export interface RankWindowRow {
+  keyword_id: number;
+  keyword: string;
+  domain: string;
+  location: string;
+  device: "PC" | "移动端";
+  date: string;
+  position: number | null;
+  url: string | null;
+  featureTypes: string[];
+}
+
+/**
+ * 批量取用户（或某项目 domain）全部 tracked keywords 在时间窗口内的 rank_history。
+ * 每个关键词的序列天然按 (keyword, location, device) 隔离——tracked_keywords 的唯一约束保证。
+ * 用于 RankTrackingService 计算 current/previous/change/status，一次查询避免 N+1。
+ */
+export async function getRankWindow(
+  userId: string,
+  domain: string | null,
+  days: number
+): Promise<RankWindowRow[]> {
+  const db = await getAdapter();
+  const rows = await db.query(`
+    SELECT tk.id AS keyword_id, tk.keyword, tk.domain, tk.location, tk.device,
+           rh.date, rh.position, rh.url, rh.feature_types
+    FROM tracked_keywords tk
+    JOIN rank_history rh ON rh.keyword_id = tk.id AND rh.user_id = tk.user_id
+    WHERE tk.user_id = ?
+      AND rh.date >= date('now', 'localtime', ?)
+      ${domain ? "AND tk.domain = ?" : ""}
+    ORDER BY tk.id ASC, rh.date ASC
+  `, domain ? [userId, `-${days} day`, domain] : [userId, `-${days} day`]) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    keyword_id: Number(r.keyword_id),
+    keyword: String(r.keyword),
+    domain: String(r.domain),
+    location: String(r.location),
+    device: String(r.device) as "PC" | "移动端",
+    date: String(r.date),
+    position: r.position === null || r.position === undefined ? null : Number(r.position),
+    url: r.url ? String(r.url) : null,
+    featureTypes: parseFeatureTypes(r.feature_types),
+  }));
+}
+
+export interface CompetitorMovementRow {
+  competitor_id: number;
+  domain: string;
+  /** 最新一次记录的排名（null = 该次检查未进前 100） */
+  currentRank: number | null;
+  /** 最新记录之前最近一次记录的排名 */
+  previousRank: number | null;
+  /** previousRank - currentRank（正 = 竞品上升；任一侧缺失为 null） */
+  change: number | null;
+}
+
+/**
+ * 某关键词下所有竞品的最新两次排名（competitor movement）。
+ * 复用 competitor_ranks 既有历史（每次刷新 INSERT 新行），不新建表。
+ */
+export async function getCompetitorRankMovement(
+  userId: string,
+  keywordId: number
+): Promise<CompetitorMovementRow[]> {
+  const db = await getAdapter();
+  const rows = await db.query(`
+    WITH ordered AS (
+      SELECT cr.competitor_id, c.domain, cr.rank,
+        ROW_NUMBER() OVER (PARTITION BY cr.competitor_id ORDER BY cr.checked_at DESC) AS rn
+      FROM competitor_ranks cr
+      JOIN competitors c ON c.id = cr.competitor_id
+      WHERE cr.keyword_id = ? AND cr.user_id = ?
+    )
+    SELECT competitor_id, domain,
+      MAX(CASE WHEN rn = 1 THEN rank END) AS current_rank,
+      MAX(CASE WHEN rn = 2 THEN rank END) AS previous_rank
+    FROM ordered
+    WHERE rn <= 2
+    GROUP BY competitor_id
+    ORDER BY domain ASC
+  `, [keywordId, userId]) as Record<string, unknown>[];
+  return rows.map((r) => {
+    const current = r.current_rank === null || r.current_rank === undefined ? null : Number(r.current_rank);
+    const previous = r.previous_rank === null || r.previous_rank === undefined ? null : Number(r.previous_rank);
+    return {
+      competitor_id: Number(r.competitor_id),
+      domain: String(r.domain),
+      currentRank: current,
+      previousRank: previous,
+      change: current !== null && previous !== null ? previous - current : null,
+    };
+  });
 }

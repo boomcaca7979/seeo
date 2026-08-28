@@ -1,12 +1,13 @@
 import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service";
 import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-research-service";
+import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, serpInputSchema, type ToolName } from "../schemas";
+import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, backlinkOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, backlinkOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 export interface RegisteredTool { name: ToolName; description: string; inputSchema: Record<string, unknown>; execute: (ctx: ToolAuthContext, input: unknown) => Promise<unknown>; }
 
@@ -44,6 +45,15 @@ const tools: RegisteredTool[] = [
   { name: "get_backlinks_profile", description: "Read a bounded, filterable, paginated SeeO backlink profile.", inputSchema: { type: "object", properties: { ...projectProperty, domain: stringProperty, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 }, sort: { type: "string", enum: ["sourceRankDesc", "sourceRankAsc", "firstSeenDesc", "firstSeenAsc"] }, filters: { type: "object" }, onePerDomain: { type: "boolean" }, asIs: { type: "boolean" } }, required: ["projectId"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = backlinkInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId); const domain = normalizeBacklinkDomain(parsed.domain ?? project.domain); if (!domain) throw new McpNormalizedError("BAD_REQUEST", "domain is invalid.");
     return validateOutput(backlinkOutputSchema, await getBacklinkProfile(ctx.userId, ctx.plan, domain, { page: parsed.page, pageSize: parsed.pageSize, sort: parsed.sort, ...parsed.filters, onePerDomain: parsed.onePerDomain }));
+  } },
+  { name: "get_rank_history", description: "Read SeeO rank tracking data for a project: current rank, previous rank, rank change (positive = improved), status (improved/declined/stable/new/lost), ranking URL and captured SERP feature types per tracked keyword, plus project-level rank distribution. Reads stored history only — no provider cost; trigger a refresh in SeeO for fresh data. Rank series are isolated per keyword+location+device.", inputSchema: { type: "object", properties: { ...projectProperty, keyword: { type: "string", description: "Optional exact keyword filter." }, days: { type: "integer", minimum: 1, maximum: 90 }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = rankHistoryInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);
+    const summary = await getProjectRankSummary(ctx.userId, project.domain, parsed.days);
+    const filtered = parsed.keyword
+      ? summary.keywords.filter((row) => normalizeKeywordForDedup(row.keyword) === normalizeKeywordForDedup(parsed.keyword!))
+      : summary.keywords;
+    const keywords = filtered.slice(0, parsed.limit);
+    return validateOutput(rankHistoryOutputSchema, { data: { domain: summary.domain, keywords, distribution: summary.distribution }, meta: { count: keywords.length, source: "db", days: parsed.days } });
   } },
   { name: "search_console_tools", description: "Expose SeeO Search Console operations. SeeO does not have a GSC integration configured yet.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" } }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => { const parsed = gscInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId); throw new McpNormalizedError("NOT_CONFIGURED", `Search Console operation '${parsed.operation}' is not configured in SeeO.`); } },
 ];

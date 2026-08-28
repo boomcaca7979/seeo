@@ -27,6 +27,7 @@ vi.mock("./serpapi", () => ({
 
 import {
   calculateSerpOverlap,
+  searchRank,
   searchSerp,
   summarizeSerp,
 } from "./serp-service";
@@ -207,5 +208,49 @@ describe("calculateSerpOverlap", () => {
     expect(calculateSerpOverlap(empty, resultA).overlap).toBe(0);
     expect(calculateSerpOverlap(resultA, empty).overlap).toBe(0);
     expect(calculateSerpOverlap(empty, empty)).toEqual({ overlap: null, commonCount: 0, unionCount: 0, common: [] });
+  });
+});
+
+describe("searchRank（P0-02-D 统一 rank 检查）", () => {
+  const rankResult = {
+    keyword: "kw", domain: "me.site", location: "中国", device: "PC" as const,
+    fetchedAt: "2026-08-28T00:00:00.000Z", rank: 8, matchedUrl: "https://me.site/a",
+  };
+
+  beforeEach(() => {
+    checkRankProviderMock.mockReset().mockResolvedValue(rankResult);
+  });
+
+  it("cache miss 时经 provider 查询并单点计费，key 含 provider 版本 + language + device", async () => {
+    const result = await searchRank("u1", "lite", { keyword: "kw", domain: "me.site", location: "中国", device: "PC" });
+
+    expect(checkRankProviderMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "lite");
+    expect(writeCacheMock).toHaveBeenCalledWith("rank", {
+      provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "PC",
+    }, rankResult);
+    expect(result.result.rank).toBe(8);
+    expect(result.fromCache).toBe(false);
+  });
+
+  it("cache 命中时零 provider 调用、零扣费", async () => {
+    readCacheMock.mockResolvedValue(rankResult);
+    const result = await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "中国", device: "PC" });
+    expect(checkRankProviderMock).not.toHaveBeenCalled();
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(result.fromCache).toBe(true);
+    expect(result.result.rank).toBe(8);
+  });
+
+  it("不同 device / location / language 使用不同 cache key", async () => {
+    await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "中国", device: "PC" });
+    await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "中国", device: "移动端" });
+    await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "美国", device: "PC" });
+    await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "中国", device: "PC", language: "en" });
+    const keys = readCacheMock.mock.calls.map((call) => JSON.stringify(call[1]));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "移动端" }));
+    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "en", device: "PC" }));
   });
 });
