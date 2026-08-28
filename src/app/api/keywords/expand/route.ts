@@ -1,10 +1,12 @@
 // ===== /api/keywords/expand =====
-// 拓词 API：调用 SerpApi google_search，返回相关搜索 + PAA
-// 复用 serp 命名空间缓存 + 用量计数
+// 拓词 API：SerpApi 相关搜索 + PAA（既有 contract 不变）
+// P0-02-A 起经由 KeywordResearchService 统一入口，附带 DataForSEO 指标补全（data.metrics，可空）
+// 缓存与用量：serpapi 沿用 serp 命名空间；dataforseo 沿用 kw-metrics 命名空间 + dataforseo 配额
 
 import { NextResponse } from "next/server";
 import { SeoProviderError } from "@/lib/seo/provider";
-import { getSerpUsage, expandKeyword } from "@/lib/seo/serp-service";
+import { getSerpUsage } from "@/lib/seo/serp-service";
+import { researchKeywords } from "@/lib/seo/keyword-research-service";
 import { QuotaExceededError } from "@/lib/seo/cache";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -19,6 +21,24 @@ interface ExpandResponse {
   location: string;
   device: string;
   fromCache: boolean;
+  /** P0-02-A 新增（可空）：DataForSEO 指标补全；不影响既有字段 */
+  metrics?: {
+    source: "dataforseo" | null;
+    fromCache: boolean;
+    unavailableMetrics: string[];
+    warnings: string[];
+    keywords: {
+      keyword: string;
+      origin: string;
+      searchVolume: number | null;
+      difficulty: number | null;
+      cpc: number | null;
+      competition: number | null;
+      competitionLevel: string | null;
+      intent: string | null;
+      trend: { year: number; month: number; searchVolume: number }[] | null;
+    }[];
+  };
 }
 
 function badParams(msg: string) {
@@ -74,8 +94,25 @@ export async function POST(req: Request) {
   if (device !== "PC" && device !== "移动端") return badParams("device 必须是 PC 或 移动端");
 
   try {
-    const data = await expandKeyword(userId, plan, { keyword: seed, location, device });
-    const resp: ExpandResponse = { ...data };
+    // KeywordResearchService 内部已兼容旧的 expand contract（seed/related/paa/device/fromCache）
+    const research = await researchKeywords(userId, plan, { keyword: seed, location, device, enrichMetrics: true });
+    const resp: ExpandResponse = {
+      seed: research.seed,
+      related: research.related,
+      paa: research.paa,
+      location: research.location,
+      device: research.device,
+      fromCache: research.fromCache,
+      metrics: {
+        source: research.metrics.source,
+        fromCache: research.metrics.fromCache,
+        unavailableMetrics: research.unavailableMetrics,
+        warnings: research.metrics.warnings,
+        keywords: research.keywords.map(({ keyword, origin, searchVolume, difficulty, cpc, competition, competitionLevel, intent, trend }) => ({
+          keyword, origin, searchVolume, difficulty, cpc, competition, competitionLevel, intent, trend,
+        })),
+      },
+    };
     return NextResponse.json({ data: resp, usage: await getSerpUsage(userId, plan) });
   } catch (e) {
     return mapError(e);

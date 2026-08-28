@@ -1,4 +1,6 @@
-import { getSerpUsage, expandKeyword, searchSerp } from "@/lib/seo/serp-service";
+import { getSerpUsage, searchSerp } from "@/lib/seo/serp-service";
+import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-research-service";
+import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
 import { backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, serpInputSchema, type ToolName } from "../schemas";
@@ -13,11 +15,24 @@ const projectProperty = { projectId: stringProperty };
 const tools: RegisteredTool[] = [
   { name: "list_projects", description: "List projects accessible to the authenticated SeeO caller.", inputSchema: { type: "object", properties: {}, additionalProperties: false }, execute: async (ctx, input) => { if (input !== undefined && (typeof input !== "object" || input === null || Object.keys(input as object).length > 0)) throw new McpNormalizedError("BAD_REQUEST", "list_projects does not accept arguments."); return validateOutput(projectListOutputSchema, { projects: await listAuthorizedProjects(ctx) }); } },
   { name: "project_context", description: "Get the verified context and available SEO metadata for a SeeO project.", inputSchema: { type: "object", properties: projectProperty, required: ["projectId"], additionalProperties: false }, execute: async (ctx, input) => validateOutput(projectOutputSchema, await projectContext(ctx, projectIdSchema.parse(input).projectId)) },
-  { name: "research_keywords", description: "Expand seed keywords using SeeO's existing SerpApi related-search and PAA capability. Volume and difficulty are unavailable in the current provider.", inputSchema: { type: "object", properties: { ...projectProperty, seedKeywords: { type: "array", items: stringProperty, minItems: 1, maxItems: 20 }, location: stringProperty, language: stringProperty, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId", "seedKeywords"], additionalProperties: false }, execute: async (ctx, input) => {
+  { name: "research_keywords", description: "Research seed keywords via SeeO's Keyword Research Service: SerpApi related-search/PAA expansion enriched with real DataForSEO metrics (search volume, difficulty, CPC, competition, trend) where available. Metrics not covered by the provider for the request are returned as null and listed in meta.unavailableMetrics.", inputSchema: { type: "object", properties: { ...projectProperty, seedKeywords: { type: "array", items: stringProperty, minItems: 1, maxItems: 20 }, location: stringProperty, language: stringProperty, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId", "seedKeywords"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = keywordInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
-    const items = await Promise.all(parsed.seedKeywords.map(async (seed) => expandKeyword(ctx.userId, ctx.plan, { keyword: seed, location: parsed.location, device: "PC" })));
-    const keywords = items.flatMap((item) => [...item.related, ...item.paa].slice(0, parsed.limit).map((keyword) => ({ keyword, searchVolume: null, difficulty: null, cpc: null, competition: null, intent: null, trend: null, source: "serpapi", seed: item.seed })));
-    return validateOutput(keywordOutputSchema, { data: { keywords: keywords.slice(0, parsed.limit) }, meta: { count: Math.min(keywords.length, parsed.limit), source: "serpapi", unavailableMetrics: ["searchVolume", "difficulty", "cpc", "competition", "intent", "trend"] }, usage: await getSerpUsage(ctx.userId, ctx.plan) });
+    const results = await Promise.all(parsed.seedKeywords.map(async (seed) => researchKeywords(ctx.userId, ctx.plan, { keyword: seed, location: parsed.location, device: "PC", limit: 100, language: parsed.language, enrichMetrics: true })));
+    const seen = new Set<string>();
+    const keywords: { keyword: string; searchVolume: number | null; difficulty: number | null; cpc: number | null; competition: number | null; competitionLevel: string | null; intent: string | null; trend: { year: number; month: number; searchVolume: number }[] | null; source: string; seed: string }[] = [];
+    for (const result of results) {
+      for (const item of result.keywords) {
+        if (keywords.length >= parsed.limit) break;
+        const key = normalizeKeywordForDedup(item.keyword);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        keywords.push({ keyword: item.keyword, searchVolume: item.searchVolume, difficulty: item.difficulty, cpc: item.cpc, competition: item.competition, competitionLevel: item.competitionLevel, intent: item.intent, trend: item.trend, source: item.source, seed: item.seed });
+      }
+    }
+    const metricFields = ["searchVolume", "difficulty", "cpc", "competition", "intent", "trend"] as const;
+    const unavailableMetrics = metricFields.filter((field) => keywords.every((row) => row[field] === null));
+    const metricsSource = results.some((result) => result.metrics.source === "dataforseo") ? "dataforseo" : "serpapi";
+    return validateOutput(keywordOutputSchema, { data: { keywords }, meta: { count: keywords.length, source: "serpapi", metricsSource, unavailableMetrics: [...unavailableMetrics], warnings: [...new Set(results.flatMap((result) => result.metrics.warnings))] }, usage: { serp: await getSerpUsage(ctx.userId, ctx.plan), dataforseo: await peekUsage(ctx.userId, "dataforseo", ctx.plan) } });
   } },
   { name: "get_serp_results", description: "Get structured organic SERP results through SeeO's SerpApi service.", inputSchema: { type: "object", properties: { ...projectProperty, keyword: stringProperty, location: stringProperty, language: stringProperty, device: { type: "string", enum: ["PC", "移动端"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId", "keyword"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = serpInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId); const { result } = await searchSerp(ctx.userId, ctx.plan, parsed); return validateOutput(serpOutputSchema, { data: { ...result, organic: result.organic.slice(0, parsed.limit).map((row) => ({ rank: row.position, title: row.title, url: row.link, domain: row.domain, snippet: row.snippet, featureType: null })) }, meta: { count: Math.min(result.organic.length, parsed.limit), source: "serpapi", fromCache: result.fromCache === true }, usage: await getSerpUsage(ctx.userId, ctx.plan) });
