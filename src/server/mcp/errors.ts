@@ -6,7 +6,7 @@ import { FeatureNotAllowedError, PlanLimitError, QuotaExceededError } from "@/li
 export type McpErrorCode =
   | "AUTH_REQUIRED" | "PROJECT_ACCESS_DENIED" | "PROJECT_NOT_FOUND" | "BAD_REQUEST"
   | "RATE_LIMITED" | "PLAN_LIMIT_REACHED" | "PROVIDER_ERROR" | "PROVIDER_QUOTA"
-  | "NOT_CONFIGURED" | "INTERNAL_ERROR";
+  | "NOT_CONFIGURED" | "PROVIDER_ACCESS_DENIED" | "INTERNAL_ERROR";
 
 export class McpNormalizedError extends Error {
   constructor(

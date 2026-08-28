@@ -27,3 +27,13 @@ export function requireScope(ctx: ToolAuthContext, scope: string): void {
     throw new McpNormalizedError("PROJECT_ACCESS_DENIED", `The API key does not grant scope '${scope}'.`);
   }
 }
+
+/** Demo sessions must never be able to incur third-party provider costs. */
+export function requireProviderAccess(ctx: ToolAuthContext): void {
+  if (ctx.authMode === "demo") {
+    throw new McpNormalizedError(
+      "PROVIDER_ACCESS_DENIED",
+      "Provider-backed MCP tools are unavailable in demo mode.",
+    );
+  }
+}
