@@ -918,7 +918,8 @@
       "collapse": "折叠侧边栏",
       "demoToast": "当前为演示模式，账号系统未启用",
       "demoUser": "本地开发",
-      "demoEmail": "演示账号"
+      "demoEmail": "演示账号",
+      "opportunities": "优化机会"
     },
     "topbar": {
       "noProject": "未选择项目",
@@ -2010,6 +2011,32 @@
       "thSampleUrl": "示例 URL",
       "thSuggestion": "修复建议",
       "footer": "本报告由 SeeO 自动生成 · {time} · 域名 {domain}"
+    },
+    "opportunities": {
+      "title": "SEO 优化机会",
+      "subtitle": "来自 SeeO Opportunity Engine 的按优先级排序、有证据支撑的下一步行动",
+      "scanBtn": "运行扫描",
+      "scanning": "扫描中…",
+      "empty": "暂无机会。运行扫描，从追踪关键词、GSC、审计与 AI Search 数据中生成。",
+      "colPriority": "优先级",
+      "colType": "类型",
+      "colTarget": "目标",
+      "colStatus": "状态",
+      "colWhy": "原因（证据）",
+      "recommendedAction": "建议动作",
+      "actionPlan": "行动计划（手动执行）",
+      "verifyBtn": "验证",
+      "reviewBtn": "标记已读",
+      "approveBtn": "批准",
+      "startBtn": "开始执行",
+      "completeBtn": "标记完成",
+      "dismissBtn": "忽略",
+      "dataGaps": "扫描时的数据缺口",
+      "pending": "待观察",
+      "previewTitle": "执行包（手动）",
+      "previewBtn": "生成预览",
+      "approveActionBtn": "批准执行",
+      "manualCompleteBtn": "标记为已手动执行"
     }
   },
   "apiErrors": {

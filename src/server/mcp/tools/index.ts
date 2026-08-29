@@ -3,16 +3,18 @@ import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-re
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
 import { aiBrandLookup } from "@/lib/seo/ai-search-service";
 import { getCompetitorKeywordGap } from "@/lib/seo/competitor-service";
+import { previewAction, ensureAction } from "@/lib/seo/action-service";
 import { getCompetitorById, listTrackedKeywords } from "@/lib/db";
-import { listOpportunities } from "@/lib/db/opportunities";
+import { listOpportunities, getOpportunityById } from "@/lib/db/opportunities";
+import { getActionByOpportunity } from "@/lib/db/actions";
 import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, seoOpportunityInputSchema, serpInputSchema, type ToolName } from "../schemas";
+import { actionPlanInputSchema, aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, seoOpportunityInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, seoOpportunityOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, actionPlanOutputSchema, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, seoOpportunityOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 /** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
 function gscTodayMinusLag(): string {
@@ -119,6 +121,17 @@ const tools: RegisteredTool[] = [
       };
     });
     return validateOutput(seoOpportunityOutputSchema, { data: { opportunities }, meta: { count: opportunities.length, source: "db" } });
+  } },
+  { name: "get_action_plan", description: "Read (and optionally regenerate) the deterministic execution package for an opportunity's action plan: manual instruction steps, expected result, verification plan, and rollback notes. Execution mode is manual — SeeO has no CMS/GitHub write integrations; approval and status transitions happen in the SeeO UI. Agents can preview and recommend but never auto-approve.", inputSchema: { type: "object", properties: { ...projectProperty, opportunityId: { type: "integer", minimum: 1 }, refreshPreview: { type: "boolean" } }, required: ["projectId", "opportunityId"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = actionPlanInputSchema.parse(input); const opportunity = await getOpportunityById(ctx.userId, parsed.opportunityId);
+    if (!opportunity) throw new McpNormalizedError("PROJECT_ACCESS_DENIED", "The opportunity was not found for this caller.");
+    if (parsed.refreshPreview) { await ensureAction(ctx.userId, parsed.opportunityId); await previewAction(ctx.userId, parsed.opportunityId); }
+    const row = await getActionByOpportunity(ctx.userId, parsed.opportunityId);
+    if (!row) throw new McpNormalizedError("NOT_CONFIGURED", "No action exists yet — call with refreshPreview=true to generate the execution package.");
+    let preview: Record<string, unknown> = {};
+    try { preview = JSON.parse(row.preview_json ?? "{}") as Record<string, unknown>; } catch { /* ignore */ }
+    if (!preview.exactSteps) throw new McpNormalizedError("NOT_CONFIGURED", "No preview yet — call with refreshPreview=true to generate the execution package.");
+    return validateOutput(actionPlanOutputSchema, { data: { opportunity: { id: opportunity.id, type: opportunity.type, targetValue: opportunity.target_value, status: opportunity.status }, action: { id: row.id, actionType: row.action_type, executionMode: row.execution_mode, status: row.status, approvedAt: row.approved_at, completedAt: row.completed_at }, preview: { kind: String(preview.kind ?? "manual_instruction_package"), target: String(preview.target ?? ""), currentState: Array.isArray(preview.currentState) ? preview.currentState.map(String) : [], exactSteps: Array.isArray(preview.exactSteps) ? preview.exactSteps.map(String) : [], expectedResult: String(preview.expectedResult ?? ""), verificationPlan: Array.isArray(preview.verificationPlan) ? preview.verificationPlan.map(String) : [], rollbackNotes: String(preview.rollbackNotes ?? "manual") }, note: "Execution mode is manual. Approve and mark completion in the SeeO UI; agents never auto-approve." }, meta: { source: "db" } });
   } },
   { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);

@@ -125,4 +125,29 @@ export const seoOpportunityOutputSchema = z.object({
   meta: z.object({ count: z.number(), source: z.string() }),
 }).passthrough();
 
+export const actionPlanOutputSchema = z.object({
+  data: z.object({
+    opportunity: z.object({ id: z.number(), type: z.string(), targetValue: z.string(), status: z.string() }),
+    action: z.object({
+      id: z.number(),
+      actionType: z.string(),
+      executionMode: z.string(),
+      status: z.string(),
+      approvedAt: z.string().nullable(),
+      completedAt: z.string().nullable(),
+    }),
+    preview: z.object({
+      kind: z.string(),
+      target: z.string(),
+      currentState: z.array(z.string()),
+      exactSteps: z.array(z.string()),
+      expectedResult: z.string(),
+      verificationPlan: z.array(z.string()),
+      rollbackNotes: z.string(),
+    }),
+    note: z.string(),
+  }),
+  meta: z.object({ source: z.string() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

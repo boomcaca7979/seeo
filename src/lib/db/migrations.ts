@@ -183,6 +183,36 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_seo_opportunities_project
       ON seo_opportunities(project_id, priority, status);
 
+    CREATE TABLE IF NOT EXISTS seo_actions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      opportunity_id INTEGER NOT NULL,
+      project_id INTEGER NOT NULL,
+      action_type TEXT NOT NULL,
+      execution_mode TEXT NOT NULL DEFAULT 'manual',
+      status TEXT NOT NULL DEFAULT 'planned',
+      plan_json TEXT NOT NULL DEFAULT '{}',
+      preview_json TEXT,
+      result_json TEXT,
+      events_json TEXT NOT NULL DEFAULT '[]',
+      approved_at TEXT,
+      approved_by TEXT,
+      executed_at TEXT,
+      completed_at TEXT,
+      error_code TEXT,
+      idempotency_key TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (opportunity_id),
+      FOREIGN KEY (opportunity_id) REFERENCES seo_opportunities(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_seo_actions_user
+      ON seo_actions(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_seo_actions_project
+      ON seo_actions(project_id, status);
+
     CREATE TABLE IF NOT EXISTS content_checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,

@@ -133,11 +133,11 @@ async function officialClient() {
 }
 
 describe("SeeO MCP standard Streamable HTTP compatibility", () => {
-  it("connects with the official MCP client and lists exactly ten tools", async () => {
+  it("connects with the official MCP client and lists exactly eleven tools", async () => {
     const { client } = await officialClient();
     const listed = await client.listTools();
     expect(listed.tools.map((tool) => tool.name)).toEqual([
-      "list_projects", "project_context", "research_keywords", "get_serp_results", "get_backlinks_profile", "get_rank_history", "ai_search_brand_lookup", "get_competitor_keyword_gap", "get_seo_opportunities", "search_console_tools",
+      "list_projects", "project_context", "research_keywords", "get_serp_results", "get_backlinks_profile", "get_rank_history", "ai_search_brand_lookup", "get_competitor_keyword_gap", "get_seo_opportunities", "get_action_plan", "search_console_tools",
     ]);
     await client.close();
   });

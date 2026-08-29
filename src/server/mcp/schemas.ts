@@ -65,4 +65,11 @@ export const seoOpportunityInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
 });
 
-export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities";
+export const actionPlanInputSchema = z.object({
+  projectId: z.string().min(1),
+  opportunityId: z.number().int().min(1),
+  /** 重新生成 preview（确定性，幂等） */
+  refreshPreview: z.boolean().default(false),
+});
+
+export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities" | "get_action_plan";

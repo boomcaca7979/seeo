@@ -24,6 +24,15 @@ interface OpportunityRow {
   verification: Array<{ check: string; status: string; detail: string | null }> | null;
 }
 
+interface ActionRow {
+  id: number;
+  actionType: string;
+  executionMode: string;
+  status: string;
+  approvedAt: string | null;
+  preview: { exactSteps: string[]; expectedResult: string; verificationPlan: string[]; rollbackNotes: string } | null;
+}
+
 interface ScanSummary {
   generated: number;
   refreshed: number;
@@ -45,6 +54,52 @@ export default function OpportunitiesPage() {
   const [scanning, setScanning] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [action, setAction] = useState<ActionRow | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const loadAction = useCallback(async (opportunityId: number, operation?: "preview") => {
+    setActionBusy(true);
+    try {
+      if (operation === "preview") {
+        const res = await fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opportunity_id: opportunityId, operation: "preview" }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "preview failed");
+        setAction(json.data?.action ?? null);
+        return;
+      }
+      const res = await fetch(`/api/actions?opportunity_id=${opportunityId}`, { cache: "no-store" });
+      const json = await res.json();
+      setAction(json.data?.action ?? null);
+    } catch (e) {
+      show((e as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }, [show]);
+
+  async function actionOperation(opportunityId: number, operation: "approve" | "complete") {
+    setActionBusy(true);
+    try {
+      const res = await fetch("/api/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunity_id: opportunityId, operation }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "failed");
+      setAction(json.data?.action ?? null);
+      show(operation === "approve" ? "已批准执行动作" : "已记录手动执行完成（验证已启动）");
+      if (projectId) await load(projectId);
+    } catch (e) {
+      show((e as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   // 与 competitors 页一致：localStorage 选中项目 + Topbar 切换事件
   useEffect(() => {
@@ -207,8 +262,41 @@ export default function OpportunitiesPage() {
                 ))}
               </div>
             )}
+            {expandedId === row.id && (
+              <div className="mt-3 rounded border border-line-soft p-3 text-xs">
+                {actionBusy && <span className="text-ink-60">…</span>}
+                {action && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 text-ink-60">
+                      <span>execution mode: {action.executionMode}</span>
+                      <span>status: {action.status}</span>
+                      {action.approvedAt && <span>approved: {action.approvedAt}</span>}
+                    </div>
+                    {action.preview && (
+                      <div className="space-y-1">
+                        <div className="font-medium text-ink">{t("previewTitle")}</div>
+                        <ol className="list-decimal space-y-1 pl-5">
+                          {action.preview.exactSteps.map((step, index) => <li key={index}>{step}</li>)}
+                        </ol>
+                        <div>→ {action.preview.expectedResult}</div>
+                        <div className="text-ink-40">rollback: {action.preview.rollbackNotes}</div>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" disabled={actionBusy} onClick={() => void loadAction(row.id, "preview")} className="rounded border border-line-soft px-2 py-1 text-ink disabled:opacity-50">{t("previewBtn")}</button>
+                      {action.status === "planned" && <button type="button" disabled={actionBusy} onClick={() => actionOperation(row.id, "approve")} className="rounded border border-line-soft px-2 py-1 text-ink disabled:opacity-50">{t("approveActionBtn")}</button>}
+                      {action.status === "approved" && <button type="button" disabled={actionBusy} onClick={() => actionOperation(row.id, "complete")} className="rounded border border-line-soft px-2 py-1 text-ink disabled:opacity-50">{t("manualCompleteBtn")}</button>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" className="text-xs text-ink-60 underline" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}>
+              <button type="button" className="text-xs text-ink-60 underline" onClick={() => {
+                const next = expandedId === row.id ? null : row.id;
+                setExpandedId(next);
+                if (next !== null) void loadAction(row.id);
+              }}>
                 {expandedId === row.id ? "▲" : "▼"} {t("actionPlan")}
               </button>
               <div className="ml-auto flex flex-wrap gap-2">
