@@ -225,11 +225,19 @@ export async function createGitHubPullRequest(token: string, owner: string, repo
   return data;
 }
 
-/** 查询 PR 状态（幂等/状态轮询用；按 head 分支定位，避免依赖 PR number） */
+/** 查询 PR 状态（幂等/状态轮询用；按 head 分支定位，避免依赖 PR number）。
+ * 注意：list /pulls 响应不含 merged 布尔字段（只有 merged_at），非 open 状态必须
+ * 回源到单 PR GET 拿权威 merged 值，否则已 merge 的 PR 会被误判为 closed-unmerged。 */
 export async function getGitHubPullRequestForBranch(token: string, owner: string, repo: string, headBranch: string): Promise<GitHubPullRequest | null> {
   const { data } = await ghFetch<GitHubPullRequest[]>(
     token,
     `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?head=${encodeURIComponent(owner)}:${encodeURIComponent(headBranch)}&state=all&per_page=1`
   );
-  return data[0] ?? null;
+  const found = data[0] ?? null;
+  if (!found || found.state === "open") return found;
+  const { data: single } = await ghFetch<GitHubPullRequest>(
+    token,
+    `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${found.number}`
+  );
+  return single;
 }

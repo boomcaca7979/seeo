@@ -186,7 +186,18 @@ describe("executeGitHubChanges", () => {
 
   it("PR 已 merged → EXECUTION_CONFLICT（幂等：不重复执行）", async () => {
     const responses = baseResponses();
-    responses[4] = { match: (url: string, method: string) => { void method; return url.includes("/pulls?head"); }, body: [{ number: 7, html_url: "pr-url", state: "closed", merged: true }] };
+    // 如实模拟：list /pulls 响应不含 merged 字段；单 PR GET 才返回 merged: true
+    responses[4] = { match: (url: string, method: string) => { void method; return url.includes("/pulls?head"); }, body: [{ number: 7, html_url: "pr-url", state: "closed" }] };
+    responses.push({ match: (url: string, method: string) => { void method; return url.endsWith("/pulls/7"); }, body: { number: 7, html_url: "pr-url", state: "closed", merged: true } });
+    mockGitHub(responses);
+    await expect(executeGitHubChanges("u1", 2, { actionId: 55, spec, evidence: [], opportunityId: 9, idempotencyKey: "k" }))
+      .rejects.toMatchObject({ code: "EXECUTION_CONFLICT" });
+  });
+
+  it("PR closed 未合并 → EXECUTION_CONFLICT（list 无 merged 字段时回源单 PR 判定）", async () => {
+    const responses = baseResponses();
+    responses[4] = { match: (url: string, method: string) => { void method; return url.includes("/pulls?head"); }, body: [{ number: 7, html_url: "pr-url", state: "closed" }] };
+    responses.push({ match: (url: string, method: string) => { void method; return url.endsWith("/pulls/7"); }, body: { number: 7, html_url: "pr-url", state: "closed", merged: false } });
     mockGitHub(responses);
     await expect(executeGitHubChanges("u1", 2, { actionId: 55, spec, evidence: [], opportunityId: 9, idempotencyKey: "k" }))
       .rejects.toMatchObject({ code: "EXECUTION_CONFLICT" });
