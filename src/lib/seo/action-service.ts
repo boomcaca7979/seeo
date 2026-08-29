@@ -19,7 +19,7 @@ import { createAction, getActionById as dbGetActionById, getActionByOpportunity,
 import { getOpportunityById, saveOpportunityVerification, type OpportunityStatus } from "@/lib/db/opportunities";
 import { getExecutionAdapter, type ActionForExecution, type ExecutionPreview } from "./execution-adapter";
 import { verifyOpportunity } from "./opportunity-service";
-import { executeGitHubChanges, buildBranchName, type GitHubActionSpec } from "./github-execution-adapter";
+import { executeGitHubChanges, previewGitHubChanges, extractActionSpec, buildBranchName, type GitHubActionSpec } from "./github-execution-adapter";
 import { GitHubExecutionError } from "./github-execution-adapter";
 import { getGitHubPullRequestForBranch, getGitHubAppToken } from "./github-provider";
 import type { PlanTier } from "@/lib/auth";
@@ -51,7 +51,7 @@ export async function ensureAction(userId: string, opportunityId: number): Promi
   if (opportunity.status === "dismissed" || opportunity.status === "completed") {
     throw new ActionError("EXECUTION_INVALID_STATE", `机会状态为 ${opportunity.status}，不可创建执行动作`);
   }
-  let plan: { executionMode?: string; actionType?: string; steps?: string[] } = {};
+  let plan: { executionMode?: string; actionType?: string; steps?: string[]; filePath?: string; newContent?: string } = {};
   try { plan = JSON.parse(opportunity.action_plan_json ?? "{}") as typeof plan; } catch { /* 损坏按空 */ }
   const idempotencyKey = `${opportunity.project_id}|${opportunity.type}|${opportunity.target_value}`.toLowerCase();
   await createAction(userId, {
@@ -59,7 +59,12 @@ export async function ensureAction(userId: string, opportunityId: number): Promi
     project_id: opportunity.project_id,
     action_type: plan.actionType ?? "content_update",
     execution_mode: plan.executionMode ?? "manual",
-    plan: { steps: plan.steps ?? [], recommendation: opportunity.target_value },
+    plan: {
+      steps: plan.steps ?? [],
+      recommendation: opportunity.target_value,
+      ...(plan.filePath ? { filePath: plan.filePath } : {}),
+      ...(plan.newContent ? { newContent: plan.newContent } : {}),
+    },
     idempotency_key: idempotencyKey,
   });
   const created = await getActionByOpportunity(userId, opportunityId);
@@ -81,20 +86,43 @@ function toExecutionAction(row: SeoActionRow, evidence: Array<{ source: string; 
 }
 
 /**
- * Preview（确定性）：生成结构化手动执行包并持久化到 preview_json。
- * 不伪造旧内容 diff——manual adapter 只输出指令包。
+ * Preview（确定性）：有显式 spec（入参或 action plan 中的 filePath/newContent）且项目已连接 GitHub
+ * → 读取仓库真实文件生成 before/after（含 beforeSha，供 execute 冲突检查）；
+ * 无 spec → manual adapter 指令包（不伪造旧内容 diff）。
+ * 持久化到 preview_json；githubFiles[0].beforeSha 即 execute 时的 beforeHash 基准。
  */
-export async function previewAction(userId: string, opportunityId: number): Promise<ExecutionPreview> {
+export async function previewAction(
+  userId: string,
+  opportunityId: number,
+  spec?: GitHubActionSpec
+): Promise<ExecutionPreview & { githubFiles?: Array<{ path: string; before: string; beforeSha: string }> }> {
   const row = await ensureAction(userId, opportunityId);
-  const adapter = getExecutionAdapter(row.execution_mode);
-  if (!adapter) throw new ActionError("EXECUTION_NOT_SUPPORTED", `执行模式 ${row.execution_mode} 没有可用 adapter`);
+  // 恢复路径：failed action 重新生成预览 → 重置为 planned（可重新批准执行）。
+  // 失败路径（guard 拒绝/冲突/Provider 错误）均无未完成副作用；PR 幂等保证重试安全。
+  if (row.status === "failed") {
+    await updateActionStatus(userId, row.id, {
+      status: "planned",
+      event: { event: "reset_for_retry", by: userId },
+    });
+  }
   const opportunity = await getOpportunityById(userId, opportunityId);
   let evidence: Array<{ source: string; ref: string; summary: string }> = [];
   try { evidence = JSON.parse(opportunity?.evidence_json ?? "[]") as typeof evidence; } catch { /* 损坏按空 */ }
-  const preview = adapter.preview(toExecutionAction(row, evidence));
+
+  let plan: { filePath?: string; newContent?: string; steps?: string[] } = {};
+  try { plan = JSON.parse(row.plan_json) as typeof plan; } catch { /* 损坏按空 */ }
+  const planSpec = row.execution_mode === "github" ? extractActionSpec(plan) : null;
+  const effectiveSpec = spec ?? planSpec;
+  const preview = effectiveSpec || row.execution_mode === "github"
+    ? await previewGitHubChanges(userId, row.project_id, effectiveSpec)
+    : (() => {
+        const adapter = getExecutionAdapter(row.execution_mode);
+        if (!adapter) throw new ActionError("EXECUTION_NOT_SUPPORTED", `执行模式 ${row.execution_mode} 没有可用 adapter`);
+        return adapter.preview(toExecutionAction(row, evidence));
+      })();
   await updateActionStatus(userId, row.id, {
     preview_json: JSON.stringify(preview),
-    event: { event: "preview_generated", by: userId },
+    event: { event: "preview_generated", by: userId, detail: effectiveSpec ? "github" : "manual" },
   });
   return preview;
 }
@@ -244,15 +272,24 @@ export async function executeActionViaGitHub(userId: string, plan: PlanTier, act
 
   await updateActionStatus(userId, row.id, { status: "executing", event: { event: "executing", by: userId, detail: "github_pr" } });
   try {
+    // 冲突基准：preview 时持久化的目标文件 blob SHA（preview 后文件被第三方修改 → EXECUTION_CONFLICT）
+    const persistedPreview = safeParse(row.preview_json) as { githubFiles?: Array<{ beforeSha?: string }> };
+    const beforeHash = typeof persistedPreview.githubFiles?.[0]?.beforeSha === "string"
+      ? persistedPreview.githubFiles[0].beforeSha
+      : undefined;
     const result = await executeGitHubChanges(userId, opportunity.project_id, {
       actionId: row.id,
       spec,
+      beforeHash,
       evidence,
       opportunityId: opportunity.id,
       idempotencyKey: row.idempotency_key,
     });
+    // 幂等复用（既有 open PR）时不覆盖已持久化的首次执行结果（保留真实 commitSha 证据链）
+    const previous = safeParse(row.result_json) as { prNumber?: unknown };
+    const isIdempotentReuse = typeof previous.prNumber === "number" && previous.prNumber === result.prNumber;
     await updateActionStatus(userId, row.id, {
-      result_json: JSON.stringify(result),
+      ...(isIdempotentReuse ? {} : { result_json: JSON.stringify(result) }),
       event: { event: "pr_created", by: userId, detail: `${result.repository}#${result.prNumber}` },
     });
     return { stage: "awaiting_review", prUrl: result.prUrl };
@@ -293,7 +330,12 @@ export async function refreshGitHubStatus(userId: string, plan: PlanTier, action
     return { stage: "awaiting_review", repository, branch, prNumber: pr.number, prUrl: pr.html_url, verification: [] };
   }
   if (pr.merged) {
-    await updateActionStatus(userId, row.id, { event: { event: "pr_merged", by: userId, detail: `PR #${pr.number}` } });
+    await updateActionStatus(userId, row.id, {
+      status: "completed",
+      executed_at: row.executed_at ?? new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      event: { event: "pr_merged", by: userId, detail: `PR #${pr.number}` },
+    });
     const opportunity = await getOpportunityById(userId, row.opportunity_id);
     const { checks } = await verifyOpportunity(userId, plan, {
       projectId: row.project_id,
@@ -309,8 +351,8 @@ export async function refreshGitHubStatus(userId: string, plan: PlanTier, action
   await updateActionStatus(userId, row.id, {
     status: "failed",
     error_code: "EXECUTION_CONFLICT",
-    result_json: JSON.stringify({ prClosedWithoutMerge: true, manualExecutionPackage: true }),
-    event: { event: "pr_closed", by: userId },
+    result_json: JSON.stringify({ prClosedWithoutMerge: true, manualExecutionPackage: true, repository, branch, prNumber: pr.number, prUrl: pr.html_url }),
+    event: { event: "pr_closed", by: userId, detail: `PR #${pr.number}` },
   });
   return { stage: "closed", repository, branch, prNumber: pr.number, prUrl: pr.html_url, verification: [] };
 }

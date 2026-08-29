@@ -16,9 +16,10 @@ export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: "Opportunity 扫描需要登录 SeeO 账号", code: "AUTH_REQUIRED" }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: { project_id?: string | number; include_ctr?: boolean };
   try {
     body = await req.json();
@@ -29,13 +30,13 @@ export async function POST(req: Request) {
   if (!projectRef) {
     return NextResponse.json({ error: "project_id 参数无效", code: "INVALID_PROJECT_ID" }, { status: 400 });
   }
-  const projectId = await resolveSqliteProjectId(auth.user.id, projectRef);
+  const projectId = await resolveSqliteProjectId(userId, projectRef);
   if (projectId === null) {
     return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
 
   try {
-    const result = await scanOpportunities(auth.user.id, auth.plan, projectId, {
+    const result = await scanOpportunities(userId, auth.plan, projectId, {
       includeCtr: body.include_ctr !== false,
     });
     return NextResponse.json({ data: result });

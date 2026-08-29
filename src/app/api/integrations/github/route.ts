@@ -18,23 +18,24 @@ export const dynamic = "force-dynamic";
 
 async function resolveProject(req: Request): Promise<{ userId: string; projectId: number } | NextResponse> {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: "GitHub 集成需要登录 SeeO 账号", code: "GITHUB_NOT_CONNECTED" }, { status: 403 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const projectRef = (searchParams.get("project_id") ?? "").trim();
   if (!projectRef) {
     return NextResponse.json({ error: "project_id 参数无效", code: "INVALID_PROJECT_ID" }, { status: 400 });
   }
-  const projectId = await resolveSqliteProjectId(auth.user.id, projectRef);
+  const projectId = await resolveSqliteProjectId(userId, projectRef);
   if (projectId === null) {
     return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
-  const project = await getProjectById(auth.user.id, projectId);
+  const project = await getProjectById(userId, projectId);
   if (!project) {
     return NextResponse.json({ error: "未找到该项目", code: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
-  return { userId: auth.user.id, projectId };
+  return { userId, projectId };
 }
 
 export async function GET(req: Request) {
@@ -123,7 +124,21 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message, code: (e as { code?: string }).code ?? "GITHUB_PROVIDER_ERROR" }, { status: 502 });
+    // 不回显 GitHub 原始响应体（可能含内部细节）；映射为稳定错误码 + 用户可读信息
+    const code = (e as { code?: string }).code ?? "GITHUB_PROVIDER_ERROR";
+    const friendly: Record<string, string> = {
+      GITHUB_REPOSITORY_NOT_FOUND: "仓库不存在，或当前凭证无权访问该仓库",
+      GITHUB_PERMISSION_DENIED: "GitHub 拒绝了该凭证（无效、过期或权限不足）",
+      GITHUB_REPOSITORY_ARCHIVED: "仓库已归档，不可写入",
+      GITHUB_RATE_LIMITED: "GitHub API 速率受限，请稍后重试",
+      GITHUB_NOT_CONFIGURED: "GitHub App 未配置，连接时必须提供访问 token",
+    };
+    const status = code === "GITHUB_REPOSITORY_NOT_FOUND" ? 404
+      : code === "GITHUB_PERMISSION_DENIED" ? 403
+      : code === "GITHUB_RATE_LIMITED" ? 429
+      : code === "GITHUB_NOT_CONFIGURED" ? 503
+      : 502;
+    return NextResponse.json({ error: friendly[code] ?? "GitHub 连接失败，请检查 owner/repository 与凭证", code }, { status });
   }
 }
 

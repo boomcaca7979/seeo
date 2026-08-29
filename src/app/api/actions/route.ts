@@ -18,6 +18,7 @@ import {
 } from "@/lib/seo/action-service";
 import { getActionById as dbGetActionById } from "@/lib/db/actions";
 import { requireAuthOrDemo } from "@/lib/auth";
+import { GitHubExecutionError } from "@/lib/seo/github-execution-adapter";
 import type { SeoApiError } from "@/lib/seo/types";
 
 export const runtime = "nodejs";
@@ -27,6 +28,14 @@ export const maxDuration = 120;
 function mapActionError(e: unknown) {
   if (e instanceof ActionError) {
     const status = e.code === "EXECUTION_NOT_APPROVED" || e.code === "EXECUTION_INVALID_STATE" || e.code === "EXECUTION_CONFLICT" ? 409 : 400;
+    return NextResponse.json({ error: e.message, code: e.code }, { status });
+  }
+  if (e instanceof GitHubExecutionError) {
+    const status = e.code === "EXECUTION_CONFLICT" ? 409
+      : e.code === "GITHUB_RATE_LIMITED" ? 429
+      : e.code === "GITHUB_PERMISSION_DENIED" ? 403
+      : e.code === "GITHUB_NOT_CONNECTED" ? 409
+      : 400;
     return NextResponse.json({ error: e.message, code: e.code }, { status });
   }
   return NextResponse.json<SeoApiError>({ error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" }, { status: 500 });
@@ -44,7 +53,7 @@ function serialize(row: NonNullable<Awaited<ReturnType<typeof getActionByOpportu
     actionType: row.action_type,
     executionMode: row.execution_mode,
     status: row.status,
-    plan: parse<{ steps?: string[] }>(row.plan_json, {}),
+    plan: parse<{ steps?: string[]; recommendation?: string; filePath?: string; newContent?: string }>(row.plan_json, {}),
     preview: parse<{ kind: string; currentState: string[]; exactSteps: string[]; expectedResult: string; verificationPlan: string[]; rollbackNotes: string } | null>(row.preview_json, null),
     result: parse<Record<string, unknown> | null>(row.result_json, null),
     events: parse<Array<{ event: string; by: string; at: string; detail?: string }>>(row.events_json, []),
@@ -59,24 +68,26 @@ function serialize(row: NonNullable<Awaited<ReturnType<typeof getActionByOpportu
 
 export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   const { searchParams } = new URL(req.url);
   const opportunityId = Number(searchParams.get("opportunity_id") ?? "");
   if (!Number.isInteger(opportunityId) || opportunityId <= 0) {
     return NextResponse.json<SeoApiError>({ error: "opportunity_id 参数无效", code: "BAD_REQUEST" }, { status: 400 });
   }
-  const row = await getActionByOpportunity(auth.user.id, opportunityId);
+  const row = await getActionByOpportunity(userId, opportunityId);
   if (!row) return NextResponse.json({ data: { action: null } });
   return NextResponse.json({ data: { action: serialize(row) } });
 }
 
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: {
     opportunity_id?: number;
     operation?: string;
@@ -95,7 +106,7 @@ export async function POST(req: Request) {
     return NextResponse.json<SeoApiError>({ error: "opportunity_id 参数无效", code: "BAD_REQUEST" }, { status: 400 });
   }
   // 授权：opportunity 必须属于当前用户
-  const opportunity = await getOpportunityById(auth.user.id, opportunityId);
+  const opportunity = await getOpportunityById(userId, opportunityId);
   if (!opportunity) {
     return NextResponse.json({ error: "未找到该机会", code: "OPPORTUNITY_NOT_FOUND" }, { status: 404 });
   }
@@ -103,22 +114,30 @@ export async function POST(req: Request) {
   try {
     switch (operation) {
       case "preview": {
-        const preview = await previewAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        // 显式 file_path/new_content → 真实 GitHub preview（读取仓库当前内容生成 before/after）
+        const spec = body.file_path && body.new_content
+          ? {
+              filePath: body.file_path,
+              newContent: body.new_content,
+              ...(body.commit_description ? { commitDescription: body.commit_description } : {}),
+            }
+          : undefined;
+        const preview = await previewAction(userId, opportunityId, spec);
+        const row = await getActionByOpportunity(userId, opportunityId);
         return NextResponse.json({ data: { preview, action: row ? serialize(row) : null } });
       }
       case "approve": {
-        await ensureAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        await ensureAction(userId, opportunityId);
+        const row = await getActionByOpportunity(userId, opportunityId);
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        const approved = await approveAction(auth.user.id, row.id);
+        const approved = await approveAction(userId, row.id);
         return NextResponse.json({ data: { action: serialize(approved) } });
       }
       case "complete": {
-        await ensureAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        await ensureAction(userId, opportunityId);
+        const row = await getActionByOpportunity(userId, opportunityId);
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        const { action, verification } = await completeActionManually(auth.user.id, auth.plan, row.id);
+        const { action, verification } = await completeActionManually(userId, auth.plan, row.id);
         return NextResponse.json({ data: { action: serialize(action), verification } });
       }
       case "execute": {
@@ -126,33 +145,33 @@ export async function POST(req: Request) {
         if (!body.file_path || !body.new_content) {
           return NextResponse.json({ error: "GitHub 执行需要 file_path 与 new_content", code: "EXECUTION_TARGET_NOT_FOUND" }, { status: 400 });
         }
-        await ensureAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        await ensureAction(userId, opportunityId);
+        const row = await getActionByOpportunity(userId, opportunityId);
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        const actionRow = await dbGetActionById(auth.user.id, row.id);
+        const actionRow = await dbGetActionById(userId, row.id);
         if (!actionRow) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        const execution = await executeActionViaGitHub(auth.user.id, auth.plan, actionRow.id, {
+        const execution = await executeActionViaGitHub(userId, auth.plan, actionRow.id, {
           filePath: body.file_path,
           newContent: body.new_content,
           ...(body.commit_description ? { commitDescription: body.commit_description } : {}),
         });
-        const updated = await getActionByOpportunity(auth.user.id, opportunityId);
+        const updated = await getActionByOpportunity(userId, opportunityId);
         return NextResponse.json({ data: { execution, action: updated ? serialize(updated) : null } });
       }
       case "status": {
-        await ensureAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        await ensureAction(userId, opportunityId);
+        const row = await getActionByOpportunity(userId, opportunityId);
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        const status = await refreshGitHubStatus(auth.user.id, auth.plan, row.id);
-        const updated = await getActionByOpportunity(auth.user.id, opportunityId);
+        const status = await refreshGitHubStatus(userId, auth.plan, row.id);
+        const updated = await getActionByOpportunity(userId, opportunityId);
         return NextResponse.json({ data: { status, action: updated ? serialize(updated) : null } });
       }
       case "cancel": {
-        await ensureAction(auth.user.id, opportunityId);
-        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        await ensureAction(userId, opportunityId);
+        const row = await getActionByOpportunity(userId, opportunityId);
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
-        await cancelAction(auth.user.id, row.id);
-        const updated = await getActionByOpportunity(auth.user.id, opportunityId);
+        await cancelAction(userId, row.id);
+        const updated = await getActionByOpportunity(userId, opportunityId);
         return NextResponse.json({ data: { action: updated ? serialize(updated) : null } });
       }
       default:

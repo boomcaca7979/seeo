@@ -167,7 +167,11 @@ export async function previewGitHubChanges(userId: string, projectId: number, sp
   });
 }
 
-/** 执行：branch（复用）→ hash 冲突检查 → commit → PR（幂等）。PR created ≠ completed。 */
+/**
+ * 执行：全部校验先行（敏感路径/scope/文件存在/hash 冲突/PR 幂等），全部通过后才创建 branch → commit → PR。
+ * 任何拒绝路径都不产生 branch/commit/PR。PR created ≠ completed。
+ * beforeHash 来自 preview 时的文件 blob SHA：preview 之后目标文件被第三方修改 → EXECUTION_CONFLICT，绝不覆盖。
+ */
 export async function executeGitHubChanges(userId: string, projectId: number, params: {
   actionId: number;
   spec: GitHubActionSpec;
@@ -180,6 +184,10 @@ export async function executeGitHubChanges(userId: string, projectId: number, pa
   if (!isPathAllowed(spec.filePath)) {
     throw new GitHubExecutionError("EXECUTION_NOT_SUPPORTED", `文件路径不允许修改：${spec.filePath}`);
   }
+  // 提前 scope guard：newContent 行数超限 → 任何写操作（含 branch）都不发生
+  if (spec.newContent.split("\n").length > MAX_CHANGED_LINES) {
+    throw new GitHubExecutionError("EXECUTION_SCOPE_TOO_LARGE", `变更行数 ${spec.newContent.split("\n").length} 超过上限 ${MAX_CHANGED_LINES}`);
+  }
   const branch = buildBranchName(params.actionId, params.idempotencyKey);
 
   return withConnection(userId, projectId, async (connection, token) => {
@@ -189,31 +197,26 @@ export async function executeGitHubChanges(userId: string, projectId: number, pa
     // 1. base HEAD（concurrency control）
     const baseSha = await getGitHubBranchSha(token, owner, repo, connection.default_branch);
 
-    // 2. branch 幂等：已存在则复用
-    let branchExisted = true;
+    // 2. 冲突基准：读默认分支上的当前文件（PR 将合并回去的目标状态）
+    let baseFile;
     try {
-      await getGitHubBranchSha(token, owner, repo, branch);
-    } catch {
-      await createGitHubBranch(token, owner, repo, branch, baseSha);
-      branchExisted = false;
-    }
-
-    // 3. 真实当前文件 + hash 冲突检查（禁止覆盖第三方修改）
-    let file;
-    try {
-      file = await getGitHubFile(token, owner, repo, spec.filePath, branch);
+      baseFile = await getGitHubFile(token, owner, repo, spec.filePath, connection.default_branch);
     } catch (e) {
       if (e instanceof GitHubError && e.code === "GITHUB_REPOSITORY_NOT_FOUND") {
-        throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `分支上不存在文件 ${spec.filePath}`);
+        throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `仓库中不存在文件 ${spec.filePath}`);
       }
       throw e;
     }
-    if (!file) throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `分支上不存在文件 ${spec.filePath}`);
-    void params.beforeHash;
+    if (!baseFile) throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `仓库中不存在文件 ${spec.filePath}`);
+    if (params.beforeHash && baseFile.sha !== params.beforeHash) {
+      throw new GitHubExecutionError(
+        "EXECUTION_CONFLICT",
+        `目标文件在预览后被修改（blob ${params.beforeHash.slice(0, 8)} → ${baseFile.sha.slice(0, 8)}），未应用任何变更——请刷新预览后重新批准执行`
+      );
+    }
 
-    // 4. 范围 guard
-    // 变更规模上限：以 before/after 行数的较大者作为保守上界
-    const changedLines = Math.max(spec.newContent.split("\n").length, file.content.split("\n").length);
+    // 3. 范围 guard（完整版：以 before/after 行数的较大者作为保守上界）
+    const changedLines = Math.max(spec.newContent.split("\n").length, baseFile.content.split("\n").length);
     const changedFileCount = 1; // V1 单文件变更；多文件 changeset 留给后续版本
     if (changedFileCount > MAX_FILES) {
       throw new GitHubExecutionError("EXECUTION_SCOPE_TOO_LARGE", `变更文件数超过上限（${MAX_FILES}）`);
@@ -222,20 +225,12 @@ export async function executeGitHubChanges(userId: string, projectId: number, pa
       throw new GitHubExecutionError("EXECUTION_SCOPE_TOO_LARGE", `变更规模超过上限（${MAX_CHANGED_LINES} 行）`);
     }
 
-    // 5. commit（branch scoped、action-linked、可审计；无 secrets）
-    const { commitSha } = await putGitHubFile(token, owner, repo, {
-      path: spec.filePath,
-      branch,
-      content: spec.newContent,
-      fileSha: file.sha,
-      message: `seo(action): ${spec.commitDescription ?? "approved SEO action"}\n\nSeeO Action: ${params.actionId}\nOpportunity: ${params.opportunityId}`,
-    });
-
-    // 6. PR 幂等：已有 open PR → 复用不重建
+    // 4. PR 幂等（任何写之前）：已有 open PR → 直接复用，不产生第二个 commit
     const existingPR = await getGitHubPullRequestForBranch(token, owner, repo, branch);
     if (existingPR && existingPR.state === "open") {
       return {
-        repository: `${owner}/${repo}`, branch, baseSha, commitSha,
+        repository: `${owner}/${repo}`, branch, baseSha,
+        commitSha: "", // 未产生新 commit（幂等复用既有 PR）
         prNumber: existingPR.number, prUrl: existingPR.html_url,
         changedFiles: 1, prState: existingPR.merged ? "merged" : "open",
       };
@@ -246,9 +241,35 @@ export async function executeGitHubChanges(userId: string, projectId: number, pa
     if (existingPR && existingPR.state === "closed") {
       throw new GitHubExecutionError("EXECUTION_CONFLICT", "该 action 的 PR 已被关闭且未合并——请在 SeeO 中取消后重新规划（不自动重开）");
     }
-    if (branchExisted && !existingPR) {
-      // branch 在但无 PR（上次中途失败）→ 补建 PR
+
+    // 5. branch 幂等：已存在则复用（含上次中途失败、无 PR 的残留分支）
+    try {
+      await getGitHubBranchSha(token, owner, repo, branch);
+    } catch {
+      await createGitHubBranch(token, owner, repo, branch, baseSha);
     }
+
+    // 6. 分支上的当前文件（取 fileSha 用于 commit；残留分支可能已含上次的部分提交）
+    let file;
+    try {
+      file = await getGitHubFile(token, owner, repo, spec.filePath, branch);
+    } catch (e) {
+      if (e instanceof GitHubError && e.code === "GITHUB_REPOSITORY_NOT_FOUND") {
+        throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `分支上不存在文件 ${spec.filePath}`);
+      }
+      throw e;
+    }
+    if (!file) throw new GitHubExecutionError("EXECUTION_TARGET_NOT_FOUND", `分支上不存在文件 ${spec.filePath}`);
+
+    // 7. commit（branch scoped、action-linked、可审计；无 secrets）
+    const { commitSha } = await putGitHubFile(token, owner, repo, {
+      path: spec.filePath,
+      branch,
+      content: spec.newContent,
+      fileSha: file.sha,
+      message: `seo(action): ${spec.commitDescription ?? "approved SEO action"}\n\nSeeO Action: ${params.actionId}\nOpportunity: ${params.opportunityId}`,
+    });
+
     const evidenceLines = params.evidence.map((item) => `- [${item.source}] ${item.summary}`).join("\n");
     const pr = await createGitHubPullRequest(token, owner, repo, {
       title: `SEO: ${spec.commitDescription ?? "approved SEO action"}`,

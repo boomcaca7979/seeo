@@ -19,9 +19,10 @@ const VERIFIABLE: OpportunityStatus[] = ["approved", "in_progress"];
 
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: { id?: number };
   try {
     body = await req.json();
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json<SeoApiError>({ error: "id 参数无效", code: "BAD_REQUEST" }, { status: 400 });
   }
-  const row = await getOpportunityById(auth.user.id, id);
+  const row = await getOpportunityById(userId, id);
   if (!row) {
     return NextResponse.json({ error: "未找到该机会", code: "OPPORTUNITY_NOT_FOUND" }, { status: 404 });
   }
@@ -46,14 +47,14 @@ export async function POST(req: Request) {
   } catch { /* 损坏数据按空处理 */ }
 
   try {
-    const { checks } = await verifyOpportunity(auth.user.id, auth.plan, {
+    const { checks } = await verifyOpportunity(userId, auth.plan, {
       projectId: row.project_id,
       type: row.type,
       targetType: row.target_type,
       targetValue: row.target_value,
       signals,
     });
-    await saveOpportunityVerification(auth.user.id, id, checks);
+    await saveOpportunityVerification(userId, id, checks);
     return NextResponse.json({ data: { id, verification: checks } });
   } catch (e) {
     if (e instanceof QuotaExceededError) {

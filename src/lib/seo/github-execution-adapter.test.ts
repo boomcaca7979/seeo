@@ -145,7 +145,7 @@ describe("executeGitHubChanges", () => {
     expect(String(prCall?.body?.body)).toContain("after explicit user approval");
   });
 
-  it("PR 已 open → 幂等返回既有 PR，不重建", async () => {
+  it("PR 已 open → 幂等返回既有 PR，不重建、不产生第二个 commit", async () => {
     const responses = baseResponses();
     responses[4] = { match: (url: string, method: string) => { void method; return url.includes("/pulls?head"); }, body: [{ number: 7, html_url: "pr-url", state: "open", merged: false }] };
     mockGitHub(responses);
@@ -154,6 +154,34 @@ describe("executeGitHubChanges", () => {
     });
     expect(result.prNumber).toBe(7);
     expect(ghCalls.filter((call) => call.method === "POST" && String(call.url).endsWith("/pulls"))).toHaveLength(0);
+    expect(ghCalls.filter((call) => call.method === "PUT")).toHaveLength(0);
+  });
+
+  it("beforeHash 不匹配（preview 后文件被第三方修改）→ EXECUTION_CONFLICT，不写 commit", async () => {
+    mockGitHub(baseResponses());
+    await expect(executeGitHubChanges("u1", 2, {
+      actionId: 55, spec, beforeHash: "different-blob-sha", evidence: [], opportunityId: 9, idempotencyKey: "k",
+    })).rejects.toMatchObject({ code: "EXECUTION_CONFLICT" });
+    expect(ghCalls.filter((call) => call.method === "PUT")).toHaveLength(0);
+    expect(ghCalls.filter((call) => call.method === "POST")).toHaveLength(0);
+  });
+
+  it("beforeHash 一致 → 正常执行（无冲突）", async () => {
+    mockGitHub(baseResponses());
+    const result = await executeGitHubChanges("u1", 2, {
+      actionId: 55, spec, beforeHash: "filesha", evidence: [], opportunityId: 9, idempotencyKey: "k",
+    });
+    expect(result.prNumber).toBe(7);
+  });
+
+  it("newContent 行数超限 → EXECUTION_SCOPE_TOO_LARGE，不创建 branch / commit / PR", async () => {
+    mockGitHub(baseResponses());
+    const oversized = { ...spec, newContent: Array.from({ length: 401 }, (_, i) => `line ${i}`).join("\n") };
+    await expect(executeGitHubChanges("u1", 2, {
+      actionId: 55, spec: oversized, evidence: [], opportunityId: 9, idempotencyKey: "k",
+    })).rejects.toMatchObject({ code: "EXECUTION_SCOPE_TOO_LARGE" });
+    expect(ghCalls.filter((call) => call.method === "POST")).toHaveLength(0);
+    expect(ghCalls.filter((call) => call.method === "PUT")).toHaveLength(0);
   });
 
   it("PR 已 merged → EXECUTION_CONFLICT（幂等：不重复执行）", async () => {
@@ -175,6 +203,7 @@ describe("executeGitHubChanges", () => {
     mockGitHub([
       { match: (url: string, method: string) => { void method; return url.includes("/git/ref/heads/main"); }, body: { object: { sha: "base" } } },
       { match: (url: string, method: string) => { void method; return url.includes("/git/ref/heads/seeo"); }, body: { object: { sha: "b" } } },
+      { match: (url: string, method: string) => { void method; return url.includes("/pulls?head"); }, body: [] },
       { match: (url: string, method: string) => { void method; return url.includes("/contents/"); }, body: { message: "Not Found" }, status: 404 },
     ]);
     await expect(executeGitHubChanges("u1", 2, { actionId: 55, spec, evidence: [], opportunityId: 9, idempotencyKey: "k" }))

@@ -2056,7 +2056,41 @@
       "previewTitle": "Execution package (manual)",
       "previewBtn": "Generate preview",
       "approveActionBtn": "Approve execution",
-      "manualCompleteBtn": "Mark as manually executed"
+      "manualCompleteBtn": "Mark as manually executed",
+      "previewAfter": "proposed content after change",
+      "conflictMsg": "The target file changed after preview. No changes were applied. Refresh the preview, then re-approve and execute.",
+      "prLabel": "Pull Request",
+      "openPrBtn": "Open Pull Request",
+      "awaitingReviewHint": "PR created — a human review and merge is required. SeeO never merges automatically.",
+      "createPrBtn": "Create GitHub PR",
+      "refreshStatusBtn": "Refresh PR status",
+      "stage": {
+        "previewReady": "Preview ready",
+        "approved": "Approved — ready to execute",
+        "preparing": "Preparing (branch / commit / PR)",
+        "awaitingReview": "PR created — awaiting review",
+        "merged": "Merged — verification in progress",
+        "conflict": "Conflict",
+        "failed": "Failed"
+      },
+      "github": {
+        "title": "GitHub Execution",
+        "connected": "Connected",
+        "notConnected": "Not connected",
+        "connectHint": "Connect a repository to execute approved SEO actions via pull requests.",
+        "connectBtn": "Connect",
+        "connecting": "Connecting…",
+        "disconnectBtn": "Disconnect",
+        "repository": "Repository",
+        "defaultBranch": "Default branch",
+        "authMode": "Auth mode",
+        "appMode": "GitHub App",
+        "patMode": "Personal access token",
+        "ownerPlaceholder": "owner",
+        "repoPlaceholder": "repository",
+        "tokenPlaceholder": "access token (self-host)",
+        "tokenHint": "The token is encrypted at rest and never displayed again. GitHub App mode is used automatically when configured on the server."
+      }
     }
   },
   "apiErrors": {

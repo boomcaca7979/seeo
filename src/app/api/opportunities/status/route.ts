@@ -16,9 +16,10 @@ const VALID_STATUSES: OpportunityStatus[] = ["new", "reviewed", "approved", "in_
 
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
-  if (!auth.allowed || !auth.user) {
+  if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
+  const userId = auth.user?.id ?? "demo-user";
   let body: { id?: number; status?: string };
   try {
     body = await req.json();
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
   }
   // 预校验给出清晰错误；transition 内部再原子校验
   void canTransition;
-  const result = await transitionOpportunity(auth.user.id, id, to);
+  const result = await transitionOpportunity(userId, id, to);
   if (!result.ok) {
     const status = result.reason === "not_found" ? 404 : 409;
     return NextResponse.json({ error: result.reason === "not_found" ? "未找到该机会" : `非法状态流转（${result.reason?.replace("invalid_transition:", "")}）`, code: result.reason === "not_found" ? "OPPORTUNITY_NOT_FOUND" : "INVALID_TRANSITION" }, { status });
