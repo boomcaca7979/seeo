@@ -89,4 +89,20 @@ export const aiSearchBrandLookupOutputSchema = z.object({
   meta: z.object({ source: z.string(), providerCostUsd: z.number().nullable() }),
 }).passthrough();
 
+export const competitorGapOutputSchema = z.object({
+  data: z.object({
+    competitor: z.object({ id: z.number(), domain: z.string(), registrableDomain: z.string() }),
+    summary: z.object({ analyzedKeywords: z.number(), shared: z.number(), weaklyOwned: z.number(), competitorOnly: z.number(), projectOnly: z.number() }),
+    keywords: z.array(z.object({
+      keyword: z.string(), location: z.string(), device: z.string(),
+      projectRank: z.number().nullable(), competitorRank: z.number().nullable(),
+      rankGap: z.number().nullable(),
+      category: z.enum(["shared", "weaklyOwned", "competitorOnly", "projectOnly"]),
+      searchVolume: z.number().nullable(), difficulty: z.number().nullable(), cpc: z.number().nullable(), competition: z.number().nullable(),
+    })),
+    warnings: z.array(z.string()),
+  }),
+  meta: z.object({ count: z.number(), source: z.string() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

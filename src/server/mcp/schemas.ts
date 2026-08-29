@@ -49,4 +49,13 @@ export const aiSearchInputSchema = z.object({
   languageCode: z.string().min(1).optional(),
 });
 
-export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup";
+export const competitorGapInputSchema = z.object({
+  projectId: z.string().min(1),
+  competitorId: z.number().int().min(1),
+  limit: z.number().int().min(1).max(200).default(50),
+  /** 触发竞品排名刷新（searchRank 缓存优先；可能消耗 serpapi 配额） */
+  refresh: z.boolean().default(false),
+  enrich: z.boolean().default(true),
+});
+
+export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap";

@@ -2,14 +2,16 @@ import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service"
 import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-research-service";
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
 import { aiBrandLookup } from "@/lib/seo/ai-search-service";
+import { getCompetitorKeywordGap } from "@/lib/seo/competitor-service";
+import { listTrackedKeywords, getCompetitorById } from "@/lib/db";
 import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { aiSearchInputSchema, backlinkInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
+import { aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 /** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
 function gscTodayMinusLag(): string {
@@ -22,6 +24,8 @@ function gscDaysBefore(dateStr: string, days: number): string {
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString().slice(0, 10);
 }
+
+export type { ToolName };
 
 export interface RegisteredTool { name: ToolName; description: string; inputSchema: Record<string, unknown>; execute: (ctx: ToolAuthContext, input: unknown) => Promise<unknown>; }
 
@@ -79,6 +83,20 @@ const tools: RegisteredTool[] = [
       ...(parsed.languageCode ? { languageCode: parsed.languageCode } : {}),
     });
     return validateOutput(aiSearchBrandLookupOutputSchema, { data: { target: result.target, platforms: result.platforms.map((bundle) => ({ platform: bundle.platform, status: bundle.status, totalMentions: bundle.totalMentions, totalAiSearchVolume: bundle.totalAiSearchVolume, samplePrompts: bundle.mentions.filter((mention) => mention.question).slice(0, 5).map((mention) => ({ question: mention.question, aiSearchVolume: mention.aiSearchVolume, brandEntities: mention.brandEntities })) })), mentionsTotal: result.mentionsTotal, citations: result.citations.slice(0, 25), topCitedDomains: result.topCitedDomains, aiShareOfVoice: result.aiShareOfVoice, warnings: result.warnings, hasData: result.hasData, runId: result.runId }, meta: { source: "dataforseo-ai-optimization", providerCostUsd: result.providerCostUsd } });
+  } },
+  { name: "get_competitor_keyword_gap", description: "Keyword gap between the project and one saved competitor over the project's tracked keywords: shared / weaklyOwned / competitorOnly / projectOnly categories, rank gaps, and DataForSEO metrics (volume/difficulty/CPC/competition). Universe is the project's tracked keyword set. Set refresh=true to re-check ranks via the SERP cache (may consume SerpApi quota); enrich=false skips DataForSEO metrics.", inputSchema: { type: "object", properties: { ...projectProperty, competitorId: { type: "integer", minimum: 1 }, limit: { type: "integer", minimum: 1, maximum: 200 }, refresh: { type: "boolean" }, enrich: { type: "boolean" } }, required: ["projectId", "competitorId"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = competitorGapInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);
+    // competitor 必须属于该项目（禁止跨项目访问竞品数据）
+    const competitor = await getCompetitorById(ctx.userId, parsed.competitorId);
+    if (!competitor || competitor.project_id !== project.sqliteId) throw new McpNormalizedError("PROJECT_ACCESS_DENIED", "The competitor does not belong to this project.");
+    const allTracked = await listTrackedKeywords(ctx.userId);
+    const tracked = allTracked.filter((kw) => kw.domain === project.domain).map((kw) => ({ id: kw.id, keyword: kw.keyword, location: kw.location, device: kw.device, todayPosition: kw.todayPosition, todayUrl: kw.matchedUrl ?? null }));
+    const gap = await getCompetitorKeywordGap({
+      userId: ctx.userId, plan: ctx.plan, projectDomain: project.domain, trackedKeywords: tracked,
+      competitorId: parsed.competitorId, competitorDomain: competitor.domain,
+      limit: parsed.limit, refresh: parsed.refresh, enrichMetrics: parsed.enrich,
+    });
+    return validateOutput(competitorGapOutputSchema, { data: { competitor: gap.competitor, summary: gap.summary, keywords: gap.keywords.map(({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition }) => ({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition })), warnings: gap.warnings }, meta: { count: gap.keywords.length, source: "db+serpapi+dataforseo" } });
   } },
   { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);
