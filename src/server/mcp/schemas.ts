@@ -58,4 +58,11 @@ export const competitorGapInputSchema = z.object({
   enrich: z.boolean().default(true),
 });
 
-export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap";
+export const seoOpportunityInputSchema = z.object({
+  projectId: z.string().min(1),
+  status: z.enum(["new", "reviewed", "approved", "in_progress", "completed", "dismissed"]).optional(),
+  type: z.enum(["rank_improvement", "competitor_gap", "ctr", "content_refresh", "lost_recovery", "ai_visibility", "technical"]).optional(),
+  limit: z.number().int().min(1).max(100).default(20),
+});
+
+export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities";

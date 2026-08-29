@@ -11,7 +11,8 @@ export type SkillId =
   | "competitor-analysis"
   | "rank-drop-diagnosis"
   | "gsc-diagnosis"
-  | "ai-search-visibility";
+  | "ai-search-visibility"
+  | "seo-opportunity";
 
 export interface SkillDefinition {
   id: SkillId;
@@ -72,6 +73,15 @@ export const SKILLS: Record<SkillId, SkillDefinition> = {
     maxToolCalls: 4,
     requiredParams: [],
     providerTools: ["search_console_tools"],
+  },
+  "seo-opportunity": {
+    id: "seo-opportunity",
+    name: "SEO Opportunity",
+    description: "读取 Opportunity Engine 的 prioritized 机会（P0-P2）与 action plan，回答“下一步该做什么”。",
+    triggers: ["该做什么", "机会", "优先级", "opportunity", "what should i do", "next step", "priorities", "建议做什么"],
+    maxToolCalls: 3,
+    requiredParams: [],
+    providerTools: [],
   },
   "ai-search-visibility": {
     id: "ai-search-visibility",

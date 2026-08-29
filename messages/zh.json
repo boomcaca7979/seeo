@@ -2107,7 +2107,9 @@
     "AI_SEARCH_PROVIDER_QUOTA": "你的 DataForSEO AI Search 配额已用尽。",
     "AI_SEARCH_BILLING_ISSUE": "连接的 DataForSEO 账号存在计费或余额问题。",
     "AI_SEARCH_NOT_CONFIGURED": "AI Search 尚未配置（缺少 DataForSEO 凭证）。",
-    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search 需要拥有 DataForSEO 配额的 SeeO 账号。请登录并升级后使用。"
+    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search 需要拥有 DataForSEO 配额的 SeeO 账号。请登录并升级后使用。",
+    "OPPORTUNITY_NOT_FOUND": "未找到该机会。",
+    "INVALID_TRANSITION": "该机会不允许此状态变更。"
   },
   "notFoundPage": {
     "title": "页面不存在 | SeeO",

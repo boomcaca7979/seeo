@@ -43,7 +43,7 @@ const PROVIDER_TOOLS = new Set([
   "get_competitor_keyword_gap",
 ]);
 
-export type AgentToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap";
+export type AgentToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities";
 export type ToolExecutor = (tool: AgentToolName, input: unknown) => Promise<unknown>;
 
 /** 真实执行器：经注册表调用 MCP tool（授权 = 与外部 MCP client 相同路径） */

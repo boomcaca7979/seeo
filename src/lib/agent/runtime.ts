@@ -64,6 +64,26 @@ function keywordRows(evidence: EvidenceRecord | null): Array<Record<string, unkn
 // ---------- 六个 Skill workflow ----------
 
 const EXECUTORS: Record<SkillId, SkillExecutor> = {
+  // 7. 机会清单（Opportunity Engine 输出）
+  "seo-opportunity": async (ctx) => {
+    const { collector, projectId } = ctx;
+    await collector.collect("project_context", { projectId }, "项目上下文");
+    const opportunities = await collector.collect("get_seo_opportunities", { projectId, limit: 20 }, "SEO 机会清单（P0-P2）");
+    const rows = keywordRows(opportunities);
+    if (opportunities) {
+      const p0 = rows.filter((row) => row.priority === "P0").length;
+      collector.addSignal(`机会清单：共 ${rows.length} 条，其中 P0 ${p0} 条`, [opportunities.id]);
+    }
+    const recommendations = rows.slice(0, 5).map((row) => ({
+      action: `[${row.priority}] ${row.type}: ${row.targetValue}${row.recommendation ? ` — ${row.recommendation}` : ""}`,
+      evidenceIds: opportunities ? [opportunities.id] : [],
+    }));
+    return {
+      summary: `Opportunity Engine 输出 ${rows.length} 条机会（证据与 action plan 见详情）。`,
+      observations: ["状态流转（approve/execute/verify）在 SeeO UI 由用户完成；action plan 为 manual execution。"],
+      recommendations,
+    };
+  },
   // 1. 总入口：排名分布 + 搜索表现 + 外链 + AI 可见性
   "seo-diagnostic": async (ctx) => {
     const { collector, projectId } = ctx;

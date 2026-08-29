@@ -3,15 +3,16 @@ import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-re
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
 import { aiBrandLookup } from "@/lib/seo/ai-search-service";
 import { getCompetitorKeywordGap } from "@/lib/seo/competitor-service";
-import { listTrackedKeywords, getCompetitorById } from "@/lib/db";
+import { getCompetitorById, listTrackedKeywords } from "@/lib/db";
+import { listOpportunities } from "@/lib/db/opportunities";
 import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, serpInputSchema, type ToolName } from "../schemas";
+import { aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, seoOpportunityInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, seoOpportunityOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 /** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
 function gscTodayMinusLag(): string {
@@ -97,6 +98,27 @@ const tools: RegisteredTool[] = [
       limit: parsed.limit, refresh: parsed.refresh, enrichMetrics: parsed.enrich,
     });
     return validateOutput(competitorGapOutputSchema, { data: { competitor: gap.competitor, summary: gap.summary, keywords: gap.keywords.map(({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition }) => ({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition })), warnings: gap.warnings }, meta: { count: gap.keywords.length, source: "db+serpapi+dataforseo" } });
+  } },
+  { name: "get_seo_opportunities", description: "Read SeeO's Opportunity Engine output for a project: prioritized (P0-P2), evidence-backed SEO opportunities (rank improvement, competitor gap, CTR, content refresh, lost-ranking recovery, AI visibility, technical) with recommended action plans. Each opportunity carries evidence references; run SeeO's scan to refresh. Free (DB read).", inputSchema: { type: "object", properties: { ...projectProperty, status: { type: "string", enum: ["new", "reviewed", "approved", "in_progress", "completed", "dismissed"] }, type: { type: "string", enum: ["rank_improvement", "competitor_gap", "ctr", "content_refresh", "lost_recovery", "ai_visibility", "technical"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = seoOpportunityInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
+    const rows = await listOpportunities(ctx.userId, { project_id: Number(parsed.projectId), ...(parsed.status ? { status: parsed.status } : {}), ...(parsed.type ? { type: parsed.type } : {}), limit: parsed.limit });
+    const opportunities = rows.map((row) => {
+      let evidence: Array<{ source: string; ref: string; summary: string }> = [];
+      let signals: Record<string, unknown> = {};
+      let actionPlan: { steps?: string[] } | undefined = undefined;
+      try { evidence = JSON.parse(row.evidence_json) as typeof evidence; } catch { /* ignore */ }
+      try { signals = JSON.parse(row.signals_json) as Record<string, unknown>; } catch { /* ignore */ }
+      try { actionPlan = row.action_plan_json ? JSON.parse(row.action_plan_json) as { steps?: string[] } : undefined; } catch { /* ignore */ }
+      return {
+        id: row.id, type: row.type, targetType: row.target_type, targetValue: row.target_value,
+        priority: row.priority, impact: row.impact, confidence: row.confidence, status: row.status,
+        recommendation: typeof signals.recommendation === "string" ? signals.recommendation : null,
+        evidence: evidence.map(({ source, ref, summary }) => ({ source, ref, summary })),
+        actionSteps: actionPlan?.steps ?? null,
+        generatedAt: row.generated_at,
+      };
+    });
+    return validateOutput(seoOpportunityOutputSchema, { data: { opportunities }, meta: { count: opportunities.length, source: "db" } });
   } },
   { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);

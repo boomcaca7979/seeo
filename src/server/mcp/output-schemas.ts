@@ -105,4 +105,24 @@ export const competitorGapOutputSchema = z.object({
   meta: z.object({ count: z.number(), source: z.string() }),
 }).passthrough();
 
+export const seoOpportunityOutputSchema = z.object({
+  data: z.object({
+    opportunities: z.array(z.object({
+      id: z.number(),
+      type: z.string(),
+      targetType: z.string(),
+      targetValue: z.string(),
+      priority: z.enum(["P0", "P1", "P2"]),
+      impact: z.string().nullable(),
+      confidence: z.string().nullable(),
+      status: z.string(),
+      recommendation: z.string().nullable(),
+      evidence: z.array(z.object({ source: z.string(), ref: z.string(), summary: z.string() })),
+      actionSteps: z.array(z.string()).nullable(),
+      generatedAt: z.string(),
+    })),
+  }),
+  meta: z.object({ count: z.number(), source: z.string() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

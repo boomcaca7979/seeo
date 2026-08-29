@@ -2127,7 +2127,9 @@
     "AI_SEARCH_PROVIDER_QUOTA": "Your DataForSEO quota for AI Search is exhausted.",
     "AI_SEARCH_BILLING_ISSUE": "The connected DataForSEO account has a billing or balance issue.",
     "AI_SEARCH_NOT_CONFIGURED": "AI Search is not configured (DataForSEO credentials missing).",
-    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search requires a SeeO account with DataForSEO quota. Sign in and upgrade to use it."
+    "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search requires a SeeO account with DataForSEO quota. Sign in and upgrade to use it.",
+    "OPPORTUNITY_NOT_FOUND": "The opportunity was not found.",
+    "INVALID_TRANSITION": "That status change is not allowed for this opportunity."
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

@@ -13,6 +13,7 @@ import { planLabel } from "@/lib/plan-labels";
 type NavItem = {
   labelKey:
     | "overview"
+    | "opportunities"
     | "keywordOverview"
     | "keywordExpand"
     | "positionTracking"
@@ -37,6 +38,15 @@ const navItems: NavItem[] = [
         <rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
         <rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
         <rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
+  {
+    labelKey: "opportunities",
+    href: "/app/opportunities",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+        <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6L13 2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </svg>
     ),
   },
