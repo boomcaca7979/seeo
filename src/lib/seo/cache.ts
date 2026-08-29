@@ -210,7 +210,10 @@ export async function readCache<T>(
 ): Promise<T | null> {
   const key = hashKey(namespace, ...Object.entries(params).map(([k, v]) => `${k}=${v}`));
 
-  // 1. 先读 DB
+  // 1. 先读 DB（DB 可用即以 DB 为准：miss 也是最终结果；
+  //    仅 DB 不可用时才走文件 fallback——无服务器环境文件系统只读，
+  //    正常 miss 也 mkdir 会在 Vercel 上抛 ENOENT 阻断所有 provider 调用）
+  let dbUnavailable = false;
   try {
     const row = await dbGetCache(key);
     if (row) {
@@ -220,12 +223,19 @@ export async function readCache<T>(
           const entry = JSON.parse(row.value) as CacheEntry<T>;
           return entry.data;
         } catch {
-          // value 解析失败，fallback 文件
+          // value 解析失败：DB 不可信，走文件 fallback
+          dbUnavailable = true;
         }
+      } else {
+        // 已过期 = miss，DB 可用
+        return null;
       }
     }
   } catch {
-    // DB 未初始化或不可用，fallback
+    dbUnavailable = true;
+  }
+  if (!dbUnavailable) {
+    return null; // DB 健康：cache miss 即最终结果
   }
 
   // 2. Fallback 文件（兼容本地历史数据）
