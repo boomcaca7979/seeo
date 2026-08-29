@@ -102,8 +102,11 @@ const tools: RegisteredTool[] = [
     return validateOutput(competitorGapOutputSchema, { data: { competitor: gap.competitor, summary: gap.summary, keywords: gap.keywords.map(({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition }) => ({ keyword, location, device, projectRank, competitorRank, rankGap, category, searchVolume, difficulty, cpc, competition })), warnings: gap.warnings }, meta: { count: gap.keywords.length, source: "db+serpapi+dataforseo" } });
   } },
   { name: "get_seo_opportunities", description: "Read SeeO's Opportunity Engine output for a project: prioritized (P0-P2), evidence-backed SEO opportunities (rank improvement, competitor gap, CTR, content refresh, lost-ranking recovery, AI visibility, technical) with recommended action plans. Each opportunity carries evidence references; run SeeO's scan to refresh. Free (DB read).", inputSchema: { type: "object", properties: { ...projectProperty, status: { type: "string", enum: ["new", "reviewed", "approved", "in_progress", "completed", "dismissed"] }, type: { type: "string", enum: ["rank_improvement", "competitor_gap", "ctr", "content_refresh", "lost_recovery", "ai_visibility", "technical"] }, limit: { type: "integer", minimum: 1, maximum: 100 } }, required: ["projectId"], additionalProperties: false }, execute: async (ctx, input) => {
-    const parsed = seoOpportunityInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
-    const rows = await listOpportunities(ctx.userId, { project_id: Number(parsed.projectId), ...(parsed.status ? { status: parsed.status } : {}), ...(parsed.type ? { type: parsed.type } : {}), limit: parsed.limit });
+    const parsed = seoOpportunityInputSchema.parse(input);
+    // authorizeProject 兼容 SQLite 整数 id 与 Supabase UUID（鉴权模式）；用其解析出的 sqliteId 查询，
+    // 不能 Number(projectId)——UUID 会变 NaN 导致鉴权模式下永远返回空列表
+    const authorized = await authorizeProject(ctx, parsed.projectId);
+    const rows = await listOpportunities(ctx.userId, { project_id: authorized.sqliteId, ...(parsed.status ? { status: parsed.status } : {}), ...(parsed.type ? { type: parsed.type } : {}), limit: parsed.limit });
     const opportunities = rows.map((row) => {
       let evidence: Array<{ source: string; ref: string; summary: string }> = [];
       let signals: Record<string, unknown> = {};
