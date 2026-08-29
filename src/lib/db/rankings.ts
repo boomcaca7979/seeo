@@ -36,6 +36,8 @@ export async function upsertRankHistory(userId: string, params: {
   featureTypes?: string[];
 }): Promise<void> {
   const db = await getAdapter();
+  // 显式列出绑定键：...params 会把原始 featureTypes 数组一起带入（7 键 vs SQL 6 占位符），
+  // better-sqlite3 容忍多余命名参数而 Turso 严格校验（生产报 SQLITE_UNKNOWN 参数数量不匹配）
   await db.run(`
     INSERT INTO rank_history (keyword_id, date, position, url, feature_types, user_id)
     VALUES (@keyword_id, @date, @position, @url, @feature_types, @user_id)
@@ -44,7 +46,10 @@ export async function upsertRankHistory(userId: string, params: {
       url = excluded.url,
       feature_types = excluded.feature_types
   `, [{
-    ...params,
+    keyword_id: params.keyword_id,
+    date: params.date,
+    position: params.position,
+    url: params.url,
     feature_types: params.featureTypes && params.featureTypes.length > 0 ? JSON.stringify(params.featureTypes) : null,
     user_id: userId,
   }]);
