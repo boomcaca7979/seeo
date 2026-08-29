@@ -11,9 +11,12 @@ import {
   cancelAction,
   completeActionManually,
   ensureAction,
+  executeActionViaGitHub,
   previewAction,
+  refreshGitHubStatus,
   ActionError,
 } from "@/lib/seo/action-service";
+import { getActionById as dbGetActionById } from "@/lib/db/actions";
 import { requireAuthOrDemo } from "@/lib/auth";
 import type { SeoApiError } from "@/lib/seo/types";
 
@@ -74,7 +77,13 @@ export async function POST(req: Request) {
   if (!auth.allowed || !auth.user) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
-  let body: { opportunity_id?: number; operation?: string };
+  let body: {
+    opportunity_id?: number;
+    operation?: string;
+    file_path?: string;
+    new_content?: string;
+    commit_description?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -111,6 +120,32 @@ export async function POST(req: Request) {
         if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
         const { action, verification } = await completeActionManually(auth.user.id, auth.plan, row.id);
         return NextResponse.json({ data: { action: serialize(action), verification } });
+      }
+      case "execute": {
+        // P3：GitHub PR 执行。硬门槛：action approved（内部再校验）；spec 必须显式提供
+        if (!body.file_path || !body.new_content) {
+          return NextResponse.json({ error: "GitHub 执行需要 file_path 与 new_content", code: "EXECUTION_TARGET_NOT_FOUND" }, { status: 400 });
+        }
+        await ensureAction(auth.user.id, opportunityId);
+        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
+        const actionRow = await dbGetActionById(auth.user.id, row.id);
+        if (!actionRow) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
+        const execution = await executeActionViaGitHub(auth.user.id, auth.plan, actionRow.id, {
+          filePath: body.file_path,
+          newContent: body.new_content,
+          ...(body.commit_description ? { commitDescription: body.commit_description } : {}),
+        });
+        const updated = await getActionByOpportunity(auth.user.id, opportunityId);
+        return NextResponse.json({ data: { execution, action: updated ? serialize(updated) : null } });
+      }
+      case "status": {
+        await ensureAction(auth.user.id, opportunityId);
+        const row = await getActionByOpportunity(auth.user.id, opportunityId);
+        if (!row) throw new ActionError("EXECUTION_NOT_SUPPORTED", "action 创建失败");
+        const status = await refreshGitHubStatus(auth.user.id, auth.plan, row.id);
+        const updated = await getActionByOpportunity(auth.user.id, opportunityId);
+        return NextResponse.json({ data: { status, action: updated ? serialize(updated) : null } });
       }
       case "cancel": {
         await ensureAction(auth.user.id, opportunityId);

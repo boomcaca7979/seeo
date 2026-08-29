@@ -2156,7 +2156,17 @@
     "AI_SEARCH_NOT_CONFIGURED": "AI Search is not configured (DataForSEO credentials missing).",
     "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search requires a SeeO account with DataForSEO quota. Sign in and upgrade to use it.",
     "OPPORTUNITY_NOT_FOUND": "The opportunity was not found.",
-    "INVALID_TRANSITION": "That status change is not allowed for this opportunity."
+    "INVALID_TRANSITION": "That status change is not allowed for this opportunity.",
+    "GITHUB_NOT_CONNECTED": "This project is not connected to GitHub yet. Connect a repository to execute actions.",
+    "GITHUB_NOT_CONFIGURED": "GitHub integration is not configured (no GitHub App and no token provided).",
+    "GITHUB_PERMISSION_DENIED": "GitHub denied access: the credential lacks push permission on this repository.",
+    "GITHUB_REPOSITORY_NOT_FOUND": "The GitHub repository was not found or is not accessible.",
+    "GITHUB_REPOSITORY_ARCHIVED": "The GitHub repository is archived and cannot be written.",
+    "GITHUB_RATE_LIMITED": "GitHub rate limit reached. Please retry later.",
+    "GITHUB_PROVIDER_ERROR": "The GitHub request failed. Please retry.",
+    "GITHUB_REPOSITORY_NOT_CONFIGURED": "No repository is mapped to this project. Connect one explicitly.",
+    "EXECUTION_TARGET_NOT_FOUND": "The target file for this action could not be determined — manual execution required.",
+    "EXECUTION_SCOPE_TOO_LARGE": "The change scope exceeds safety limits. Re-preview or execute manually."
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

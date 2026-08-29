@@ -3,7 +3,7 @@ import { researchKeywords, normalizeKeywordForDedup } from "@/lib/seo/keyword-re
 import { getProjectRankSummary } from "@/lib/seo/rank-tracking-service";
 import { aiBrandLookup } from "@/lib/seo/ai-search-service";
 import { getCompetitorKeywordGap } from "@/lib/seo/competitor-service";
-import { previewAction, ensureAction } from "@/lib/seo/action-service";
+import { previewAction, ensureAction, refreshGitHubStatus } from "@/lib/seo/action-service";
 import { getCompetitorById, listTrackedKeywords } from "@/lib/db";
 import { listOpportunities, getOpportunityById } from "@/lib/db/opportunities";
 import { getActionByOpportunity } from "@/lib/db/actions";
@@ -11,10 +11,10 @@ import { inspectUrl, searchAnalytics } from "@/lib/seo/gsc-service";
 import { peekUsage } from "@/lib/seo/cache";
 import { getBacklinkProfile, normalizeBacklinkDomain } from "@/lib/seo/backlink-service";
 import { authorizeProject, listAuthorizedProjects, projectContext } from "../project-auth";
-import { actionPlanInputSchema, aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, seoOpportunityInputSchema, serpInputSchema, type ToolName } from "../schemas";
+import { actionExecuteInputSchema, actionPlanInputSchema, actionStatusInputSchema, aiSearchInputSchema, backlinkInputSchema, competitorGapInputSchema, gscInputSchema, keywordInputSchema, projectIdSchema, rankHistoryInputSchema, seoOpportunityInputSchema, serpInputSchema, type ToolName } from "../schemas";
 import { McpNormalizedError } from "../errors";
 import type { ToolAuthContext } from "../context";
-import { validateOutput, actionPlanOutputSchema, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, seoOpportunityOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
+import { validateOutput, actionPlanOutputSchema, actionPreviewOutputSchema, actionStatusOutputSchema, aiSearchBrandLookupOutputSchema, backlinkOutputSchema, competitorGapOutputSchema, seoOpportunityOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, projectListOutputSchema, projectOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "../output-schemas";
 
 /** GSC 数据滞后 2-3 天；compare_periods 默认窗口的结束日扣除滞后 */
 function gscTodayMinusLag(): string {
@@ -132,6 +132,21 @@ const tools: RegisteredTool[] = [
     try { preview = JSON.parse(row.preview_json ?? "{}") as Record<string, unknown>; } catch { /* ignore */ }
     if (!preview.exactSteps) throw new McpNormalizedError("NOT_CONFIGURED", "No preview yet — call with refreshPreview=true to generate the execution package.");
     return validateOutput(actionPlanOutputSchema, { data: { opportunity: { id: opportunity.id, type: opportunity.type, targetValue: opportunity.target_value, status: opportunity.status }, action: { id: row.id, actionType: row.action_type, executionMode: row.execution_mode, status: row.status, approvedAt: row.approved_at, completedAt: row.completed_at }, preview: { kind: String(preview.kind ?? "manual_instruction_package"), target: String(preview.target ?? ""), currentState: Array.isArray(preview.currentState) ? preview.currentState.map(String) : [], exactSteps: Array.isArray(preview.exactSteps) ? preview.exactSteps.map(String) : [], expectedResult: String(preview.expectedResult ?? ""), verificationPlan: Array.isArray(preview.verificationPlan) ? preview.verificationPlan.map(String) : [], rollbackNotes: String(preview.rollbackNotes ?? "manual") }, note: "Execution mode is manual. Approve and mark completion in the SeeO UI; agents never auto-approve." }, meta: { source: "db" } });
+  } },
+  { name: "preview_seo_action", description: "Generate a real execution preview for an approved opportunity's action: reads the actual file from the connected GitHub repository and returns its current content plus the proposed change (before/after). Requires an explicit file path — SeeO never guesses URL-to-file mappings. Cannot determine the file → EXECUTION_TARGET_NOT_FOUND (manual execution instead). Read-only; nothing is committed.", inputSchema: { type: "object", properties: { ...projectProperty, opportunityId: { type: "integer", minimum: 1 }, filePath: { type: "string" }, newContent: { type: "string" }, commitDescription: { type: "string" } }, required: ["projectId", "opportunityId", "filePath", "newContent"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = actionExecuteInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
+    await ensureAction(ctx.userId, parsed.opportunityId);
+    const preview = await previewAction(ctx.userId, parsed.opportunityId);
+    const row = await getActionByOpportunity(ctx.userId, parsed.opportunityId);
+    return validateOutput(actionPreviewOutputSchema, { data: { opportunityId: parsed.opportunityId, executionMode: row?.execution_mode ?? "manual", status: row?.status ?? "planned", preview: preview as unknown as Record<string, unknown>, note: "Preview only. Committing requires user approval in SeeO UI and a human GitHub review." }, meta: { source: "db+github" } });
+  } },
+  { name: "get_action_status", description: "Poll the execution status of an opportunity's action: GitHub PR state (open/merged/closed), branch, and verification checks. On merge, triggers production verification (rank re-check; GSC/AI pending due to data lag). Read-only.", inputSchema: { type: "object", properties: { ...projectProperty, opportunityId: { type: "integer", minimum: 1 } }, required: ["projectId", "opportunityId"], additionalProperties: false }, execute: async (ctx, input) => {
+    const parsed = actionStatusInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
+    await ensureAction(ctx.userId, parsed.opportunityId);
+    const row = await getActionByOpportunity(ctx.userId, parsed.opportunityId);
+    if (!row) throw new McpNormalizedError("NOT_CONFIGURED", "No action exists for this opportunity.");
+    const status = await refreshGitHubStatus(ctx.userId, ctx.plan, row.id);
+    return validateOutput(actionStatusOutputSchema, { data: { opportunityId: parsed.opportunityId, stage: status.stage, repository: status.repository, branch: status.branch, prNumber: status.prNumber, prUrl: status.prUrl, verification: status.verification.map((check) => ({ check: check.check, status: check.status, detail: check.detail })), note: "PR merged does not equal verified — production verification completes the loop." }, meta: { source: "db+github" } });
   } },
   { name: "search_console_tools", description: "First-party Google Search Console data for a project's connected property. Operations: performance_summary (daily rows + totals), top_queries, top_pages, compare_periods (range vs previous equal-length range), inspect_url (URL Inspection; requires url). Requires the project to be connected to a Search Console property in SeeO; CTR is a 0-1 fraction and position is a float average (distinct from SERP rank). Reads the free GSC API — no SeeO credits consumed.", inputSchema: { type: "object", properties: { ...projectProperty, operation: { type: "string", enum: ["performance_summary", "top_queries", "top_pages", "compare_periods", "inspect_url"] }, url: { type: "string", format: "uri" }, startDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, endDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, rowLimit: { type: "integer", minimum: 1, maximum: 1000 }, keyword: stringProperty, page: stringProperty }, required: ["projectId", "operation"], additionalProperties: false }, execute: async (ctx, input) => {
     const parsed = gscInputSchema.parse(input); const project = await authorizeProject(ctx, parsed.projectId);

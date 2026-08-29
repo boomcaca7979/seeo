@@ -150,4 +150,28 @@ export const actionPlanOutputSchema = z.object({
   meta: z.object({ source: z.string() }),
 }).passthrough();
 
+export const actionPreviewOutputSchema = z.object({
+  data: z.object({
+    opportunityId: z.number(),
+    executionMode: z.string(),
+    status: z.string(),
+    preview: z.record(z.string(), z.unknown()),
+    note: z.string(),
+  }),
+  meta: z.object({ source: z.string() }),
+}).passthrough();
+export const actionStatusOutputSchema = z.object({
+  data: z.object({
+    opportunityId: z.number(),
+    stage: z.string(),
+    repository: z.string().nullable(),
+    branch: z.string().nullable(),
+    prNumber: z.number().nullable(),
+    prUrl: z.string().nullable(),
+    verification: z.array(z.object({ check: z.string(), status: z.string(), detail: z.string().nullable() })),
+    note: z.string(),
+  }),
+  meta: z.object({ source: z.string() }),
+}).passthrough();
+
 export function validateOutput<T>(schema: z.ZodType<T>, value: T): T { return schema.parse(value); }

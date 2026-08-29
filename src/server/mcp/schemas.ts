@@ -72,4 +72,17 @@ export const actionPlanInputSchema = z.object({
   refreshPreview: z.boolean().default(false),
 });
 
-export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities" | "get_action_plan";
+export const actionExecuteInputSchema = z.object({
+  projectId: z.string().min(1),
+  opportunityId: z.number().int().min(1),
+  filePath: z.string().min(1),
+  newContent: z.string().min(1),
+  commitDescription: z.string().min(1).optional(),
+});
+
+export const actionStatusInputSchema = z.object({
+  projectId: z.string().min(1),
+  opportunityId: z.number().int().min(1),
+});
+
+export type ToolName = "list_projects" | "project_context" | "research_keywords" | "get_serp_results" | "get_backlinks_profile" | "search_console_tools" | "get_rank_history" | "ai_search_brand_lookup" | "get_competitor_keyword_gap" | "get_seo_opportunities" | "get_action_plan" | "preview_seo_action" | "get_action_status";

@@ -213,6 +213,24 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_seo_actions_project
       ON seo_actions(project_id, status);
 
+    CREATE TABLE IF NOT EXISTS github_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      owner TEXT NOT NULL,
+      repository TEXT NOT NULL,
+      default_branch TEXT NOT NULL,
+      auth_mode TEXT NOT NULL,
+      encrypted_credentials TEXT,
+      connected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (project_id),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_github_connections_user
+      ON github_connections(user_id);
+
     CREATE TABLE IF NOT EXISTS content_checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       url TEXT NOT NULL,

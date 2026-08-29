@@ -2136,7 +2136,17 @@
     "AI_SEARCH_NOT_CONFIGURED": "AI Search 尚未配置（缺少 DataForSEO 凭证）。",
     "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search 需要拥有 DataForSEO 配额的 SeeO 账号。请登录并升级后使用。",
     "OPPORTUNITY_NOT_FOUND": "未找到该机会。",
-    "INVALID_TRANSITION": "该机会不允许此状态变更。"
+    "INVALID_TRANSITION": "该机会不允许此状态变更。",
+    "GITHUB_NOT_CONNECTED": "该项目尚未连接 GitHub。请先连接仓库以执行动作。",
+    "GITHUB_NOT_CONFIGURED": "GitHub 集成未配置（缺少 GitHub App 或未提供 token）。",
+    "GITHUB_PERMISSION_DENIED": "GitHub 拒绝访问：凭证对该仓库没有 push 权限。",
+    "GITHUB_REPOSITORY_NOT_FOUND": "GitHub 仓库不存在或不可访问。",
+    "GITHUB_REPOSITORY_ARCHIVED": "GitHub 仓库已归档，无法写入。",
+    "GITHUB_RATE_LIMITED": "GitHub 限速已达上限，请稍后重试。",
+    "GITHUB_PROVIDER_ERROR": "GitHub 请求失败，请重试。",
+    "GITHUB_REPOSITORY_NOT_CONFIGURED": "该项目尚未映射仓库。请显式连接。",
+    "EXECUTION_TARGET_NOT_FOUND": "无法确定该动作的目标文件——需要手动执行。",
+    "EXECUTION_SCOPE_TOO_LARGE": "变更范围超过安全上限。请重新预览或改为手动执行。"
   },
   "notFoundPage": {
     "title": "页面不存在 | SeeO",

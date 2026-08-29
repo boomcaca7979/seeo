@@ -19,6 +19,9 @@ import { createAction, getActionById as dbGetActionById, getActionByOpportunity,
 import { getOpportunityById, saveOpportunityVerification, type OpportunityStatus } from "@/lib/db/opportunities";
 import { getExecutionAdapter, type ActionForExecution, type ExecutionPreview } from "./execution-adapter";
 import { verifyOpportunity } from "./opportunity-service";
+import { executeGitHubChanges, buildBranchName, type GitHubActionSpec } from "./github-execution-adapter";
+import { GitHubExecutionError } from "./github-execution-adapter";
+import { getGitHubPullRequestForBranch, getGitHubAppToken } from "./github-provider";
 import type { PlanTier } from "@/lib/auth";
 
 export class ActionError extends Error {
@@ -189,8 +192,8 @@ async function getActionById(userId: string, actionId: number): Promise<SeoActio
   return row;
 }
 
-function safeParse(raw: string): Record<string, unknown> {
-  try { return JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
+function safeParse(raw: string | null): Record<string, unknown> {
+  try { return JSON.parse(raw ?? "") as Record<string, unknown>; } catch { return {}; }
 }
 
 interface VerificationCheckView { check: string; status: string; detail: string | null; checkedAt: string | null }
@@ -200,6 +203,128 @@ function parseVerification(raw: string | null): VerificationCheckView[] {
   try { return JSON.parse(raw) as VerificationCheckView[]; } catch { return []; }
 }
 
-// re-export 供 route 层读取
+
+// ===== GitHub PR 执行（P3；approval 硬门槛 + PR created ≠ completed） =====
+
+
+export interface GitHubExecutionStatus {
+  stage: "awaiting_review" | "merged" | "closed" | "verifying" | "none";
+  repository: string | null;
+  branch: string | null;
+  prNumber: number | null;
+  prUrl: string | null;
+  verification: VerificationCheckView[];
+}
+
+/**
+ * 经 GitHub adapter 执行已批准 action：branch → commit → PR。
+ * - 只有 action.status === approved 才执行（未批准 EXECUTION_NOT_APPROVED）
+ * - executing 状态 → 刷新 PR 状态而非重复执行（幂等）
+ * - completed → 幂等返回
+ * - 无 GitHub 连接 → GITHUB_NOT_CONNECTED（保持 manual，不静默切换执行模式）
+ * - spec（filePath/newContent）必须显式提供；无法确定文件 → EXECUTION_TARGET_NOT_FOUND
+ */
+export async function executeActionViaGitHub(userId: string, plan: PlanTier, actionId: number, spec: GitHubActionSpec): Promise<{ stage: GitHubExecutionStatus["stage"]; prUrl: string | null }> {
+  const row = await getActionById(userId, actionId);
+  if (row.status === "completed") {
+    const completed = safeParse(row.result_json);
+    return { stage: "merged", prUrl: typeof completed.prUrl === "string" ? completed.prUrl : null };
+  }
+  if (row.status === "executing") {
+    const status = await refreshGitHubStatus(userId, plan, actionId);
+    return { stage: status.stage, prUrl: status.prUrl };
+  }
+  if (row.status !== "approved") {
+    throw new ActionError("EXECUTION_NOT_APPROVED", `仅 approved 状态可执行（当前 ${row.status}）`);
+  }
+  const opportunity = await getOpportunityById(userId, row.opportunity_id);
+  if (!opportunity) throw new ActionError("EXECUTION_NOT_SUPPORTED", "未找到所属机会");
+  let evidence: Array<{ source: string; ref: string; summary: string }> = [];
+  try { evidence = JSON.parse(opportunity.evidence_json ?? "[]") as typeof evidence; } catch { /* 损坏按空 */ }
+
+  await updateActionStatus(userId, row.id, { status: "executing", event: { event: "executing", by: userId, detail: "github_pr" } });
+  try {
+    const result = await executeGitHubChanges(userId, opportunity.project_id, {
+      actionId: row.id,
+      spec,
+      evidence,
+      opportunityId: opportunity.id,
+      idempotencyKey: row.idempotency_key,
+    });
+    await updateActionStatus(userId, row.id, {
+      result_json: JSON.stringify(result),
+      event: { event: "pr_created", by: userId, detail: `${result.repository}#${result.prNumber}` },
+    });
+    return { stage: "awaiting_review", prUrl: result.prUrl };
+  } catch (e) {
+    const code = e instanceof GitHubExecutionError ? e.code : "EXECUTION_ADAPTER_ERROR";
+    await updateActionStatus(userId, row.id, {
+      status: "failed",
+      error_code: code,
+      result_json: JSON.stringify({ error: (e as Error).message }),
+      event: { event: "failed", by: userId, detail: (e as Error).message },
+    });
+    throw e;
+  }
+}
+
+/** 状态轮询（bounded 单次查询）：PR open → awaiting_review；merged → 触发验证；closed → failed + 手动包 */
+export async function refreshGitHubStatus(userId: string, plan: PlanTier, actionId: number): Promise<GitHubExecutionStatus> {
+  const row = await getActionById(userId, actionId);
+  const result = safeParse(row.result_json) as { branch?: unknown; repository?: unknown; prUrl?: string | null };
+  const branch = typeof result.branch === "string" ? result.branch : buildBranchName(row.id, row.idempotency_key);
+  const repository = typeof result.repository === "string" ? result.repository : null;
+  const prUrl = typeof result.prUrl === "string" ? result.prUrl : null;
+
+  if (row.status === "completed") {
+    return { stage: "merged", repository, branch, prNumber: null, prUrl, verification: parseVerification((await getOpportunityById(userId, row.opportunity_id))?.verification_json ?? null) };
+  }
+  if (!repository) {
+    return { stage: "none", repository, branch, prNumber: null, prUrl: null, verification: [] };
+  }
+  const [owner, repo] = repository.split("/");
+  const token = await resolveTokenForUser(userId, row.project_id);
+  const pr = await getGitHubPullRequestForBranch(token, owner, repo, branch);
+  if (!pr) {
+    return { stage: "none", repository, branch, prNumber: null, prUrl, verification: [] };
+  }
+  if (pr.state === "open") {
+    await updateActionStatus(userId, row.id, { event: { event: "awaiting_review", by: userId, detail: `PR #${pr.number}` } });
+    return { stage: "awaiting_review", repository, branch, prNumber: pr.number, prUrl: pr.html_url, verification: [] };
+  }
+  if (pr.merged) {
+    await updateActionStatus(userId, row.id, { event: { event: "pr_merged", by: userId, detail: `PR #${pr.number}` } });
+    const opportunity = await getOpportunityById(userId, row.opportunity_id);
+    const { checks } = await verifyOpportunity(userId, plan, {
+      projectId: row.project_id,
+      type: opportunity?.type ?? "content_refresh",
+      targetType: opportunity?.target_type ?? "keyword",
+      targetValue: opportunity?.target_value ?? row.idempotency_key,
+      signals: safeParse(opportunity?.signals_json ?? "{}"),
+    });
+    await saveOpportunityVerification(userId, row.opportunity_id, checks);
+    return { stage: "verifying", repository, branch, prNumber: pr.number, prUrl: pr.html_url, verification: checks };
+  }
+  // PR closed 未合并 → failed + 手动包（用户决定下一步，不自动重开）
+  await updateActionStatus(userId, row.id, {
+    status: "failed",
+    error_code: "EXECUTION_CONFLICT",
+    result_json: JSON.stringify({ prClosedWithoutMerge: true, manualExecutionPackage: true }),
+    event: { event: "pr_closed", by: userId },
+  });
+  return { stage: "closed", repository, branch, prNumber: pr.number, prUrl: pr.html_url, verification: [] };
+}
+
+async function resolveTokenForUser(userId: string, projectId: number): Promise<string> {
+  const { getGitHubConnectionByProject } = await import("@/lib/db/github");
+  const connection = await getGitHubConnectionByProject(userId, projectId);
+  if (!connection) throw new ActionError("EXECUTION_NOT_SUPPORTED", "GitHub 未连接");
+  if (connection.auth_mode === "app") return getGitHubAppToken();
+  if (!connection.encrypted_credentials) throw new ActionError("EXECUTION_NOT_SUPPORTED", "GitHub 连接缺少凭证");
+  const { decryptSecret } = await import("@/lib/crypto/secure-store");
+  return decryptSecret(connection.encrypted_credentials);
+}
+
+// re-export
 export { getActionByOpportunity };
 export type { ActionStatus };
