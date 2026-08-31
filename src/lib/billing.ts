@@ -76,7 +76,7 @@ export interface PlanDisplayInfo {
   priceUnit: string;
   ctaLabel: string;
   /** 走 /api/payment/yaolipay/create 的 plan key；undefined 表示不走支付 */
-  checkoutPlan?: "lite" | "pro";
+  checkoutPlan?: CheckoutPlan;
   /** 非支付的跳转地址（如 free → /app） */
   ctaHref?: string;
   highlighted?: boolean;
@@ -90,13 +90,20 @@ export interface PlanPricing {
   amountCents: number;
   /** 币种，固定 CNY */
   currency: "CNY";
-  /** 周期天数（一次性购买 N 天会员） */
+  /** 周期天数（一次性购买 N 天会员；定制服务为 0 = 不开通会员周期） */
   periodDays: number;
 }
 
-export const PLAN_PRICING: Record<"lite" | "pro", PlanPricing> = {
+/** 可购买套餐 plan key（走支付链路的标识） */
+export type CheckoutPlan = "lite" | "pro" | "custom";
+
+/** 定制服务套餐标识（一次性服务购买，非会员周期） */
+export const CUSTOM_SERVICE_PLAN = "custom" as const;
+
+export const PLAN_PRICING: Record<CheckoutPlan, PlanPricing> = {
   lite: { amountCents: 990, currency: "CNY", periodDays: 30 },
   pro: { amountCents: 2990, currency: "CNY", periodDays: 30 },
+  custom: { amountCents: 64900, currency: "CNY", periodDays: 0 },
 };
 
 /** 将分转成元字符串（保留 2 位小数），用于传给耀立接口的 money 参数 */
@@ -164,7 +171,7 @@ export function isTestPaymentMisconfigured(): boolean {
  *   - 误配置的拦截由 isTestPaymentMisconfigured() + create API 负责
  *   - 此函数不修改 PLAN_PRICING 本身
  */
-export function getEffectivePaymentAmountCents(plan: "lite" | "pro"): number {
+export function getEffectivePaymentAmountCents(plan: CheckoutPlan): number {
   if (
     isVercelPreviewEnv() &&
     isTestPaymentModeEnabled() &&
@@ -175,7 +182,7 @@ export function getEffectivePaymentAmountCents(plan: "lite" | "pro"): number {
   return PLAN_PRICING[plan].amountCents;
 }
 
-export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
+export const PLAN_DISPLAY_INFO: Record<PlanTier | "custom", PlanDisplayInfo> = {
   free: {
     name: "免费版",
     tagline: "适合个人站长和初学者",
@@ -200,6 +207,14 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier, PlanDisplayInfo> = {
     ctaLabel: "升级到 Pro",
     checkoutPlan: "pro",
     highlighted: true,
+  },
+  custom: {
+    name: "定制服务",
+    tagline: "一对一 SEO 定制服务，按需求交付",
+    price: "¥649",
+    priceUnit: "/次",
+    ctaLabel: "购买定制服务",
+    checkoutPlan: "custom",
   },
 };
 
@@ -346,16 +361,21 @@ export interface PurchaseCheckResult {
  *   lite → pro         UPGRADE  允许
  *   pro  → pro         RENEWAL  允许（续费 30 天）
  *   pro  → lite        拒绝（PLAN_DOWNGRADE_NOT_ALLOWED）
+ *   任意 → custom      PURCHASE 允许（定制服务为一次性服务，不影响会员周期）
  *
  * 注意：currentPlan 必须由服务端查询（profiles.effectivePlan）得出，
  * 不可信任前端传入。过期订阅 effectivePlan=free，允许重新购买。
  */
 export function canPurchasePlan(
   currentPlan: PlanTier,
-  targetPlan: "lite" | "pro"
+  targetPlan: CheckoutPlan
 ): PurchaseCheckResult {
+  // 定制服务：任何用户（含 Pro）都可购买，与会员等级无关
+  if (targetPlan === CUSTOM_SERVICE_PLAN) {
+    return { allowed: true, purchaseType: "PURCHASE" };
+  }
   const currentRank = PLAN_RANK[currentPlan] ?? 0;
-  const targetRank = PLAN_RANK[targetPlan] ?? 0;
+  const targetRank = PLAN_RANK[targetPlan as PlanTier] ?? 0;
   if (targetRank < currentRank) {
     return {
       allowed: false,
@@ -517,19 +537,30 @@ export async function getAllPlanLimits(): Promise<PlanLimits[]> {
 /** 合并后的套餐信息（limits + display），供前端展示用 */
 export interface PlanInfo extends PlanLimits {
   display: PlanDisplayInfo;
+  /** 定制服务卡标记：非会员套餐，前端渲染服务说明而非额度列表 */
+  isCustomService?: boolean;
 }
 
 /**
  * 获取所有套餐的完整信息（limits + display），按 PLAN_ORDER 排序
  * Pricing / Settings 页面统一数据源
+ * 末尾附加「定制服务」条目（非会员套餐，limits 字段无意义，前端按 isCustomService 渲染）
  */
 export async function getAllPlanInfo(): Promise<PlanInfo[]> {
   const limits = await getAllPlanLimits();
   const limitsByPlan = new Map(limits.map((l) => [l.plan, l]));
-  return PLAN_ORDER.map((plan) => {
+  const plans = PLAN_ORDER.map((plan) => {
     const l = limitsByPlan.get(plan) ?? DEFAULT_PLAN_LIMITS[plan];
     return { ...l, display: PLAN_DISPLAY_INFO[plan] };
   });
+  // 定制服务：limits 以 free 兜底填充（前端不渲染额度），价格/名称走 display
+  const customEntry: PlanInfo = {
+    ...DEFAULT_PLAN_LIMITS.free,
+    plan: CUSTOM_SERVICE_PLAN as unknown as PlanTier,
+    display: PLAN_DISPLAY_INFO.custom,
+    isCustomService: true,
+  };
+  return [...plans, customEntry];
 }
 
 /**

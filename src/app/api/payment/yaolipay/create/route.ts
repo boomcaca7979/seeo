@@ -14,17 +14,15 @@ import { NextResponse } from "next/server";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { getYaolipayConfig, getReturnUrl, isValidPaymentChannel } from "@/lib/yaolipay/config";
 import { createOrder } from "@/lib/yaolipay/client";
-import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured, canPurchasePlan } from "@/lib/billing";
+import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured, canPurchasePlan, CUSTOM_SERVICE_PLAN, type CheckoutPlan } from "@/lib/billing";
 import { createPendingOrder } from "@/lib/orders/service";
 import type { PaymentChannel } from "@/lib/yaolipay/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type CheckoutPlan = "lite" | "pro";
-
 function isValidPlan(plan: unknown): plan is CheckoutPlan {
-  return plan === "lite" || plan === "pro";
+  return plan === "lite" || plan === "pro" || plan === CUSTOM_SERVICE_PLAN;
 }
 
 /** 从请求头提取客户端真实 IP */
@@ -84,7 +82,7 @@ export async function POST(req: Request) {
   const { plan, payment_channel } = body;
   if (!isValidPlan(plan)) {
     return NextResponse.json(
-      { error: "plan 必须是 lite 或 pro", code: "PLAN_PARAM_INVALID" },
+      { error: "plan 必须是 lite、pro 或 custom", code: "PLAN_PARAM_INVALID" },
       { status: 400 }
     );
   }
@@ -151,10 +149,14 @@ export async function POST(req: Request) {
 
   // 2. 调用耀立统一下单接口
   try {
+    const productName =
+      plan === CUSTOM_SERVICE_PLAN
+        ? "SeeO 定制服务"
+        : `SeeO ${plan === "lite" ? "Lite" : "Pro"} 30天会员`;
     const yaolipayResp = await createOrder({
       type: payment_channel as PaymentChannel,
       out_trade_no: order.out_trade_no,
-      name: `SeeO ${plan === "lite" ? "Lite" : "Pro"} 30天会员`,
+      name: productName,
       money: moneyStr,
       clientip: clientIp,
       return_url: returnUrl,

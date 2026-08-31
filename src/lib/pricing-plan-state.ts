@@ -11,11 +11,15 @@
 //   null       → 未登录（anonymous，按 free 规则展示）
 
 import type { PlanTier } from "@/lib/auth";
+import type { CheckoutPlan } from "@/lib/billing";
+
+/** 卡片对应的 plan：会员档位（PlanTier）或定制服务（custom，非会员） */
+export type PlanCardPlan = PlanTier | "custom";
 
 export interface PlanCardBase {
   ctaLabel: string;
   ctaHref?: string;
-  checkoutPlan?: "lite" | "pro";
+  checkoutPlan?: CheckoutPlan;
   highlighted?: boolean;
 }
 
@@ -35,7 +39,7 @@ export interface PlanCardState {
   disabled: boolean;
   /** 行为类型：checkout = 发起支付；link = 跳转；none = 无动作（禁用按钮） */
   kind: "checkout" | "link" | "none";
-  checkoutPlan?: "lite" | "pro";
+  checkoutPlan?: CheckoutPlan;
   ctaHref?: string;
 }
 
@@ -47,10 +51,22 @@ const DEFAULT_LABELS: PlanCardLabels = {
 
 export function getPlanCardState(
   currentPlan: PlanTier | null | undefined,
-  cardPlan: PlanTier,
+  cardPlan: PlanCardPlan,
   base: PlanCardBase,
   labels: PlanCardLabels = DEFAULT_LABELS
 ): PlanCardState {
+  // 定制服务卡：与会员等级无关，任何用户（含 Pro）都可购买
+  if (cardPlan === "custom") {
+    return {
+      badge: null,
+      ctaLabel: base.ctaLabel,
+      disabled: currentPlan === undefined,
+      kind: base.checkoutPlan ? "checkout" : "link",
+      checkoutPlan: base.checkoutPlan,
+      ctaHref: base.ctaHref,
+    };
+  }
+
   // 加载中：保持原文案但禁用，避免先显示「升级到 Lite」再闪变为「当前套餐」
   if (currentPlan === undefined) {
     return {

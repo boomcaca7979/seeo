@@ -223,10 +223,16 @@
       "name": "专业版",
       "tagline": "适合专业 SEO 从业者"
     },
+    "custom": {
+      "name": "定制服务",
+      "tagline": "一对一 SEO 定制服务，按需求交付",
+      "priceUnit": "/次"
+    },
     "cta": {
       "start": "开始使用",
       "upgradeLite": "升级到 Lite",
       "upgradePro": "升级到 Pro",
+      "purchaseCustom": "购买定制服务",
       "renew": "续费 30 天",
       "noDowngrade": "不可降级"
     },
@@ -257,6 +263,14 @@
     "networkError": "网络错误，加载套餐失败",
     "noPlans": "暂无套餐信息",
     "note": "套餐价格与限制统一由 billing 层管理。支付由耀立支付聚合支付服务处理，支持支付宝与微信支付。",
+    "customService": {
+      "features": [
+        "一对一 SEO 策略咨询与方案定制",
+        "站点深度诊断与优化建议报告",
+        "关键词策略与内容规划指导",
+        "专属顾问跟进交付"
+      ]
+    },
     "faqTitle": "常见问题",
     "faqEyebrow": "FAQ",
     "backHome": "← 返回首页",

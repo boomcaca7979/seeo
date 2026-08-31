@@ -223,10 +223,16 @@
       "name": "Pro",
       "tagline": "For professional SEO practitioners"
     },
+    "custom": {
+      "name": "Custom Service",
+      "tagline": "One-on-one SEO service, delivered per your needs",
+      "priceUnit": "/project"
+    },
     "cta": {
       "start": "Start free",
       "upgradeLite": "Upgrade to Lite",
       "upgradePro": "Upgrade to Pro",
+      "purchaseCustom": "Purchase Custom Service",
       "renew": "Renew 30 days",
       "noDowngrade": "No downgrade"
     },
@@ -257,6 +263,14 @@
     "networkError": "Network error, failed to load plans",
     "noPlans": "No plan information available",
     "note": "Prices and limits are managed centrally by the billing layer. Payments are processed by the YaoLi Pay aggregated payment service, supporting Alipay and WeChat Pay.",
+    "customService": {
+      "features": [
+        "One-on-one SEO strategy consulting",
+        "In-depth site audit & optimization report",
+        "Keyword strategy & content planning",
+        "Dedicated advisor follow-up"
+      ]
+    },
     "faqTitle": "Frequently asked questions",
     "faqEyebrow": "FAQ",
     "backHome": "← Back to home",

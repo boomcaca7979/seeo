@@ -17,7 +17,7 @@ interface PlanDisplayInfo {
   price: string;
   priceUnit: string;
   ctaLabel: string;
-  checkoutPlan?: "lite" | "pro";
+  checkoutPlan?: "lite" | "pro" | "custom";
   ctaHref?: string;
   highlighted?: boolean;
 }
@@ -25,6 +25,8 @@ interface PlanDisplayInfo {
 interface PlanInfo {
   plan: string;
   display: PlanDisplayInfo;
+  /** 定制服务卡标记：非会员套餐，渲染服务说明而非额度列表 */
+  isCustomService?: boolean;
   // 核心限制
   max_projects: number;
   max_tracked_keywords: number;
@@ -105,7 +107,7 @@ function PricingContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // 支付方式选择弹窗
-  const [selectedPlan, setSelectedPlan] = useState<"lite" | "pro" | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<"lite" | "pro" | "custom" | null>(null);
   const [creating, setCreating] = useState(false);
 
   // 当前用户套餐：undefined = 加载中；null = 未登录（anonymous/free）
@@ -156,7 +158,7 @@ function PricingContent() {
   }, [t]);
 
   // 创建耀立支付订单
-  async function handleCreatePayment(plan: "lite" | "pro", channel: PaymentChannel) {
+  async function handleCreatePayment(plan: "lite" | "pro" | "custom", channel: PaymentChannel) {
     setCreating(true);
     setErrorMsg(null);
     try {
@@ -219,6 +221,50 @@ function PricingContent() {
         ) : plans && plans.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {plans.map((p) => {
+              // 定制服务卡：渲染服务说明而非额度列表
+              if (p.isCustomService || p.plan === "custom") {
+                const card = getPlanCardState(
+                  currentPlan,
+                  "custom",
+                  {
+                    ctaLabel: tp("cta.purchaseCustom"),
+                    checkoutPlan: p.display.checkoutPlan,
+                    ctaHref: p.display.ctaHref,
+                    highlighted: p.display.highlighted,
+                  },
+                  { renew: tp("cta.renew"), noDowngrade: tp("cta.noDowngrade") }
+                );
+                const customFeatures = t.raw("pricing.customService.features") as string[];
+                return (
+                  <div key="custom" className="card-a p-6 relative">
+                    <div className="mb-5">
+                      <h2 className="font-mono text-lg font-semibold text-ink mb-1">
+                        {tp("custom.name")}
+                      </h2>
+                      <p className="font-sans text-xs text-ink-40">{tp("custom.tagline")}</p>
+                    </div>
+                    <div className="mb-5">
+                      <span className="font-mono text-2xl font-semibold text-ink">{p.display.price}</span>
+                      <span className="font-sans text-xs text-ink-40">{tp("custom.priceUnit")}</span>
+                    </div>
+                    <ul className="space-y-2 mb-6">
+                      {customFeatures.map((f) => (
+                        <li key={f} className="flex items-start gap-2 font-sans text-xs text-ink-60">
+                          <span className="text-pos mt-0.5 flex-shrink-0">✓</span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => card.checkoutPlan && setSelectedPlan(card.checkoutPlan)}
+                      disabled={card.disabled}
+                      className="btn-secondary block w-full h-10 text-center"
+                    >
+                      {card.ctaLabel}
+                    </button>
+                  </div>
+                );
+              }
               const features = buildFeatureList(p);
               // 套餐名/tagline/CTA 文案按 locale 从 messages 输出；
               // 价格与额度为 /api/plans（billing 层）真实数据
@@ -385,14 +431,19 @@ function PaymentChannelModal({
   onClose,
   onSelect,
 }: {
-  plan: "lite" | "pro";
+  plan: "lite" | "pro" | "custom";
   loading: boolean;
   onClose: () => void;
   onSelect: (channel: PaymentChannel) => void;
 }) {
   const t = useTranslations("paymentModal");
   const tp = useTranslations("plans");
-  const planLabel = plan === "lite" ? tp("lite.name") : tp("pro.name");
+  const planLabel =
+    plan === "lite"
+      ? tp("lite.name")
+      : plan === "pro"
+        ? tp("pro.name")
+        : tp("custom.name");
 
   return (
     <div

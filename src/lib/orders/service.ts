@@ -4,18 +4,18 @@
 // notify / query 都调用同一个 completeOrder，避免逻辑差异
 
 import { getAdminClient } from "@/lib/supabase/admin";
-import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents, type PurchaseType } from "@/lib/billing";
+import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents, CUSTOM_SERVICE_PLAN, type PurchaseType, type CheckoutPlan } from "@/lib/billing";
 import type { PlanTier } from "@/lib/auth";
 import type { PaymentChannel, OrderStatus } from "@/lib/yaolipay/types";
 
-/** 订单记录（与 0008_orders_table.sql 一一对应） */
+/** 订单记录（与 0008_orders_table.sql 一一对应；0012 迁移后 plan 增加 custom） */
 export interface OrderRecord {
   id: string;
   user_id: string;
   out_trade_no: string;
   trade_no: string | null;
   api_trade_no: string | null;
-  plan: "lite" | "pro";
+  plan: CheckoutPlan;
   amount: number;
   currency: string;
   payment_channel: PaymentChannel | null;
@@ -57,7 +57,7 @@ export function generateOutTradeNo(): string {
  */
 export async function createPendingOrder(args: {
   userId: string;
-  plan: "lite" | "pro";
+  plan: CheckoutPlan;
   paymentChannel: PaymentChannel;
   clientIp: string;
   purchaseType?: PurchaseType;
@@ -90,7 +90,7 @@ export async function createPendingOrder(args: {
         currency: pricing.currency,
         payment_channel: args.paymentChannel,
         payment_status: "pending",
-        period_type: `${pricing.periodDays}d`,
+        period_type: args.plan === CUSTOM_SERVICE_PLAN ? "custom" : `${pricing.periodDays}d`,
         clientip: args.clientIp,
         param: args.purchaseType
           ? JSON.stringify({ purchase_type: args.purchaseType })
@@ -251,6 +251,22 @@ export async function completeOrder(args: {
   }
 
   const finalOrder = updatedOrder as unknown as OrderRecord;
+
+  // 6a. 定制服务订单：不开通会员周期（profiles.plan 不变），
+  //     仅记录 period_end = 支付时间作为履约标记，避免 query 轮询重试开通
+  if (order.plan === CUSTOM_SERVICE_PLAN) {
+    const paidTs = finalOrder.paid_at ?? new Date().toISOString();
+    try {
+      await admin
+        .from("orders")
+        .update({ period_end: paidTs })
+        .eq("out_trade_no", args.outTradeNo);
+      finalOrder.period_end = paidTs;
+    } catch (err) {
+      console.error("[Orders] 定制服务订单 period_end 更新失败:", err);
+    }
+    return { ok: true, order: finalOrder, opened: true };
+  }
 
   // 6. 调用 extend_membership RPC 原子更新 profiles（B1 修复）
   //    数据库内部通过 FOR UPDATE 行锁串行化并发续费
@@ -449,6 +465,9 @@ export async function handleRefundSuccess(args: {
 export async function retryMembershipActivation(order: OrderRecord): Promise<boolean> {
   const admin = getAdminClient();
   if (!admin) return false;
+
+  // 定制服务订单无会员周期可开通，直接视为已处理
+  if (order.plan === CUSTOM_SERVICE_PLAN) return true;
 
   const pricing = PLAN_PRICING[order.plan];
   if (!pricing) return false;

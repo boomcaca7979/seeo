@@ -30,6 +30,7 @@ const MAX_POLL_DURATION = 10 * 60 * 1000; // 最多轮询 10 分钟
 const PLAN_LABELS: Record<string, string> = {
   lite: "Lite 版",
   pro: "专业版",
+  custom: "定制服务",
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -254,6 +255,20 @@ function PendingCard({
   const showQrcode = payType === "qrcode" && payInfo;
   const showRedirect = (payType === "jump" || payType === "html" || payType === "urlscheme") && payInfo;
 
+  // 跳转型支付：自动前往支付页（当前标签页导航，支付完成后经 return_url 回流恢复轮询）
+  useEffect(() => {
+    if (
+      (payType === "jump" || payType === "urlscheme") &&
+      payInfo &&
+      /^https?:\/\//i.test(payInfo)
+    ) {
+      const timer = setTimeout(() => {
+        window.location.href = payInfo;
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [payType, payInfo]);
+
   return (
     <div className="space-y-6">
       {/* 支付信息卡片 */}
@@ -262,7 +277,9 @@ function PendingCard({
           <div>
             <h1 className="font-mono text-lg font-semibold text-ink">等待支付</h1>
             <p className="mt-1 font-sans text-xs text-ink-40">
-              {planLabel} · 30 天会员{channelLabel ? ` · ${channelLabel}` : ""}
+              {planLabel}
+              {planLabel === "定制服务" ? "" : " · 30 天会员"}
+              {channelLabel ? ` · ${channelLabel}` : ""}
             </p>
           </div>
           <span className="badge-info">处理中</span>
@@ -310,7 +327,9 @@ function PendingCard({
               点击前往支付页面
             </a>
             <p className="mt-4 font-mono text-xs text-ink-40">
-              支付完成后返回此页面，系统将自动确认
+              {payType === "jump" || payType === "urlscheme"
+                ? "即将自动跳转支付页面，若未跳转请点击上方按钮"
+                : "支付完成后返回此页面，系统将自动确认"}
             </p>
           </div>
         )}
@@ -389,7 +408,9 @@ function SuccessCard({
 
         <h1 className="mt-5 font-mono text-xl font-semibold text-ink">支付成功</h1>
         <p className="mt-2 font-sans text-sm text-ink-60">
-          {planLabel}会员已开通，感谢你的购买
+          {planLabel === "定制服务"
+            ? "定制服务订单已确认，我们将尽快与你联系安排交付"
+            : `${planLabel}会员已开通，感谢你的购买`}
         </p>
 
         {/* 订单详情 */}

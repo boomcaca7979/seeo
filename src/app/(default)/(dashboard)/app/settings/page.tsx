@@ -285,7 +285,8 @@ function SettingsContent() {
         const res = await fetch("/api/plans", { cache: "no-store" });
         const json = await res.json();
         if (!cancelled && res.ok && Array.isArray(json.data)) {
-          setPlans(json.data as PlanInfo[]);
+          // 定制服务（非会员套餐）不在 Settings 套餐对比中展示，仅在 Pricing 页出售
+          setPlans((json.data as PlanInfo[]).filter((p) => p.plan !== "custom"));
         }
       } catch {
         // ignore
