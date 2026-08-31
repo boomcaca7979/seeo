@@ -258,13 +258,16 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "选择适合你的方案",
-    "subtitle": "从免费开始，随时升级。一次性购买 30 天会员。",
+    "subtitle": "从免费开始，随时升级或取消。",
     "loading": "加载中…",
     "loadFailed": "加载套餐信息失败",
     "networkError": "网络错误，加载套餐失败",
     "noPlans": "暂无套餐信息",
-    "note": "套餐价格与限制统一由 billing 层管理。支付系统升级中，升级/购买功能即将恢复。",
-    "paymentMigrating": "支付系统升级中，暂时无法购买，敬请期待",
+    "note": "套餐价格与限制统一由 billing 层管理。Lite/专业版为按月订阅，定制服务为一次性付费。",
+    "paymentMigrating": "该套餐暂不支持购买",
+    "paymentStarting": "正在跳转支付…",
+    "paymentCreateFailed": "创建支付失败，请稍后重试",
+    "loginRequired": "请先登录后再购买",
     "customService": {
       "features": [
         "一对一 SEO 策略咨询与方案定制",
@@ -284,11 +287,11 @@
       },
       {
         "q": "如何升级套餐？",
-        "a": "点击对应套餐的升级按钮，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。当前支付系统升级中，购买功能即将恢复。"
+        "a": "点击对应套餐的升级按钮，在支付页完成付款，支付确认后权益即开通。Lite/专业版为按月自动续费订阅，可随时取消。"
       },
       {
         "q": "支持哪些支付方式？",
-        "a": "支付系统升级中，正式开通后将在定价页公布支持的支付方式。"
+        "a": "通过 Creem 安全支付，支持主流银行卡/信用卡。"
       },
       {
         "q": "会员到期后会怎样？",
@@ -303,6 +306,23 @@
         "a": "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。"
       }
     ]
+  },
+  "paymentResult": {
+    "pendingTitle": "支付确认中",
+    "pendingDesc": "我们正在等待支付渠道确认，通常几秒内完成，请勿关闭本页…",
+    "paidTitle": "支付成功",
+    "paidDesc": "支付已确认，对应权益已开通。如购买的是订阅套餐，会员周期以渠道实际订阅周期为准。",
+    "failedTitle": "支付未完成",
+    "failedDesc": "支付未成功或已取消，未产生任何扣款影响。可返回定价页重新发起购买。",
+    "refundedTitle": "订单已退款",
+    "refundedDesc": "该订单已完成退款，会员权益已按剩余有效订单重新计算。",
+    "notFoundTitle": "未找到订单",
+    "notFoundDesc": "未找到对应的订单信息，请从定价页重新发起购买。",
+    "orderNo": "订单号",
+    "customService": "定制服务",
+    "backPricing": "返回定价页",
+    "backApp": "进入控制台",
+    "webhookNote": "支付结果以支付渠道回调确认为准，本页状态仅供参考。"
   },
   "featureShared": {
     "eyebrow": "FEATURE",
@@ -2132,6 +2152,12 @@
     "REPORT_NOT_FOUND": "报告不存在",
     "AUDIT_NOT_FOUND": "审计记录不存在",
     "ORDER_NOT_FOUND": "订单不存在",
+    "INVALID_PLAN": "非法的套餐参数",
+    "MISSING_ORDER": "缺少订单号参数",
+    "PAYMENT_NOT_CONFIGURED": "支付通道未配置，请稍后再试",
+    "PURCHASE_NOT_ALLOWED": "当前套餐不支持此购买",
+    "ORDER_CREATE_FAILED": "订单创建失败，请稍后重试",
+    "CREEM_CHECKOUT_FAILED": "创建支付失败，请稍后重试",
     "SETTINGS_NOT_FOUND": "配置不存在",
     "PLAN_REQUIRED": "需要 Pro 套餐权限才能执行该操作",
     "PLAN_DOWNGRADE_NOT_ALLOWED": "当前套餐不支持该购买：Pro 会员不可降级购买 Lite",

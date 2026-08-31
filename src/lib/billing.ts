@@ -7,9 +7,11 @@
 //   - 不可用时 fallback 到 DEFAULT_PLAN_LIMITS（与迁移 SQL 保持一致）
 //   - 用户套餐：profiles.plan / subscription_status / current_period_end
 //
-// 支付模式：一次性购买 30 天会员（非自动续费）
-//   - 支付渠道处于迁移中（原支付渠道已下线，新渠道接入前暂不可购买）
-//   - 支付成功后 profiles.plan 升级、subscription_status=active、current_period_end=+30天
+// 支付模式：Creem（USD）
+//   - Lite / Pro：Creem Monthly 订阅（$1.49 / $4.49 每月），会员周期以 Creem webhook
+//     返回的订阅周期（current_period_end_date）为准，不自建续费扣款
+//   - Custom：一次性支付 $89.99，不开通会员周期
+//   - 历史订单：Yaolipay 时代为 CNY 一次性购买 30 天会员，数据保留不动
 //   - 到期由 cron /api/cron/membership-expire 自动降级 plan=free、subscription_status=expired
 
 import { createServer } from "@/lib/supabase/server";
@@ -83,15 +85,18 @@ export interface PlanDisplayInfo {
   highlighted?: boolean;
 }
 
-// ---------- 一次性购买 30 天会员的服务端权威价格表 ----------
-// 客户端不可传金额；订单服务 / create API 从此表读取
-// 金额以人民币分（CNY cents）为单位，避免浮点误差
+// ---------- Creem（USD）服务端权威价格表 ----------
+// 客户端不可传金额 / Product ID；订单服务 / create API 从此表读取
+// 金额以美分（USD cents）为单位，避免浮点误差
 export interface PlanPricing {
-  /** 人民币分（如 990 = ¥9.90） */
+  /** 美分（如 149 = $1.49） */
   amountCents: number;
-  /** 币种，固定 CNY */
-  currency: "CNY";
-  /** 周期天数（一次性购买 N 天会员；定制服务为 0 = 不开通会员周期） */
+  /** 币种，固定 USD（历史 Yaolipay 订单为 CNY，数据保留） */
+  currency: "USD";
+  /**
+   * 兜底周期天数（Creem 订阅订单实际周期以 webhook 返回的
+   * current_period_end_date 为准；此值仅在缺失渠道周期时防御性使用）
+   */
   periodDays: number;
 }
 
@@ -102,86 +107,14 @@ export type CheckoutPlan = "lite" | "pro" | "custom";
 export const CUSTOM_SERVICE_PLAN = "custom" as const;
 
 export const PLAN_PRICING: Record<CheckoutPlan, PlanPricing> = {
-  lite: { amountCents: 990, currency: "CNY", periodDays: 30 },
-  pro: { amountCents: 2990, currency: "CNY", periodDays: 30 },
-  custom: { amountCents: 64900, currency: "CNY", periodDays: 0 },
+  lite: { amountCents: 149, currency: "USD", periodDays: 30 },
+  pro: { amountCents: 449, currency: "USD", periodDays: 30 },
+  custom: { amountCents: 8999, currency: "USD", periodDays: 0 },
 };
 
-/** 将分转成元字符串（保留 2 位小数），用于支付渠道的 money 参数 */
-export function formatAmountYuan(amountCents: number): string {
-  return (amountCents / 100).toFixed(2);
-}
-
-// ---------- Preview 测试价格开关（严格隔离） ----------
-//
-// 设计目标：
-//   - Production 永远使用 PLAN_PRICING 正常价格
-//   - 仅当 VERCEL_ENV === "preview" 且显式配置测试开关时，才返回测试价格
-//   - 任何条件不满足，一律回退到正常价格
-//   - Production 误配置测试开关时，由 create API 层拒绝创建订单（503）
-//
-// 安全保证：
-//   - 客户端无法控制（无 NEXT_PUBLIC_ 前缀）
-//   - 金额完全由服务端常量 + 环境变量决定
-//   - notify/refund 使用 order.amount（数据库存储值），不受环境变量影响
-//   - development/local 环境不自动启用测试价格
-
-/** 测试价格唯一允许的值（1 cent = ¥0.01） */
-const TEST_PAYMENT_AMOUNT_CENTS_ALLOWED = "1";
-
-/** 判断当前环境是否为 Vercel Preview */
-function isVercelPreviewEnv(): boolean {
-  return (process.env.VERCEL_ENV ?? "").trim() === "preview";
-}
-
-/** 判断是否启用了测试支付开关 */
-function isTestPaymentModeEnabled(): boolean {
-  return (process.env.PAYMENT_TEST_MODE ?? "").trim() === "true";
-}
-
-/** 判断测试金额配置是否合法 */
-function isTestPaymentAmountValid(): boolean {
-  return (process.env.PAYMENT_TEST_AMOUNT_CENTS ?? "").trim() === TEST_PAYMENT_AMOUNT_CENTS_ALLOWED;
-}
-
-/**
- * 判断是否处于"误配置"状态：
- * 启用了测试支付开关（PAYMENT_TEST_MODE=true），但当前环境不是 Vercel Preview。
- *
- * 此状态下 create API 应直接返回 503，拒绝创建任何订单，
- * 防止 Production 误配置导致错误价格订单。
- *
- * 注意：此函数仅用于 create API 的前置拦截，不影响 getEffectivePaymentAmountCents 的返回值。
- */
-export function isTestPaymentMisconfigured(): boolean {
-  return isTestPaymentModeEnabled() && !isVercelPreviewEnv();
-}
-
-/**
- * 获取生效的支付金额（人民币分）
- *
- * 严格隔离逻辑：
- *   1. 仅当 VERCEL_ENV === "preview" 时才考虑测试价格
- *   2. 仅当 PAYMENT_TEST_MODE === "true" 时才考虑测试价格
- *   3. 仅当 PAYMENT_TEST_AMOUNT_CENTS === "1" 时才考虑测试价格
- *   4. 三个条件全满足 → 返回 1（¥0.01）
- *   5. 任何一个不满足 → 返回 PLAN_PRICING[plan].amountCents
- *
- * 注意：
- *   - Production 误配置时，此函数仍返回正常价格（双重保险）
- *   - 误配置的拦截由 isTestPaymentMisconfigured() + create API 负责
- *   - 此函数不修改 PLAN_PRICING 本身
- */
-export function getEffectivePaymentAmountCents(plan: CheckoutPlan): number {
-  if (
-    isVercelPreviewEnv() &&
-    isTestPaymentModeEnabled() &&
-    isTestPaymentAmountValid()
-  ) {
-    return 1;
-  }
-  return PLAN_PRICING[plan].amountCents;
-}
+// 说明：旧 PAYMENT_TEST_MODE / PAYMENT_TEST_AMOUNT_CENTS 测试价格机制
+// 随 Yaolipay 移除一并废弃 —— Creem 测试通过官方 Test Mode
+// （test-api.creem.io + 测试卡）完成，无需价格覆盖。
 
 export const PLAN_DISPLAY_INFO: Record<PlanTier | "custom", PlanDisplayInfo> = {
   free: {
@@ -195,16 +128,16 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier | "custom", PlanDisplayInfo> = {
   lite: {
     name: "Lite 版",
     tagline: "适合个人 SEO 入门",
-    price: "¥9.9",
-    priceUnit: "/30天",
+    price: "$1.49",
+    priceUnit: "/mo",
     ctaLabel: "升级到 Lite",
     checkoutPlan: "lite",
   },
   pro: {
     name: "专业版",
     tagline: "适合专业 SEO 从业者",
-    price: "¥29.9",
-    priceUnit: "/30天",
+    price: "$4.49",
+    priceUnit: "/mo",
     ctaLabel: "升级到 Pro",
     checkoutPlan: "pro",
     highlighted: true,
@@ -212,8 +145,8 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier | "custom", PlanDisplayInfo> = {
   custom: {
     name: "定制服务",
     tagline: "一对一 SEO 定制服务，按需求交付",
-    price: "¥649",
-    priceUnit: "/次",
+    price: "$89.99",
+    priceUnit: " one-time",
     ctaLabel: "购买定制服务",
     checkoutPlan: "custom",
   },

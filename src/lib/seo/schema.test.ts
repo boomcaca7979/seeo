@@ -69,7 +69,7 @@ describe("softwareApplicationSchema", () => {
     expect(s.operatingSystem).toBe("Web");
   });
 
-  it("offers 价格与 PLAN_PRICING 单一来源一致（¥0 / ¥9.90 / ¥29.90）", () => {
+  it("offers 价格与 PLAN_PRICING 单一来源一致（$0 / $1.49 / $4.49，USD）", () => {
     const s = softwareApplicationSchema();
     const offers = s.offers as Array<Record<string, unknown>>;
     expect(offers).toHaveLength(3);
@@ -82,7 +82,7 @@ describe("softwareApplicationSchema", () => {
       (PLAN_PRICING.pro.amountCents / 100).toFixed(2)
     );
     offers.forEach((o) => {
-      expect(o.priceCurrency).toBe("CNY");
+      expect(o.priceCurrency).toBe("USD");
       // Phase 5：offers url 随 locale（默认 zh → /zh/pricing；en → /pricing）
       expect(o.url).toBe(`${SITE_URL}/zh/pricing`);
     });

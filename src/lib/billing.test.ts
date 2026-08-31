@@ -1,142 +1,38 @@
 // ===== Billing 商业化回归测试 =====
-// 覆盖：PLAN_PRICING 价格表、Preview 测试价格隔离、误配置拦截、金额格式化
+// 覆盖：PLAN_PRICING 价格表（Creem USD）、订阅有效性、套餐购买规则
 //
-// 安全目标：
-//   - Production 永远不会进入测试金额
-//   - 测试金额仅在三重条件（preview + 开关 + 合法值）全满足时生效
+// 说明：旧 PAYMENT_TEST_MODE / 测试价格机制已随 Yaolipay 移除废弃，
+// Creem 测试通过官方 Test Mode（test-api.creem.io + 测试卡）完成，
+// 无需本地价格覆盖，相关测试一并删除。
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 
-describe("PLAN_PRICING 服务端权威价格表", () => {
-  it("lite：990 分 / 30 天 / CNY", async () => {
+describe("PLAN_PRICING 服务端权威价格表（Creem USD）", () => {
+  it("lite：149 分（$1.49）/ 30 天兜底 / USD", async () => {
     const { PLAN_PRICING } = await import("@/lib/billing");
     expect(PLAN_PRICING.lite).toEqual({
-      amountCents: 990,
-      currency: "CNY",
+      amountCents: 149,
+      currency: "USD",
       periodDays: 30,
     });
   });
 
-  it("pro：2990 分 / 30 天 / CNY", async () => {
+  it("pro：449 分（$4.49）/ 30 天兜底 / USD", async () => {
     const { PLAN_PRICING } = await import("@/lib/billing");
     expect(PLAN_PRICING.pro).toEqual({
-      amountCents: 2990,
-      currency: "CNY",
+      amountCents: 449,
+      currency: "USD",
       periodDays: 30,
     });
   });
-});
 
-describe("getEffectivePaymentAmountCents 测试金额隔离", () => {
-  const ENV_KEYS = ["VERCEL_ENV", "PAYMENT_TEST_MODE", "PAYMENT_TEST_AMOUNT_CENTS"] as const;
-  let saved: Record<string, string | undefined>;
-
-  beforeEach(() => {
-    saved = {};
-    for (const k of ENV_KEYS) {
-      saved[k] = process.env[k];
-      delete process.env[k];
-    }
-  });
-
-  afterEach(() => {
-    for (const k of ENV_KEYS) {
-      if (saved[k] === undefined) delete process.env[k];
-      else process.env[k] = saved[k];
-    }
-  });
-
-  it("Production：即使误配置全部测试开关，也返回正常价格", async () => {
-    process.env.VERCEL_ENV = "production";
-    process.env.PAYMENT_TEST_MODE = "true";
-    process.env.PAYMENT_TEST_AMOUNT_CENTS = "1";
-    const { getEffectivePaymentAmountCents } = await import("@/lib/billing");
-    expect(getEffectivePaymentAmountCents("lite")).toBe(990);
-    expect(getEffectivePaymentAmountCents("pro")).toBe(2990);
-  });
-
-  it("Preview + 测试开关 + 合法金额 → 返回 1 分（¥0.01）", async () => {
-    process.env.VERCEL_ENV = "preview";
-    process.env.PAYMENT_TEST_MODE = "true";
-    process.env.PAYMENT_TEST_AMOUNT_CENTS = "1";
-    const { getEffectivePaymentAmountCents } = await import("@/lib/billing");
-    expect(getEffectivePaymentAmountCents("lite")).toBe(1);
-    expect(getEffectivePaymentAmountCents("pro")).toBe(1);
-  });
-
-  it("Preview 但未开启测试开关 → 正常价格", async () => {
-    process.env.VERCEL_ENV = "preview";
-    const { getEffectivePaymentAmountCents } = await import("@/lib/billing");
-    expect(getEffectivePaymentAmountCents("lite")).toBe(990);
-    expect(getEffectivePaymentAmountCents("pro")).toBe(2990);
-  });
-
-  it("Preview + 开关但测试金额非法（非 1）→ 正常价格", async () => {
-    process.env.VERCEL_ENV = "preview";
-    process.env.PAYMENT_TEST_MODE = "true";
-    process.env.PAYMENT_TEST_AMOUNT_CENTS = "100"; // 非法：只允许 1
-    const { getEffectivePaymentAmountCents } = await import("@/lib/billing");
-    expect(getEffectivePaymentAmountCents("lite")).toBe(990);
-    expect(getEffectivePaymentAmountCents("pro")).toBe(2990);
-  });
-
-  it("development/local：不自动启用测试价格", async () => {
-    process.env.VERCEL_ENV = "development";
-    process.env.PAYMENT_TEST_MODE = "true";
-    process.env.PAYMENT_TEST_AMOUNT_CENTS = "1";
-    const { getEffectivePaymentAmountCents } = await import("@/lib/billing");
-    expect(getEffectivePaymentAmountCents("lite")).toBe(990);
-    expect(getEffectivePaymentAmountCents("pro")).toBe(2990);
-  });
-});
-
-describe("isTestPaymentMisconfigured 误配置拦截", () => {
-  const ENV_KEYS = ["VERCEL_ENV", "PAYMENT_TEST_MODE"] as const;
-  let saved: Record<string, string | undefined>;
-
-  beforeEach(() => {
-    saved = {};
-    for (const k of ENV_KEYS) {
-      saved[k] = process.env[k];
-      delete process.env[k];
-    }
-  });
-
-  afterEach(() => {
-    for (const k of ENV_KEYS) {
-      if (saved[k] === undefined) delete process.env[k];
-      else process.env[k] = saved[k];
-    }
-  });
-
-  it("Production 误开启测试开关 → 判定为误配置（create API 应 503 拒单）", async () => {
-    process.env.VERCEL_ENV = "production";
-    process.env.PAYMENT_TEST_MODE = "true";
-    const { isTestPaymentMisconfigured } = await import("@/lib/billing");
-    expect(isTestPaymentMisconfigured()).toBe(true);
-  });
-
-  it("Preview 开启测试开关 → 不是误配置", async () => {
-    process.env.VERCEL_ENV = "preview";
-    process.env.PAYMENT_TEST_MODE = "true";
-    const { isTestPaymentMisconfigured } = await import("@/lib/billing");
-    expect(isTestPaymentMisconfigured()).toBe(false);
-  });
-
-  it("未开启测试开关 → 永远不是误配置", async () => {
-    process.env.VERCEL_ENV = "production";
-    delete process.env.PAYMENT_TEST_MODE;
-    const { isTestPaymentMisconfigured } = await import("@/lib/billing");
-    expect(isTestPaymentMisconfigured()).toBe(false);
-  });
-});
-
-describe("formatAmountYuan 金额格式化", () => {
-  it("分转元，保留 2 位小数", async () => {
-    const { formatAmountYuan } = await import("@/lib/billing");
-    expect(formatAmountYuan(990)).toBe("9.90");
-    expect(formatAmountYuan(2990)).toBe("29.90");
-    expect(formatAmountYuan(1)).toBe("0.01");
+  it("custom：8999 分（$89.99）/ 一次性（periodDays=0）/ USD", async () => {
+    const { PLAN_PRICING } = await import("@/lib/billing");
+    expect(PLAN_PRICING.custom).toEqual({
+      amountCents: 8999,
+      currency: "USD",
+      periodDays: 0,
+    });
   });
 });
 
@@ -162,7 +58,7 @@ describe("isSubscriptionActive 订阅有效性", () => {
   });
 });
 
-describe("canPurchasePlan 套餐购买规则（CASE 1-6）", () => {
+describe("canPurchasePlan 套餐购买规则（CASE 1-7）", () => {
   it("CASE 1: free → lite 允许，类型 PURCHASE", async () => {
     const { canPurchasePlan } = await import("@/lib/billing");
     expect(canPurchasePlan("free", "lite")).toEqual({
@@ -209,5 +105,17 @@ describe("canPurchasePlan 套餐购买规则（CASE 1-6）", () => {
     expect(result.allowed).toBe(false);
     expect(result.errorCode).toBe("PLAN_DOWNGRADE_NOT_ALLOWED");
     expect(result.purchaseType).toBeUndefined();
+  });
+
+  it("CASE 7: 任意套餐（含 pro）→ custom 均允许（一次性服务）", async () => {
+    const { canPurchasePlan } = await import("@/lib/billing");
+    expect(canPurchasePlan("free", "custom")).toEqual({
+      allowed: true,
+      purchaseType: "PURCHASE",
+    });
+    expect(canPurchasePlan("pro", "custom")).toEqual({
+      allowed: true,
+      purchaseType: "PURCHASE",
+    });
   });
 });

@@ -58,14 +58,14 @@ export function websiteSchema(locale?: "en" | "zh") {
 
 /**
  * SoftwareApplication：SeeO 以 SaaS Web 应用形式呈现
- * offers 与 PLAN_PRICING 保持单一数据源（免费版 ¥0 + Lite/Pro 30 天一次性购买）
+ * offers 与 PLAN_PRICING 保持单一数据源（免费版 $0 + Lite/Pro 按月订阅，USD）
  * locale：en/zh 输出对应语言的 name/description（价格仍来自 PLAN_PRICING）
  */
 export function softwareApplicationSchema(locale: "en" | "zh" = "zh") {
   const text = APP_TEXT[locale];
   const priceOf = (key: "free" | "lite" | "pro") =>
     key === "free"
-      ? { price: "0", priceCurrency: "CNY" }
+      ? { price: "0", priceCurrency: "USD" }
       : {
           price: (PLAN_PRICING[key].amountCents / 100).toFixed(2),
           priceCurrency: PLAN_PRICING[key].currency,

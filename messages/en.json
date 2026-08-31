@@ -258,13 +258,16 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "Choose the plan that fits",
-    "subtitle": "Start free, upgrade anytime. One-time purchase for a 30-day membership.",
+    "subtitle": "Start free, upgrade or cancel anytime.",
     "loading": "Loading…",
     "loadFailed": "Failed to load plans",
     "networkError": "Network error, failed to load plans",
     "noPlans": "No plan information available",
-    "note": "Prices and limits are managed centrally by the billing layer. Our payment system is being upgraded — purchasing will be back soon.",
-    "paymentMigrating": "Our payment system is being upgraded. Purchasing is temporarily unavailable — check back soon.",
+    "note": "Prices and limits are managed centrally by the billing layer. Lite/Pro are monthly subscriptions; the custom service is a one-time payment.",
+    "paymentMigrating": "This plan is not available for purchase yet",
+    "paymentStarting": "Redirecting to checkout…",
+    "paymentCreateFailed": "Failed to start payment, please try again later",
+    "loginRequired": "Please sign in first to purchase",
     "customService": {
       "features": [
         "One-on-one SEO strategy consulting",
@@ -284,11 +287,11 @@
       },
       {
         "q": "How do I upgrade?",
-        "a": "Click the upgrade button on the plan you want, and your benefits take effect immediately after payment. Membership is a one-time 30-day purchase; when it expires, your account automatically returns to the Free plan. Our payment system is currently being upgraded — purchasing will be back soon."
+        "a": "Click the upgrade button on the plan you want, complete the payment on the checkout page, and your benefits take effect once the payment is confirmed. Lite and Pro are monthly subscriptions that renew automatically and can be cancelled anytime."
       },
       {
         "q": "Which payment methods are supported?",
-        "a": "Our payment system is being upgraded. Supported payment methods will be announced on the pricing page once available."
+        "a": "Payments are securely processed by Creem, supporting major credit and debit cards."
       },
       {
         "q": "What happens when my membership expires?",
@@ -303,6 +306,23 @@
         "a": "Production uses a Turso cloud database, with user authentication provided by Supabase Auth. Each user's data is isolated."
       }
     ]
+  },
+  "paymentResult": {
+    "pendingTitle": "Confirming your payment",
+    "pendingDesc": "We are waiting for confirmation from the payment provider. This usually takes a few seconds — please keep this page open…",
+    "paidTitle": "Payment successful",
+    "paidDesc": "Your payment has been confirmed and the benefits are now active. For subscription plans, the membership period follows the provider's actual billing cycle.",
+    "failedTitle": "Payment not completed",
+    "failedDesc": "The payment was not completed or was cancelled. You can return to the pricing page and try again.",
+    "refundedTitle": "Order refunded",
+    "refundedDesc": "This order has been refunded, and your membership has been recalculated based on remaining valid orders.",
+    "notFoundTitle": "Order not found",
+    "notFoundDesc": "No matching order was found. Please start a new purchase from the pricing page.",
+    "orderNo": "Order No.",
+    "customService": "Custom Service",
+    "backPricing": "Back to pricing",
+    "backApp": "Go to dashboard",
+    "webhookNote": "Payment results are confirmed by provider webhooks; this page is for reference only."
   },
   "featureShared": {
     "eyebrow": "FEATURE",
@@ -2152,6 +2172,12 @@
     "REPORT_NOT_FOUND": "Report not found.",
     "AUDIT_NOT_FOUND": "Audit record not found.",
     "ORDER_NOT_FOUND": "Order not found.",
+    "INVALID_PLAN": "Invalid plan parameter.",
+    "MISSING_ORDER": "Missing order number parameter.",
+    "PAYMENT_NOT_CONFIGURED": "The payment provider is not configured. Please try again later.",
+    "PURCHASE_NOT_ALLOWED": "Your current plan does not allow this purchase.",
+    "ORDER_CREATE_FAILED": "Failed to create the order. Please try again later.",
+    "CREEM_CHECKOUT_FAILED": "Failed to start payment. Please try again later.",
     "SETTINGS_NOT_FOUND": "Settings not found.",
     "PLAN_REQUIRED": "This action requires the Pro plan.",
     "PLAN_DOWNGRADE_NOT_ALLOWED": "Your current plan does not allow this purchase: Pro members cannot downgrade to Lite.",

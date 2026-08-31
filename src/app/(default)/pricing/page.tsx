@@ -101,6 +101,8 @@ function PricingContent() {
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 正在创建支付订单的 plan key（防止重复提交）
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
   // 当前用户套餐：undefined = 加载中；null = 未登录（anonymous/free）
   // 401 视为未登录，不是系统错误
@@ -149,10 +151,37 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, [t]);
 
-  // 支付系统迁移中（原支付渠道已下线，新渠道接入前暂不可购买）
-  // 点击购买按钮仅提示，不进入任何支付流程
-  function handleCheckoutClick() {
-    show(t("pricing.paymentMigrating"), "info");
+  // 发起 Creem Checkout：
+  // POST /api/payment/creem/create → 服务端创建 pending 订单 + Creem checkout → 跳转支付
+  // 前端不传金额 / Product ID，仅传 plan key；支付结果以 Creem webhook 为准
+  async function handleCheckoutClick(plan?: "lite" | "pro" | "custom") {
+    if (!plan) {
+      show(t("pricing.paymentMigrating"), "info");
+      return;
+    }
+    if (purchasing) return;
+    setPurchasing(plan);
+    try {
+      const res = await fetch("/api/payment/creem/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      if (res.status === 401) {
+        show(t("pricing.loginRequired"), "info");
+        return;
+      }
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.data?.checkoutUrl) {
+        window.location.assign(json.data.checkoutUrl as string);
+        return; // 跳转后组件卸载，无需复位 purchasing
+      }
+      show(json?.error ?? t("pricing.paymentCreateFailed"), "error");
+    } catch {
+      show(t("pricing.paymentCreateFailed"), "error");
+    } finally {
+      setPurchasing(null);
+    }
   }
 
   return (
@@ -210,11 +239,13 @@ function PricingContent() {
                       ))}
                     </ul>
                     <button
-                      onClick={handleCheckoutClick}
-                      disabled={card.disabled}
+                      onClick={() => void handleCheckoutClick(p.display.checkoutPlan)}
+                      disabled={card.disabled || purchasing !== null}
                       className="btn-secondary block w-full h-10 text-center"
                     >
-                      {card.ctaLabel}
+                      {purchasing === p.display.checkoutPlan
+                        ? t("pricing.paymentStarting")
+                        : card.ctaLabel}
                     </button>
                   </div>
                 );
@@ -298,13 +329,15 @@ function PricingContent() {
                     </Link>
                   ) : (
                     <button
-                      onClick={handleCheckoutClick}
-                      disabled={card.disabled}
+                      onClick={() => void handleCheckoutClick(card.checkoutPlan ?? p.display.checkoutPlan)}
+                      disabled={card.disabled || purchasing !== null}
                       className={`block w-full h-10 text-center ${
                         card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
                       }`}
                     >
-                      {card.ctaLabel}
+                      {purchasing === (card.checkoutPlan ?? p.display.checkoutPlan)
+                        ? t("pricing.paymentStarting")
+                        : card.ctaLabel}
                     </button>
                   )}
                 </div>
