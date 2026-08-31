@@ -7,7 +7,8 @@
 //   - 不可用时 fallback 到 DEFAULT_PLAN_LIMITS（与迁移 SQL 保持一致）
 //   - 用户套餐：profiles.plan / subscription_status / current_period_end
 //
-// 支付模式：耀立支付 V2 一次性购买 30 天会员（非自动续费）
+// 支付模式：一次性购买 30 天会员（非自动续费）
+//   - 支付渠道处于迁移中（原支付渠道已下线，新渠道接入前暂不可购买）
 //   - 支付成功后 profiles.plan 升级、subscription_status=active、current_period_end=+30天
 //   - 到期由 cron /api/cron/membership-expire 自动降级 plan=free、subscription_status=expired
 
@@ -75,7 +76,7 @@ export interface PlanDisplayInfo {
   price: string;
   priceUnit: string;
   ctaLabel: string;
-  /** 走 /api/payment/yaolipay/create 的 plan key；undefined 表示不走支付 */
+  /** 可购买的 plan key（支付链路标识）；undefined 表示不走支付 */
   checkoutPlan?: CheckoutPlan;
   /** 非支付的跳转地址（如 free → /app） */
   ctaHref?: string;
@@ -106,7 +107,7 @@ export const PLAN_PRICING: Record<CheckoutPlan, PlanPricing> = {
   custom: { amountCents: 64900, currency: "CNY", periodDays: 0 },
 };
 
-/** 将分转成元字符串（保留 2 位小数），用于传给耀立接口的 money 参数 */
+/** 将分转成元字符串（保留 2 位小数），用于支付渠道的 money 参数 */
 export function formatAmountYuan(amountCents: number): string {
   return (amountCents / 100).toFixed(2);
 }

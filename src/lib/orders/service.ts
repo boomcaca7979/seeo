@@ -1,12 +1,17 @@
 // ===== 订单服务层 =====
 // 统一处理订单的创建、完成、退款逻辑
 // 所有"支付成功后开通会员"的逻辑都通过 completeOrder 完成
-// notify / query 都调用同一个 completeOrder，避免逻辑差异
+// 支付回调 / 订单查询均调用同一个 completeOrder，避免逻辑差异
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { PLAN_PRICING, formatAmountYuan, getEffectivePaymentAmountCents, CUSTOM_SERVICE_PLAN, type PurchaseType, type CheckoutPlan } from "@/lib/billing";
 import type { PlanTier } from "@/lib/auth";
-import type { PaymentChannel, OrderStatus } from "@/lib/yaolipay/types";
+
+/** 订单支付方式（orders.payment_channel 历史数据值） */
+export type PaymentChannel = "alipay" | "wxpay";
+
+/** 订单支付状态（orders.payment_status） */
+export type OrderStatus = "pending" | "paid" | "failed" | "refunded";
 
 /** 订单记录（与 0008_orders_table.sql 一一对应；0012 迁移后 plan 增加 custom） */
 export interface OrderRecord {
@@ -52,7 +57,7 @@ export function generateOutTradeNo(): string {
 
 /**
  * 创建本地 pending 订单
- * 在调用耀立 createOrder 之前先创建本地订单
+ * 在调用支付渠道下单接口之前先创建本地订单
  * purchaseType 写入 param 字段（JSON），复用现有列，不改变表结构
  */
 export async function createPendingOrder(args: {

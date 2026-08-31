@@ -258,12 +258,13 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "选择适合你的方案",
-    "subtitle": "从免费开始，随时升级。一次性购买 30 天会员，支持支付宝 / 微信支付。",
+    "subtitle": "从免费开始，随时升级。一次性购买 30 天会员。",
     "loading": "加载中…",
     "loadFailed": "加载套餐信息失败",
     "networkError": "网络错误，加载套餐失败",
     "noPlans": "暂无套餐信息",
-    "note": "套餐价格与限制统一由 billing 层管理。支付由耀立支付聚合支付服务处理，支持支付宝与微信支付。",
+    "note": "套餐价格与限制统一由 billing 层管理。支付系统升级中，升级/购买功能即将恢复。",
+    "paymentMigrating": "支付系统升级中，暂时无法购买，敬请期待",
     "customService": {
       "features": [
         "一对一 SEO 策略咨询与方案定制",
@@ -276,9 +277,6 @@
     "faqEyebrow": "FAQ",
     "backHome": "← 返回首页",
     "cancelToast": "支付已取消，套餐未发生变化",
-    "createFailed": "创建订单失败，请稍后重试",
-    "noPayInfo": "未收到支付信息",
-    "networkRetry": "网络错误，请稍后重试",
     "faqs": [
       {
         "q": "免费版有使用期限吗？",
@@ -286,11 +284,11 @@
       },
       {
         "q": "如何升级套餐？",
-        "a": "点击对应套餐的升级按钮，选择支付宝或微信支付，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。"
+        "a": "点击对应套餐的升级按钮，完成支付后权益立即生效。一次性购买 30 天会员，到期后自动恢复为免费版。当前支付系统升级中，购买功能即将恢复。"
       },
       {
         "q": "支持哪些支付方式？",
-        "a": "目前支持支付宝和微信支付两种方式，由耀立支付提供聚合支付技术服务。"
+        "a": "支付系统升级中，正式开通后将在定价页公布支持的支付方式。"
       },
       {
         "q": "会员到期后会怎样？",
@@ -305,16 +303,6 @@
         "a": "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。"
       }
     ]
-  },
-  "paymentModal": {
-    "title": "选择支付方式",
-    "subtitle": "{plan} · 30 天会员",
-    "close": "关闭",
-    "alipay": "支付宝",
-    "alipayDesc": "跳转支付宝完成支付",
-    "wxpay": "微信支付",
-    "wxpayDesc": "扫码或跳转微信完成支付",
-    "creating": "正在创建订单…"
   },
   "featureShared": {
     "eyebrow": "FEATURE",
@@ -2122,10 +2110,6 @@
     "KEYWORD_REQUIRED": "关键词不能为空",
     "DEVICE_INVALID": "device 必须是 PC 或 移动端",
     "EMAIL_INVALID": "邮箱格式不正确",
-    "PLAN_PARAM_INVALID": "plan 必须是 lite、pro 或 custom",
-    "PAYMENT_CHANNEL_INVALID": "payment_channel 必须是 alipay 或 wxpay",
-    "OUT_TRADE_NO_REQUIRED": "out_trade_no 必填",
-    "MONEY_INVALID": "money 必须为正数",
     "AUTOMATION_TYPE_INVALID": "type 必须是 daily_refresh 或 weekly_report",
     "REPORT_TYPE_INVALID": "type 必须是 ranking/audit/content/weekly",
     "TITLE_REQUIRED": "title 不能为空",
@@ -2151,7 +2135,6 @@
     "SETTINGS_NOT_FOUND": "配置不存在",
     "PLAN_REQUIRED": "需要 Pro 套餐权限才能执行该操作",
     "PLAN_DOWNGRADE_NOT_ALLOWED": "当前套餐不支持该购买：Pro 会员不可降级购买 Lite",
-    "PLAN_PRICE_NOT_CONFIGURED": "套餐价格未配置",
     "AUDIT_RATE_LIMITED": "今日审计次数已达上限，请稍后再试",
     "AUDIT_COOLDOWN": "该域名审计冷却中（同模式 1 小时内仅允许一次，可切另一种模式或稍后再试）",
     "AUDIT_IN_PROGRESS": "该域名审计正在进行中，请等待完成",
@@ -2167,16 +2150,6 @@
     "KEYWORD_GROUP_LIMIT_REACHED": "当前套餐（{plan}）关键词分组上限为 {limit}，请升级套餐",
     "UPSTREAM_ERROR": "服务器内部错误，请稍后再试",
     "DATAFORSEO_NOT_CONFIGURED": "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）",
-    "YAOLIPAY_NOT_CONFIGURED": "支付网关配置缺失，请联系管理员",
-    "PAYMENT_CREATE_FAILED": "创建本地订单失败",
-    "PAYMENT_SIGN_FAILED": "生成支付签名失败，请联系管理员",
-    "PAYMENT_FAILED": "支付请求失败，请稍后再试",
-    "REFUND_FAILED": "退款请求失败，请稍后再试",
-    "PAYMENT_DEMO_DISABLED": "演示模式下不支持支付，请在生产环境开启鉴权后使用",
-    "PAYMENT_TEST_MODE_FORBIDDEN": "测试支付开关在非 Preview 环境启用，已拒绝创建订单",
-    "REFUND_DEMO_DISABLED": "演示模式下不支持退款",
-    "REFUND_NOT_ALLOWED": "订单当前状态不可退款",
-    "REFUND_AMOUNT_EXCEEDED": "退款金额不能超过订单金额",
     "RESEND_NOT_CONFIGURED": "邮件功能未配置：缺少 RESEND_API_KEY 环境变量",
     "SEND_FAILED": "发送失败",
     "ADMIN_CLIENT_UNAVAILABLE": "admin client 不可用",

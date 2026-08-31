@@ -7,7 +7,7 @@ import { breadcrumbSchema } from "@/lib/seo/schema";
 
 // ===== /refund 内容组件（en: /refund · zh: /zh/refund）=====
 // 文案走 messages（refundPage），与当前 payment 实际行为对齐：
-//   - 退款经耀立退款 API 原路退回，仅限本人 paid 订单（api/payment/yaolipay/refund）
+//   - 原支付渠道已下线，历史订单退款需人工处理（联系渠道以页面公示为准）
 //   - 已移除与实际规则冲突的"消耗超 50 次不退 / 生成超 5 份报告不退"条款
 //   - 联系邮箱未定案：以"待公布"占位，不虚构邮箱
 

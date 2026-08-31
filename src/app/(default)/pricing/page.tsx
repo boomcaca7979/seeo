@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { handleBillingError } from "@/lib/billing-error-client";
 import { useToast } from "@/components/dashboard/Toast";
 import { getPlanCardState } from "@/lib/pricing-plan-state";
 
@@ -41,8 +40,6 @@ interface PlanInfo {
   can_export_excel: boolean;
   can_email_report: boolean;
 }
-
-type PaymentChannel = "alipay" | "wxpay";
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
@@ -100,15 +97,10 @@ function PricingContent() {
     ];
   };
 
-  const router = useRouter();
   const { show, Toast } = useToast();
   const [plans, setPlans] = useState<PlanInfo[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // 支付方式选择弹窗
-  const [selectedPlan, setSelectedPlan] = useState<"lite" | "pro" | "custom" | null>(null);
-  const [creating, setCreating] = useState(false);
 
   // 当前用户套餐：undefined = 加载中；null = 未登录（anonymous/free）
   // 401 视为未登录，不是系统错误
@@ -157,67 +149,10 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, [t]);
 
-  // 创建支付订单（客户端表单直提模式）
-  // 服务端创建本地 pending 订单并返回 RSA 已签名支付参数，
-  // 浏览器构建隐藏表单 POST 到耀立 submit.php（当前页 navigation，非 popup）
-  async function handleCreatePayment(plan: "lite" | "pro" | "custom", channel: PaymentChannel) {
-    setCreating(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch("/api/payment/yaolipay/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, payment_channel: channel }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        const { message } = handleBillingError(json, t("pricing.createFailed"));
-        show(message, "error");
-        return;
-      }
-
-      const data = json.data;
-      if (!data) {
-        setErrorMsg(t("pricing.noPayInfo"));
-        return;
-      }
-
-      // 客户端表单直提模式：提交服务端已签名参数到耀立 submit.php
-      if (data.pay_mode === "form_submit" && data.submit_url && data.params) {
-        const form = document.createElement("form");
-        form.action = data.submit_url as string;
-        form.method = (data.submit_method as string) ?? "POST";
-        form.style.display = "none";
-        for (const [key, value] of Object.entries(data.params as Record<string, string>)) {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        }
-        document.body.appendChild(form);
-        // 当前页 navigation 到耀立收银台（支付完成后经 return_url 回流）
-        form.submit();
-        return;
-      }
-
-      // 兼容旧响应（pay_type/pay_info）：跳转支付结果页处理展示与轮询
-      const payType = data.pay_type as string | null;
-      const payInfo = data.pay_info as string | null;
-      const outTradeNo = data.out_trade_no as string;
-
-      const params = new URLSearchParams({
-        order: outTradeNo,
-        pay_type: payType ?? "",
-        channel,
-      });
-      if (payInfo) params.set("pay_info", payInfo);
-      router.push(`/payment/result?${params.toString()}`);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : t("pricing.networkRetry"));
-    } finally {
-      setCreating(false);
-    }
+  // 支付系统迁移中（原支付渠道已下线，新渠道接入前暂不可购买）
+  // 点击购买按钮仅提示，不进入任何支付流程
+  function handleCheckoutClick() {
+    show(t("pricing.paymentMigrating"), "info");
   }
 
   return (
@@ -275,7 +210,7 @@ function PricingContent() {
                       ))}
                     </ul>
                     <button
-                      onClick={() => card.checkoutPlan && setSelectedPlan(card.checkoutPlan)}
+                      onClick={handleCheckoutClick}
                       disabled={card.disabled}
                       className="btn-secondary block w-full h-10 text-center"
                     >
@@ -363,7 +298,7 @@ function PricingContent() {
                     </Link>
                   ) : (
                     <button
-                      onClick={() => card.checkoutPlan && setSelectedPlan(card.checkoutPlan)}
+                      onClick={handleCheckoutClick}
                       disabled={card.disabled}
                       className={`block w-full h-10 text-center ${
                         card.badge || p.display.highlighted ? "btn-primary" : "btn-secondary"
@@ -427,107 +362,8 @@ function PricingContent() {
         </div>
       </div>
 
-      {/* 支付方式选择弹窗 */}
-      {selectedPlan && (
-        <PaymentChannelModal
-          plan={selectedPlan}
-          loading={creating}
-          onClose={() => setSelectedPlan(null)}
-          onSelect={(channel) => handleCreatePayment(selectedPlan, channel)}
-        />
-      )}
-
       <Footer />
       <Toast />
-    </div>
-  );
-}
-
-// ===== 支付方式选择弹窗 =====
-function PaymentChannelModal({
-  plan,
-  loading,
-  onClose,
-  onSelect,
-}: {
-  plan: "lite" | "pro" | "custom";
-  loading: boolean;
-  onClose: () => void;
-  onSelect: (channel: PaymentChannel) => void;
-}) {
-  const t = useTranslations("paymentModal");
-  const tp = useTranslations("plans");
-  const planLabel =
-    plan === "lite"
-      ? tp("lite.name")
-      : plan === "pro"
-        ? tp("pro.name")
-        : tp("custom.name");
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-lg border border-line bg-card p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <h3 className="font-display text-lg font-semibold text-ink">{t("title")}</h3>
-            <p className="mt-1 font-mono text-xs text-ink-40">
-              {t("subtitle", { plan: planLabel })}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
-            aria-label={t("close")}
-            disabled={loading}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <button
-            onClick={() => onSelect("alipay")}
-            disabled={loading}
-            className="flex w-full items-center gap-3 rounded-lg border border-line p-4 text-left transition-colors hover:border-brand hover:bg-brand/5 disabled:opacity-50"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded bg-[#1677FF] text-white">
-              <span className="font-mono text-xs">支</span>
-            </div>
-            <div>
-              <div className="font-display text-sm font-semibold text-ink">{t("alipay")}</div>
-              <div className="font-sans text-xs text-ink-40">{t("alipayDesc")}</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => onSelect("wxpay")}
-            disabled={loading}
-            className="flex w-full items-center gap-3 rounded-lg border border-line p-4 text-left transition-colors hover:border-brand hover:bg-brand/5 disabled:opacity-50"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded bg-[#09BB07] text-white">
-              <span className="font-mono text-xs">微</span>
-            </div>
-            <div>
-              <div className="font-display text-sm font-semibold text-ink">{t("wxpay")}</div>
-              <div className="font-sans text-xs text-ink-40">{t("wxpayDesc")}</div>
-            </div>
-          </button>
-        </div>
-
-        {loading && (
-          <div className="mt-4 text-center font-mono text-xs text-ink-40">
-            {t("creating")}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

@@ -258,12 +258,13 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "Choose the plan that fits",
-    "subtitle": "Start free, upgrade anytime. One-time purchase for a 30-day membership. Alipay / WeChat Pay supported.",
+    "subtitle": "Start free, upgrade anytime. One-time purchase for a 30-day membership.",
     "loading": "Loading…",
     "loadFailed": "Failed to load plans",
     "networkError": "Network error, failed to load plans",
     "noPlans": "No plan information available",
-    "note": "Prices and limits are managed centrally by the billing layer. Payments are processed by the YaoLi Pay aggregated payment service, supporting Alipay and WeChat Pay.",
+    "note": "Prices and limits are managed centrally by the billing layer. Our payment system is being upgraded — purchasing will be back soon.",
+    "paymentMigrating": "Our payment system is being upgraded. Purchasing is temporarily unavailable — check back soon.",
     "customService": {
       "features": [
         "One-on-one SEO strategy consulting",
@@ -276,9 +277,6 @@
     "faqEyebrow": "FAQ",
     "backHome": "← Back to home",
     "cancelToast": "Payment cancelled — your plan remains unchanged",
-    "createFailed": "Failed to create order, please try again later",
-    "noPayInfo": "No payment information received",
-    "networkRetry": "Network error, please try again later",
     "faqs": [
       {
         "q": "Does the Free plan expire?",
@@ -286,11 +284,11 @@
       },
       {
         "q": "How do I upgrade?",
-        "a": "Click the upgrade button on the plan you want, choose Alipay or WeChat Pay, and your benefits take effect immediately after payment. Membership is a one-time 30-day purchase; when it expires, your account automatically returns to the Free plan."
+        "a": "Click the upgrade button on the plan you want, and your benefits take effect immediately after payment. Membership is a one-time 30-day purchase; when it expires, your account automatically returns to the Free plan. Our payment system is currently being upgraded — purchasing will be back soon."
       },
       {
         "q": "Which payment methods are supported?",
-        "a": "Alipay and WeChat Pay, provided as aggregated payment services by YaoLi Pay."
+        "a": "Our payment system is being upgraded. Supported payment methods will be announced on the pricing page once available."
       },
       {
         "q": "What happens when my membership expires?",
@@ -305,16 +303,6 @@
         "a": "Production uses a Turso cloud database, with user authentication provided by Supabase Auth. Each user's data is isolated."
       }
     ]
-  },
-  "paymentModal": {
-    "title": "Choose a payment method",
-    "subtitle": "{plan} · 30-day membership",
-    "close": "Close",
-    "alipay": "Alipay",
-    "alipayDesc": "Opens Alipay to complete payment",
-    "wxpay": "WeChat Pay",
-    "wxpayDesc": "Scan the QR code or pay in WeChat",
-    "creating": "Creating order…"
   },
   "featureShared": {
     "eyebrow": "FEATURE",
@@ -2142,10 +2130,6 @@
     "KEYWORD_REQUIRED": "Keyword is required.",
     "DEVICE_INVALID": "device must be PC or Mobile.",
     "EMAIL_INVALID": "Invalid email address.",
-    "PLAN_PARAM_INVALID": "plan must be lite, pro or custom.",
-    "PAYMENT_CHANNEL_INVALID": "payment_channel must be alipay or wxpay.",
-    "OUT_TRADE_NO_REQUIRED": "out_trade_no is required.",
-    "MONEY_INVALID": "money must be a positive number.",
     "AUTOMATION_TYPE_INVALID": "type must be daily_refresh or weekly_report.",
     "REPORT_TYPE_INVALID": "type must be ranking/audit/content/weekly.",
     "TITLE_REQUIRED": "title is required.",
@@ -2171,7 +2155,6 @@
     "SETTINGS_NOT_FOUND": "Settings not found.",
     "PLAN_REQUIRED": "This action requires the Pro plan.",
     "PLAN_DOWNGRADE_NOT_ALLOWED": "Your current plan does not allow this purchase: Pro members cannot downgrade to Lite.",
-    "PLAN_PRICE_NOT_CONFIGURED": "Price for this plan is not configured.",
     "AUDIT_RATE_LIMITED": "Daily audit limit reached. Please try again later.",
     "AUDIT_COOLDOWN": "This domain is in audit cooldown. One audit per hour per mode; try the other mode or retry later.",
     "AUDIT_IN_PROGRESS": "An audit is already running for this domain. Please wait for it to finish.",
@@ -2187,16 +2170,6 @@
     "KEYWORD_GROUP_LIMIT_REACHED": "Your current plan ({plan}) allows at most {limit} keyword groups. Please upgrade.",
     "UPSTREAM_ERROR": "Internal server error. Please try again later.",
     "DATAFORSEO_NOT_CONFIGURED": "DataForSEO credentials are not configured (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD).",
-    "YAOLIPAY_NOT_CONFIGURED": "Payment gateway configuration is missing. Please contact the administrator.",
-    "PAYMENT_CREATE_FAILED": "Failed to create the local order.",
-    "PAYMENT_SIGN_FAILED": "Failed to generate the payment signature. Please contact support.",
-    "PAYMENT_FAILED": "Payment request failed. Please try again later.",
-    "REFUND_FAILED": "Refund request failed. Please try again later.",
-    "PAYMENT_DEMO_DISABLED": "Payment is not supported in demo mode. Enable authentication in production first.",
-    "PAYMENT_TEST_MODE_FORBIDDEN": "Test payment switch is enabled outside the Preview environment. Order creation refused.",
-    "REFUND_DEMO_DISABLED": "Refund is not supported in demo mode.",
-    "REFUND_NOT_ALLOWED": "Order status does not allow a refund.",
-    "REFUND_AMOUNT_EXCEEDED": "Refund amount cannot exceed the order amount.",
     "RESEND_NOT_CONFIGURED": "Email is not configured: RESEND_API_KEY environment variable is missing.",
     "SEND_FAILED": "Failed to send.",
     "ADMIN_CLIENT_UNAVAILABLE": "Admin client is unavailable.",

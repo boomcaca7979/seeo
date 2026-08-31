@@ -103,7 +103,6 @@ describe("4. route 实际使用的 code 都在 catalog 内", () => {
     const invalid: string[] = [];
     let total = 0;
     for (const f of routes) {
-      // YaoLiPay notify 协议响应完全不含 code 字段（禁区验证）
       for (const c of extractRouteCodes(readFileSync(f, "utf8"))) {
         total++;
         if (!(c in EN)) invalid.push(`${f}: ${c}`);
@@ -138,11 +137,6 @@ describe("5. API response contract 兼容", () => {
       });
     }
     expect(bad).toEqual([]);
-  });
-
-  it("YaoLiPay notify 协议 route 零 code 注入（协议不变）", () => {
-    const src = readFileSync(join(API_DIR, "payment/yaolipay/notify/route.ts"), "utf8");
-    expect(src).not.toMatch(/code:\s*"[A-Z_]+"/);
   });
 
   it("既有 QUOTA_EXCEEDED / UPSTREAM_ERROR code 未被移除（seo 系 route）", () => {
