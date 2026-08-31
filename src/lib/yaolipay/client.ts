@@ -24,6 +24,30 @@ function timestampSeconds(): string {
 /** 耀立接口请求超时时间（毫秒），与其它外部 API 一致 */
 const YAOLIPAY_TIMEOUT_MS = 15_000;
 
+/** 网络错误重试次数（指数退避），覆盖瞬时抖动 */
+const YAOLIPAY_MAX_RETRIES = 2;
+const YAOLIPAY_RETRY_BASE_DELAY_MS = 500;
+
+/**
+ * 提取 fetch 网络错误的真实原因（err.cause）。
+ * undici 的 "fetch failed" 本身不带信息，cause 里才有
+ * ENOTFOUND / ETIMEDOUT / CERT_HAS_EXPIRED 等关键细节。
+ */
+function describeNetworkError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = (e as { cause?: unknown }).cause;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: string }).code;
+    return [e.message, code, cause.message].filter(Boolean).join(" / ");
+  }
+  return e.message;
+}
+
+/** 判断是否为可重试的网络层错误（TypeError: fetch failed） */
+function isRetryableNetworkError(e: unknown): boolean {
+  return e instanceof TypeError;
+}
+
 /** 调用耀立接口的统一封装 */
 async function callYaolipayApi<T>(
   path: string,
@@ -52,47 +76,65 @@ async function callYaolipayApi<T>(
     if (v !== null && v !== undefined) body.append(k, String(v));
   }
 
-  // P1 修复：加 AbortController 超时控制，防止耀立侧慢响应或 TCP 挂起
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), YAOLIPAY_TIMEOUT_MS);
+  let lastNetworkError: unknown = null;
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-      signal: controller.signal,
-    });
+  for (let attempt = 0; attempt <= YAOLIPAY_MAX_RETRIES; attempt++) {
+    // P1 修复：加 AbortController 超时控制，防止耀立侧慢响应或 TCP 挂起
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), YAOLIPAY_TIMEOUT_MS);
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`耀立接口 HTTP ${res.status}: ${text.slice(0, 200)}`);
-    }
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: controller.signal,
+      });
 
-    const json = (await res.json()) as T;
-
-    // 验签响应（如果响应中包含 sign 字段）
-    const responseObj = json as Record<string, unknown>;
-    if (responseObj.sign && responseObj.sign_type === "RSA") {
-      const signString = buildSignString(responseObj);
-      const { verifyWithPublicKey } = await import("./sign");
-      const ok = verifyWithPublicKey(signString, responseObj.sign as string, config.publicKey);
-      if (!ok) {
-        console.error("[Yaolipay] 响应验签失败", { path, code: responseObj.code, msg: responseObj.msg });
-        throw new Error("耀立接口响应验签失败");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`耀立接口 HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
-    }
 
-    return json;
-  } catch (e) {
-    // 超时明确返回业务错误，不让 fetch 无限挂起
-    if (e instanceof DOMException && e.name === "AbortError") {
-      throw new Error(`耀立接口请求超时（${YAOLIPAY_TIMEOUT_MS / 1000}s）`);
+      const json = (await res.json()) as T;
+
+      // 验签响应（如果响应中包含 sign 字段）
+      const responseObj = json as Record<string, unknown>;
+      if (responseObj.sign && responseObj.sign_type === "RSA") {
+        const signString = buildSignString(responseObj);
+        const { verifyWithPublicKey } = await import("./sign");
+        const ok = verifyWithPublicKey(signString, responseObj.sign as string, config.publicKey);
+        if (!ok) {
+          console.error("[Yaolipay] 响应验签失败", { path, code: responseObj.code, msg: responseObj.msg });
+          throw new Error("耀立接口响应验签失败");
+        }
+      }
+
+      return json;
+    } catch (e) {
+      // 超时明确返回业务错误，不让 fetch 无限挂起
+      if (e instanceof DOMException && e.name === "AbortError") {
+        throw new Error(`耀立接口请求超时（${YAOLIPAY_TIMEOUT_MS / 1000}s）`);
+      }
+      lastNetworkError = e;
+      const detail = describeNetworkError(e);
+      if (isRetryableNetworkError(e) && attempt < YAOLIPAY_MAX_RETRIES) {
+        console.error(
+          `[Yaolipay] 请求失败（第 ${attempt + 1} 次，将重试） path=${path} detail=${detail}`
+        );
+        await new Promise((r) => setTimeout(r, YAOLIPAY_RETRY_BASE_DELAY_MS * (attempt + 1)));
+        continue;
+      }
+      console.error(`[Yaolipay] 请求失败（重试耗尽） path=${path} detail=${detail}`);
+      throw new Error(`耀立接口网络请求失败: ${detail}`);
+    } finally {
+      clearTimeout(timer);
     }
-    throw e;
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw new Error(
+    `耀立接口网络请求失败: ${lastNetworkError ? describeNetworkError(lastNetworkError) : "未知错误"}`
+  );
 }
 
 /**
