@@ -20,7 +20,7 @@ import {
   parseOrderParam,
   type OrderRecord,
 } from "@/lib/orders/service";
-import { getCreemConfig, CREEM_PRODUCT_IDS } from "@/lib/creem/config";
+import { getCreemConfig, getCreemProductIds } from "@/lib/creem/config";
 import { createCreemCheckout, CreemApiError } from "@/lib/creem/client";
 import { getAdminClient } from "@/lib/supabase/admin";
 
@@ -60,23 +60,7 @@ export async function POST(req: Request) {
   }
   const userId = auth.user.id;
 
-  // 2. plan 校验：仅接受服务端映射表中的 key
-  let body: { plan?: unknown };
-  try {
-    body = (await req.json()) as { plan?: unknown };
-  } catch {
-    body = {};
-  }
-  const plan = body.plan;
-  if (typeof plan !== "string" || !(plan in CREEM_PRODUCT_IDS)) {
-    return NextResponse.json(
-      { error: "非法的套餐参数", code: "INVALID_PLAN" },
-      { status: 400 }
-    );
-  }
-  const checkoutPlan = plan as keyof typeof CREEM_PRODUCT_IDS;
-
-  // 3. Creem 配置（secret 只在服务端环境变量中）
+  // 2. Creem 配置（secret 只在服务端环境变量中）
   const config = getCreemConfig();
   if (!config) {
     return NextResponse.json(
@@ -84,6 +68,24 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
+  // 产品映射按 test / live 模式选择（两套独立产品，ID 不互通）
+  const productIds = getCreemProductIds(config.mode);
+
+  // 3. plan 校验：仅接受服务端映射表中的 key
+  let body: { plan?: unknown };
+  try {
+    body = (await req.json()) as { plan?: unknown };
+  } catch {
+    body = {};
+  }
+  const plan = body.plan;
+  if (typeof plan !== "string" || !(plan in productIds)) {
+    return NextResponse.json(
+      { error: "非法的套餐参数", code: "INVALID_PLAN" },
+      { status: 400 }
+    );
+  }
+  const checkoutPlan = plan as keyof typeof productIds;
 
   // 4. 购买规则校验（防降级；currentPlan 由服务端查询，不信任前端）
   const userPlan = await getUserPlan(userId);
@@ -121,7 +123,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   try {
     const checkout = await createCreemCheckout(config, {
-      productId: CREEM_PRODUCT_IDS[checkoutPlan],
+      productId: productIds[checkoutPlan],
       requestId: order.out_trade_no,
       successUrl: `${origin}/payment/result?order=${order.out_trade_no}`,
       metadata: {

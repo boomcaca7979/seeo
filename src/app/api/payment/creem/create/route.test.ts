@@ -111,7 +111,10 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { POST } from "./route";
 import { createCreemCheckout } from "@/lib/creem/client";
 import { createPendingOrder, markOrderFailed } from "@/lib/orders/service";
-import { CREEM_PRODUCT_IDS } from "@/lib/creem/config";
+import { getCreemProductIds } from "@/lib/creem/config";
+
+// 测试环境 CREEM_API_MODE=test，应使用 test 模式产品映射
+const CREEM_PRODUCT_IDS = getCreemProductIds("test");
 
 const mockCreateCheckout = vi.mocked(createCreemCheckout);
 const mockCreatePending = vi.mocked(createPendingOrder);
@@ -191,6 +194,28 @@ describe("POST /api/payment/creem/create", () => {
       expect.anything(),
       expect.objectContaining({ productId: CREEM_PRODUCT_IDS.custom })
     );
+  });
+
+  it("test / live 模式使用各自的 Product ID 映射（两套产品不互通）", async () => {
+    // 默认 test 模式
+    await POST(makeRequest({ plan: "lite" }));
+    expect(mockCreateCheckout).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ productId: getCreemProductIds("test").lite })
+    );
+
+    // 切到 live 模式：应使用 live 产品 ID
+    mockCreateCheckout.mockClear();
+    process.env.CREEM_API_MODE = "live";
+    try {
+      await POST(makeRequest({ plan: "lite" }));
+      expect(mockCreateCheckout).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ productId: getCreemProductIds("live").lite })
+      );
+    } finally {
+      process.env.CREEM_API_MODE = "test";
+    }
   });
 
   it("非法 plan → 400，不创建订单", async () => {
