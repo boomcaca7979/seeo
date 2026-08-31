@@ -202,6 +202,7 @@
     "colCompany": "公司",
     "colCompanyLinks": {
       "about": "关于 SeeO",
+      "contact": "联系我们",
       "privacy": "隐私政策",
       "terms": "服务条款",
       "refund": "退款政策"
@@ -911,6 +912,21 @@
     "after": "退款成功后，系统会根据你剩余的有效订单重新计算会员状态——套餐可能相应降级，功能权限以降级后的套餐为准。",
     "banned": "因违反服务条款被封禁的账号，费用处理详见服务条款相关约定。",
     "lastUpdated": "最后更新：2026年8月"
+  },
+  "contactPage": {
+    "meta": {
+      "title": "联系 SeeO",
+      "description": "联系 SeeO——一个独立的 AI SEO 软件项目。了解如何就支持、反馈与平台使用问题与 SeeO 取得联系。"
+    },
+    "title": "联系 SeeO",
+    "intro": "SeeO 是一个独立的 AI SEO 软件项目。",
+    "sections": {
+      "email": "01 邮箱",
+      "response": "02 响应时间"
+    },
+    "email": "[占位：正式公开前填写公开邮箱]",
+    "emailNote": "公开邮箱待公布",
+    "response": "消息会定期查看。公开邮箱确认后将在此公布典型响应时间。"
   },
   "dashboard": {
     "sidebar": {
@@ -2106,7 +2122,7 @@
     "KEYWORD_REQUIRED": "关键词不能为空",
     "DEVICE_INVALID": "device 必须是 PC 或 移动端",
     "EMAIL_INVALID": "邮箱格式不正确",
-    "PLAN_PARAM_INVALID": "plan 必须是 lite 或 pro",
+    "PLAN_PARAM_INVALID": "plan 必须是 lite、pro 或 custom",
     "PAYMENT_CHANNEL_INVALID": "payment_channel 必须是 alipay 或 wxpay",
     "OUT_TRADE_NO_REQUIRED": "out_trade_no 必填",
     "MONEY_INVALID": "money 必须为正数",
@@ -2153,6 +2169,7 @@
     "DATAFORSEO_NOT_CONFIGURED": "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）",
     "YAOLIPAY_NOT_CONFIGURED": "支付网关配置缺失，请联系管理员",
     "PAYMENT_CREATE_FAILED": "创建本地订单失败",
+    "PAYMENT_SIGN_FAILED": "生成支付签名失败，请联系管理员",
     "PAYMENT_FAILED": "支付请求失败，请稍后再试",
     "REFUND_FAILED": "退款请求失败，请稍后再试",
     "PAYMENT_DEMO_DISABLED": "演示模式下不支持支付，请在生产环境开启鉴权后使用",

@@ -157,7 +157,9 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, [t]);
 
-  // 创建耀立支付订单
+  // 创建支付订单（客户端表单直提模式）
+  // 服务端创建本地 pending 订单并返回 RSA 已签名支付参数，
+  // 浏览器构建隐藏表单 POST 到耀立 submit.php（当前页 navigation，非 popup）
   async function handleCreatePayment(plan: "lite" | "pro" | "custom", channel: PaymentChannel) {
     setCreating(true);
     setErrorMsg(null);
@@ -180,18 +182,35 @@ function PricingContent() {
         return;
       }
 
-      // 根据 pay_type 决定展示方式
+      // 客户端表单直提模式：提交服务端已签名参数到耀立 submit.php
+      if (data.pay_mode === "form_submit" && data.submit_url && data.params) {
+        const form = document.createElement("form");
+        form.action = data.submit_url as string;
+        form.method = (data.submit_method as string) ?? "POST";
+        form.style.display = "none";
+        for (const [key, value] of Object.entries(data.params as Record<string, string>)) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        // 当前页 navigation 到耀立收银台（支付完成后经 return_url 回流）
+        form.submit();
+        return;
+      }
+
+      // 兼容旧响应（pay_type/pay_info）：跳转支付结果页处理展示与轮询
       const payType = data.pay_type as string | null;
       const payInfo = data.pay_info as string | null;
       const outTradeNo = data.out_trade_no as string;
 
-      // 跳转到支付结果页，由该页处理支付展示与轮询
       const params = new URLSearchParams({
         order: outTradeNo,
         pay_type: payType ?? "",
         channel,
       });
-      // 把 pay_info 编码后传过去（可能较长）
       if (payInfo) params.set("pay_info", payInfo);
       router.push(`/payment/result?${params.toString()}`);
     } catch (err) {

@@ -202,6 +202,7 @@
     "colCompany": "Company",
     "colCompanyLinks": {
       "about": "About SeeO",
+      "contact": "Contact",
       "privacy": "Privacy Policy",
       "terms": "Terms of Service",
       "refund": "Refund Policy"
@@ -932,6 +933,21 @@
     "banned": "For accounts banned due to violations of the Terms of Service, see the terms regarding fees.",
     "lastUpdated": "Last updated: August 2026"
   },
+  "contactPage": {
+    "meta": {
+      "title": "Contact SeeO",
+      "description": "Contact SeeO, an independent AI SEO software project. Find how to reach the SeeO team for support, feedback, and questions about the SEO platform."
+    },
+    "title": "Contact SeeO",
+    "intro": "SeeO is an independent AI SEO software project.",
+    "sections": {
+      "email": "01 Email",
+      "response": "02 Response time"
+    },
+    "email": "[PLACEHOLDER: ADD PUBLIC EMAIL BEFORE PRODUCTION]",
+    "emailNote": "Public email pending announcement",
+    "response": "Messages are reviewed periodically. Typical response time will be published once the public email is confirmed."
+  },
   "dashboard": {
     "sidebar": {
       "overview": "Overview",
@@ -951,8 +967,8 @@
       "expand": "Expand sidebar",
       "collapse": "Collapse sidebar",
       "demoToast": "Demo mode — account system is disabled",
-      "demoUser": "Demo User",
-      "demoEmail": "Demo Account",
+      "demoUser": "Alex Morgan",
+      "demoEmail": "alex@acme-example.com",
       "opportunities": "Opportunities"
     },
     "topbar": {
@@ -2126,7 +2142,7 @@
     "KEYWORD_REQUIRED": "Keyword is required.",
     "DEVICE_INVALID": "device must be PC or Mobile.",
     "EMAIL_INVALID": "Invalid email address.",
-    "PLAN_PARAM_INVALID": "plan must be lite or pro.",
+    "PLAN_PARAM_INVALID": "plan must be lite, pro or custom.",
     "PAYMENT_CHANNEL_INVALID": "payment_channel must be alipay or wxpay.",
     "OUT_TRADE_NO_REQUIRED": "out_trade_no is required.",
     "MONEY_INVALID": "money must be a positive number.",
@@ -2173,6 +2189,7 @@
     "DATAFORSEO_NOT_CONFIGURED": "DataForSEO credentials are not configured (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD).",
     "YAOLIPAY_NOT_CONFIGURED": "Payment gateway configuration is missing. Please contact the administrator.",
     "PAYMENT_CREATE_FAILED": "Failed to create the local order.",
+    "PAYMENT_SIGN_FAILED": "Failed to generate the payment signature. Please contact support.",
     "PAYMENT_FAILED": "Payment request failed. Please try again later.",
     "REFUND_FAILED": "Refund request failed. Please try again later.",
     "PAYMENT_DEMO_DISABLED": "Payment is not supported in demo mode. Enable authentication in production first.",

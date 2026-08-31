@@ -1,25 +1,36 @@
 // ===== POST /api/payment/yaolipay/create =====
-// 创建耀立支付订单
+// 创建支付订单（客户端表单直提模式）
+//
+// 背景：耀立支付（腾讯云源站）封锁 Vercel/AWS 等云厂商出口 IP，
+// 服务端调用 https://www.yaolipay.com/api/pay/create 会被 TCP 重置。
+// 改用耀立 V1 页面跳转支付端点 submit.php：
+//
+//   浏览器 → POST https://www.yaolipay.com/submit.php（带服务端签名参数）
+//   → 耀立收银台 → 支付 → notify_url 异步回调 SeeO → completeOrder
 //
 // 安全要点：
 //   - 必须登录（requireAuthOrDemo）
 //   - 客户端只能传 plan + payment_channel
 //   - amount 由服务端从 PLAN_PRICING 读取
-//   - period_end 由服务端计算
 //   - out_trade_no 由服务端生成
+//   - RSA 私钥仅服务端使用，签名在服务端完成后才返回前端
+//   - 前端只提交服务端返回的已签名字段；任何篡改都会导致耀立验签失败
 //
 // 演示模式返回 503
 
 import { NextResponse } from "next/server";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { getYaolipayConfig, getReturnUrl, isValidPaymentChannel } from "@/lib/yaolipay/config";
-import { createOrder } from "@/lib/yaolipay/client";
+import { signParams } from "@/lib/yaolipay/sign";
 import { formatAmountYuan, PLAN_PRICING, getEffectivePaymentAmountCents, isTestPaymentMisconfigured, canPurchasePlan, CUSTOM_SERVICE_PLAN, type CheckoutPlan } from "@/lib/billing";
 import { createPendingOrder } from "@/lib/orders/service";
 import type { PaymentChannel } from "@/lib/yaolipay/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** 耀立页面跳转支付端点（接受 V2 RSA 签名，浏览器表单直提） */
+export const YAOLIPAY_SUBMIT_URL = "https://www.yaolipay.com/submit.php";
 
 function isValidPlan(plan: unknown): plan is CheckoutPlan {
   return plan === "lite" || plan === "pro" || plan === CUSTOM_SERVICE_PLAN;
@@ -125,7 +136,7 @@ export async function POST(req: Request) {
   const clientIp = getClientIp(req);
   const returnUrl = getReturnUrl();
 
-  // 1. 先创建本地 pending 订单（param 记录购买类型，供后续对账/分析）
+  // 1. 创建本地 pending 订单（param 记录购买类型，供后续对账/分析）
   const pendingResult = await createPendingOrder({
     userId,
     plan,
@@ -147,59 +158,53 @@ export async function POST(req: Request) {
   }
   const { order } = pendingResult;
 
-  // 2. 调用耀立统一下单接口
+  // 2. 服务端构造支付参数并 RSA 签名（不调用耀立 API，不受出口封锁影响）
+  const productName =
+    plan === CUSTOM_SERVICE_PLAN
+      ? "SeeO 定制服务"
+      : `SeeO ${plan === "lite" ? "Lite" : "Pro"} 30天会员`;
+
+  const payParams: Record<string, string> = {
+    pid: String(config.pid),
+    type: payment_channel as string,
+    out_trade_no: order.out_trade_no,
+    notify_url: config.notifyUrl,
+    return_url: returnUrl,
+    name: productName,
+    money: moneyStr,
+    param: JSON.stringify({ user_id: userId, plan }),
+  };
+
+  let sign: string;
   try {
-    const productName =
-      plan === CUSTOM_SERVICE_PLAN
-        ? "SeeO 定制服务"
-        : `SeeO ${plan === "lite" ? "Lite" : "Pro"} 30天会员`;
-    const yaolipayResp = await createOrder({
-      type: payment_channel as PaymentChannel,
-      out_trade_no: order.out_trade_no,
-      name: productName,
-      money: moneyStr,
-      clientip: clientIp,
-      return_url: returnUrl,
-      param: JSON.stringify({ user_id: userId, plan }),
-    });
-
-    // 失败：标记订单为 failed
-    if (yaolipayResp.code !== 0) {
-      const { markOrderFailed } = await import("@/lib/orders/service");
-      await markOrderFailed(order.out_trade_no);
-      return NextResponse.json(
-        { error: yaolipayResp.msg ?? "耀立下单失败", code: "PAYMENT_FAILED" },
-        { status: 500 }
-      );
-    }
-
-    // 3. 保存耀立返回的 trade_no（如果在响应中）
-    if (yaolipayResp.trade_no) {
-      const admin = (await import("@/lib/supabase/admin")).getAdminClient();
-      if (admin) {
-        await admin
-          .from("orders")
-          .update({ trade_no: yaolipayResp.trade_no })
-          .eq("out_trade_no", order.out_trade_no);
-      }
-    }
-
-    // 4. 返回前端支付所需信息
-    return NextResponse.json({
-      data: {
-        out_trade_no: order.out_trade_no,
-        trade_no: yaolipayResp.trade_no ?? null,
-        pay_type: yaolipayResp.pay_type ?? null,
-        pay_info: yaolipayResp.pay_info ?? null,
-        money: moneyStr,
-        payment_channel: payment_channel,
-      },
-    });
+    sign = signParams(payParams, config.privateKey);
   } catch (err) {
-    // 异常：标记订单为 failed
+    // 签名失败（私钥格式错误等）：标记订单失败，不返回可提交的参数
     const { markOrderFailed } = await import("@/lib/orders/service");
     await markOrderFailed(order.out_trade_no);
-    const msg = err instanceof Error ? err.message : "耀立下单异常";
-    return NextResponse.json({ error: msg, code: "PAYMENT_CREATE_FAILED" }, { status: 500 });
+    console.error("[Payment Create] RSA 签名失败:", err instanceof Error ? err.message : String(err));
+    return NextResponse.json(
+      { error: "支付签名生成失败，请联系管理员", code: "PAYMENT_SIGN_FAILED" },
+      { status: 500 }
+    );
   }
+
+  // 3. 返回前端已签名参数（浏览器构建表单 POST 到 submit.php）
+  //    pay_mode 标识客户端表单直提模式
+  return NextResponse.json({
+    data: {
+      pay_mode: "form_submit",
+      submit_url: YAOLIPAY_SUBMIT_URL,
+      submit_method: "POST",
+      params: {
+        ...payParams,
+        sign,
+        sign_type: "RSA",
+      },
+      out_trade_no: order.out_trade_no,
+      trade_no: null,
+      money: moneyStr,
+      payment_channel: payment_channel,
+    },
+  });
 }

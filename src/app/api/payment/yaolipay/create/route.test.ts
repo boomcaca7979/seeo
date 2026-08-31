@@ -16,7 +16,13 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/yaolipay/config", () => ({
-  getYaolipayConfig: vi.fn(() => ({ pid: "test-pid", key: "test-key" })),
+  getYaolipayConfig: vi.fn(() => ({
+    pid: 1001,
+    privateKey: "mock-private-key",
+    publicKey: "mock-public-key",
+    apiBase: "https://www.yaolipay.com",
+    notifyUrl: "https://www.seeo.asia/api/payment/yaolipay/notify",
+  })),
   getReturnUrl: vi.fn(() => "https://www.seeo.asia/payment/result"),
   isValidPaymentChannel: vi.fn((c: unknown) => c === "alipay" || c === "wxpay"),
 }));
@@ -28,6 +34,14 @@ vi.mock("@/lib/yaolipay/client", () => ({
     pay_type: "qrcode",
     pay_info: "mock-pay-info",
   })),
+  queryOrder: vi.fn(async () => ({ code: 0, status: 0 })),
+  refundOrder: vi.fn(async () => ({ code: 0 })),
+}));
+
+vi.mock("@/lib/yaolipay/sign", () => ({
+  signParams: vi.fn(() => "mock-sign"),
+  verifyParams: vi.fn(() => true),
+  buildSignString: vi.fn(() => ""),
 }));
 
 vi.mock("@/lib/orders/service", () => ({
@@ -105,6 +119,18 @@ describe("合法购买通过校验并记录 purchaseType", () => {
     expect(mockCreatePending).toHaveBeenCalledWith(
       expect.objectContaining({ plan: "lite", purchaseType: "PURCHASE" })
     );
+
+    // 客户端表单直提模式：返回已签名参数而非服务端下单结果
+    const json = await res.json();
+    expect(json.data.pay_mode).toBe("form_submit");
+    expect(json.data.submit_url).toBe("https://www.yaolipay.com/submit.php");
+    expect(json.data.submit_method).toBe("POST");
+    expect(json.data.params.sign).toBe("mock-sign");
+    expect(json.data.params.sign_type).toBe("RSA");
+    expect(json.data.params.out_trade_no).toBe("S20260817TEST01");
+    expect(json.data.params.money).toBe("9.90");
+    // 私钥绝不能出现在响应中
+    expect(JSON.stringify(json)).not.toContain("mock-private-key");
   });
 
   it("free → pro：PURCHASE", async () => {
