@@ -2006,7 +2006,7 @@
       "limitExport": "Report Export",
       "unlimited": "Unlimited",
       "currentPlanToast": "You're already on this plan",
-      "planChangeToast": "Plan changes are completed on the checkout page — Alipay / WeChat Pay supported",
+      "planChangeToast": "Plan changes are completed on the checkout page.",
       "ctaStart": "Get Started",
       "ctaUpgrade": "Upgrade to {plan}",
       "priceUnitDays": "/{n} days",

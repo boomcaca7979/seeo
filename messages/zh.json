@@ -1986,7 +1986,7 @@
       "limitExport": "报表导出",
       "unlimited": "无限",
       "currentPlanToast": "当前已在使用此套餐",
-      "planChangeToast": "套餐变更将通过支付页面完成，支持支付宝 / 微信支付",
+      "planChangeToast": "套餐变更将在结账页面完成。",
       "ctaStart": "开始使用",
       "ctaUpgrade": "升级到 {plan}",
       "priceUnitDays": "/{n}天",
