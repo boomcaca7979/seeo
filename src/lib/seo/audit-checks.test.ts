@@ -1,19 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
-  calculateHealthScore,
-  perPageChecks,
-  crossPageChecks,
+  auditRules,
+  pageRuleIds,
+  siteRuleIds,
   allCheckMeta,
-  runPerPageChecks,
+  runAuditRules,
+  executionToIssues,
+  normalizePage,
   pickText,
+  type AuditContext,
   type AuditIssue,
+  type FetchRecord,
 } from "@/lib/seo/audit-checks";
+import { calculateHealthScoreV2 } from "@/lib/seo/audit-score";
 import type { PageData } from "@/lib/crawl";
 
 /** 构造「各项基本失败」的最小 PageData（触发尽可能多的检查项） */
 function makeFailingPage(): PageData {
   return {
     url: "http://example.com/",
+    finalUrl: "http://example.com/",
     title: "",
     metaDescription: null,
     canonical: null,
@@ -29,78 +35,138 @@ function makeFailingPage(): PageData {
     viewport: null,
     ogTitle: null,
     ogDescription: null,
+    ogImage: null,
     twitterCard: null,
     favicon: null,
     hasStructuredData: false,
     structuredDataRaw: [],
     inlineStyleLength: 0,
-    finalUrl: "http://example.com/",
   };
 }
 
-function makeIssue(checkId: string): AuditIssue {
+/** PageData[] → 最小可用的 AuditContext（页面级规则用） */
+function makeQuickContext(pages: PageData[]): AuditContext {
+  const fetchRecords: FetchRecord[] = pages.map((p, i) => ({
+    url: p.url,
+    finalUrl: p.finalUrl ?? p.url,
+    status: 200,
+    responseTimeMs: p.responseTimeMs ?? 100,
+    hops: 0,
+    redirectChain: [],
+    isLoop: false,
+    ok: true,
+    source: i === 0 ? "start" : "link",
+    depth: i,
+  }));
+  const linkGraph = new Map<string, Set<string>>();
+  const normalized = pages.map((p, i) => normalizePage(p, fetchRecords[i], linkGraph));
   return {
-    checkId,
-    checkName: "test",
-    message: "test",
-    url: "https://example.com/",
-    severity: "warning",
-    suggestion: "test",
+    baseUrl: "http://example.com/",
+    origin: "http://example.com",
+    depth: "quick",
+    crawlLimit: 50,
+    pages: normalized,
+    fetchRecords,
+    linkGraph,
+    robots: {
+      status: "ok",
+      httpStatus: 200,
+      text: "",
+      universalDisallow: [],
+      disallowAll: false,
+      sitemapUrls: [],
+      aiCrawlers: {},
+    },
+    sitemap: null,
+    llmsTxt: null,
+    indexablePages: normalized.length,
   };
 }
 
-describe("calculateHealthScore", () => {
+/** 运行页面级规则并收集全部 issue */
+function runPageRules(pages: PageData[]): AuditIssue[] {
+  const ctx = makeQuickContext(pages);
+  return runAuditRules(ctx).flatMap((ex) => executionToIssues(ex));
+}
+
+describe("统一规则目录结构", () => {
+  it("每条规则包含 id/category/severity/pageLevel/scoreWeight/name/description/recommendation", () => {
+    expect(auditRules.length).toBeGreaterThanOrEqual(20);
+    for (const rule of auditRules) {
+      expect(rule.id).toMatch(/^[a-z0-9-]+$/);
+      expect(["crawlability", "indexability", "onpage", "content", "links", "structured-data", "performance", "sitemap", "ai-search"]).toContain(rule.category);
+      expect(["error", "warning", "notice"]).toContain(rule.severity);
+      expect(["page", "site"]).toContain(rule.pageLevel);
+      expect(rule.scoreWeight).toBeGreaterThan(0);
+      expect(pickText(rule.name, "en").length).toBeGreaterThan(0);
+      expect(pickText(rule.name, "zh").length).toBeGreaterThan(0);
+      expect(pickText(rule.description, "en").length).toBeGreaterThan(0);
+      expect(pickText(rule.description, "zh").length).toBeGreaterThan(0);
+      expect(pickText(rule.recommendation, "en").length).toBeGreaterThan(0);
+      expect(pickText(rule.recommendation, "zh").length).toBeGreaterThan(0);
+      expect(typeof rule.check).toBe("function");
+    }
+  });
+
+  it("规则 id 全局唯一；page/site 集合无交集且并集为全量", () => {
+    const ids = auditRules.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of pageRuleIds) {
+      expect(siteRuleIds.has(id)).toBe(false);
+    }
+    expect(pageRuleIds.size + siteRuleIds.size).toBe(auditRules.length);
+  });
+
+  it("V1 23 项能力全部保留（规则 id 覆盖）", () => {
+    const ids = new Set(auditRules.map((r) => r.id));
+    for (const id of [
+      "missing-title", "missing-description", "missing-h1", "missing-alt",
+      "missing-canonical", "no-ssl", "title-length", "description-length",
+      "missing-lang", "missing-viewport", "no-robots-meta", "slow-page",
+      "no-structured-data", "missing-og-tags", "missing-twitter-card",
+      "no-favicon", "inline-css", "no-h2-h3", "duplicate-title",
+      "duplicate-description", "duplicate-h1", "no-sitemap", "broken-links",
+    ]) {
+      expect(ids.has(id), `规则缺失: ${id}`).toBe(true);
+    }
+  });
+});
+
+describe("runAuditRules：统一执行结构", () => {
+  it("返回 status/pass-fail/findings/affectedPages 结构，affectedPages 为 distinct URL", () => {
+    const ctx = makeQuickContext([makeFailingPage(), makeFailingPage()]);
+    const executions = runAuditRules(ctx);
+    const failed = executions.filter((e) => e.status === "fail");
+    // 两个相同失败页面：affectedPages 去重后仍为 1（不把 2 个 finding 当 2 页）
+    for (const ex of failed) {
+      expect(ex.findings.length).toBeGreaterThan(0);
+      expect(ex.affectedPages).toBe(1);
+    }
+  });
+
+  it("severity 由规则定义，不由前端推断", () => {
+    const ctx = makeQuickContext([makeFailingPage()]);
+    const byId = new Map(runAuditRules(ctx).map((e) => [e.rule.id, e]));
+    expect(byId.get("missing-title")!.severity).toBe("error");
+    expect(byId.get("missing-canonical")!.severity).toBe("warning");
+    expect(byId.get("missing-lang")!.severity).toBe("notice");
+  });
+});
+
+describe("计算健康分（V2 引擎）", () => {
   it("无 issue 时返回 100", () => {
-    const score = calculateHealthScore([], new Set(perPageChecks.map((c) => c.id)));
-    expect(score).toBe(100);
+    expect(calculateHealthScoreV2([], 50)).toBe(100);
   });
 
-  it("quick 模式只按 perPageChecks 权重计算", () => {
-    // 触发一个 missing-title（weight=5）
-    const issues: AuditIssue[] = [makeIssue("missing-title")];
-    const executed = new Set(perPageChecks.map((c) => c.id));
-    const perPageWeight = perPageChecks.reduce((s, c) => s + c.weight, 0);
-    const expected = Math.round(100 - (5 / perPageWeight) * 100);
-    const score = calculateHealthScore(issues, executed);
-    expect(score).toBe(expected);
+  it("同一 error 影响 1/100 页与 80/100 页扣分不同（影响面参与计算）", () => {
+    const one = calculateHealthScoreV2([{ ruleId: "r", severity: "error", scoreWeight: 1, pageLevel: "page", affectedPages: 1 }], 100);
+    const many = calculateHealthScoreV2([{ ruleId: "r", severity: "error", scoreWeight: 1, pageLevel: "page", affectedPages: 80 }], 100);
+    expect(many).toBeLessThan(one);
   });
 
-  it("full 模式按 perPage + crossPage 权重计算", () => {
-    const issues: AuditIssue[] = [makeIssue("duplicate-title")];
-    const executed = new Set([
-      ...perPageChecks.map((c) => c.id),
-      ...crossPageChecks.map((c) => c.id),
-    ]);
-    const totalWeight = perPageChecks.reduce((s, c) => s + c.weight, 0) +
-      crossPageChecks.reduce((s, c) => s + c.weight, 0);
-    const dupWeight = crossPageChecks.find((c) => c.id === "duplicate-title")!.weight;
-    const expected = Math.round(100 - (dupWeight / totalWeight) * 100);
-    const score = calculateHealthScore(issues, executed);
-    expect(score).toBe(expected);
-  });
-
-  it("quick 模式与 full 模式权重不同导致分数不同", () => {
-    const issues: AuditIssue[] = [makeIssue("missing-title")];
-    const quickScore = calculateHealthScore(
-      issues,
-      new Set(perPageChecks.map((c) => c.id))
-    );
-    const fullScore = calculateHealthScore(
-      issues,
-      new Set([
-        ...perPageChecks.map((c) => c.id),
-        ...crossPageChecks.map((c) => c.id),
-      ])
-    );
-    // full 模式分母更大，扣分比例更小，分数更高
-    expect(fullScore).toBeGreaterThan(quickScore);
-  });
-
-  it("未传 executedCheckIds 时使用全量权重（向后兼容）", () => {
-    const issues: AuditIssue[] = [makeIssue("missing-title")];
-    const score = calculateHealthScore(issues);
-    expect(score).toBeLessThanOrEqual(100);
-    expect(score).toBeGreaterThanOrEqual(0);
+  it("notice 极低扣分：1/100 页几乎不影响分数", () => {
+    const score = calculateHealthScoreV2([{ ruleId: "r", severity: "notice", scoreWeight: 1, pageLevel: "page", affectedPages: 1 }], 100);
+    expect(score).toBeGreaterThanOrEqual(99);
   });
 });
 
@@ -128,13 +194,13 @@ describe("本地化：检查项元数据双语齐备", () => {
   it("所有检查项 name/description 的 en 为非空英文、zh 为非空中文", () => {
     expect(allCheckMeta.length).toBeGreaterThanOrEqual(20);
     for (const meta of allCheckMeta) {
-      expect(meta.name.en.length).toBeGreaterThan(0);
-      expect(meta.name.zh.length).toBeGreaterThan(0);
-      expect(HAS_CHINESE(meta.name.en)).toBe(false);
-      expect(HAS_CHINESE(meta.name.zh)).toBe(true);
-      expect(meta.description.en.length).toBeGreaterThan(0);
-      expect(meta.description.zh.length).toBeGreaterThan(0);
-      expect(HAS_CHINESE(meta.description.en)).toBe(false);
+      expect(pickText(meta.name, "en").length).toBeGreaterThan(0);
+      expect(pickText(meta.name, "zh").length).toBeGreaterThan(0);
+      expect(HAS_CHINESE(pickText(meta.name, "en"))).toBe(false);
+      expect(HAS_CHINESE(pickText(meta.name, "zh"))).toBe(true);
+      expect(pickText(meta.description, "en").length).toBeGreaterThan(0);
+      expect(pickText(meta.description, "zh").length).toBeGreaterThan(0);
+      expect(HAS_CHINESE(pickText(meta.description, "en"))).toBe(false);
     }
   });
 
@@ -148,7 +214,7 @@ describe("本地化：检查项元数据双语齐备", () => {
 });
 
 describe("本地化：检查结果输出（EN 英文 / ZH 中文）", () => {
-  const issues = runPerPageChecks(makeFailingPage(), "http://example.com/");
+  const issues = runPageRules([makeFailingPage()]);
   const HAS_CHINESE = (s: string) => /[\u4e00-\u9fff]/.test(s);
 
   it("EN locale 输出英文文案（无中文残留）", () => {
@@ -179,12 +245,5 @@ describe("本地化：检查结果输出（EN 英文 / ZH 中文）", () => {
     expect(ids.has("missing-title")).toBe(true);
     expect(ids.has("missing-h1")).toBe(true);
     expect(ids.has("no-ssl")).toBe(true);
-  });
-
-  it("severity 由 category 映射：critical→error / warning→warning / info→notice", () => {
-    const byId = new Map(issues.map((i) => [i.checkId, i]));
-    expect(byId.get("missing-title")!.severity).toBe("error");
-    expect(byId.get("missing-canonical")!.severity).toBe("warning");
-    expect(byId.get("missing-lang")!.severity).toBe("notice");
   });
 });

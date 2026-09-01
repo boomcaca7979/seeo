@@ -2,7 +2,7 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { formatNumber } from "@/lib/ui-locale";
-import { checkMetaMap, nonCatalogCheckNames, pickText, type LText } from "@/lib/seo/audit-checks";
+import { checkMetaMap, nonCatalogCheckNames, pickText, type LocalizedText } from "@/lib/seo/audit-checks";
 
 export interface AuditReportProps {
   projectName: string;
@@ -43,7 +43,7 @@ const severityColor = (s: string): string => {
 function checkDisplayName(issue: { type: string; checkName?: string }, locale: "en" | "zh"): string {
   const meta = checkMetaMap[issue.type];
   if (meta) return pickText(meta.name, locale);
-  const extra: LText | undefined = nonCatalogCheckNames[issue.type];
+  const extra: LocalizedText | undefined = nonCatalogCheckNames[issue.type];
   if (extra) return pickText(extra, locale);
   return issue.checkName ?? issue.type;
 }

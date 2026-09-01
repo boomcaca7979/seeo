@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
 import { allCheckMeta, checkMetaMap, getExecutedCheckIds, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
+import type { DashboardSnapshot } from "@/lib/seo/audit-dashboard";
 import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
 import { requireAuthOrDemo } from "@/lib/auth";
@@ -25,7 +26,12 @@ interface HistoryItem {
   id: number;
   score: number | null;
   issuesCount: number;
+  errors: number;
+  warnings: number;
+  notices: number;
   checkedAt: string;
+  engineVersion: string | null;
+  ruleSetVersion: string | null;
 }
 
 interface PageDetailEntry {
@@ -194,15 +200,19 @@ export async function GET(req: Request) {
     }
   }
 
-  // 历史记录（最近 10 次）
+  // 历史记录（最近 10 次；含分项计数与引擎版本，供趋势多指标切换与版本标记）
   const historyRows = await getAuditHistory(userId, domain, 10);
   const history: HistoryItem[] = historyRows.map((h) => ({
     id: h.id,
     score: h.health_score,
     issuesCount: h.errors + h.warnings + h.notices,
+    errors: h.errors,
+    warnings: h.warnings,
+    notices: h.notices,
     checkedAt: h.finished_at ?? h.started_at,
+    engineVersion: h.engine_version,
+    ruleSetVersion: h.rule_set_version,
   }));
-
   // 解析页面响应时间明细
   let pagesDetail: PageDetailEntry[] = [];
   if (audit.pages_detail) {
@@ -210,6 +220,16 @@ export async function GET(req: Request) {
       pagesDetail = JSON.parse(audit.pages_detail) as PageDetailEntry[];
     } catch {
       pagesDetail = [];
+    }
+  }
+
+  // 解析 Dashboard 快照（V2 第二阶段单一数据源；旧审计无快照 → null）
+  let dashboard: DashboardSnapshot | null = null;
+  if (audit.dashboard_json) {
+    try {
+      dashboard = JSON.parse(audit.dashboard_json) as DashboardSnapshot;
+    } catch {
+      dashboard = null;
     }
   }
 
@@ -225,11 +245,14 @@ export async function GET(req: Request) {
       notices: audit.notices,
       startedAt: audit.started_at,
       finishedAt: audit.finished_at,
+      engineVersion: audit.engine_version,
+      ruleSetVersion: audit.rule_set_version,
       issues: grouped,
       comparison,
       coverage,
       history,
       pagesDetail,
+      dashboard,
       error: audit.error,
     },
   });

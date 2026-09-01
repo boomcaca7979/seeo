@@ -60,6 +60,17 @@ const legacyDetailStatic: StaticEntry[] = [
     zh: "起始页未能解析，单页检查项未执行，本次审计结果不可用",
     en: "The start page could not be parsed; per-page checks were not executed and this audit is unusable",
   },
+  // ===== Audit Engine V2 新增静态文案 =====
+  { zh: "主内容未使用语义化标签包裹（main/article/section）", en: "Main content is not wrapped in semantic tags (main/article/section)" },
+  { zh: "页面没有任何指向其他页面的内链", en: "Page has no internal links to other pages" },
+  { zh: "没有其他已抓取页面的内链指向该页面", en: "No internal links from other crawled pages point to this page" },
+  { zh: "页面无法连接（网络错误）", en: "Page failed to connect (network error)" },
+  { zh: "链接目标无法连接（网络错误）", en: "Link target failed to connect (network error)" },
+  { zh: "Sitemap 可访问但不包含有效的 urlset/sitemapindex 结构", en: "Sitemap responds but does not contain a valid urlset/sitemapindex structure" },
+  { zh: "llms.txt 存在但缺少必需结构（标题 + 列表）", en: "llms.txt exists but lacks required structure (heading + list)" },
+  { zh: "缺少 llms.txt（AI 搜索可见性优化机会）", en: "llms.txt is missing (opportunity for AI search visibility)" },
+  { zh: 'robots.txt 包含 "Disallow: /"，阻断整个站点', en: 'robots.txt contains "Disallow: /" which blocks the entire site' },
+  { zh: "URL 在 sitemap 中列出，但被 robots.txt 阻断", en: "URL is listed in the sitemap but blocked by robots.txt" },
 ];
 
 // ---------- detail（message）动态模板 ----------
@@ -73,6 +84,37 @@ const legacyDetailPatterns: PatternEntry[] = [
   { pattern: /^内联样式 ([\d,]+) 字符（>5000）$/, en: (m) => `Inline styles ${m[1]} characters (>5000)` },
   { pattern: /^"(.*)" 在 (\d+) 个页面重复$/, en: (m) => `"${m[1]}" duplicated across ${m[2]} pages` },
   { pattern: /^网络错误：(.+)$/, en: (m) => `Network error: ${m[1]}` },
+  // ===== Audit Engine V2 新增动态文案 =====
+  { pattern: /^JSON-LD 无效（(.+)），共 (\d+) 处$/, en: (m) => `Invalid JSON-LD (${m[1]}) in ${m[2]} node(s)` },
+  { pattern: /^JSON-LD 存在潜在问题（(\d+) 处）$/, en: (m) => `Potential JSON-LD issues (${m[1]})` },
+  { pattern: /^(\d+) 个 Schema 类型重复声明$/, en: (m) => `${m[1]} schema type(s) declared more than once` },
+  {
+    pattern: /^内容量(极低|偏低)：(.+) 页面 (\d+) 词（阈值 (\d+)）$/,
+    en: (m) => `${m[1] === "极低" ? "Very low" : "Low"} content: ${m[3]} words on page type "${m[2]}" (threshold ${m[4]})`,
+  },
+  {
+    pattern: /^可见文本 ([\d,]+) 字符 \/ HTML ([\d,]+) 字符（([\d.]+)%）$/,
+    en: (m) => `Visible text ${m[1]} chars vs HTML ${m[2]} chars (${m[3]}%)`,
+  },
+  { pattern: /^标题层级跳跃：h(\d+) → h(\d+)$/, en: (m) => `Heading hierarchy skips from h${m[1]} to h${m[2]}` },
+  { pattern: /^页面存在 (\d+) 个 H1$/, en: (m) => `Page has ${m[1]} H1 tags` },
+  { pattern: /^页面返回 HTTP (\d+)$/, en: (m) => `Page returns HTTP ${m[1]}` },
+  { pattern: /^链接目标返回 HTTP (\d+)$/, en: (m) => `Link target returns HTTP ${m[1]}` },
+  { pattern: /^检测到重定向环（回到 (.+)）$/, en: (m) => `Redirect loop detected (back to ${m[1]})` },
+  { pattern: /^经过 (\d+) 次重定向才到达 (.+)（影响较大）$/, en: (m) => `${m[1]} redirects before reaching ${m[2]} (high impact)` },
+  { pattern: /^经过 (\d+) 次重定向才到达 (.+)$/, en: (m) => `${m[1]} redirects before reaching ${m[2]}` },
+  { pattern: /^重定向到 (.+)（HTTP (\d+)）$/, en: (m) => `Redirects to ${m[1]} (HTTP ${m[2]})` },
+  { pattern: /^被链接的 URL 重定向到 (.+)（(\d+) 跳）$/, en: (m) => `Linked URL redirects to ${m[1]} (${m[2]} hop${Number(m[2]) > 1 ? "s" : ""})` },
+  { pattern: /^页面距起始页 (\d+) 次点击$/, en: (m) => `Page is ${m[1]} clicks away from the start page` },
+  { pattern: /^Sitemap 返回 HTTP (\d+)(（robots.txt 已声明）)?$/, en: (m) => `Sitemap returns HTTP ${m[1]}${m[2] ? " (declared in robots.txt)" : ""}` },
+  { pattern: /^sitemap 中的 URL 返回 HTTP (\d+)$/, en: (m) => `Sitemap URL returns HTTP ${m[1]}` },
+  { pattern: /^sitemap 中的 URL 发生重定向(到 (.+))?$/, en: (m) => `Sitemap URL redirects${m[2] ? ` to ${m[2]}` : ""}` },
+  {
+    pattern: /^(\d+) 个已抓取页面中有 (\d+) 个未列入 sitemap$/,
+    en: (m) => `${m[2]} of ${m[1]} crawled pages are not listed in the sitemap`,
+  },
+  { pattern: /^robots.txt 无法获取(（HTTP (\d+)）)?$/, en: (m) => `robots.txt could not be fetched${m[2] ? ` (HTTP ${m[2]})` : ""}` },
+  { pattern: /^robots.txt 阻止了 (.+)$/, en: (m) => `${m[1]} is disallowed in robots.txt` },
 ];
 
 // ---------- suggestion 静态模板 ----------
@@ -114,6 +156,31 @@ const legacySuggestionStatic: StaticEntry[] = [
     zh: "请稍后重试，或检查目标站点是否可访问。冷启动场景下重试一次通常可成功",
     en: "Retry later or verify the target site is reachable; a single retry usually succeeds after cold start",
   },
+  // ===== Audit Engine V2 新增建议 =====
+  { zh: "设置 canonical 避免重复内容混淆", en: "Set canonical to avoid duplicate-content confusion" },
+  { zh: '修正 <script type="application/ld+json"> 内的 JSON 语法与必填字段', en: 'Fix the JSON syntax and required fields inside <script type="application/ld+json">' },
+  { zh: "确保 JSON-LD 包含 @context 及各 Schema 类型的必填字段", en: "Ensure JSON-LD includes @context and required fields for each schema type" },
+  { zh: "将重复的 Schema 类型合并到单个 JSON-LD 块", en: "Merge duplicated schema types into a single JSON-LD block" },
+  { zh: "针对该页面类型补充正文内容至阈值以上", en: "Expand the main content to the threshold for this page type" },
+  { zh: "精简 HTML/脚本体积，或补充有价值的可见内容", en: "Reduce HTML/script bloat or add meaningful visible content" },
+  { zh: "用 <main>/<article>/<section> 包裹主内容，并保持标题层级连续", en: "Wrap main content in <main>/<article>/<section> and keep heading levels in order" },
+  { zh: "添加指向相关页面的内链，传递权重", en: "Add internal links to related pages to spread link equity" },
+  { zh: "恢复页面内容，或将其 301 重定向到相关有效页面", en: "Restore the page or redirect it (301) to a relevant live page" },
+  { zh: "修正重定向规则，确保每个 URL 一跳到达", en: "Fix the redirect rules so each URL resolves in a single hop" },
+  { zh: "将重定向直接指向最终目标 URL", en: "Point redirects directly at the final destination URL" },
+  { zh: "更新内链直接指向最终 URL", en: "Update internal links to point directly at the final URL" },
+  { zh: "将链接 href 更新为最终目标 URL", en: "Update the link href to the final destination URL" },
+  { zh: "从相关内容页面添加指向这些页面的内链", en: "Add internal links to these pages from relevant content" },
+  { zh: "扁平化重要页面的内链结构", en: "Flatten the internal linking structure to important pages" },
+  { zh: "发布 sitemap.xml 并在 robots.txt 中声明", en: "Publish a sitemap.xml and reference it in robots.txt" },
+  { zh: "修正 sitemap 地址，或重新生成有效的 XML sitemap", en: "Fix the sitemap URL or regenerate a valid XML sitemap" },
+  { zh: "从 sitemap 移除失效 URL，并修复或重定向这些地址", en: "Remove broken URLs from the sitemap and fix or redirect them" },
+  { zh: "在 sitemap 中列出最终目标 URL", en: "List the final destination URLs in the sitemap" },
+  { zh: "考虑将所有可索引页面列入 sitemap", en: "Consider listing all indexable pages in the sitemap" },
+  { zh: "确保 robots.txt 可访问并返回有效响应", en: "Ensure robots.txt is reachable and returns a valid response" },
+  { zh: "收窄 Disallow 规则，确保重要页面可被抓取", en: "Narrow the Disallow rules so important pages are crawlable" },
+  { zh: "如需 AI 搜索可见性，可在 robots.txt 中允许 AI 爬虫", en: "If AI search visibility matters, allow the AI crawlers in robots.txt" },
+  { zh: "在站点根目录发布结构化的 llms.txt，供 AI 助手读取", en: "Publish a structured llms.txt at the site root for AI assistants" },
 ];
 
 function mapStatic(catalog: StaticEntry[], text: string, locale: UiLocale): string | null {
@@ -150,6 +217,37 @@ const legacyDetailPatternsReverse: Array<{ pattern: RegExp; zh: (m: RegExpMatchA
   { pattern: /^Inline styles ([\d,]+) characters \(>5000\)$/, zh: (m) => `内联样式 ${m[1]} 字符（>5000）` },
   { pattern: /^"(.*)" duplicated across (\d+) pages$/, zh: (m) => `"${m[1]}" 在 ${m[2]} 个页面重复` },
   { pattern: /^Network error: (.+)$/, zh: (m) => `网络错误：${m[1]}` },
+  // ===== Audit Engine V2 新增动态文案（反向） =====
+  { pattern: /^Invalid JSON-LD \((.+)\) in (\d+) node\(s\)$/, zh: (m) => `JSON-LD 无效（${m[1]}），共 ${m[2]} 处` },
+  { pattern: /^Potential JSON-LD issues \((\d+)\)$/, zh: (m) => `JSON-LD 存在潜在问题（${m[1]} 处）` },
+  { pattern: /^(\d+) schema type\(s\) declared more than once$/, zh: (m) => `${m[1]} 个 Schema 类型重复声明` },
+  {
+    pattern: /^(Very low|Low) content: (\d+) words on page type "(.+)" \(threshold (\d+)\)$/,
+    zh: (m) => `内容量${m[1] === "Very low" ? "极低" : "偏低"}：${m[3]} 页面 ${m[2]} 词（阈值 ${m[4]}）`,
+  },
+  {
+    pattern: /^Visible text ([\d,]+) chars vs HTML ([\d,]+) chars \(([\d.]+)%\)$/,
+    zh: (m) => `可见文本 ${m[1]} 字符 / HTML ${m[2]} 字符（${m[3]}%）`,
+  },
+  { pattern: /^Heading hierarchy skips from h(\d+) to h(\d+)$/, zh: (m) => `标题层级跳跃：h${m[1]} → h${m[2]}` },
+  { pattern: /^Page has (\d+) H1 tags$/, zh: (m) => `页面存在 ${m[1]} 个 H1` },
+  { pattern: /^Page returns HTTP (\d+)$/, zh: (m) => `页面返回 HTTP ${m[1]}` },
+  { pattern: /^Link target returns HTTP (\d+)$/, zh: (m) => `链接目标返回 HTTP ${m[1]}` },
+  { pattern: /^Redirect loop detected \(back to (.+)\)$/, zh: (m) => `检测到重定向环（回到 ${m[1]}）` },
+  { pattern: /^(\d+) redirects before reaching (.+) \(high impact\)$/, zh: (m) => `经过 ${m[1]} 次重定向才到达 ${m[2]}（影响较大）` },
+  { pattern: /^(\d+) redirects before reaching (.+)$/, zh: (m) => `经过 ${m[1]} 次重定向才到达 ${m[2]}` },
+  { pattern: /^Redirects to (.+) \(HTTP (\d+)\)$/, zh: (m) => `重定向到 ${m[1]}（HTTP ${m[2]}）` },
+  { pattern: /^Linked URL redirects to (.+) \((\d+) hops?\)$/, zh: (m) => `被链接的 URL 重定向到 ${m[1]}（${m[2]} 跳）` },
+  { pattern: /^Page is (\d+) clicks away from the start page$/, zh: (m) => `页面距起始页 ${m[1]} 次点击` },
+  { pattern: /^Sitemap returns HTTP (\d+)( \(declared in robots.txt\))?$/, zh: (m) => `Sitemap 返回 HTTP ${m[1]}${m[2] ? "（robots.txt 已声明）" : ""}` },
+  { pattern: /^Sitemap URL returns HTTP (\d+)$/, zh: (m) => `sitemap 中的 URL 返回 HTTP ${m[1]}` },
+  { pattern: /^Sitemap URL redirects( to (.+))?$/, zh: (m) => `sitemap 中的 URL 发生重定向${m[2] ? `到 ${m[2]}` : ""}` },
+  {
+    pattern: /^(\d+) of (\d+) crawled pages are not listed in the sitemap$/,
+    zh: (m) => `${m[2]} 个已抓取页面中有 ${m[1]} 个未列入 sitemap`,
+  },
+  { pattern: /^robots\.txt could not be fetched( \(HTTP (\d+)\))?$/, zh: (m) => `robots.txt 无法获取${m[2] ? `（HTTP ${m[2]}）` : ""}` },
+  { pattern: /^(.+) is disallowed in robots\.txt$/, zh: (m) => `robots.txt 阻止了 ${m[1]}` },
 ];
 
 function mapPatternsReverse(text: string, locale: UiLocale): string | null {

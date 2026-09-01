@@ -27,7 +27,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET } from "./route";
-import { allCheckMeta, perPageChecks, crossPageCheckIds } from "@/lib/seo/audit-checks";
+import { allCheckMeta, pageRuleIds, crossPageCheckIds } from "@/lib/seo/audit-checks";
 
 function makeAudit(overrides: Partial<AuditRow>): AuditRow {
   return {
@@ -45,6 +45,9 @@ function makeAudit(overrides: Partial<AuditRow>): AuditRow {
     error: null,
     depth: "full",
     pages_detail: null,
+    engine_version: "v2",
+    rule_set_version: "2.0",
+    dashboard_json: null,
     ...overrides,
   };
 }
@@ -138,7 +141,7 @@ describe("latest 路由 coverage：quick 深度", () => {
     const body = (await res.json()) as { data: { coverage: CoverageEntry[] } };
     const coverage = body.data.coverage;
 
-    expect(coverage.length).toBe(perPageChecks.length);
+    expect(coverage.length).toBe(pageRuleIds.size);
     for (const c of coverage) {
       expect(crossPageCheckIds.has(c.id)).toBe(false);
     }

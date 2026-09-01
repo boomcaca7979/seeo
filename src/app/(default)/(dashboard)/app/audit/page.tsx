@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo, Fragment, Suspense } from "react";
+// ===== Site Audit（V2 第二阶段）：产品级 Dashboard =====
+// 结构：Overview / Issues / Crawled Pages / Internal Linking / Structured Data /
+//       AI Search / History（view 参数切换，issue 参数进入 Issue Detail）
+// 数据：单一 /api/audit/latest 返回 AuditResult + dashboard 快照，无重复请求。
+// 保留：Quick/Deep 审计、轮询、PDF 导出、保存到报告、项目/域名选择。
+
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
@@ -13,25 +19,19 @@ import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import AuditReport from "@/components/reports/AuditReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 import DomainSelect from "@/components/dashboard/DomainSelect";
-import ChartCard from "@/components/dashboard/charts/ChartCard";
-import AuditCoverageStacked from "@/components/dashboard/charts/AuditCoverageStacked";
-import AuditPassDonut from "@/components/dashboard/charts/AuditPassDonut";
 import AuditScoreTrend from "@/components/dashboard/charts/AuditScoreTrend";
-import ResponseTimeBars from "@/components/dashboard/charts/ResponseTimeBars";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
-
-// 注：审计已改为同步执行（P1-1），不再需要轮询 /api/audit/status
+import AuditOverview, { type HistoryItem, type ComparisonData } from "@/components/audit/Overview";
+import IssuesCenter from "@/components/audit/IssuesCenter";
+import CrawledPages from "@/components/audit/CrawledPages";
+import { LinkingSection, StructuredDataSection, AiSearchSection, CrawlerStatsSection } from "@/components/audit/Analysis";
+import HistorySection from "@/components/audit/HistorySection";
+import type { DashboardSnapshot } from "@/lib/seo/audit-dashboard";
 
 const severityConfig = {
-  error: { badge: "badge-err", bar: "#E14B4B", text: "text-neg", dot: "bg-neg" },
-  warning: { badge: "badge-warn", bar: "#C98A0A", text: "text-warn", dot: "bg-warn" },
-  notice: { badge: "badge-info", bar: "var(--color-ink-25)", text: "text-ink-40", dot: "bg-ink-25" },
-} as const;
-
-const categoryConfig = {
-  critical: { badge: "badge-err", text: "text-neg" },
-  warning: { badge: "badge-warn", text: "text-warn" },
-  info: { badge: "badge-info", text: "text-ink-40" },
+  error: { badge: "badge-err", bar: "#EF4444", text: "text-neg", dot: "bg-neg" },
+  warning: { badge: "badge-warn", bar: "#F59E0B", text: "text-warn", dot: "bg-warn" },
+  notice: { badge: "badge-info", bar: "#9CA3AF", text: "text-ink-40", dot: "bg-ink-25" },
 } as const;
 
 interface IssueGroup {
@@ -42,40 +42,6 @@ interface IssueGroup {
   sampleUrl: string;
   detail: string;
   suggestion: string | null;
-}
-
-interface CheckCoverageItem {
-  id: string;
-  name: string;
-  category: "critical" | "warning" | "info";
-  weight: number;
-  description: string;
-  passed: boolean;
-  affectedPages: number;
-}
-
-interface ComparisonData {
-  current: { score: number; issues: number; checkedAt: string };
-  previous: { score: number; issues: number; checkedAt: string } | null;
-  scoreChange: number;
-  issuesChange: number;
-  newIssues: Array<{ checkId: string; checkName: string; message: string; url: string; severity: string }>;
-  resolvedIssues: Array<{ checkId: string; checkName: string; message: string; url: string; severity: string }>;
-  unchangedIssues: Array<{ checkId: string; checkName: string; message: string; url: string; severity: string }>;
-}
-
-interface HistoryItem {
-  id: number;
-  score: number | null;
-  issuesCount: number;
-  checkedAt: string;
-}
-
-interface PageDetailEntry {
-  url: string;
-  responseTimeMs: number;
-  status: number;
-  ok: boolean;
 }
 
 interface AuditData {
@@ -91,39 +57,17 @@ interface AuditData {
   finishedAt: string | null;
   issues: IssueGroup[];
   comparison: ComparisonData | null;
-  coverage: CheckCoverageItem[];
+  coverage: Array<{ id: string; name: string; category: string; weight: number; description: string; passed: boolean; affectedPages: number }>;
   history: HistoryItem[];
-  pagesDetail?: PageDetailEntry[];
+  pagesDetail?: Array<{ url: string; responseTimeMs: number; status: number; ok: boolean }>;
+  dashboard: DashboardSnapshot | null;
   error?: string | null;
 }
 
-type FilterType = "all" | "error" | "warning" | "notice";
-
-/** 将 SQLite datetime（UTC）转为本地时间可读字符串 */
-function formatTime(
-  iso: string | null,
-  locale: Locale,
-  tc: (key: "justNow" | "minutesAgo" | "hoursAgo", values?: { n: number }) => string
-): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-    if (Number.isNaN(d.getTime())) return iso;
-    const now = Date.now();
-    const diff = now - d.getTime();
-    if (diff < 60_000) return tc("justNow");
-    if (diff < 3_600_000) return tc("minutesAgo", { n: Math.floor(diff / 60_000) });
-    if (diff < 86_400_000) return tc("hoursAgo", { n: Math.floor(diff / 3_600_000) });
-    return d.toLocaleString(intlLocale(locale), { hour12: false });
-  } catch {
-    return iso;
-  }
-}
-
 type AuditDepth = "quick" | "full";
+type ViewKey = "overview" | "issues" | "pages" | "linking" | "structured" | "ai" | "history";
 
 interface ProjectItem {
-  /** 项目 id：鉴权模式为 Supabase UUID string，演示模式为 SQLite 整数（string） */
   id: string;
   name: string;
   domain: string;
@@ -143,22 +87,55 @@ function AuditPageInner() {
   const t = useTranslations("dashboard.audit");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as Locale;
-  const severityLabel: Record<"error" | "warning" | "notice", string> = {
-    error: t("sevError"),
-    warning: t("sevWarning"),
-    notice: t("sevNotice"),
-  };
-  const categoryLabel: Record<"critical" | "warning" | "info", string> = {
-    critical: t("catCritical"),
-    warning: t("catWarning"),
-    info: t("catInfo"),
-  };
   const { show, Toast } = useToast();
   const { features, loading: entitlementsLoading } = useEntitlements();
   const canFullAudit = entitlementsLoading ? false : features.full_audit;
   const canExportPdf = entitlementsLoading ? false : features.pdf_export;
+
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // ---- 视图状态（searchParams 驱动，支持直接 URL） ----
+  const view = (searchParams.get("view") ?? "overview") as ViewKey;
+  const selectedIssue = searchParams.get("issue");
+  // P0-1：rule / pageType 必须读回，否则 IssuesCenter 的筛选器静默失效
+  const issuesFilters = {
+    severity: searchParams.get("severity") ?? undefined,
+    category: searchParams.get("category") ?? undefined,
+    search: searchParams.get("search") ?? undefined,
+    sort: searchParams.get("sort") ?? undefined,
+    group: searchParams.get("group") ?? undefined,
+    rule: searchParams.get("rule") ?? undefined,
+    pageType: searchParams.get("pageType") ?? undefined,
+  };
+  // P1-3：Pages 全部筛选条件 URL 化（issue 在 pages 视图下 = 按规则过滤受影响页面）
+  const pagesFilters = {
+    health: searchParams.get("health") ?? undefined,
+    status: searchParams.get("status") ?? undefined,
+    depth: searchParams.get("depth") ?? undefined,
+    sdStatus: searchParams.get("sdStatus") ?? undefined,
+    pageType: searchParams.get("pageType") ?? undefined,
+    severity: searchParams.get("severity") ?? undefined,
+    search: searchParams.get("search") ?? undefined,
+    sort: searchParams.get("sort") ?? undefined,
+    dir: searchParams.get("dir") ?? undefined,
+    issue: searchParams.get("issue") ?? undefined,
+  };
+
+  const navigate = useCallback(
+    (params: Record<string, string>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      // 显式 null 值清除对应参数
+      for (const [k, v] of Object.entries(params)) {
+        if (v === "" || v === undefined) next.delete(k);
+        else next.set(k, v);
+      }
+      router.replace(`/app/audit?${next.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  // ---- 数据状态 ----
   const [domain, setDomain] = useState("");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -167,31 +144,33 @@ function AuditPageInner() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [auditing, setAuditing] = useState(false);
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [showUnchanged, setShowUnchanged] = useState(false);
+  // P1-5：运行期来自 status 端点的实时爬取页数（轻量轮询，不拉全量载荷）
+  const [progressPages, setProgressPages] = useState<number | null>(null);
   const [pendingDepth, setPendingDepth] = useState<AuditDepth>("quick");
   const [activeDepth, setActiveDepth] = useState<AuditDepth>("quick");
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadLatest = useCallback(async (d: string) => {
+  const loadLatest = useCallback(async (d: string): Promise<AuditData | null> => {
     setLoading(true);
     try {
       const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(d)}`, { cache: "no-store" });
       const json = await res.json();
       if (res.ok) {
-        setAudit(json.data ?? null);
+        const data = json.data ?? null;
+        setAudit(data);
+        return data;
       }
+      return null;
     } catch {
-      // ignore
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 挂载时拉取项目列表：有项目 → 默认选中第一个并自动加载审计；无项目 → 域名为空
+  // 挂载时拉取项目列表
   const didInitProjectsRef = useRef(false);
   useEffect(() => {
     if (didInitProjectsRef.current) return;
@@ -235,7 +214,7 @@ function AuditPageInner() {
     })();
   }, [loadLatest, searchParams]);
 
-  // 域名变化时加载审计结果（仅手动输入后触发）
+  // 域名变化时加载
   const lastLoadedDomain = useRef<string | null>(null);
   useEffect(() => {
     const d = domain.trim();
@@ -246,16 +225,15 @@ function AuditPageInner() {
     }
   }, [loadLatest, domain]);
 
+  // ---- 审计执行（沿用第一阶段异步模式） ----
   const handleConfirmAudit = async () => {
     const depth = pendingDepth;
     setConfirmOpen(false);
     setStarting(true);
     setActiveDepth(depth);
     setAuditing(true);
-    show(
-      depth === "quick" ? t("toastQuickRunning") : t("toastFullRunning"),
-      "info"
-    );
+    setProgressPages(null);
+    show(depth === "quick" ? t("toastQuickRunning") : t("toastFullRunning"), "info");
     try {
       const res = await fetch("/api/audit/start", {
         method: "POST",
@@ -273,56 +251,57 @@ function AuditPageInner() {
       } catch {
         // ignore
       }
-
-      // 异步模式：start API 返回 status=running，需要轮询直到完成
       if (json.data?.status === "running") {
-        // 立即加载一次（显示 running 状态）
         await loadLatest(domain);
-        // 轮询：每 3 秒查询一次，最多 100 次（5 分钟）
+        // P1-5：运行期只轮询轻量 status 端点（不反复下载完整 latest 载荷）
+        const auditId: number | undefined = json.data.auditId;
         const POLL_INTERVAL = 3000;
         const MAX_POLLS = 100;
+        let finalStatus: string | undefined;
         for (let i = 0; i < MAX_POLLS; i++) {
           await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-          const pollRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
-          const pollJson = await pollRes.json();
-          const status = pollJson.data?.status;
-          if (status === "completed" || status === "failed") {
-            break;
-          }
-          // data=null：审计记录丢失（createAudit 失败或被清理），不再轮询
-          if (pollJson.data === null) {
-            break;
+          if (auditId !== undefined) {
+            try {
+              const pollRes = await fetch(`/api/audit/status?id=${auditId}`, { cache: "no-store" });
+              const pollJson = await pollRes.json();
+              const data = pollJson.data;
+              if (!data) break;
+              if (typeof data.pagesCrawled === "number") setProgressPages(data.pagesCrawled);
+              if (data.status === "completed" || data.status === "failed") {
+                finalStatus = data.status;
+                break;
+              }
+            } catch {
+              // 网络抖动：下轮重试
+            }
+          } else {
+            // 兜底：无 auditId（不应发生）时退回 latest 轮询
+            const pollRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
+            const pollJson = await pollRes.json();
+            const status = pollJson.data?.status;
+            if (status === "completed" || status === "failed") {
+              finalStatus = status;
+              break;
+            }
+            if (pollJson.data === null) break;
           }
         }
-        // 加载最终结果
-        await loadLatest(domain);
-        // 重新查询最新结果判断成功/失败
-        const finalRes = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain.trim())}`, { cache: "no-store" });
-        const finalJson = await finalRes.json();
-        const finalStatus = finalJson.data?.status;
-        if (finalStatus === "completed") {
-          show(
-            t("toastDone", { score: finalJson.data?.healthScore ?? 0, pages: finalJson.data?.pagesCrawled ?? 0 }),
-            "success"
-          );
-        } else if (finalStatus === "failed") {
-          const apiErr = finalJson.data?.error || finalJson?.error;
+        // 完成后仅取一次完整结果（删除原先的重复 latest 请求）
+        const finalAudit = await loadLatest(domain);
+        if (finalAudit?.status === "completed" || finalStatus === "completed") {
+          show(t("toastDone", { score: finalAudit?.healthScore ?? 0, pages: finalAudit?.dashboard?.pagesCrawled ?? finalAudit?.pagesCrawled ?? 0 }), "success");
+        } else if (finalAudit?.status === "failed" || finalStatus === "failed") {
+          const apiErr = finalAudit?.error || json?.error;
           const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
           show(apiErr ? t("apiErrorWithHint", { error: apiErr, hint }) : hint, "error");
-        } else if (finalStatus === "running") {
-          // 轮询超时，审计仍在运行（after() 执行较慢或被限流）
+        } else if (finalAudit?.status === "running") {
           show(t("stillRunning"), "info");
         } else {
-          // data=null：审计记录丢失
           show(t("recordMissing"), "error");
         }
       } else {
-        // 兼容旧同步模式（直接返回结果）
         if (json.data?.status === "completed") {
-          show(
-            t("toastDone", { score: json.data?.healthScore ?? 0, pages: json.data?.pagesCrawled ?? 0 }),
-            "success"
-          );
+          show(t("toastDone", { score: json.data?.healthScore ?? 0, pages: json.data?.pagesCrawled ?? 0 }), "success");
         } else if (json.data?.status === "failed") {
           const apiErr = json.data?.error || json?.error;
           const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
@@ -345,40 +324,27 @@ function AuditPageInner() {
     setConfirmOpen(true);
   };
 
-  // ===== 导出报告 =====
-
+  // ---- PDF 导出 / 保存报告（沿用） ----
   const todayStr = () => {
     const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
   const handleDownloadPdf = async () => {
     if (!audit) return;
     setExporting(true);
     try {
-      // 服务端 PDF 导出权限校验（pdf_export feature gate）
-      // 用 id=0 触发 feature 检查；feature 允许时路由返回 400（id 无效），属正常
       const verifyRes = await fetch(`/api/reports/pdf?id=0`, { cache: "no-store" });
       if (!verifyRes.ok) {
         const json = await verifyRes.json().catch(() => ({}));
-        // 403 = FEATURE_NOT_AVAILABLE（feature 不允许），触发升级引导
-        // 400/404 = feature 允许但 id 无效，继续生成 PDF
         if (verifyRes.status === 403) {
           const { message } = handleBillingError(json, t("pdfNoPermission"));
           show(message, "error");
           return;
         }
       }
-
       const filename = t("pdfFilename", { domain: audit.domain, date: todayStr() });
-      const blob = await generatePDF({
-        title: t("reportTitle", { domain: audit.domain }),
-        filename,
-        elementId: "report-content",
-      });
+      const blob = await generatePDF({ title: t("reportTitle", { domain: audit.domain }), filename, elementId: "report-content" });
       downloadPDF(blob, filename);
       show(t("pdfDownloaded"), "success");
     } catch (err) {
@@ -401,7 +367,6 @@ function AuditPageInner() {
           data_json: JSON.stringify({
             healthScore: audit.healthScore,
             issues: audit.issues,
-            // coverage 一并存入快照：否则历史预览按全量检查集重建，与本次审计深度的口径不一致
             coverage: audit.coverage,
           }),
           project_id: null,
@@ -425,7 +390,6 @@ function AuditPageInner() {
   const handleDomainChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuditing(false);
-    // 手动切换后同步 URL query（replace 不产生历史记录），刷新保持当前选中域名
     const d = domain.trim();
     if (d && searchParams.get("domain") !== d) {
       router.replace(`/app/audit?domain=${encodeURIComponent(d)}`, { scroll: false });
@@ -435,76 +399,32 @@ function AuditPageInner() {
 
   const hasResult = audit && audit.status === "completed";
   const hasFailed = audit && audit.status === "failed";
-  const healthScore = audit?.healthScore ?? 0;
-  const issueCount = audit?.issues.length ?? 0;
+  const hasDashboard = !!audit?.dashboard;
 
-  const filteredIssues = audit
-    ? filter === "all"
-      ? audit.issues
-      : audit.issues.filter((i) => i.severity === filter)
-    : [];
-
-  // ===== 图表数据聚合（前端聚合现有 audit 数据，不加新接口） =====
-  const coverage = audit?.coverage;
-  const coverageByCategory = useMemo(() => {
-    if (!coverage) return [];
-    const groups: Record<string, { passed: number; failed: number }> = {
-      critical: { passed: 0, failed: 0 },
-      warning: { passed: 0, failed: 0 },
-      info: { passed: 0, failed: 0 },
-    };
-    coverage.forEach((c) => {
-      const g = groups[c.category];
-      if (g) {
-        if (c.passed) g.passed += 1;
-        else g.failed += 1;
-      }
-    });
-    return [
-      { category: "critical", passed: groups.critical.passed, failed: groups.critical.failed },
-      { category: "warning", passed: groups.warning.passed, failed: groups.warning.failed },
-      { category: "info", passed: groups.info.passed, failed: groups.info.failed },
-    ];
-  }, [coverage]);
-
-  const passCount = coverage?.filter((c) => c.passed).length ?? 0;
-  const failCount = coverage?.filter((c) => !c.passed).length ?? 0;
-
-  const history = audit?.history;
-  const historyChart = useMemo(() => {
-    if (!history) return [];
-    return history
-      .filter((h) => h.score !== null)
-      .map((h) => ({ date: h.checkedAt, score: h.score as number }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [history]);
-
-  // 响应时间分布（按桶聚合：快<1s / 中1-3s / 慢>3s / 超时）
-  const responseTimeData = useMemo(() => {
-    const pagesDetail = audit?.pagesDetail ?? [];
-    if (!pagesDetail.length) return [];
-    const buckets = [
-      { bucket: "<1s", count: 0 },
-      { bucket: "1-3s", count: 0 },
-      { bucket: "3-10s", count: 0 },
-      { bucket: t("bucketTimeout"), count: 0 },
-    ];
-    for (const p of pagesDetail) {
-      if (!p.ok) {
-        buckets[3].count++;
-      } else if (p.responseTimeMs < 1000) {
-        buckets[0].count++;
-      } else if (p.responseTimeMs < 3000) {
-        buckets[1].count++;
-      } else {
-        buckets[2].count++;
-      }
+  const formatTime = (iso: string | null): string => {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString(intlLocale(locale), { hour12: false });
+    } catch {
+      return iso;
     }
-    return buckets;
-  }, [audit?.pagesDetail, t]);
+  };
+
+  // ---- Tab 定义 ----
+  const tabs: Array<{ key: ViewKey; label: string }> = [
+    { key: "overview", label: t("tabOverview") },
+    { key: "issues", label: t("tabIssues") },
+    { key: "pages", label: t("tabPages") },
+    { key: "linking", label: t("tabLinking") },
+    { key: "structured", label: t("tabStructured") },
+    { key: "ai", label: t("tabAi") },
+    { key: "history", label: t("tabHistory") },
+  ];
 
   return (
-    <div className="dash-container p-6 lg:p-8 print-area">
+    <div className="dash-container p-4 lg:p-8 print-area">
       {/* 打印专用页眉 */}
       <div className="mb-6 hidden border-b border-line pb-3 print:block">
         <div className="font-sans text-xs text-ink-40">{t("printHeader")}</div>
@@ -512,134 +432,128 @@ function AuditPageInner() {
             触发 React 18 生产模式整树客户端重渲染，期间页面事件未挂载（点击「快速审计」无反应）。
             suppressHydrationWarning 抑制该 mismatch，保持 SSR 树有效。 */}
         <h1 className="mt-1 font-display text-xl font-semibold text-ink" suppressHydrationWarning>
-          {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt, locale, tc) : formatTime(new Date().toISOString(), locale, tc)}
+          {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt) : formatTime(new Date().toISOString())}
         </h1>
       </div>
 
-      {/* 页头 */}
-      <div className="flex items-center gap-3 print:hidden">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("title")}
-        </h1>
-        <div className="hairline flex-1" />
-      </div>
-      <p className="mt-2 font-sans text-sm text-ink-60 print:hidden">
-        {t("subtitle")}
-      </p>
-
-      {/* 工具栏 */}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
-        <form onSubmit={handleDomainChange} className="flex items-end gap-2">
-          <div>
-            <label className="font-sans text-xs text-ink-40">{t("domainLabel")}</label>
-            {/* R2：等页面初始化（URL > localStorage > 项目一）确定 domain 后再挂载，
-                避免 DomainSelect 的"无值→选第一个项目"先于初始化生效，出现瞬态覆盖 */}
-            {projectsLoading ? (
-              <div className="mt-2 h-10 w-48 animate-pulse rounded-md border border-line bg-paper" />
-            ) : (
-              <DomainSelect
-                value={domain}
-                onChange={(d) => {
-                  setDomain(d);
-                }}
-                className="mt-2 w-48 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-              />
-            )}
-          </div>
-          <button type="submit" className="btn-secondary">
-            {t("viewBtn")}
-          </button>
-        </form>
-        <div className="flex items-center gap-2">
+      {/* ===== Header（高密度） ===== */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between print:hidden">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("title")}</h1>
+          <p className="mt-1 font-sans text-sm text-ink-60">{t("subtitle")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => openConfirm("quick")}
             disabled={auditing || starting}
             title={auditing || starting ? t("auditInProgress") : undefined}
             className="btn-primary disabled:opacity-60"
           >
-            {auditing && activeDepth === "quick" ? (
-              <>
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 loading-spin">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
-                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                {t("quickAuditing")}
-              </>
-            ) : starting && pendingDepth === "quick" ? (
-              t("starting")
-            ) : (
-              t("quickAudit")
-            )}
+            {auditing && activeDepth === "quick" ? t("quickAuditing") : starting && pendingDepth === "quick" ? t("starting") : t("quickAudit")}
           </button>
           {canFullAudit ? (
-            <button
-              onClick={() => openConfirm("full")}
-              disabled={auditing || starting}
-              title={t("fullAuditTip")}
-              className="btn-secondary disabled:opacity-60"
-            >
-              {auditing && activeDepth === "full" ? (
-                <>
-                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 loading-spin">
-                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
-                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  {t("fullAuditing")}
-                </>
-              ) : starting && pendingDepth === "full" ? (
-                t("starting")
-              ) : (
-                t("fullAudit")
-              )}
+            <button onClick={() => openConfirm("full")} disabled={auditing || starting} title={t("fullAuditTip")} className="btn-secondary disabled:opacity-60">
+              {auditing && activeDepth === "full" ? t("fullAuditing") : starting && pendingDepth === "full" ? t("starting") : t("fullAudit")}
             </button>
           ) : (
-            <Link
-              href="/pricing"
-              title={t("fullAuditProTip")}
-              className="btn-secondary inline-flex items-center gap-2"
-            >
-              <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
-                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <Link href="/pricing" title={t("fullAuditProTip")} className="btn-secondary inline-flex items-center gap-2">
               {t("upgradeFullAudit")}
             </Link>
           )}
           {hasResult && (
-            <button
-              onClick={() => setExportOpen(true)}
-              className="btn-secondary"
-            >
+            <button onClick={() => setExportOpen(true)} className="btn-secondary">
               {t("exportReport")}
             </button>
           )}
         </div>
       </div>
 
-      {/* 上次审计信息 */}
+      {/* ===== Audit Meta 条（域名 / 状态 / 时间 / 页数 / 模式） ===== */}
       {!projectsLoading && (
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-sans text-xs text-ink-40 print:hidden">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3 font-mono text-xs text-ink-40 print:hidden">
+          <form onSubmit={handleDomainChange} className="flex items-center gap-2">
+            {/* R2：等页面初始化（URL > localStorage > 项目一）确定 domain 后再挂载，
+                避免 DomainSelect 的"无值→选第一个项目"先于初始化生效，出现瞬态覆盖 */}
+            {projectsLoading ? (
+              <div className="h-10 w-44 animate-pulse rounded-md border border-line bg-paper" />
+            ) : (
+              <DomainSelect value={domain} onChange={setDomain} className="rounded-md border border-line bg-card px-2 py-1.5 font-mono text-xs text-ink focus:border-ink-25 focus:outline-none" />
+            )}
+            <button type="submit" className="btn-secondary px-2 py-1.5 text-xs">{t("viewBtn")}</button>
+          </form>
           {audit ? (
             <>
-              <span>{t("domainColon")}<span className="text-ink-60">{audit.domain}</span></span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-pos" aria-hidden />
+                {t("statusCompleted")}
+              </span>
               <span>·</span>
-              <span>{t("lastAuditColon")}<span className="text-ink-60">{formatTime(audit.finishedAt ?? audit.startedAt, locale, tc)}</span></span>
+              <span>{t("lastAuditColon")}{formatTime(audit.finishedAt ?? audit.startedAt)}</span>
               <span>·</span>
-              <span>{t("pagesCrawledColon")}<span className="text-ink-60">{t("pagesUnit", { n: audit.pagesCrawled })}</span></span>
-              {audit.status === "running" && (
-                <>
-                  <span>·</span>
-                  <span className="text-warn">{t("auditInProgress")}</span>
-                </>
-              )}
+              <span>
+                {t("crawledColon")}
+                {/* P1-6：单一可信来源——V2 用 dashboard 快照，legacy 才读 DB 列 */}
+                <b className="text-ink">{audit.dashboard ? audit.dashboard.pagesCrawled : audit.pagesCrawled}</b>
+              </span>
+              <span>·</span>
+              <span className="badge-info">{audit.dashboard?.depth === "full" ? t("depthFull") : t("depthQuick")}</span>
+              {audit.dashboard?.partial ? <span className="badge-warn">{t("partialAudit")}</span> : null}
+              {audit.dashboard?.engineVersion ? <span className="badge-info">engine {audit.dashboard.engineVersion} · rules {audit.dashboard.ruleSetVersion}</span> : null}
             </>
           ) : domain.trim() ? (
             <span>{t("noAuditRecord")}</span>
           ) : null}
+          {audit?.status === "running" && <span className="text-warn">{t("auditInProgress")}</span>}
+          {audit?.status === "failed" && <span className="text-neg">{t("failedTitle")}</span>}
+        </div>
+      )}
+
+      {/* 运行进度 */}
+      {auditing && (
+        <div className="card-a mt-4 p-5 print:hidden">
+          <div className="flex items-center justify-between font-sans text-xs text-ink-40">
+            <span>{activeDepth === "quick" ? t("progressQuick") : t("progressFull")}</span>
+            <span className="text-warn">{progressPages !== null ? `${t("crawling")} ${progressPages} / 50` : t("starting")}</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-line-soft">
+            <div className="h-full rounded-full bg-warn transition-all" style={{ width: `${progressPages !== null ? Math.min(100, (progressPages / 50) * 100) : 4}%` }} />
+          </div>
+          <p className="mt-2 font-sans text-xs text-ink-40">{activeDepth === "quick" ? t("etaQuick") : t("etaFull")}</p>
+        </div>
+      )}
+
+      {/* ===== Tab 导航 ===== */}
+      {!loading && hasResult && (
+        <nav className="mt-4 flex flex-wrap gap-1 border-b border-line print:hidden" aria-label={t("navLabel")} role="tablist">
+          {tabs.map((tab) => {
+            const active = view === tab.key;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => navigate({ view: tab.key })}
+                className={`-mb-px border-b-2 px-3 py-2 font-sans text-sm transition-colors ${
+                  active ? "border-brand font-semibold text-ink" : "border-transparent text-ink-40 hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {/* 加载骨架 */}
+      {(loading || projectsLoading) && !auditing && (
+        <div className="mt-6 space-y-4 print:hidden">
+          <TableSkeleton rows={3} />
+          <TableSkeleton rows={6} />
         </div>
       )}
 
       {/* 无项目空态 */}
-      {!projectsLoading && projects.length === 0 && !domain.trim() && (
+      {!projectsLoading && projects.length === 0 && !domain.trim() && !loading && (
         <div className="card-a mt-6 flex flex-col items-center justify-center py-16 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-ink-40">
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -652,560 +566,52 @@ function AuditPageInner() {
         </div>
       )}
 
-      {/* 审计进度条（同步执行，显示加载态） */}
-      {auditing && (
-        <div className="card-a mt-4 p-5 print:hidden">
-          <div className="flex items-center justify-between font-sans text-xs text-ink-40">
-            <span>
-              {activeDepth === "quick" ? t("progressQuick") : t("progressFull")}
-            </span>
-            <span className="text-warn">
-              {activeDepth === "quick" ? t("progressBadgeQuick") : t("progressBadgeFull")}
-            </span>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-line-soft">
-            <div
-              className="h-full rounded-full bg-warn"
-              style={{ width: activeDepth === "quick" ? "100%" : "50%" }}
-            />
-          </div>
-          <p className="mt-2 font-sans text-xs text-ink-40">
-            {activeDepth === "quick"
-              ? t("etaQuick")
-              : t("etaFull")
-            }
-          </p>
-        </div>
-      )}
-
-      {/* 加载骨架 */}
-      {(loading || projectsLoading) && !auditing && (
-        <div className="mt-6 space-y-4 print:hidden">
-          <TableSkeleton rows={3} />
-          <TableSkeleton rows={6} />
-        </div>
-      )}
-
-      {/* 审计失败提示 */}
+      {/* 失败状态 */}
       {!loading && hasFailed && (
         <div className="card-a mt-6 border-neg/30 bg-neg/5 p-5">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
               <div className="font-display text-sm font-semibold text-neg">{t("failedTitle")}</div>
-              <p className="mt-1 font-sans text-sm text-ink-60">
-                {activeDepth === "full"
-                  ? t("failedHintFull")
-                  : t("failedHintDefault")}
-              </p>
-              {audit?.error ? (
-                <p className="mt-1 font-mono text-xs text-ink-40 break-all">
-                  {audit.error}
-                </p>
-              ) : null}
-              <p className="mt-1 font-sans text-xs text-ink-40">
-                {t("domainColon")}{audit?.domain ?? domain} · {formatTime(audit?.finishedAt ?? audit?.startedAt ?? null, locale, tc)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 概览区 */}
-      {!loading && !hasFailed && !projectsLoading && domain.trim() && (
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* 健康度大环 + 较上次变化 */}
-          <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
-            {hasResult ? (
-              <>
-                <ScoreRing score={healthScore} size={140} thickness={10} showLabel />
-                <div className="mt-3 font-display text-base font-semibold text-ink">
-                  {t("healthTitle")}
-                </div>
-                {/* 较上次审计变化 */}
-                {audit?.comparison ? (
-                  <div className="mt-2">
-                    {audit.comparison.previous === null ? (
-                      <span className="badge-info">{t("firstAuditBadge")}</span>
-                    ) : audit.comparison.scoreChange >= 5 ? (
-                      <span className="badge-pos">{t("scoreUp", { n: audit.comparison.scoreChange })}</span>
-                    ) : audit.comparison.scoreChange <= -5 ? (
-                      <span className="badge-err">{t("scoreDown", { n: Math.abs(audit.comparison.scoreChange) })}</span>
-                    ) : (
-                      <span className="badge-info">{t("scoreFlat")}</span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-2 font-mono text-xs text-ink-40">{t("scoreNote")}</div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex h-[140px] w-[140px] items-center justify-center rounded-full border-2 border-dashed border-line">
-                  <span className="font-mono text-xs text-ink-40">{t("noData")}</span>
-                </div>
-                <div className="mt-3 font-display text-base font-semibold text-ink">
-                  {t("healthTitle")}
-                </div>
-                <div className="mt-0.5 font-mono text-xs text-ink-40">
-                  {t("runAuditToShow")}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* 三级问题计数 */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-8">
-            <div className="card-a relative overflow-hidden p-5">
-              <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.error.bar }} />
-              <div className="flex items-center gap-2 pl-2">
-                <span className="h-2 w-2 rounded-full bg-neg" />
-                <span className="font-mono text-xs text-ink-40">{t("sevError")}</span>
-              </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-neg">
-                {formatNumber(audit?.errors ?? 0, locale)}
-              </div>
-              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
-                {t("errCaption")}
-              </div>
-            </div>
-            <div className="card-a relative overflow-hidden p-5">
-              <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.warning.bar }} />
-              <div className="flex items-center gap-2 pl-2">
-                <span className="h-2 w-2 rounded-full bg-warn" />
-                <span className="font-mono text-xs text-ink-40">{t("sevWarning")}</span>
-              </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-warn">
-                {formatNumber(audit?.warnings ?? 0, locale)}
-              </div>
-              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
-                {t("warnCaption")}
-              </div>
-            </div>
-            <div className="card-a relative overflow-hidden p-5">
-              <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig.notice.bar }} />
-              <div className="flex items-center gap-2 pl-2">
-                <span className="h-2 w-2 rounded-full bg-ink-25" />
-                <span className="font-mono text-xs text-ink-40">{t("sevNotice")}</span>
-              </div>
-              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-ink">
-                {formatNumber(audit?.notices ?? 0, locale)}
-              </div>
-              <div className="mt-1 pl-2 font-mono text-xs text-ink-40">
-                {t("noticeCaption")}
+              <p className="mt-1 font-sans text-sm text-ink-60">{activeDepth === "full" ? t("failedHintFull") : t("failedHintDefault")}</p>
+              {audit?.error ? <p className="mt-1 break-all font-mono text-xs text-ink-40">{audit.error}</p> : null}
+              <div className="mt-3">
+                <button onClick={() => openConfirm("quick")} className="btn-primary">{t("retryBtn")}</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 问题清单 */}
-      {!loading && !hasFailed && !projectsLoading && domain.trim() && (
-        <div className="mt-10">
-        {/* 图表区：4 张图 */}
-        {hasResult && (
-          <div className="mt-10">
-            <div className="flex items-center gap-3">
-              <h2 className="font-display text-lg font-semibold text-ink">{t("chartsTitle")}</h2>
-              <div className="hairline flex-1" />
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-              {/* 检查项类别分布 横向堆叠条 */}
-              <ChartCard
-                title={t("chartCoverageTitle")}
-                subtitle={t("chartCoverageSub")}
-                height={240}
-                className="lg:col-span-7"
-              >
-                <AuditCoverageStacked data={coverageByCategory} />
-              </ChartCard>
-
-              {/* 通过情况 donut */}
-              <ChartCard
-                title={t("chartPassTitle")}
-                subtitle={t("chartPassSub", { passed: passCount, failed: failCount })}
-                height={240}
-                className="lg:col-span-5"
-              >
-                <AuditPassDonut passed={passCount} failed={failCount} />
-              </ChartCard>
-
-              {/* 历史分数折线 */}
-              <ChartCard
-                title={t("chartHistoryTitle")}
-                subtitle={t("chartHistorySub")}
-                height={260}
-                className="lg:col-span-7"
-              >
-                <AuditScoreTrend data={historyChart} />
-              </ChartCard>
-
-              {/* 响应时间分布柱状（深度审计页面明细） */}
-              <ChartCard
-                title={t("chartResponseTitle")}
-                subtitle={activeDepth === "full" ? t("chartResponseSubFull") : t("chartResponseSubEmpty")}
-                height={260}
-                className="lg:col-span-5"
-              >
-                <ResponseTimeBars data={responseTimeData} />
-              </ChartCard>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-10">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold text-ink">
-              {t("issuesTitle")}
-            </h2>
-            <span className="font-mono text-xs text-ink-40">
-              {hasResult ? t("issuesCount", { n: issueCount }) : t("noData")}
-            </span>
-          </div>
-
-          {/* 筛选按钮 */}
-          {hasResult && audit && audit.issues.length > 0 && (
-            <div className="mt-3 flex gap-2">
-              {([
-                { key: "all" as const, label: t("filterAll"), count: audit.issues.length },
-                { key: "error" as const, label: t("sevError"), count: audit.issues.filter((i) => i.severity === "error").length },
-                { key: "warning" as const, label: t("sevWarning"), count: audit.issues.filter((i) => i.severity === "warning").length },
-                { key: "notice" as const, label: t("sevNotice"), count: audit.issues.filter((i) => i.severity === "notice").length },
-              ]).map((btn) => (
-                <button
-                  key={btn.key}
-                  onClick={() => setFilter(btn.key)}
-                  className={`rounded-md border h-8 px-3 font-mono text-xs transition-colors ${
-                    filter === btn.key
-                      ? "border-ink-25 bg-ink text-paper"
-                      : "border-line bg-card text-ink-60 hover:border-ink-25 hover:text-ink"
-                  }`}
-                >
-                  {btn.label} <span className="ml-0.5 opacity-60">{btn.count}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {hasResult && audit && audit.issues.length > 0 ? (
-            <div className="card-a mt-4 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-line-soft bg-line-soft/40">
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thCheck")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSeverity")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thAffected")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSampleUrl")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDetail")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredIssues.map((issue) => {
-                      const cfg = severityConfig[issue.severity];
-                      const rowKey = issue.checkId;
-                      const isExpanded = expandedRow === rowKey;
-                      return (
-                        <Fragment key={rowKey}>
-                          <tr
-                            className="border-b border-line-soft transition-colors hover:bg-line-soft/40 cursor-pointer"
-                            onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
-                          >
-                            <td className="px-4 py-3 font-sans text-sm font-medium text-ink">
-                              {issue.checkName}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={cfg.badge}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                                {severityLabel[issue.severity]}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-sm text-ink">
-                              {formatNumber(issue.affectedPages, locale)}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-sm text-ink-60">
-                              <span className="block max-w-[200px] truncate" title={issue.sampleUrl}>
-                                {issue.sampleUrl.replace(/^https?:\/\//, "")}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-sans text-sm text-ink-60">
-                              <div className="flex items-center gap-1">
-                                <span className="truncate">{issue.detail}</span>
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  className={`h-3 w-3 flex-shrink-0 text-ink-40 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                                >
-                                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr className="border-b border-line-soft bg-[#FBFAF4]">
-                              <td colSpan={5} className="px-4 py-3">
-                                <div className="flex flex-col gap-1 font-sans text-xs">
-                                  <span className="text-ink-40">{t("issueDetailLabel")}{issue.detail}</span>
-                                  <span className="text-ink-60">{t("suggestionLabel")}{issue.suggestion ?? "—"}</span>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="card-a mt-4 border border-dashed border-line p-10 text-center">
-              <div className="font-display text-base font-semibold text-ink-40">{t("issuesEmptyTitle")}</div>
-              <p className="mt-2 font-sans text-sm text-ink-40">
-                {audit ? t("issuesEmptyRun") : t("issuesEmptyFirst")}
-              </p>
-            </div>
-          )}
-        </div>
-        </div>
-      )}
-
-      {/* 历史对比区域 */}
-      {!loading && hasResult && audit?.comparison && (
-        <div className="mt-10">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-lg font-semibold text-ink">{t("comparisonTitle")}</h2>
-            <div className="hairline flex-1" />
-          </div>
-
-          {audit.comparison.previous === null ? (
-            <div className="card-a mt-4 p-6 text-center">
-              <span className="badge-info">{t("firstAuditBadge")}</span>
-              <p className="mt-2 font-mono text-xs text-ink-40">
-                {t("firstAuditHint")}
-              </p>
-            </div>
-          ) : (
-            <div className="card-a mt-4 p-5">
-              {/* 上次 vs 本次 */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                {/* 上次 */}
-                <div className="rounded-lg border border-line bg-card p-4">
-                  <div className="font-mono text-xs text-ink-40">{t("prevAuditLabel")}</div>
-                  <div className="mt-1 font-mono text-xs text-ink-60">
-                    {formatTime(audit.comparison.previous.checkedAt, locale, tc)}
-                  </div>
-                  <div className="mt-2 font-mono text-2xl font-semibold text-ink-60">
-                    {audit.comparison.previous.score}
-                    <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs text-ink-40">
-                    {t("issuesUnit", { n: audit.comparison.previous.issues })}
-                  </div>
-                </div>
-
-                {/* 变化箭头 */}
-                <div className="flex flex-col items-center justify-center">
-                  <div className="font-mono text-xs text-ink-40">{t("changeLabel")}</div>
-                  <div className={`mt-1 font-mono text-2xl font-semibold ${
-                    audit.comparison.scoreChange > 0 ? "text-pos" :
-                    audit.comparison.scoreChange < 0 ? "text-neg" : "text-ink-40"
-                  }`}>
-                    {audit.comparison.scoreChange > 0 ? "↑" : audit.comparison.scoreChange < 0 ? "↓" : "→"}
-                    {" "}{Math.abs(audit.comparison.scoreChange)}{" "}{t("pointsUnit")}
-                  </div>
-                  <div className={`mt-0.5 font-mono text-xs ${
-                    audit.comparison.issuesChange < 0 ? "text-pos" :
-                    audit.comparison.issuesChange > 0 ? "text-neg" : "text-ink-40"
-                  }`}>
-                    {audit.comparison.issuesChange > 0 ? "+" : ""}{t("issuesUnit", { n: audit.comparison.issuesChange })}
-                  </div>
-                </div>
-
-                {/* 本次 */}
-                <div className="rounded-lg border-2 border-brand bg-brand/5 p-4">
-                  <div className="font-mono text-xs text-brand">{t("currentAuditLabel")}</div>
-                  <div className="mt-1 font-mono text-xs text-ink-60">
-                    {formatTime(audit.comparison.current.checkedAt, locale, tc)}
-                  </div>
-                  <div className="mt-2 font-mono text-2xl font-semibold text-ink">
-                    {audit.comparison.current.score}
-                    <span className="text-sm text-ink-40">{" "}{t("pointsUnit")}</span>
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs text-ink-40">
-                    {t("issuesUnit", { n: audit.comparison.current.issues })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 新增问题 / 已修复 / 未变化 */}
-              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* 新增问题 */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="badge-err">{t("newBadge")}</span>
-                    <span className="font-mono text-xs text-ink-40">
-                      {t("newIssuesCount", { n: audit.comparison.newIssues.length })}
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {audit.comparison.newIssues.length === 0 ? (
-                      <div className="font-mono text-xs text-ink-40 py-2">{t("noNewIssues")}</div>
-                    ) : (
-                      audit.comparison.newIssues.slice(0, 8).map((issue, idx) => (
-                        <div key={`new-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
-                          <div className="font-sans text-xs text-ink">
-                            {issue.checkName}
-                          </div>
-                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
-                            {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* 已修复 */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="badge-pos">{t("resolvedBadge")}</span>
-                    <span className="font-mono text-xs text-ink-40">
-                      {t("resolvedCount", { n: audit.comparison.resolvedIssues.length })}
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-2">
-                    {audit.comparison.resolvedIssues.length === 0 ? (
-                      <div className="font-mono text-xs text-ink-40 py-2">{t("noResolvedIssues")}</div>
-                    ) : (
-                      audit.comparison.resolvedIssues.slice(0, 8).map((issue, idx) => (
-                        <div key={`resolved-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
-                          <div className="font-sans text-xs text-ink">
-                            {issue.checkName}
-                          </div>
-                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
-                            {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 未变化（折叠） */}
-              {audit.comparison.unchangedIssues.length > 0 && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => setShowUnchanged(!showUnchanged)}
-                    className="font-mono text-xs text-ink-60 hover:text-ink"
-                  >
-                    {showUnchanged ? "▼" : "▶"}{" "}{t("unchangedToggle", { n: audit.comparison.unchangedIssues.length })}
-                  </button>
-                  {showUnchanged && (
-                    <div className="mt-2 space-y-2">
-                      {audit.comparison.unchangedIssues.map((issue, idx) => (
-                        <div key={`unchanged-${idx}`} className="rounded-md border border-line-soft bg-card px-3 py-2">
-                          <div className="font-sans text-xs text-ink-60">
-                            {issue.checkName}
-                          </div>
-                          <div className="mt-0.5 font-mono text-xs text-ink-40 truncate">
-                            {issue.message} · {issue.url.replace(/^https?:\/\//, "")}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 检查项覆盖区域 */}
-      {!loading && hasResult && audit?.coverage && audit.coverage.length > 0 && (
-        <div className="mt-10">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-lg font-semibold text-ink">{t("coverageTitle")}</h2>
-            <div className="hairline flex-1" />
-          </div>
-          <p className="mt-2 font-mono text-xs text-ink-40">
-            {t("coverageSummary", {
-              total: audit.coverage.length,
-              passed: audit.coverage.filter((c) => c.passed).length,
-              failed: audit.coverage.filter((c) => !c.passed).length,
-            })}
-          </p>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {audit.coverage.map((check) => {
-              const catCfg = categoryConfig[check.category];
-              return (
-                <div
-                  key={check.id}
-                  className={`card-a p-4 ${check.passed ? "" : "border-l-2"}`}
-                  style={!check.passed ? { borderLeftColor: catCfg.text === "text-neg" ? "#E14B4B" : catCfg.text === "text-warn" ? "#C98A0A" : "var(--color-ink-25)" } : {}}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-sans text-sm font-medium text-ink">
-                      {check.name}
-                    </span>
-                    {check.passed ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-pos/10">
-                        <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3 text-pos">
-                          <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-neg/10">
-                        <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3 text-neg">
-                          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                        </svg>
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 font-mono text-xs text-ink-40">
-                    {check.description}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className={`badge-${check.category === "critical" ? "err" : check.category === "warning" ? "warn" : "info"}`}>
-                      {categoryLabel[check.category]}
-                    </span>
-                    <span className="font-mono text-xs text-ink-40">
-                      {check.passed ? t("checkPassed") : t("checkAffected", { n: check.affectedPages })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 下一步 CTA：添加关键词追踪（仅在审计成功完成后显示） */}
+      {/* ===== 主内容区 ===== */}
       {!loading && hasResult && audit && (
-        <div className="mt-10">
-          <div className="card-a flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
-            <div>
-              <div className="font-display text-base font-semibold text-ink">
-                {t("nextStepTitle")}
-              </div>
-              <p className="mt-1 font-sans text-sm text-ink-60">
-                {t("nextStepDesc")}
-              </p>
+        <div className="mt-6">
+          {/* 旧引擎审计提示 */}
+          {!hasDashboard && (
+            <div className="mb-4 rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 font-sans text-sm text-warn print:hidden">
+              {t("legacyAuditNote")}
             </div>
-            <Link
-              href={
-                projects.find((p) => p.domain === audit.domain)
-                  ? `/app/position-tracking?projectId=${encodeURIComponent(String(projects.find((p) => p.domain === audit.domain)!.id))}`
-                  : "/app/position-tracking"
-              }
-              className="btn-primary whitespace-nowrap"
-            >
-              {t("nextStepCta")}
-            </Link>
+          )}
+
+          {hasDashboard ? (
+            <RenderDashboard audit={audit} view={view} selectedIssue={selectedIssue} issuesFilters={issuesFilters} pagesFilters={pagesFilters} navigate={navigate} />
+          ) : (
+            <LegacyResult audit={audit} activeDepth={activeDepth} locale={locale} />
+          )}
+        </div>
+      )}
+      {/* 无审计记录 */}
+      {!loading && !hasResult && !hasFailed && !auditing && !projectsLoading && domain.trim() && (
+        <div className="card-a mt-6 flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-line text-ink-40">
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="mt-3 font-sans text-sm font-medium text-ink">{t("noAuditRecord")}</div>
+          <p className="mt-1 font-sans text-xs text-ink-40">{t("runAuditToShow")}</p>
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => openConfirm("quick")} className="btn-primary">{t("quickAudit")}</button>
           </div>
         </div>
       )}
@@ -1217,18 +623,8 @@ function AuditPageInner() {
         title={pendingDepth === "quick" ? t("confirmQuickTitle") : t("confirmFullTitle")}
         footer={
           <>
-            <button
-              onClick={() => setConfirmOpen(false)}
-              className="btn-secondary"
-            >
-              {tc("cancel")}
-            </button>
-            <button
-              onClick={handleConfirmAudit}
-              className="btn-primary"
-            >
-              {t("confirmAuditBtn")}
-            </button>
+            <button onClick={() => setConfirmOpen(false)} className="btn-secondary">{tc("cancel")}</button>
+            <button onClick={handleConfirmAudit} className="btn-primary">{t("confirmAuditBtn")}</button>
           </>
         }
       >
@@ -1259,38 +655,19 @@ function AuditPageInner() {
         </div>
       </Modal>
 
-      {/* 导出报告 Modal */}
-      <Modal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        title={t("exportTitle")}
-      >
+      {/* 导出 Modal */}
+      <Modal open={exportOpen} onClose={() => setExportOpen(false)} title={t("exportTitle")}>
         <div className="space-y-3">
-          <p className="font-sans text-xs text-ink-60">
-            {t("exportMeta", { domain: audit?.domain ?? "", score: audit?.healthScore ?? 0 })}
-          </p>
+          <p className="font-sans text-xs text-ink-60">{t("exportMeta", { domain: audit?.domain ?? "", score: audit?.healthScore ?? 0 })}</p>
           <div className="flex flex-col gap-2">
             {canExportPdf ? (
-              <button
-                onClick={handleDownloadPdf}
-                disabled={exporting || saving}
-                className="btn-primary disabled:opacity-60"
-              >
+              <button onClick={handleDownloadPdf} disabled={exporting || saving} className="btn-primary disabled:opacity-60">
                 {exporting ? t("generating") : t("downloadPdf")}
               </button>
             ) : (
-              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-2">
-                <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
-                  <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {t("upgradePdf")}
-              </Link>
+              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-2">{t("upgradePdf")}</Link>
             )}
-            <button
-              onClick={handleSaveToReports}
-              disabled={exporting || saving}
-              className="btn-secondary disabled:opacity-60"
-            >
+            <button onClick={handleSaveToReports} disabled={exporting || saving} className="btn-secondary disabled:opacity-60">
               {saving ? t("saving") : t("saveToReports")}
             </button>
           </div>
@@ -1301,31 +678,190 @@ function AuditPageInner() {
         </div>
       </Modal>
 
-      {/* 隐藏的审计报告渲染容器（用于 PDF 生成） */}
+      {/* 隐藏的 PDF 渲染容器 */}
       {hasResult && audit && (
         <div style={{ position: "fixed", left: -9999, top: 0, pointerEvents: "none", opacity: 0 }}>
           <AuditReport
             projectName={audit.domain}
             domain={audit.domain}
             healthScore={audit.healthScore ?? 0}
-            issues={audit.issues.map((i) => ({
-              type: i.checkId,
-              severity: i.severity,
-              url: i.sampleUrl,
-              detail: i.detail,
-              suggestion: i.suggestion ?? "",
-            }))}
-            coverage={audit.coverage.map((c) => ({
-              id: c.id,
-              name: c.name,
-              passed: c.passed,
-            }))}
-            generatedAt={formatTime(audit.finishedAt ?? audit.startedAt, locale, tc)}
+            issues={audit.issues.map((i) => ({ type: i.checkId, severity: i.severity, url: i.sampleUrl, detail: i.detail, suggestion: i.suggestion ?? "" }))}
+            coverage={audit.coverage.map((c) => ({ id: c.id, name: c.name, passed: c.passed }))}
+            generatedAt={formatTime(audit.finishedAt ?? audit.startedAt)}
           />
         </div>
       )}
 
       <Toast />
+    </div>
+  );
+}
+
+// ===== Dashboard 视图路由（单一数据源） =====
+
+function RenderDashboard({
+  audit,
+  view,
+  selectedIssue,
+  issuesFilters,
+  pagesFilters,
+  navigate,
+}: {
+  audit: AuditData;
+  view: ViewKey;
+  selectedIssue: string | null;
+  issuesFilters: { severity?: string; category?: string; search?: string; sort?: string; group?: string; rule?: string; pageType?: string };
+  pagesFilters: {
+    health?: string;
+    status?: string;
+    depth?: string;
+    sdStatus?: string;
+    pageType?: string;
+    severity?: string;
+    search?: string;
+    sort?: string;
+    dir?: string;
+    issue?: string;
+  };
+  navigate: (p: Record<string, string>) => void;
+}) {
+  const snapshot = audit.dashboard!;
+  const go = (p: Record<string, string>) => navigate({ view: p.view ?? "issues", ...p });
+  // P1-4：来自 comparison 的真实新增问题规则（禁止按时间猜测；无对比数据则不显示）
+  const newRuleIds = new Set((audit.comparison?.newIssues ?? []).map((i) => i.checkId));
+
+  if (view === "issues") {
+    return <IssuesCenter snapshot={snapshot} issue={selectedIssue} filters={issuesFilters} newRuleIds={newRuleIds} onNavigate={go} />;
+  }
+  if (view === "pages") {
+    return (
+      <CrawledPages
+        snapshot={snapshot}
+        filters={pagesFilters}
+        onNavigate={(p) => navigate({ view: "pages", ...p })}
+        onOpenIssue={(ruleId) => navigate({ view: "issues", issue: ruleId })}
+      />
+    );
+  }
+  if (view === "linking") {
+    return (
+      <div className="space-y-4">
+        <LinkingSection snapshot={snapshot} onOpenPages={(params) => navigate({ view: "pages", ...params })} />
+        <CrawlerStatsSection snapshot={snapshot} />
+      </div>
+    );
+  }
+  if (view === "structured") {
+    return <StructuredDataSection snapshot={snapshot} onNavigate={go} />;
+  }
+  if (view === "ai") {
+    return <AiSearchSection snapshot={snapshot} />;
+  }
+  if (view === "history") {
+    return <HistorySection history={audit.history} />;
+  }
+  return <AuditOverview snapshot={snapshot} history={audit.history} comparison={audit.comparison} onNavigate={navigate} />;
+}
+
+// ===== 旧引擎审计的降级视图 =====
+
+function LegacyResult({
+  audit,
+  activeDepth,
+  locale,
+}: {
+  audit: AuditData;
+  activeDepth: AuditDepth;
+  locale: Locale;
+}) {
+  const t = useTranslations("dashboard.audit");
+  const healthScore = audit.healthScore ?? 0;
+  const filtered = audit.issues;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="card-a flex flex-col items-center justify-center p-6 lg:col-span-4">
+          <ScoreRing score={healthScore} size={140} thickness={10} showLabel />
+          <div className="mt-3 font-display text-base font-semibold text-ink">{t("healthTitle")}</div>
+          {audit.comparison?.previous ? (
+            <div className="mt-2">
+              {audit.comparison.scoreChange >= 5 ? (
+                <span className="badge-pos">{t("scoreUp", { n: audit.comparison.scoreChange })}</span>
+              ) : audit.comparison.scoreChange <= -5 ? (
+                <span className="badge-err">{t("scoreDown", { n: Math.abs(audit.comparison.scoreChange) })}</span>
+              ) : (
+                <span className="badge-info">{t("scoreFlat")}</span>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 font-mono text-xs text-ink-40">{t("scoreNote")}</div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-8">
+          {(["error", "warning", "notice"] as const).map((sev) => (
+            <div key={sev} className="card-a relative overflow-hidden p-5">
+              <span className="absolute left-0 top-0 h-full w-0.5" style={{ backgroundColor: severityConfig[sev].bar }} />
+              <div className="flex items-center gap-2 pl-2">
+                <span className={`h-2 w-2 rounded-full ${severityConfig[sev].dot}`} />
+                <span className="font-mono text-xs text-ink-40">{t(`sev${sev === "error" ? "Error" : sev === "warning" ? "Warning" : "Notice"}`)}</span>
+              </div>
+              <div className="mt-2 pl-2 font-mono text-3xl font-semibold text-ink">
+                {formatNumber(sev === "error" ? audit.errors : sev === "warning" ? audit.warnings : audit.notices, locale)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card-a p-5">
+        <h2 className="font-display text-lg font-semibold text-ink">{t("issuesTitle")}</h2>
+        {filtered.length === 0 ? (
+          <p className="mt-4 font-sans text-sm text-ink-40">{t("issuesEmptyTitle")}</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-line-soft bg-line-soft/40 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">
+                  <th className="px-3 py-2 text-left font-semibold">{t("thCheck")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t("thSeverity")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t("thAffected")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t("thSampleUrl")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((issue) => (
+                  <tr key={issue.checkId} className="border-b border-line-soft">
+                    <td className="px-3 py-2 font-sans text-sm text-ink">{issue.checkName}</td>
+                    <td className="px-3 py-2">
+                      <span className={severityConfig[issue.severity].badge}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${severityConfig[issue.severity].dot}`} />
+                        {t(`sev${issue.severity === "error" ? "Error" : issue.severity === "warning" ? "Warning" : "Notice"}`)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-sm text-ink">{issue.affectedPages}</td>
+                    <td className="px-3 py-2 font-mono  text-ink-60">{issue.sampleUrl.replace(/^https?:\/\//, "")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {audit.history.length > 1 && (
+        <div className="card-a p-5">
+          <h2 className="font-display text-lg font-semibold text-ink">{t("chartHistoryTitle")}</h2>
+          <p className="mt-1 font-mono text-xs text-ink-40">{t("chartHistorySub")}</p>
+          <div className="mt-3 h-44">
+            <AuditScoreTrend
+              data={audit.history
+                .filter((h) => h.score !== null)
+                .map((h) => ({ date: h.checkedAt, score: h.score as number }))}
+            />
+          </div>
+        </div>
+      )}
+      <p className="font-mono text-xs text-ink-40">{t("legacyDetailNote")} · {activeDepth}</p>
     </div>
   );
 }

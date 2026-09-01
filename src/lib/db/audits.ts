@@ -17,6 +17,12 @@ export interface AuditRow {
   error: string | null;
   depth: "quick" | "full";
   pages_detail: string | null;
+  /** Audit Engine V2：引擎版本（如 v2） */
+  engine_version: string | null;
+  /** Audit Engine V2：规则集版本（如 2.0） */
+  rule_set_version: string | null;
+  /** Audit Dashboard V2：完整快照 JSON（页面/规则/分数/分类/报告） */
+  dashboard_json: string | null;
 }
 
 export interface AuditIssueRow {
@@ -54,6 +60,9 @@ function rowToAudit(row: Record<string, unknown>): AuditRow {
     error: row.error ? String(row.error) : null,
     depth: (row.depth === "full" ? "full" : "quick"),
     pages_detail: row.pages_detail ? String(row.pages_detail) : null,
+    engine_version: row.engine_version ? String(row.engine_version) : null,
+    rule_set_version: row.rule_set_version ? String(row.rule_set_version) : null,
+    dashboard_json: row.dashboard_json ? String(row.dashboard_json) : null,
   };
 }
 
@@ -74,6 +83,11 @@ export async function finishAudit(
     comparison?: string | null;
     error?: string | null;
     pages_detail?: string | null;
+    /** Audit Engine V2 版本号（写库，供历史解释） */
+    engine_version?: string | null;
+    rule_set_version?: string | null;
+    /** Audit Dashboard V2 完整快照 JSON */
+    dashboard_json?: string | null;
   }
 ): Promise<void> {
   const db = await getAdapter();
@@ -84,7 +98,10 @@ export async function finishAudit(
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
         comparison = COALESCE(?, comparison),
         error = COALESCE(?, error),
-        pages_detail = COALESCE(?, pages_detail)
+        pages_detail = COALESCE(?, pages_detail),
+        engine_version = COALESCE(?, engine_version),
+        rule_set_version = COALESCE(?, rule_set_version),
+        dashboard_json = COALESCE(?, dashboard_json)
     WHERE id = ? AND user_id = ? AND status = 'running'
   `, [
     params.health_score,
@@ -95,6 +112,9 @@ export async function finishAudit(
     params.comparison ?? null,
     params.error ?? null,
     params.pages_detail ?? null,
+    params.engine_version ?? null,
+    params.rule_set_version ?? null,
+    params.dashboard_json ?? null,
     id,
     userId
   ]);

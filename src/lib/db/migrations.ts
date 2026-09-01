@@ -263,6 +263,9 @@ async function migrate(db: DBAdapter): Promise<void> {
       comparison TEXT,
       error TEXT,
       depth TEXT NOT NULL DEFAULT 'quick',
+      engine_version TEXT,
+      rule_set_version TEXT,
+      dashboard_json TEXT,
       user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
@@ -693,6 +696,24 @@ async function migrate(db: DBAdapter): Promise<void> {
   // 审计表新增 pages_detail 字段（JSON：[{url, responseTimeMs, status}]，用于响应时间分布图）
   try {
     await db.run(`ALTER TABLE audits ADD COLUMN pages_detail TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+
+  // Audit Engine V2：记录引擎与规则集版本，规则演进后历史结果仍可解释
+  try {
+    await db.run(`ALTER TABLE audits ADD COLUMN engine_version TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    await db.run(`ALTER TABLE audits ADD COLUMN rule_set_version TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  // Audit Dashboard V2：完整快照（页面/规则/分数/分类/报告），Dashboard 单一数据源
+  try {
+    await db.run(`ALTER TABLE audits ADD COLUMN dashboard_json TEXT`);
   } catch {
     // 字段已存在，忽略
   }

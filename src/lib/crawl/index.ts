@@ -14,6 +14,36 @@ export interface CrawlResult {
   responseTimeMs: number;
 }
 
+/** 一次重定向跳转记录（用于 Redirect Chain / Loop 检测） */
+export interface RedirectHop {
+  /** 发起跳转的 URL */
+  url: string;
+  /** 重定向状态码（301/302/307/308 等） */
+  status: number;
+  /** Location 头原始值（可能为相对路径） */
+  location: string | null;
+}
+
+/** 带重定向链信息的抓取结果（Audit Engine V2 使用） */
+export interface DetailedFetchResult {
+  requestedUrl: string;
+  /** 最终 URL（重定向跟随到底，或环/超限时的最后一个 URL） */
+  finalUrl: string;
+  /** 最终 HTTP 状态（环/超限时为最后一条重定向状态） */
+  status: number;
+  /** 2xx 时为响应体，否则为空串 */
+  html: string;
+  /** 全程（含所有 hop）总耗时 */
+  responseTimeMs: number;
+  redirectChain: RedirectHop[];
+  /** 跟随的重定向次数 */
+  hops: number;
+  isLoop: boolean;
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+export const MAX_REDIRECT_HOPS = 10;
+
 export class CrawlError extends Error {
   code: "TIMEOUT" | "NETWORK" | "HTTP_ERROR" | "INVALID_URL";
   constructor(
@@ -68,38 +98,140 @@ export function validateUrlSafety(rawUrl: string): URL {
   return url;
 }
 
-/** 抓取单个页面 */
-export async function fetchPage(rawUrl: string, timeoutMs: number = TIMEOUT_MS): Promise<CrawlResult> {
-  const url = validateUrlSafety(rawUrl);
-
+/**
+ * 抓取页面并手动跟随重定向，记录完整重定向链（hop 数 / Location / 环检测）。
+ * - 301/302/303/307/308 跟随，最多 maxHops 次
+ * - 链中出现重复 URL → isLoop = true（不再继续请求）
+ * - 非 2xx 最终响应：status 原样返回、html 为空串（由调用方决定如何归类）
+ * - 超时 / 网络错误抛 CrawlError（与 fetchPage 一致）
+ */
+export async function fetchPageWithRedirects(
+  rawUrl: string,
+  timeoutMs: number = TIMEOUT_MS,
+  maxHops: number = MAX_REDIRECT_HOPS
+): Promise<DetailedFetchResult> {
+  const startUrl = validateUrlSafety(rawUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const start = Date.now();
+  const t0 = Date.now();
+  const chain: RedirectHop[] = [];
+  const seen = new Set<string>([startUrl.toString()]);
+  let current = startUrl.toString();
 
+  try {
+    for (;;) {
+      const res = await fetch(current, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        },
+        redirect: "manual",
+        cache: "no-store",
+      });
+
+      if (REDIRECT_STATUSES.has(res.status)) {
+        const location = res.headers.get("location");
+        // 重定向响应体无价值，尽早取消以节省带宽
+        try { await res.body?.cancel(); } catch { /* ignore */ }
+
+        const terminalRec = (finalUrl: string, isLoop: boolean): DetailedFetchResult => ({
+          requestedUrl: startUrl.toString(),
+          finalUrl,
+          status: res.status,
+          html: "",
+          responseTimeMs: Date.now() - t0,
+          redirectChain: chain,
+          hops: chain.length,
+          isLoop,
+        });
+
+        if (!location) {
+          // 重定向状态但无 Location：按终态处理
+          return terminalRec(current, false);
+        }
+        let next: URL;
+        try {
+          next = new URL(location, current);
+        } catch {
+          return terminalRec(current, false);
+        }
+        chain.push({ url: current, status: res.status, location });
+
+        if (seen.has(next.toString())) {
+          // 重定向环：A → B → A
+          return terminalRec(next.toString(), true);
+        }
+        seen.add(next.toString());
+        if (chain.length >= maxHops) {
+          // 超过最大跳数：停止跟随，按链终态处理
+          return terminalRec(next.toString(), false);
+        }
+        current = next.toString();
+        continue;
+      }
+
+      // 终态响应
+      const html = res.ok ? await res.text() : "";
+      return {
+        requestedUrl: startUrl.toString(),
+        finalUrl: current,
+        status: res.status,
+        html,
+        responseTimeMs: Date.now() - t0,
+        redirectChain: chain,
+        hops: chain.length,
+        isLoop: false,
+      };
+    }
+  } catch (e) {
+    if (e instanceof CrawlError) throw e;
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new CrawlError("TIMEOUT", `抓取超时（${timeoutMs / 1000}s）：${rawUrl}`);
+    }
+    throw new CrawlError("NETWORK", `网络错误：${(e as Error).message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 抓取单个页面（跟随重定向；HTTP 错误抛 CrawlError） */
+export async function fetchPage(rawUrl: string, timeoutMs: number = TIMEOUT_MS): Promise<CrawlResult> {
+  const r = await fetchPageWithRedirects(rawUrl, timeoutMs);
+  if (r.status >= 400) {
+    throw new CrawlError("HTTP_ERROR", `HTTP ${r.status}`);
+  }
+  return {
+    url: r.finalUrl,
+    html: r.html,
+    status: r.status,
+    responseTimeMs: r.responseTimeMs,
+  };
+}
+
+/**
+ * 仅获取 URL 的 HTTP 状态（GET + 拿到响应头即取消，不下载正文）。
+ * 用于 sitemap URL 抽检（4xx/5xx/redirect 检测），返回 Location 便于识别重定向。
+ */
+export async function fetchUrlStatus(
+  rawUrl: string,
+  timeoutMs: number = 6000
+): Promise<{ status: number; location: string | null }> {
+  const url = validateUrlSafety(rawUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url.toString(), {
       signal: controller.signal,
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-      },
-      redirect: "follow",
+      headers: { "User-Agent": USER_AGENT },
+      redirect: "manual",
       cache: "no-store",
     });
-    const responseTimeMs = Date.now() - start;
-    const html = await res.text();
-    if (!res.ok) {
-      throw new CrawlError("HTTP_ERROR", `HTTP ${res.status} ${res.statusText}`);
-    }
-    return {
-      url: res.url || url.toString(),
-      html,
-      status: res.status,
-      responseTimeMs,
-    };
+    const location = res.headers.get("location");
+    try { await res.body?.cancel(); } catch { /* ignore */ }
+    return { status: res.status, location };
   } catch (e) {
-    if (e instanceof CrawlError) throw e;
     if (e instanceof DOMException && e.name === "AbortError") {
       throw new CrawlError("TIMEOUT", `抓取超时（${timeoutMs / 1000}s）：${rawUrl}`);
     }
@@ -137,11 +269,45 @@ export interface PageData {
   viewport: string | null;
   ogTitle: string | null;
   ogDescription: string | null;
+  ogImage: string | null;
   twitterCard: string | null;
   favicon: string | null;
   hasStructuredData: boolean;
   structuredDataRaw: string[];
   inlineStyleLength: number;
+
+  // ===== Audit Engine V2 扩展（均为可选，兼容既有构造方） =====
+  /** 爬取深度（起始页 0，每跟随一次内链 +1） */
+  depth?: number;
+  /** 本次抓取实际请求的 URL（可能经重定向到 finalUrl） */
+  requestedUrl?: string;
+  /** 跟随的重定向次数 */
+  redirectHops?: number;
+  /** 重定向链 */
+  redirectChain?: RedirectHop[];
+  /** 是否检测到重定向环 */
+  isRedirectLoop?: boolean;
+  /** 原始 HTML 大小（字符数） */
+  htmlSize?: number;
+  /** <style> 内容 + style 属性总大小（字符数） */
+  cssSize?: number;
+  /** <script> 内容总大小（字符数） */
+  scriptSize?: number;
+  /** 排除 boilerplate 后的可见正文字符数 */
+  visibleTextSize?: number;
+  /** 语义化标签存在情况 */
+  semantic?: {
+    main: boolean;
+    nav: boolean;
+    article: boolean;
+    header: boolean;
+    footer: boolean;
+    section: boolean;
+  };
+  /** 主内容区语义标签（main/article/section）命中数 */
+  semanticMainCount?: number;
+  /** 完整标题大纲（h1-h6，按文档顺序） */
+  headings?: Array<{ level: number; text: string }>;
 }
 
 /** 用 cheerio 解析 HTML */
@@ -188,6 +354,8 @@ export function parsePage(html: string, baseUrl: string): PageData {
     $('link[rel="icon"]').attr("href")?.trim() ||
     $('link[rel="shortcut icon"]').attr("href")?.trim() ||
     null;
+  const ogImage = $('meta[property="og:image"]').attr("content")?.trim() || null;
+
   const structuredDataRaw: string[] = [];
   $('script[type="application/ld+json"]').each((_, el) => {
     const raw = $(el).html();
@@ -198,6 +366,37 @@ export function parsePage(html: string, baseUrl: string): PageData {
   let inlineStyleLength = 0;
   $("style").each((_, el) => {
     inlineStyleLength += $(el).html()?.length ?? 0;
+  });
+  let styleAttrLength = 0;
+  $("[style]").each((_, el) => {
+    styleAttrLength += ($(el).attr("style") || "").length;
+  });
+  const cssSize = inlineStyleLength + styleAttrLength;
+  let scriptSize = 0;
+  $("script").each((_, el) => {
+    scriptSize += $(el).html()?.length ?? 0;
+  });
+  const htmlSize = html.length;
+
+  // 语义化 HTML 检测（在移除 boilerplate 前统计）
+  const semantic = {
+    main: $("main").length > 0,
+    nav: $("nav").length > 0,
+    article: $("article").length > 0,
+    header: $("header").length > 0,
+    footer: $("footer").length > 0,
+    section: $("section").length > 0,
+  };
+  const semanticMainCount =
+    (semantic.main ? 1 : 0) + (semantic.article ? 1 : 0) + (semantic.section ? 1 : 0);
+
+  // 完整标题大纲 h1-h6（逗号选择器按文档顺序返回，用于标题层级检测）
+  const headings: Array<{ level: number; text: string }> = [];
+  $("h1, h2, h3, h4, h5, h6").each((_, el) => {
+    const tag = (el as { tagName?: string }).tagName?.toLowerCase() ?? "";
+    const level = Number(tag.replace("h", ""));
+    const t = $(el).text().trim();
+    if (level >= 1 && level <= 6 && t) headings.push({ level, text: t });
   });
 
   const images: { src: string; alt: string | null }[] = [];
@@ -236,13 +435,24 @@ export function parsePage(html: string, baseUrl: string): PageData {
     });
   });
 
-  // 移除 script/style/nav 后取正文
-  $("script, style, nav, footer, header, noscript").remove();
+  // 正文提取：移除脚本/样式/导航类 boilerplate 后取正文
+  // nav/footer/header/aside 属于布局重复内容；cookie/consent 类横幅按常见命名兜底排除
+  $(
+    "script, style, noscript, template, svg, iframe, nav, footer, header, aside"
+  ).remove();
+  try {
+    $(
+      '[id*="cookie" i], [class*="cookie" i], [id*="consent" i], [class*="consent" i], [id*="banner" i]'
+    ).remove();
+  } catch {
+    // 选择器不受支持时忽略（不影响正文提取）
+  }
   const bodyText = $("body").text().replace(/\s+/g, " ").trim();
   // 字数估算：中文按字符数 + 英文按单词数
   const cjk = (bodyText.match(/[\u4e00-\u9fa5]/g) || []).length;
   const en = (bodyText.match(/[a-zA-Z]+/g) || []).length;
   const wordCount = cjk + en;
+  const visibleTextSize = bodyText.length;
 
   return {
     url: baseUrl,
@@ -261,11 +471,19 @@ export function parsePage(html: string, baseUrl: string): PageData {
     viewport,
     ogTitle,
     ogDescription,
+    ogImage,
     twitterCard,
     favicon,
     hasStructuredData,
     structuredDataRaw,
     inlineStyleLength,
+    htmlSize,
+    cssSize,
+    scriptSize,
+    visibleTextSize,
+    semantic,
+    semanticMainCount,
+    headings,
   };
 }
 

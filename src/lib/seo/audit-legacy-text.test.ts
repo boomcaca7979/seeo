@@ -3,9 +3,19 @@ import {
   localizeLegacyDetail,
   localizeLegacySuggestion,
 } from "@/lib/seo/audit-legacy-text";
-import { perPageChecks, crossPageChecks } from "@/lib/seo/audit-checks";
+import {
+  auditRules,
+  pageRuleIds,
+  siteRuleIds,
+  runAuditRules,
+  executionToIssues,
+  normalizePage,
+  type AuditContext,
+  type FetchRecord,
+  type AuditIssue,
+} from "@/lib/seo/audit-checks";
+import { pickText } from "@/lib/seo/audit-ltext";
 import type { PageData } from "@/lib/crawl";
-import type { AuditIssue } from "@/lib/seo/audit-checks";
 
 /**
  * 历史 Audit 存量双语化测试：
@@ -83,6 +93,7 @@ describe("legacy catalog 覆盖率（与当前 audit-checks zh 文案对齐）",
   function makeFailingPage(): PageData {
     return {
       url: "http://example.com/",
+      finalUrl: "http://example.com/",
       title: "",
       metaDescription: null,
       canonical: null,
@@ -98,22 +109,52 @@ describe("legacy catalog 覆盖率（与当前 audit-checks zh 文案对齐）",
       viewport: null,
       ogTitle: null,
       ogDescription: null,
+      ogImage: null,
       twitterCard: null,
       favicon: null,
       hasStructuredData: false,
       structuredDataRaw: [],
       inlineStyleLength: 0,
-      finalUrl: "http://example.com/",
     };
   }
 
+  /** 用当前 catalog 在"全面失败页面"上运行页面级规则，收集 issue */
+  function collectPageIssues(): AuditIssue[] {
+    const page = makeFailingPage();
+    const rec: FetchRecord = {
+      url: page.url,
+      finalUrl: page.finalUrl ?? page.url,
+      status: 200,
+      responseTimeMs: 100,
+      hops: 0,
+      redirectChain: [],
+      isLoop: false,
+      ok: true,
+      source: "start",
+      depth: 0,
+    };
+    const linkGraph = new Map<string, Set<string>>();
+    const ctx: AuditContext = {
+      baseUrl: "http://example.com/",
+      origin: "http://example.com",
+      depth: "full",
+      crawlLimit: 50,
+      pages: [normalizePage(page, rec, linkGraph)],
+      fetchRecords: [rec],
+      linkGraph,
+      robots: { status: "ok", httpStatus: 200, text: "", universalDisallow: [], disallowAll: false, sitemapUrls: [], aiCrawlers: {} },
+      sitemap: null,
+      llmsTxt: null,
+      indexablePages: 1,
+    };
+    return runAuditRules(ctx).flatMap((ex) => executionToIssues(ex));
+  }
+
   it("当前 catalog 全部静态 message/suggestion zh 文案均能映射为英文", () => {
-    // 用当前 catalog 生成一批 issue（zh 侧 LText 与历史纯文本一致）
-    const issues: AuditIssue[] = [
-      ...perPageChecks.flatMap((c) => c.check(makeFailingPage(), "http://example.com/") ?? []),
-      // 逐个触发静态 message 的检查（makeFailingPage 触发大多数静态项）
-    ];
-    // manually include cross-page static messages
+    // 页面级规则产生的全部 message/suggestion（zh 侧 LText 与历史纯文本一致）
+    const issues = collectPageIssues();
+    expect(issues.length).toBeGreaterThan(0);
+    // 逐个触发静态 message 的检查（makeFailingPage 触发大多数静态项）
     const staticCrossMessages = [
       "robots.txt 中未声明 Sitemap",
       "起始页未能解析，单页检查项未执行，本次审计结果不可用",
@@ -122,18 +163,13 @@ describe("legacy catalog 覆盖率（与当前 audit-checks zh 文案对齐）",
       expect(localizeLegacyDetail(zh, "en")).not.toBe(zh);
     }
 
-    // perPage 检查产生的 message：动态的按模式断言，静态的必须精确映射
     for (const issue of issues) {
-      const zh = typeof issue.message === "string" ? issue.message : issue.message.zh;
+      const zh = pickText(issue.message, "zh");
       const en = localizeLegacyDetail(zh, "en");
       expect(en, `detail 未映射: ${zh}`).not.toBe(zh);
-      const enSug = localizeLegacySuggestion(
-        typeof issue.suggestion === "string" ? issue.suggestion : issue.suggestion.zh,
-        "en"
-      );
-      expect(enSug, `suggestion 未映射: ${typeof issue.suggestion === "string" ? issue.suggestion : issue.suggestion.zh}`).not.toBe(
-        typeof issue.suggestion === "string" ? issue.suggestion : issue.suggestion.zh
-      );
+      const zhSug = pickText(issue.suggestion, "zh");
+      const enSug = localizeLegacySuggestion(zhSug, "en");
+      expect(enSug, `suggestion 未映射: ${zhSug}`).not.toBe(zhSug);
     }
   });
 
@@ -154,7 +190,19 @@ describe("legacy catalog 覆盖率（与当前 audit-checks zh 文案对齐）",
   it("重复类跨页检查的动态 message zh 文案能映射", () => {
     const zh = '"Home" 在 2 个页面重复';
     expect(localizeLegacyDetail(zh, "en")).toBe('"Home" duplicated across 2 pages');
-    // crossPageChecks 元数据存在性（防 catalog 漂移）
-    expect(crossPageChecks.length).toBeGreaterThanOrEqual(5);
+    // 站点级规则元数据存在性（防 catalog 漂移）
+    expect(siteRuleIds.size).toBeGreaterThanOrEqual(5);
+  });
+
+  it("规则目录完整性：全部规则具备双语 name/description/recommendation", () => {
+    for (const rule of auditRules) {
+      expect(pickText(rule.name, "en"), `${rule.id} name.en`).toBeTruthy();
+      expect(pickText(rule.name, "zh"), `${rule.id} name.zh`).toBeTruthy();
+      expect(pickText(rule.description, "en"), `${rule.id} desc.en`).toBeTruthy();
+      expect(pickText(rule.description, "zh"), `${rule.id} desc.zh`).toBeTruthy();
+      expect(pickText(rule.recommendation, "en"), `${rule.id} rec.en`).toBeTruthy();
+      expect(pickText(rule.recommendation, "zh"), `${rule.id} rec.zh`).toBeTruthy();
+    }
+    expect(pageRuleIds.size).toBeGreaterThanOrEqual(20);
   });
 });

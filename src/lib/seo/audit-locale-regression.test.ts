@@ -1,4 +1,4 @@
-// ===== Audit 全链路深层国际化回归测试（语言污染扫描）=====
+// ===== Audit 全链路深层国际化回归测试（语言污染扫描） =====
 //
 // 覆盖：
 // 1. 标准 checks 双语完整性：所有 check 的 name/description 及触发的
@@ -8,19 +8,25 @@
 // 3. 统一读取层 resolver 双向映射：LText JSON / 中文纯文本 / 英文纯文本 / 未知原文
 // 4. 报告标题读取层双语化
 // 5. catalog 外 checkId（startpage-unparsed）展示名映射
+// 6. 快照字段结构契约
+//
+// V2：全部规则（页面级 + 站点级）经统一 runAuditRules 执行，
+// trigger cases 构造对应 AuditContext，逐项触发每一条规则。
 
 import { describe, it, expect } from "vitest";
 import {
-  perPageChecks,
-  crossPageChecks,
   allCheckMeta,
   nonCatalogCheckNames,
-  runPerPageChecks,
-  runCrossPageChecks,
+  runAuditRules,
+  executionToIssues,
+  normalizePage,
   pickText,
+  type AuditContext,
   type AuditIssue,
+  type FetchRecord,
   type LocalizedText,
 } from "@/lib/seo/audit-checks";
+import type { RobotsReport, SitemapReport, LlmsTxtReport } from "@/lib/seo/site-reports";
 import {
   resolveAuditDetail,
   resolveAuditSuggestion,
@@ -57,9 +63,17 @@ const ZH_SYSTEM_TEXTS = [
 
 // ---------- PageData 构造 ----------
 
+const COMPLETE_WEBSITE_JSON_LD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Example",
+  url: "https://example.com/",
+});
+
 function basePage(overrides: Partial<PageData> = {}): PageData {
   return {
     url: "https://example.com/",
+    finalUrl: "https://example.com/",
     title: "Example Domain — A sufficiently long title for tests",
     metaDescription:
       "A meta description that is long enough to stay within the recommended 120-160 character range for this test fixture.",
@@ -69,101 +83,309 @@ function basePage(overrides: Partial<PageData> = {}): PageData {
     h2: ["Section"],
     h3: ["Sub"],
     images: [{ src: "a.png", alt: "decorative image" }],
-    links: [],
+    links: [{ href: "https://example.com/about", isExternal: false, text: "about" }],
     bodyText: "example body text",
-    wordCount: 100,
+    wordCount: 150,
     responseTimeMs: 800,
     status: 200,
-    finalUrl: "https://example.com/",
     htmlLang: "en",
     viewport: "width=device-width, initial-scale=1",
     ogTitle: "Example",
     ogDescription: "Example description",
+    ogImage: null,
     twitterCard: "summary_large_image",
     favicon: "/favicon.ico",
     hasStructuredData: true,
-    structuredDataRaw: [
-      JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite" }),
-    ],
+    structuredDataRaw: [COMPLETE_WEBSITE_JSON_LD],
     inlineStyleLength: 100,
+    htmlSize: 10000,
+    cssSize: 500,
+    scriptSize: 200,
+    visibleTextSize: 2000,
+    semantic: { main: true, nav: true, article: true, header: true, footer: true, section: true },
+    semanticMainCount: 3,
+    headings: [{ level: 1, text: "Example Domain" }, { level: 2, text: "Section" }],
     ...overrides,
   };
 }
 
-interface TriggerCase {
-  label: string;
-  pages: PageData[];
-  extra?: { robotsText: string | null; brokenLinks: Array<{ url: string; statusCode: number }> };
+function okRec(url: string, source: FetchRecord["source"], depth: number, hops = 0): FetchRecord {
+  return {
+    url,
+    finalUrl: url,
+    status: 200,
+    responseTimeMs: 100,
+    hops,
+    redirectChain: [],
+    isLoop: false,
+    ok: true,
+    source,
+    depth,
+  };
 }
 
-/** 逐项触发所有检查（覆盖 no-structured-data 的全部分支） */
-const triggerCases: TriggerCase[] = [
-  { label: "missing-title", pages: [basePage({ title: "" })] },
-  { label: "missing-description", pages: [basePage({ metaDescription: null })] },
-  { label: "missing-h1", pages: [basePage({ h1: [] })] },
+const DEFAULT_ROBOTS: RobotsReport = {
+  status: "ok",
+  httpStatus: 200,
+  text: "User-agent: *\nDisallow:",
+  universalDisallow: [],
+  disallowAll: false,
+  sitemapUrls: [],
+  aiCrawlers: {},
+};
+
+/** 构造 AuditContext（默认 full 深度；robots 默认无 sitemap 声明） */
+function makeCtx(opts: {
+  pages: PageData[];
+  fetchRecords?: FetchRecord[];
+  robots?: RobotsReport;
+  sitemap?: SitemapReport | null;
+  llmsTxt?: LlmsTxtReport | null;
+  linkGraph?: Map<string, Set<string>>;
+}): AuditContext {
+  const fetchRecords =
+    opts.fetchRecords ??
+    opts.pages.map((p, i) => okRec(p.finalUrl ?? p.url, i === 0 ? "start" : "link", i));
+  const linkGraph = opts.linkGraph ?? new Map<string, Set<string>>();
+  const pages = opts.pages.map((p, i) => normalizePage(p, fetchRecords[i], linkGraph));
+  return {
+    baseUrl: "https://example.com/",
+    origin: "https://example.com",
+    depth: "full",
+    crawlLimit: 50,
+    pages,
+    fetchRecords,
+    linkGraph,
+    robots: opts.robots ?? DEFAULT_ROBOTS,
+    sitemap: opts.sitemap ?? null,
+    llmsTxt: opts.llmsTxt ?? null,
+    indexablePages: pages.length,
+  };
+}
+
+/** sitemap 报告最小构造 */
+function smReport(overrides: Partial<SitemapReport>): SitemapReport {
+  return {
+    found: true,
+    sitemapUrls: ["https://example.com/sitemap.xml"],
+    httpStatus: 200,
+    xmlValid: true,
+    isIndex: false,
+    childSitemaps: [],
+    urls: [],
+    urlStatuses: [],
+    ...overrides,
+  };
+}
+
+// ---------- 逐项触发所有规则（V2） ----------
+
+const triggerCases: Array<{ label: string; build: () => AuditContext }> = [
+  // 页面级：元数据
+  { label: "missing-title", build: () => makeCtx({ pages: [basePage({ title: "" })] }) },
+  { label: "missing-description", build: () => makeCtx({ pages: [basePage({ metaDescription: null })] }) },
+  { label: "missing-h1", build: () => makeCtx({ pages: [basePage({ h1: [] })] }) },
   {
     label: "missing-alt",
-    pages: [basePage({ images: [{ src: "a.png", alt: null }, { src: "b.png", alt: "ok" }] })],
+    build: () => makeCtx({ pages: [basePage({ images: [{ src: "a.png", alt: null }, { src: "b.png", alt: "ok" }] })] }),
   },
-  { label: "missing-canonical", pages: [basePage({ canonical: null })] },
-  { label: "no-ssl", pages: [basePage({ url: "http://example.com/", finalUrl: "http://example.com/" })] },
-  { label: "title-length", pages: [basePage({ title: "short" })] },
-  { label: "description-length", pages: [basePage({ metaDescription: "too short" })] },
-  { label: "missing-lang", pages: [basePage({ htmlLang: null })] },
-  { label: "missing-viewport", pages: [basePage({ viewport: null })] },
-  { label: "no-robots-meta", pages: [basePage({ robotsMeta: "noindex, nofollow" })] },
-  { label: "slow-page", pages: [basePage({ responseTimeMs: 4500 })] },
-  { label: "no-structured-data/absent", pages: [basePage({ hasStructuredData: false, structuredDataRaw: [] })] },
+  { label: "missing-canonical", build: () => makeCtx({ pages: [basePage({ canonical: null })] }) },
   {
-    label: "no-structured-data/malformed",
-    pages: [basePage({ structuredDataRaw: ["{ not valid json }"] })],
+    label: "no-ssl",
+    build: () => makeCtx({ pages: [basePage({ url: "http://example.com/", finalUrl: "http://example.com/" })] }),
   },
+  { label: "title-length", build: () => makeCtx({ pages: [basePage({ title: "short" })] }) },
+  { label: "description-length", build: () => makeCtx({ pages: [basePage({ metaDescription: "too short" })] }) },
+  { label: "missing-lang", build: () => makeCtx({ pages: [basePage({ htmlLang: null })] }) },
+  { label: "missing-viewport", build: () => makeCtx({ pages: [basePage({ viewport: null })] }) },
+  { label: "no-robots-meta", build: () => makeCtx({ pages: [basePage({ robotsMeta: "noindex, nofollow" })] }) },
+  { label: "slow-page", build: () => makeCtx({ pages: [basePage({ responseTimeMs: 4500 })] }) },
+  // 页面级：结构化数据
+  { label: "no-structured-data", build: () => makeCtx({ pages: [basePage({ hasStructuredData: false, structuredDataRaw: [] })] }) },
   {
-    label: "no-structured-data/graph-incomplete",
-    pages: [
-      basePage({
-        structuredDataRaw: [
-          JSON.stringify({ "@context": "https://schema.org", "@graph": [{ "@type": "WebPage" }] }),
-        ],
-      }),
-    ],
+    label: "invalid-structured-data/malformed",
+    build: () => makeCtx({ pages: [basePage({ structuredDataRaw: ["{ not valid json }"] })] }),
   },
   {
-    label: "no-structured-data/incomplete",
-    pages: [basePage({ structuredDataRaw: [JSON.stringify({ "@type": "WebPage" })] })],
-  },
-  { label: "missing-og-tags", pages: [basePage({ ogTitle: null, ogDescription: null })] },
-  { label: "missing-twitter-card", pages: [basePage({ twitterCard: null })] },
-  { label: "no-favicon", pages: [basePage({ favicon: null })] },
-  { label: "inline-css", pages: [basePage({ inlineStyleLength: 8000 })] },
-  { label: "no-h2-h3", pages: [basePage({ h2: [], h3: [] })] },
-  {
-    label: "duplicate-title",
-    pages: [basePage(), basePage({ url: "https://example.com/about" })],
+    label: "invalid-structured-data/missing-type",
+    build: () => makeCtx({ pages: [basePage({ structuredDataRaw: [JSON.stringify({ "@context": "https://schema.org", foo: "bar" })] })] }),
   },
   {
-    label: "duplicate-description",
-    pages: [basePage(), basePage({ url: "https://example.com/about" })],
+    label: "incomplete-structured-data/missing-context",
+    build: () => makeCtx({ pages: [basePage({ structuredDataRaw: [JSON.stringify({ "@type": "WebSite", name: "Example", url: "https://example.com/" })] })] }),
   },
   {
-    label: "duplicate-h1",
-    pages: [basePage(), basePage({ url: "https://example.com/about" })],
+    label: "duplicate-structured-data",
+    build: () => makeCtx({ pages: [basePage({ structuredDataRaw: [COMPLETE_WEBSITE_JSON_LD, COMPLETE_WEBSITE_JSON_LD] })] }),
+  },
+  // 页面级：社交 / favicon / 样式
+  { label: "missing-og-tags", build: () => makeCtx({ pages: [basePage({ ogTitle: null, ogDescription: null })] }) },
+  { label: "missing-og-title-only", build: () => makeCtx({ pages: [basePage({ ogTitle: null })] }) },
+  { label: "missing-twitter-card", build: () => makeCtx({ pages: [basePage({ twitterCard: null })] }) },
+  { label: "no-favicon", build: () => makeCtx({ pages: [basePage({ favicon: null })] }) },
+  { label: "inline-css", build: () => makeCtx({ pages: [basePage({ inlineStyleLength: 8000 })] }) },
+  { label: "no-h2-h3", build: () => makeCtx({ pages: [basePage({ h2: [], h3: [] })] }) },
+  // 页面级：内容
+  { label: "low-content", build: () => makeCtx({ pages: [basePage({ wordCount: 5 })] }) },
+  {
+    label: "low-text-html-ratio",
+    build: () => makeCtx({ pages: [basePage({ htmlSize: 50000, visibleTextSize: 100 })] }),
   },
   {
-    label: "no-sitemap",
-    pages: [basePage()],
-    extra: { robotsText: "User-agent: *\nDisallow: /private\n", brokenLinks: [] },
+    label: "semantic-html/no-main",
+    build: () => makeCtx({
+      pages: [basePage({ semantic: { main: false, nav: true, article: false, header: true, footer: true, section: false }, semanticMainCount: 0 })],
+    }),
+  },
+  {
+    label: "semantic-html/heading-skip",
+    build: () => makeCtx({
+      pages: [basePage({ headings: [{ level: 1, text: "H1" }, { level: 3, text: "H3" }] })],
+    }),
+  },
+  {
+    label: "semantic-html/multi-h1",
+    build: () => makeCtx({ pages: [basePage({ h1: ["A", "B"] })] }),
+  },
+  {
+    label: "zero-internal-links",
+    build: () => makeCtx({ pages: [basePage({ links: [] })] }),
+  },
+  // 站点级：重复内容
+  { label: "duplicate-title", build: () => makeCtx({ pages: [basePage(), basePage({ url: "https://example.com/about", finalUrl: "https://example.com/about" })] }) },
+  { label: "duplicate-description", build: () => makeCtx({ pages: [basePage(), basePage({ url: "https://example.com/about", finalUrl: "https://example.com/about" })] }) },
+  { label: "duplicate-h1", build: () => makeCtx({ pages: [basePage(), basePage({ url: "https://example.com/about", finalUrl: "https://example.com/about" })] }) },
+  // 站点级：失效页面 / 死链
+  {
+    label: "broken-crawled-pages",
+    build: () => makeCtx({
+      pages: [],
+      fetchRecords: [
+        { ...okRec("https://example.com/", "start", 0), status: 404, ok: false },
+        { ...okRec("https://example.com/gone", "sitemap", 1), status: 410, ok: false },
+      ],
+    }),
   },
   {
     label: "broken-links",
-    pages: [basePage()],
-    extra: {
-      robotsText: null,
-      brokenLinks: [
-        { url: "https://example.com/missing", statusCode: 404 },
-        { url: "https://example.com/error", statusCode: 500 },
+    build: () => makeCtx({
+      pages: [basePage()],
+      fetchRecords: [
+        okRec("https://example.com/", "start", 0),
+        { ...okRec("https://example.com/missing", "link", 1), status: 404, ok: false },
+        { ...okRec("https://example.com/error", "link", 1), status: 500, ok: false },
+        { ...okRec("https://example.com/net", "link", 1), status: 0, ok: false, errorCode: "NETWORK" },
       ],
-    },
+    }),
+  },
+  // 站点级：重定向
+  {
+    label: "redirect-loop",
+    build: () => makeCtx({
+      pages: [],
+      fetchRecords: [{ ...okRec("https://example.com/a", "start", 0), finalUrl: "https://example.com/a", status: 302, ok: false, isLoop: true, hops: 3 }],
+    }),
+  },
+  {
+    label: "redirect-chain",
+    build: () => makeCtx({
+      pages: [],
+      fetchRecords: [{ ...okRec("https://example.com/a", "start", 0), finalUrl: "https://example.com/final", hops: 3 }],
+    }),
+  },
+  {
+    label: "redirected-urls",
+    build: () => makeCtx({
+      pages: [],
+      fetchRecords: [{ ...okRec("https://example.com/a", "start", 0), finalUrl: "https://example.com/b", status: 301, hops: 1, redirectChain: [{ url: "https://example.com/a", status: 301, location: "https://example.com/b" }] }],
+    }),
+  },
+  {
+    label: "links-to-redirects",
+    build: () => makeCtx({
+      pages: [basePage()],
+      fetchRecords: [
+        okRec("https://example.com/", "start", 0),
+        {
+          ...okRec("https://example.com/old", "link", 1),
+          finalUrl: "https://example.com/new",
+          status: 301,
+          hops: 1,
+          redirectChain: [{ url: "https://example.com/old", status: 301, location: "https://example.com/new" }],
+        },
+      ],
+    }),
+  },
+  // 站点级：内链拓扑
+  {
+    label: "orphan-pages",
+    build: () => makeCtx({
+      pages: [basePage({ url: "https://example.com/deep", finalUrl: "https://example.com/deep" })],
+      fetchRecords: [okRec("https://example.com/deep", "link", 1)],
+      linkGraph: new Map([["https://example.com/", new Set(["https://example.com/other"])]]),
+    }),
+  },
+  {
+    label: "deep-pages",
+    build: () => makeCtx({
+      pages: [basePage()],
+      fetchRecords: [okRec("https://example.com/", "start", 5)],
+    }),
+  },
+  // 站点级：sitemap
+  {
+    label: "no-sitemap",
+    build: () => makeCtx({ pages: [basePage()], sitemap: { found: false, sitemapUrls: ["https://example.com/sitemap.xml"], httpStatus: null, xmlValid: false, isIndex: false, childSitemaps: [], urls: [], urlStatuses: [] } }),
+  },
+  {
+    label: "sitemap-invalid",
+    build: () => makeCtx({
+      pages: [basePage()],
+      robots: { ...DEFAULT_ROBOTS, sitemapUrls: ["https://example.com/sitemap.xml"] },
+      sitemap: { found: false, sitemapUrls: ["https://example.com/sitemap.xml"], httpStatus: 500, xmlValid: false, isIndex: false, childSitemaps: [], urls: [], urlStatuses: [] },
+    }),
+  },
+  {
+    label: "sitemap-bad-urls",
+    build: () => makeCtx({
+      pages: [basePage()],
+      sitemap: smReport({ urls: ["https://example.com/missing"], urlStatuses: [{ url: "https://example.com/missing", status: 404, redirect: false, location: null }] }),
+    }),
+  },
+  {
+    label: "sitemap-redirects",
+    build: () => makeCtx({
+      pages: [basePage()],
+      sitemap: smReport({ urls: ["https://example.com/old"], urlStatuses: [{ url: "https://example.com/old", status: 301, redirect: true, location: "https://example.com/new" }] }),
+    }),
+  },
+  {
+    label: "sitemap-coverage",
+    build: () => makeCtx({
+      pages: [basePage()],
+      sitemap: smReport({ urls: ["https://example.com/not-crawled"], urlStatuses: [] }),
+    }),
+  },
+  // 站点级：robots / AI 爬虫 / llms.txt
+  {
+    label: "robots-unreachable",
+    build: () => makeCtx({ pages: [basePage()], robots: { ...DEFAULT_ROBOTS, status: "unreachable", httpStatus: 500 } }),
+  },
+  {
+    label: "robots-blocks-important",
+    build: () => makeCtx({ pages: [basePage()], robots: { ...DEFAULT_ROBOTS, disallowAll: true, universalDisallow: ["/"] } }),
+  },
+  {
+    label: "ai-crawler-access",
+    build: () => makeCtx({ pages: [basePage()], robots: { ...DEFAULT_ROBOTS, aiCrawlers: { "OAI-SearchBot": "disallowed" } } }),
+  },
+  {
+    label: "llms-txt/missing",
+    build: () => makeCtx({ pages: [basePage()], llmsTxt: { status: "missing", httpStatus: 404, size: 0 } }),
+  },
+  {
+    label: "llms-txt/invalid",
+    build: () => makeCtx({ pages: [basePage()], llmsTxt: { status: "invalid", httpStatus: 200, size: 5 } }),
   },
 ];
 
@@ -171,16 +393,9 @@ const triggerCases: TriggerCase[] = [
 function collectAllIssues(): AuditIssue[] {
   const issues: AuditIssue[] = [];
   for (const c of triggerCases) {
-    const perPage = c.pages.flatMap((p) => runPerPageChecks(p, "https://example.com/"));
-    const cross = runCrossPageChecks(c.pages, "https://example.com/", {
-      robotsText: c.extra?.robotsText ?? "Sitemap: https://example.com/sitemap.xml",
-      brokenLinks: c.extra?.brokenLinks ?? [],
-    });
-    expect(
-      [...perPage, ...cross].length,
-      `触发用例未产生 issue：${c.label}`
-    ).toBeGreaterThan(0);
-    issues.push(...perPage, ...cross);
+    const execIssues = runAuditRules(c.build()).flatMap((ex) => executionToIssues(ex));
+    expect(execIssues.length, `触发用例未产生 issue：${c.label}`).toBeGreaterThan(0);
+    issues.push(...execIssues);
   }
   return issues;
 }
@@ -190,10 +405,10 @@ function collectAllIssues(): AuditIssue[] {
 describe("标准 Audit checks 双语完整性", () => {
   it("所有检查项 name/description 的 en/zh 均为非空字符串", () => {
     for (const meta of allCheckMeta) {
-      expect(meta.name.en, `${meta.id}.name.en`).toBeTruthy();
-      expect(meta.name.zh, `${meta.id}.name.zh`).toBeTruthy();
-      expect(meta.description.en, `${meta.id}.description.en`).toBeTruthy();
-      expect(meta.description.zh, `${meta.id}.description.zh`).toBeTruthy();
+      expect(pickText(meta.name, "en"), `${meta.id}.name.en`).toBeTruthy();
+      expect(pickText(meta.name, "zh"), `${meta.id}.name.zh`).toBeTruthy();
+      expect(pickText(meta.description, "en"), `${meta.id}.description.en`).toBeTruthy();
+      expect(pickText(meta.description, "zh"), `${meta.id}.description.zh`).toBeTruthy();
     }
   });
 
@@ -201,7 +416,7 @@ describe("标准 Audit checks 双语完整性", () => {
     const issues = collectAllIssues();
     expect(issues.length).toBeGreaterThanOrEqual(20);
     for (const issue of issues) {
-      // 机器值 message（如 broken-links 的 "HTTP 404"）按规范不翻译，存取均原样
+      // 机器值 message（如 HTTP 状态文本）按规范不翻译，存取均原样
       if (typeof issue.message === "string") {
         expect(issue.message.length, `${issue.checkId} machine message`).toBeGreaterThan(0);
         expect(resolveAuditDetail(issue.message, "zh")).toBe(issue.message);
@@ -217,9 +432,9 @@ describe("标准 Audit checks 双语完整性", () => {
     }
   });
 
-  it("检查项总数 ≥ 20（单页 + 跨页合计）", () => {
-    expect(perPageChecks.length + crossPageChecks.length).toBeGreaterThanOrEqual(20);
-    expect(crossPageChecks.length).toBeGreaterThanOrEqual(5);
+  it("检查项总数 ≥ 20（页面级 + 站点级合计）", () => {
+    expect(allCheckMeta.length).toBeGreaterThanOrEqual(20);
+    expect(allCheckMeta.filter((m) => m.category === "critical").length).toBeGreaterThan(0);
   });
 });
 
@@ -230,7 +445,7 @@ describe("语言污染扫描（ZH 结果无英文系统文案 / EN 结果无中�
 
   it("ZH 输出不得包含标准英文系统文案", () => {
     const zhTexts = [
-      ...allCheckMeta.flatMap((m) => [m.name.zh, m.description.zh]),
+      ...allCheckMeta.flatMap((m) => [pickText(m.name, "zh"), pickText(m.description, "zh")]),
       ...issues.flatMap((i) => [
         pickText(i.message, "zh"),
         pickText(i.suggestion, "zh"),
@@ -246,7 +461,7 @@ describe("语言污染扫描（ZH 结果无英文系统文案 / EN 结果无中�
 
   it("EN 输出不得包含标准中文系统文案", () => {
     const enTexts = [
-      ...allCheckMeta.flatMap((m) => [m.name.en, m.description.en]),
+      ...allCheckMeta.flatMap((m) => [pickText(m.name, "en"), pickText(m.description, "en")]),
       ...issues.flatMap((i) => [
         pickText(i.message, "en"),
         pickText(i.suggestion, "en"),
@@ -261,7 +476,6 @@ describe("语言污染扫描（ZH 结果无英文系统文案 / EN 结果无中�
   });
 
   it("机器值 / 技术术语允许原样出现（不误伤）", () => {
-    // HTTP 状态、canonical 等技术术语不应被误判为污染
     expect(pickText(issues.find((i) => i.checkId === "missing-canonical")!.message, "en")).toContain("canonical");
     expect(resolveAuditDetail("HTTP 404 Not Found", "zh")).toBe("HTTP 404 Not Found");
     expect(resolveAuditDetail("HTTP 404 Not Found", "en")).toBe("HTTP 404 Not Found");
@@ -334,7 +548,7 @@ describe("resolveAuditDetail / resolveAuditSuggestion（统一读取层）", () 
   it("当前 catalog 全部 message/suggestion 的 zh 与 en 纯文本均可双向解析（快照场景闭环）", () => {
     const issues = collectAllIssues();
     for (const issue of issues) {
-      // 机器值 message（如 broken-links "HTTP 404"）不参与语言映射
+      // 机器值 message（如 HTTP 状态文本）不参与语言映射
       if (typeof issue.message === "string") continue;
       const msg = issue.message as { en: string; zh: string };
       // EN 保存的快照在 ZH 下回读 → 中文
@@ -378,15 +592,15 @@ describe("catalog 外 checkId（如 startpage-unparsed）展示名映射", () =>
   it("startpage-unparsed 具备 en/zh 双语展示名", () => {
     const name = nonCatalogCheckNames["startpage-unparsed"];
     expect(name).toBeTruthy();
-    expect(name!.en).toBeTruthy();
-    expect(name!.zh).toBe("起始页未能解析");
+    expect(pickText(name, "en")).toBeTruthy();
+    expect(pickText(name, "zh")).toBe("起始页未能解析");
   });
 
   it("js-redirect（旧版检查项）具备 en/zh 双语展示名", () => {
     const name = nonCatalogCheckNames["js-redirect"];
     expect(name).toBeTruthy();
-    expect(name!.en).toBe("JS redirect");
-    expect(name!.zh).toBe("JS 重定向");
+    expect(pickText(name, "en")).toBe("JS redirect");
+    expect(pickText(name, "zh")).toBe("JS 重定向");
   });
 
   it("补充映射不得混入评分 catalog（MAX_SCORE 不受影响）", () => {
