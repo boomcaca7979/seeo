@@ -13,6 +13,7 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/privacy",
   "/terms",
   "/refund",
+  "/contact",
 ]);
 
 /** 剥离 /zh locale 前缀，返回逻辑路径（en 即原样） */

@@ -208,7 +208,8 @@
       "refund": "Refund Policy"
     },
     "copyright": "© 2026 SeeO. Data shown is for demonstration.",
-    "icp": ""
+    "icp": "",
+    "support": "Support"
   },
   "plans": {
     "priceUnit": "/30 days",
@@ -892,8 +893,8 @@
     "use": "Your data is used only to provide the SEO analysis service and is never sold to third parties.",
     "storage": "User authentication data is hosted by Supabase; business data is stored in the Turso cloud database. Both are third-party infrastructure services.",
     "cookies": "We use essential cookies to keep you signed in. When third-party analytics tools are used, we ask for your consent first.",
-    "contact": "For privacy questions, our official contact email will be published here once confirmed.",
-    "contactNote": "Contact channel pending announcement",
+    "contact": "For privacy questions, contact us at support@seeo.asia.",
+    "contactNote": "",
     "lastUpdated": "Last updated: August 2026"
   },
   "termsPage": {
@@ -919,7 +920,7 @@
     ],
     "disclaimer": "SEO data is for reference only; improved rankings or traffic are not guaranteed. Search results are affected by search engine algorithms, location, device, timing, and other factors, so this service makes no commitment to the absolute accuracy of its data.",
     "changes": "We reserve the right to change, suspend, or terminate part or all of the service at any time. If your account is banned for violating these terms, paid fees are non-refundable.",
-    "disputes": "The interpretation of and disputes under these terms are governed by the laws of the People's Republic of China. Disputes should first be resolved through negotiation; if negotiation fails, they shall be submitted to the people's court with jurisdiction at the domicile of the service provider.",
+    "disputes": "The interpretation of and disputes under these terms are governed by the laws of the People's Republic of China. Disputes should first be resolved through negotiation — you can reach us at support@seeo.asia. If negotiation fails, they shall be submitted to the people's court with jurisdiction at the domicile of the service provider.",
     "lastUpdated": "Last updated: August 2026"
   },
   "refundPage": {
@@ -935,8 +936,8 @@
       "banned": "04 Banned accounts"
     },
     "policy": "You can request a refund for a paid order. We honor full refunds for requests submitted within 7 calendar days of a successful payment; refunds are returned via the original payment method.",
-    "process": "Send a refund request including your registered email, subscription order number, and reason. Requests are processed within 3 business days and refunded via the original payment channel. Our official contact email will be published here once confirmed.",
-    "processNote": "Contact channel pending announcement",
+    "process": "Send a refund request including your registered email, subscription order number, and reason. Requests are processed within 3 business days and refunded via the original payment channel. You can reach us at support@seeo.asia.",
+    "processNote": "Contact us at support@seeo.asia to request a refund.",
     "after": "After a refund is processed, the system recalculates your membership from your remaining valid orders — your plan may be downgraded accordingly, and feature access follows the new plan.",
     "banned": "For accounts banned due to violations of the Terms of Service, see the terms regarding fees.",
     "lastUpdated": "Last updated: August 2026"
@@ -952,9 +953,10 @@
       "email": "01 Email",
       "response": "02 Response time"
     },
-    "email": "[PLACEHOLDER: ADD PUBLIC EMAIL BEFORE PRODUCTION]",
-    "emailNote": "Public email pending announcement",
-    "response": "Messages are reviewed periodically. Typical response time will be published once the public email is confirmed."
+    "email": "support@seeo.asia",
+    "emailNote": "We typically respond within 1–2 business days.",
+    "response": "Messages are reviewed regularly. We aim to respond within 1–2 business days.",
+    "emailLabel": "Customer Support"
   },
   "dashboard": {
     "sidebar": {

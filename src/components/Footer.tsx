@@ -43,6 +43,7 @@ export default function Footer() {
       title: t("colCompany"),
       links: [
         { label: t("colCompanyLinks.about"), href: "/about" },
+        { label: t("colCompanyLinks.contact"), href: "/contact" },
         { label: t("colCompanyLinks.privacy"), href: "/privacy" },
         { label: t("colCompanyLinks.terms"), href: "/terms" },
         { label: t("colCompanyLinks.refund"), href: "/refund" },
@@ -75,6 +76,13 @@ export default function Footer() {
               <span className="h-1.5 w-1.5 rounded-full bg-pos" />
               {t("dataSource")}
             </div>
+            <a
+              href="mailto:support@seeo.asia"
+              className="mt-3 inline-flex items-center gap-1.5 font-mono text-xs text-ink-60 transition-colors hover:text-ink"
+            >
+              <span>{t("support")}:</span>
+              <span className="underline decoration-line underline-offset-4">support@seeo.asia</span>
+            </a>
           </div>
 
           {/* 链接列 */}

@@ -9,7 +9,7 @@ import { breadcrumbSchema } from "@/lib/seo/schema";
 // 文案走 messages（refundPage），与当前 payment 实际行为对齐：
 //   - 原支付渠道已下线，历史订单退款需人工处理（联系渠道以页面公示为准）
 //   - 已移除与实际规则冲突的"消耗超 50 次不退 / 生成超 5 份报告不退"条款
-//   - 联系邮箱未定案：以"待公布"占位，不虚构邮箱
+//   - 支持邮箱 support@seeo.asia 已由 Creem 合规审核确认
 
 export default async function RefundPage() {
   const t = await getTranslations("refundPage");
@@ -37,9 +37,12 @@ export default async function RefundPage() {
           <section>
             <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.process")}</h2>
             <p>{t("process")}</p>
-            <span className="mt-2 inline-block rounded border border-line px-3 py-1 font-mono text-xs text-ink-40">
-              {t("processNote")}
-            </span>
+            <a
+              href="mailto:support@seeo.asia"
+              className="mt-2 inline-block font-mono text-sm text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
+            >
+              support@seeo.asia
+            </a>
           </section>
           <section>
             <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.after")}</h2>

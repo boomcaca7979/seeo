@@ -6,7 +6,7 @@ import { localePath } from "@/i18n/seo";
 import { breadcrumbSchema } from "@/lib/seo/schema";
 
 // ===== /privacy 内容组件（en: /privacy · zh: /zh/privacy）=====
-// 文案走 messages（privacyPage）。联系方式未定案：以"待公布"占位，不虚构邮箱。
+// 文案走 messages（privacyPage）。支持邮箱 support@seeo.asia 已由 Creem 合规审核确认。
 
 export default async function PrivacyPage() {
   const t = await getTranslations("privacyPage");
@@ -53,9 +53,12 @@ export default async function PrivacyPage() {
           <section>
             <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.contact")}</h2>
             <p>{t("contact")}</p>
-            <span className="mt-2 inline-block rounded border border-line px-3 py-1 font-mono text-xs text-ink-40">
-              {t("contactNote")}
-            </span>
+            <a
+              href="mailto:support@seeo.asia"
+              className="mt-2 inline-block font-mono text-sm text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
+            >
+              support@seeo.asia
+            </a>
           </section>
           <p className="pt-8 border-t border-line text-sm text-ink-40">{t("lastUpdated")}</p>
         </div>

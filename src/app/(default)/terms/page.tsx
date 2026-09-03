@@ -55,6 +55,12 @@ export default async function TermsPage() {
           <section>
             <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("sections.disputes")}</h2>
             <p>{t("disputes")}</p>
+            <a
+              href="mailto:support@seeo.asia"
+              className="mt-2 inline-block font-mono text-sm text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-ink"
+            >
+              support@seeo.asia
+            </a>
           </section>
           <p className="pt-8 border-t border-line text-sm text-ink-40">{t("lastUpdated")}</p>
         </div>

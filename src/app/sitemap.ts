@@ -23,6 +23,7 @@ const bilingualPaths = [
   "/privacy",
   "/terms",
   "/refund",
+  "/contact",
 ];
 
 /** 单语言页（仅 EN canonical，无 ZH 对应路由） */
