@@ -306,7 +306,52 @@
         "q": "Where is my data stored?",
         "a": "Production uses a Turso cloud database, with user authentication provided by Supabase Auth. Each user's data is isolated."
       }
-    ]
+    ],
+    "billingNote": "Billed monthly · cancel anytime",
+    "mostPopular": "Most Popular",
+    "cardIntroFree": "What's included:",
+    "cardIntroLite": "Everything in Free, plus:",
+    "cardIntroPro": "Everything in Lite, plus:",
+    "customNote": "One-time payment · Delivered on demand",
+    "cardsLabel": "Pricing plans",
+    "compareEyebrow": "COMPARE",
+    "compareTitle": "Compare plans",
+    "compareSubtitle": "See exactly what's included in every plan.",
+    "compareFeatureCol": "Feature",
+    "notIncluded": "Not included",
+    "compareLegend": "∞ unlimited · — not included",
+    "compareGroups": {
+      "audit": "SEO Audit",
+      "rankTracking": "Rank Tracking",
+      "competitors": "Competitor Analysis",
+      "serpData": "SERP & Data",
+      "content": "Content Analysis",
+      "reports": "Reports & Export"
+    },
+    "compareRows": {
+      "auditsPerDay": "Audits per day",
+      "auditDepth": "Max audit depth",
+      "projects": "Projects",
+      "keywords": "Tracked keywords",
+      "keywordGroups": "Keyword groups",
+      "competitors": "Competitors per project",
+      "sov": "Share of Voice & keyword gap",
+      "serpMonthly": "SERP data calls / month",
+      "dataforseo": "Keyword & backlink data queries / month",
+      "backlinks": "Backlink profile analysis",
+      "contentChecks": "Content checks / month",
+      "pdf": "PDF report export",
+      "excel": "Excel (CSV) report export",
+      "email": "Scheduled email reports"
+    },
+    "ctaTitle": "Ready to improve your search visibility?",
+    "ctaSubtitle": "Start with the free plan today. No credit card required — upgrade when you're ready.",
+    "ctaStartFree": "Start free",
+    "ctaExploreFeatures": "Explore features",
+    "ctaRiskReversal": "Free forever. Upgrade or cancel any time — no lock-in.",
+    "orRenew": "or renew 30 days",
+    "expandDetails": "Expand details",
+    "collapseDetails": "Collapse details"
   },
   "paymentResult": {
     "pendingTitle": "Confirming your payment",

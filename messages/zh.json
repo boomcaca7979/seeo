@@ -306,7 +306,52 @@
         "q": "数据存储在哪里？",
         "a": "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。"
       }
-    ]
+    ],
+    "billingNote": "按月计费 · 随时取消",
+    "mostPopular": "最受欢迎",
+    "cardIntroFree": "包含内容：",
+    "cardIntroLite": "包含 Free 全部功能，额外：",
+    "cardIntroPro": "包含 Lite 全部功能，额外：",
+    "customNote": "一次性支付 · 按需交付",
+    "cardsLabel": "套餐方案",
+    "compareEyebrow": "对比",
+    "compareTitle": "对比套餐",
+    "compareSubtitle": "详细了解每个套餐包含的功能与额度。",
+    "compareFeatureCol": "功能",
+    "notIncluded": "不包含",
+    "compareLegend": "∞ 无限 · — 不包含",
+    "compareGroups": {
+      "audit": "SEO 审计",
+      "rankTracking": "排名追踪",
+      "competitors": "竞品分析",
+      "serpData": "SERP 数据",
+      "content": "内容分析",
+      "reports": "报告与导出"
+    },
+    "compareRows": {
+      "auditsPerDay": "每日审计次数",
+      "auditDepth": "最大审计深度",
+      "projects": "项目数",
+      "keywords": "追踪关键词数",
+      "keywordGroups": "关键词分组",
+      "competitors": "每个项目竞品数",
+      "sov": "声量份额与关键词差距",
+      "serpMonthly": "SERP 数据调用次数/月",
+      "dataforseo": "关键词与外链数据查询次数/月",
+      "backlinks": "外链画像分析",
+      "contentChecks": "内容检查次数/月",
+      "pdf": "PDF 报告导出",
+      "excel": "Excel（CSV）报告导出",
+      "email": "邮件周报"
+    },
+    "ctaTitle": "准备好提升你的搜索可见度了吗？",
+    "ctaSubtitle": "今天就开始使用免费版，无需信用卡——准备好时随时升级。",
+    "ctaStartFree": "免费开始",
+    "ctaExploreFeatures": "了解功能",
+    "ctaRiskReversal": "永久免费，升级或取消随时操作——不锁定。",
+    "orRenew": "或续费 30 天",
+    "expandDetails": "展开详情",
+    "collapseDetails": "收起详情"
   },
   "paymentResult": {
     "pendingTitle": "支付确认中",
