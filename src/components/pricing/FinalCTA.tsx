@@ -19,10 +19,10 @@ export default function FinalCTA() {
           {t("ctaSubtitle")}
         </p>
         <div className="mt-6 flex items-center gap-4">
-          <LocaleLink href="/signup" className="inline-flex h-10 items-center justify-center rounded-full bg-ink px-6 font-sans text-sm font-semibold text-white transition-colors hover:bg-ink-60">
+          <LocaleLink href="/signup" className="btn-pill btn-pill-primary">
             {t("ctaStartFree")}
           </LocaleLink>
-          <LocaleLink href="/features" className="inline-flex h-10 items-center justify-center rounded-full border border-line bg-card px-6 font-sans text-sm font-medium text-ink transition-colors hover:border-ink-25">
+          <LocaleLink href="/features/seo-audit" className="btn-pill btn-pill-secondary">
             {t("ctaExploreFeatures")}
           </LocaleLink>
         </div>

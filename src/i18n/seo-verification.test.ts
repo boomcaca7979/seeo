@@ -27,6 +27,7 @@ const MARKETING_PATHS = [
   "/privacy",
   "/terms",
   "/refund",
+  "/contact",
 ];
 
 describe("1. canonical（alternatesFor）", () => {
@@ -161,8 +162,9 @@ describe("6. sitemap URL 集合", () => {
   const entries = sitemapFn();
   const urls = entries.map((e) => new URL(e.url).pathname);
 
-  it("收录 EN+ZH 成对 URL + login/signup（共 22 条）", () => {
-    expect(entries.length).toBe(22);
+  it("收录 EN+ZH 成对 URL + login/signup（数量与 MARKETING_PATHS 派生一致）", () => {
+    // 11 条双语营销路径 × 2 locale + /login + /signup = 24
+    expect(entries.length).toBe(MARKETING_PATHS.length * 2 + 2);
     for (const p of MARKETING_PATHS) {
       expect(urls).toContain(p);
       expect(urls).toContain(p === "/" ? "/zh" : `/zh${p}`);

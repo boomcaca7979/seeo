@@ -38,8 +38,6 @@ export default function RankCheckPage() {
   const { show, Toast } = useToast();
   const [device, setDevice] = useState<Device>("PC");
   const [country, setCountry] = useState(RANK_LOCATIONS[0]);
-  const [cities, setCities] = useState<string[]>(REGION_CITIES[RANK_LOCATIONS[0]]);
-  const [city, setCity] = useState(REGION_CITIES[RANK_LOCATIONS[0]][0]);
 
   const [keyword, setKeyword] = useState("");
   const [domain, setDomain] = useState("");
@@ -50,9 +48,6 @@ export default function RankCheckPage() {
 
   const handleRegionChange = (region: string) => {
     setCountry(region);
-    const next = REGION_CITIES[region] ?? [];
-    setCities(next);
-    setCity(next[0] ?? "");
   };
 
   const handleCheck = async (e: React.FormEvent) => {
@@ -140,15 +135,7 @@ export default function RankCheckPage() {
                 <option key={c} value={c}>{display(c)}</option>
               ))}
             </select>
-            <select
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
-            >
-              {cities.map((c) => (
-                <option key={c} value={c}>{display(c)}</option>
-              ))}
-            </select>
+
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-ink-40">{t("device")}</label>
@@ -237,7 +224,7 @@ export default function RankCheckPage() {
               </div>
 
               <div className="mt-4 flex items-center justify-between text-xs text-ink-40">
-                <span>{t("regionLabel")}：{display(country)} · {display(city)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
+                <span>{t("regionLabel")}：{display(country)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
                 <span>{t("queryTime")}：{new Date(result.fetchedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</span>
               </div>
             </div>

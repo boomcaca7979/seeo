@@ -15,7 +15,7 @@
     "switchLang": "EN"
   },
   "hero": {
-    "badge": "每日追踪 · 持续监控",
+    "badge": "每日追踪 · SEO 审计 · 排名监控",
     "title": "看清搜索流量的走向",
     "subtitle": "把关键词、排名、外链、技术审计、竞品和内容优化放在同一张工作台上。SeeO 帮你从一堆搜索数据里，看出下一步该做什么。",
     "primaryCta": "开始分析你的网站",
@@ -108,12 +108,12 @@
       {
         "tag": "诊断",
         "title": "外链分析",
-        "desc": "看清谁在链接你、锚文本怎么分布、哪些外链在涨哪些在掉，找到值得追的外链来源。",
+        "desc": "看清谁在链接你、锚文本怎么分布、引荐域名有哪些，随时运行外链分析获取完整的链接概况快照。",
         "bullets": [
           "外链总览 + DA",
           "引荐域名分析",
           "锚文本分布",
-          "增长 / 流失趋势"
+          "跨次快照对比"
         ],
         "metricLabel": "数据来源",
         "metricValue": "DataForSEO"
@@ -251,7 +251,7 @@
       "serpapi": "SerpApi {count} 次/月",
       "serpapiDaily": "SerpApi {count} 次/天",
       "pdf": "PDF 报告导出（Pro 专属）",
-      "excel": "Excel 报告导出（Pro 专属）",
+      "excel": "CSV 报告导出（Pro 专属）",
       "email": "邮件周报"
     },
     "unlimited": "无限"
@@ -341,7 +341,7 @@
       "backlinks": "外链画像分析",
       "contentChecks": "内容检查次数/月",
       "pdf": "PDF 报告导出",
-      "excel": "Excel（CSV）报告导出",
+      "excel": "CSV 报告导出（Excel 兼容）",
       "email": "邮件周报"
     },
     "ctaTitle": "准备好提升你的搜索可见度了吗？",
@@ -415,7 +415,7 @@
         "健康度评分（0-100）",
         "问题列表与修复建议",
         "历史审计对比",
-        "PDF / Excel 审计报告（Pro 专属）"
+        "PDF / CSV 审计报告（Pro 专属）"
       ],
       "dataSource": "自建爬虫直接抓取目标网站，不依赖第三方数据 API"
     },
@@ -466,7 +466,7 @@
       },
       {
         "q": "审计报告可以导出吗？",
-        "a": "可以。PDF 与 Excel 导出为专业版（Pro）功能。"
+        "a": "可以。PDF 与 CSV 导出为专业版（Pro）功能。"
       },
       {
         "q": "审计频率有限制吗？",
@@ -571,7 +571,7 @@
     },
     "title": "外链分析",
     "subtitle": "查看指向你网站的外链规模、质量与构成",
-    "whatItDoes": "外链分析对指定域名拉取外链概况：外链总数、引荐域名数、Domain Rank 评分与 dofollow 比例，并提供单条外链明细——来源页面、锚文本、目标页面与首次发现时间。数据拉取后缓存 7 天，可跨天对比变化。",
+    "whatItDoes": "外链分析对指定域名拉取一次外链快照：外链总数、引荐域名数、Domain Rank 评分与 dofollow 比例，并提供单条外链明细——来源页面、锚文本、目标页面与首次发现时间。可作为外链建设前的基线检查、竞品外链研究工具，或再次运行以对比外链概况的变化。数据拉取后缓存 7 天，可跨次刷新对比变化。",
     "how": {
       "input": "一个域名（如 example.com）",
       "process": [
@@ -590,7 +590,7 @@
     "who": [
       "评估外链建设效果的专业版用户",
       "分析竞争对手外链构成的 SEO 从业者",
-      "需要定期监控外链增长 / 流失的人"
+      "可以跨次刷新对比外链概况的用户"
     ],
     "limits": [
       "专业版（Pro）专属功能",
@@ -758,7 +758,7 @@
       },
       {
         "q": "如何导出报告？",
-        "a": "在报表中心支持生成 PDF 和 Excel（CSV）格式的审计报告与排名报告。PDF 与 Excel 导出为专业版（Pro）功能。"
+        "a": "在报表中心支持生成 PDF 和 CSV 格式的审计报告与排名报告。PDF 与 CSV 导出为专业版（Pro）功能。"
       }
     ],
     "contact": {
@@ -806,7 +806,7 @@
     "how": {
       "input": "用户创建项目并添加网站域名与关键词列表",
       "process": "自建爬虫抓取页面执行技术检查；SerpApi 查询关键词排名；DataForSEO 拉取外链数据；定时任务每日自动刷新排名并生成波动预警",
-      "output": "健康度评分与修复建议、排名趋势曲线、竞品对比、内容优化建议、可导出的 PDF / Excel 报告"
+      "output": "健康度评分与修复建议、排名趋势曲线、竞品对比、内容优化建议、可导出的 PDF / CSV 报告"
     },
     "capabilities": [
       {
@@ -1042,7 +1042,8 @@
       "demoModeNoSave": "当前为演示模式，数据不会保存",
       "demoModeDisabled": "演示模式 · 账号系统未启用",
       "notAudited": "未审计",
-      "rankChange": "排名变化"
+      "rankChange": "排名变化",
+      "loadFailed": "数据加载失败"
     },
     "upgrade": {
       "title": "升级套餐",
@@ -1541,7 +1542,8 @@
       "externalLinksLabel": "外链数",
       "h1Label": "H1",
       "canonicalLabel": "Canonical",
-      "descriptionLabel": "Meta 描述"
+      "descriptionLabel": "Meta 描述",
+      "crawledPages": "抓取中… 已处理 {count} 页"
     },
     "positionTracking": {
       "title": "位置追踪",
@@ -1608,7 +1610,7 @@
       "keywordPlaceholder": "如：seo 工具",
       "targetDomain": "目标域名",
       "domainPlaceholder": "输入你的网站域名，如：example.com",
-      "addModalHint": "演示期限定追踪 {limit} 个关键词。每日刷新一次，同日重复刷新走缓存不重复扣额度。",
+      "addModalHint": "{plan} 套餐限定追踪 {limit} 个关键词。每日刷新一次，同日重复刷新走缓存不重复扣额度。",
       "confirmDelete": "确认删除",
       "deleteModalBody": "删除后将同时清除该词的所有历史排名记录，无法恢复。确定继续？",
       "createGroupModalTitle": "创建关键词分组",
@@ -1636,7 +1638,8 @@
       "removedFromGroup": "已移出分组",
       "emptyTitle": "还没有追踪的关键词",
       "emptyHint": "添加一个关键词开始监控它的 Google 排名",
-      "emptyAddBtn": "+ 添加追踪关键词"
+      "emptyAddBtn": "+ 添加追踪关键词",
+      "quotaReached": "已达到当前套餐的追踪上限（{limit} 个关键词）。升级套餐可追踪更多关键词。"
     },
     "keywords": {
       "overview": {
@@ -1704,13 +1707,13 @@
         "trackAction": "+ 追踪",
         "trackAdded": "已添加追踪：{keyword}",
         "alreadyTracking": "该词已在追踪中",
-        "noProject": "请先在概览页创建项目，再添加追踪",
         "addFailed": "添加失败",
         "trackTitle": "加入追踪",
         "trackedTitle": "已加入追踪",
         "intentInformational": "信息型",
         "intentCommercial": "商业型",
-        "intentNavigational": "导航型"
+        "intentNavigational": "导航型",
+        "selectProjectFirst": "请先选择项目域名，再追踪关键词"
       }
     },
     "competitors": {
@@ -1942,7 +1945,7 @@
       "aboutTitle": "关于报告导出",
       "aboutPdf": "· PDF 报告基于 html2pdf.js 在浏览器端生成，无需服务器渲染",
       "aboutCsv": "· CSV 报告带 UTF-8 BOM，Excel 直接打开中文不乱码",
-      "aboutEmail": "· 邮件发送基于 Resend，需配置 RESEND_API_KEY 环境变量",
+      "aboutEmail": "· 邮件报告可将摘要发送到你的邮箱",
       "aboutData": "· 全部基于本地 SQLite 真实数据，不消耗 SerpApi 额度",
       "previewTitle": "{type}报告预览",
       "closeLabel": "关闭",
@@ -2471,7 +2474,7 @@
     "KEYWORD_GROUP_LIMIT_REACHED": "当前套餐（{plan}）关键词分组上限为 {limit}，请升级套餐",
     "UPSTREAM_ERROR": "服务器内部错误，请稍后再试",
     "DATAFORSEO_NOT_CONFIGURED": "未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）",
-    "RESEND_NOT_CONFIGURED": "邮件功能未配置：缺少 RESEND_API_KEY 环境变量",
+    "RESEND_NOT_CONFIGURED": "邮件报告暂时不可用，请稍后再试。",
     "SEND_FAILED": "发送失败",
     "ADMIN_CLIENT_UNAVAILABLE": "admin client 不可用",
     "VERIFY_READ_FAILED": "同步已执行但回读验证失败，请重试",
@@ -2481,7 +2484,7 @@
     "INVALID_URL": "URL 无效：{detail}",
     "HTTP_ERROR": "页面返回错误：{detail}",
     "UNKNOWN": "抓取失败：{detail}",
-    "GSC_NOT_CONFIGURED": "Google Search Console 尚未配置。请设置 GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET 与 GSC_TOKEN_ENCRYPTION_KEY 后重新连接。",
+    "GSC_NOT_CONFIGURED": "Google Search Console 连接暂不可用，请稍后再试。",
     "GSC_NOT_CONNECTED": "该项目尚未连接 Google Search Console。请先在设置中连接已验证的 property。",
     "GSC_AUTH_REQUIRED": "Search Console 拒绝了访问。请在设置中重新连接该 property。",
     "GSC_QUOTA_EXCEEDED": "Search Console API 配额已达上限，请稍后重试。",

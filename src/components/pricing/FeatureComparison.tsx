@@ -148,7 +148,7 @@ export default function FeatureComparison({ plans, planNames }: FeatureCompariso
               <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
-                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-full border border-line bg-card px-6 font-sans text-sm font-medium text-ink transition-colors hover:border-ink-25"
+                className="btn-pill btn-pill-secondary cursor-pointer"
               >
                 {expanded ? t("collapseDetails") : t("expandDetails")}
               </button>

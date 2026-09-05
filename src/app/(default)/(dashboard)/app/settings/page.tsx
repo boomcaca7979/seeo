@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { isAuthEnabled } from "@/lib/auth-config";
@@ -121,6 +121,7 @@ function SettingsContent() {
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("account");
   const [signingOut, setSigningOut] = useState(false);
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -509,7 +510,7 @@ function SettingsContent() {
                           onClick={() =>
                             isCurrent
                               ? show(t("currentPlanToast"), "info")
-                              : show(t("planChangeToast"), "info")
+                              : router.push(`/${locale}/pricing`)
                           }
                           className={isCurrent ? "btn-secondary mt-5 w-full" : "btn-primary mt-5 w-full"}
                         >

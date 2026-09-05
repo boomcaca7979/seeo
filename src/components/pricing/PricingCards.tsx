@@ -43,7 +43,7 @@ export default function PricingCards({
   const t = useTranslations("pricing");
 
   return (
-    <section className="mx-auto max-w-[1392px] px-6" aria-label={t("cardsLabel")}>
+    <section className="wide-shell px-6" aria-label={t("cardsLabel")}>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         {memberCards.map((c) => (
           <MemberCard
@@ -76,7 +76,7 @@ function MemberCard({
       style={{ boxShadow: "5px 5px 25px 0 rgba(137,141,154,0.3)" }}
     >
       {/* Plan name: Semrush 21px/600 */}
-      <h2 className="text-[21px] font-semibold leading-[28px] text-ink">
+      <h2 className="text-xl font-semibold leading-[28px] text-ink">
         {display.name}
       </h2>
       {/* Persona: Semrush 14px/19.88px */}
@@ -87,13 +87,13 @@ function MemberCard({
       {/* Price：Semrush 风格 —— $ 小 + 主数字大 + /mo 小 */}
       <div className="mt-5 flex items-baseline gap-0.5">
         {display.plan === "free" ? (
-          <span className="font-mono text-[44px] font-semibold leading-none tracking-tight text-ink">
+          <span className="font-mono text-[2.75rem] font-semibold leading-none tracking-tight text-ink">
             {display.price}
           </span>
         ) : (
           <>
             <span className="font-mono text-sm font-medium text-ink">$</span>
-            <span className="font-mono text-[44px] font-semibold leading-none tracking-tight text-ink">
+            <span className="font-mono text-[2.75rem] font-semibold leading-none tracking-tight text-ink">
               {display.price.replace("$", "")}
             </span>
             <span className="ml-1 font-sans text-xs text-ink-40">/mo</span>
@@ -110,7 +110,7 @@ function MemberCard({
         {state.kind === "link" ? (
           <Link
             href={state.ctaHref ?? "/app"}
-            className="flex h-10 w-full items-center justify-center rounded-full bg-ink font-sans text-sm font-medium text-white transition-colors hover:bg-ink-60"
+            className="btn-pill btn-pill-primary w-full"
           >
             {state.ctaLabel}
           </Link>
@@ -119,7 +119,7 @@ function MemberCard({
             type="button"
             onClick={() => onCheckout(state.checkoutPlan ?? display.checkoutPlan)}
             disabled={state.disabled || purchasing}
-            className="flex h-10 w-full cursor-pointer items-center justify-center rounded-full bg-ink font-sans text-sm font-medium text-white transition-colors hover:bg-ink-60 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-pill btn-pill-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {purchasing ? t("paymentStarting") : state.ctaLabel}
           </button>
@@ -138,11 +138,11 @@ function MemberCard({
       {/* Feature list：Semrush 14px/19.88px, gap 0 */}
       <ul className="flex-1 space-y-0">
         {features.map((f) => (
-          <li key={f.text} className="flex items-start gap-2 py-[3px] font-sans text-sm leading-5">
+          <li key={f.text} className="flex items-start gap-2 py-[0.1875rem] font-sans text-sm leading-5">
             {f.included ? (
-              <span aria-hidden="true" className="mt-[2px] flex-shrink-0 text-pos">✓</span>
+              <span aria-hidden="true" className="mt-0.5 flex-shrink-0 text-pos">✓</span>
             ) : (
-              <span aria-hidden="true" className="mt-[2px] flex-shrink-0 text-ink-40">✗</span>
+              <span aria-hidden="true" className="mt-0.5 flex-shrink-0 text-ink-40">✗</span>
             )}
             <span className={f.included ? "text-ink-60" : "text-ink-40"}>{f.text}</span>
           </li>

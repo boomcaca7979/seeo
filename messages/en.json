@@ -15,7 +15,7 @@
     "switchLang": "中文"
   },
   "hero": {
-    "badge": "Daily rank updates · Continuous monitoring",
+    "badge": "Daily rank updates · SEO audits · Rank tracking",
     "title": "Track rankings. Audit technical SEO. Find the keywords that matter.",
     "subtitle": "SeeO brings keyword research, rank tracking, backlink analysis, technical audits, competitor analysis, and content optimization together on one workbench — so you always know what to do next.",
     "primaryCta": "Run your first audit",
@@ -108,12 +108,12 @@
       {
         "tag": "Diagnostics",
         "title": "Backlink Analysis Tool",
-        "desc": "See who links to you, how anchor text is distributed, and which backlinks are growing or fading — find link sources worth pursuing.",
+        "desc": "See who links to you, how anchor text is distributed, and identify referring domains — run a backlink analysis anytime to get a complete link profile snapshot.",
         "bullets": [
           "Backlink overview + DA",
           "Referring domains",
           "Anchor text distribution",
-          "Growth / loss trends"
+          "Profile comparison across refreshes"
         ],
         "metricLabel": "Data source",
         "metricValue": "DataForSEO"
@@ -251,7 +251,7 @@
       "serpapi": "{count} SerpApi calls per month",
       "serpapiDaily": "{count} SerpApi calls per day",
       "pdf": "PDF report export (Pro)",
-      "excel": "Excel report export (Pro)",
+      "excel": "CSV report export (Pro)",
       "email": "Email weekly reports"
     },
     "unlimited": "Unlimited"
@@ -341,7 +341,7 @@
       "backlinks": "Backlink profile analysis",
       "contentChecks": "Content checks / month",
       "pdf": "PDF report export",
-      "excel": "Excel (CSV) report export",
+      "excel": "CSV report export (Excel-compatible)",
       "email": "Scheduled email reports"
     },
     "ctaTitle": "Ready to improve your search visibility?",
@@ -417,7 +417,7 @@
         "Health score (0–100) with per-category breakdown",
         "Issue list with fix recommendations ordered by priority",
         "Audit history comparison across runs",
-        "PDF / Excel SEO audit reports for sharing (Pro)"
+        "PDF / CSV SEO audit reports for sharing (Pro)"
       ],
       "dataSource": "SeeO's own crawler fetches the target site directly — no third-party data API involved"
     },
@@ -469,7 +469,7 @@
       },
       {
         "q": "Can I export audit reports?",
-        "a": "Yes — PDF and Excel export is included in the Pro plan, so your SEO audit report can be shared with clients or stakeholders as-is. Exports keep the health score, issue list, and fix recommendations intact, so the document is ready to send without editing."
+        "a": "Yes — PDF and CSV export is included in the Pro plan, so your SEO audit report can be shared with clients or stakeholders as-is. Exports keep the health score, issue list, and fix recommendations intact, so the document is ready to send without editing."
       },
       {
         "q": "Is there a limit on audit frequency?",
@@ -583,9 +583,9 @@
       "title": "Backlink Analysis Tool - SEO Backlink Checker & Link Analysis | SeeO",
       "description": "SeeO's backlink analysis tool works as your backlink checker: analyze SEO backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text."
     },
-    "title": "Backlink Analysis Tool for SEO Link Monitoring",
-    "subtitle": "See the scale, quality, and composition of links pointing to your site — a backlink monitoring tool for your entire link profile",
-    "whatItDoes": "Backlink analysis pulls the complete link profile of a domain: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Use it as a backlink checker before a link-building campaign, an SEO backlink analyzer for competitor research, or a backlink monitoring tool to watch link growth and loss across refreshes. Link profile analysis and anchor text analysis surface which domains and phrases drive your links, so you can judge quality, spot risky patterns early, and prove that link-building work is paying off. The anchor text view is often where risk hides: an over-optimized exact-match pattern is a classic penalty signal, while a natural mix of branded and generic anchors points to a healthy profile. Growth and loss trends let you catch a lost link the week it disappears instead of months later, and comparing your distribution against a competitor gives link-building targets a concrete shape — which domains to pursue, which anchors to vary, and which pages on your site attract links naturally. Results are cached for 7 days, so you can compare across refreshes.",
+    "title": "Backlink Analysis Tool for SEO Link Profile Analysis",
+    "subtitle": "See the scale, quality, and composition of links pointing to your site — a backlink analysis tool for your entire link profile",
+    "whatItDoes": "Backlink analysis pulls a snapshot of a domain's link profile: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Use it as a backlink checker before a link-building campaign, an SEO backlink analyzer for competitor research, or run it again later to compare how your profile has changed. Results are cached for 7 days, so you can compare snapshots across refreshes to see the net effect of link-building work.",
     "how": {
       "input": "A domain (e.g. example.com)",
       "process": [
@@ -605,12 +605,12 @@
     "who": [
       "Pro users measuring link-building results against a baseline",
       "SEO practitioners studying competitor link profiles for target lists",
-      "Anyone monitoring link growth and loss over time",
+      "Anyone comparing link profiles across refreshes",
       "Site owners keeping their anchor text mix natural and penalty-safe"
     ],
     "limits": [
       "Included in the Pro plan only",
-      "Per-domain data is cached for 7 days — not real-time, but stable enough for trend comparisons",
+      "Per-domain data is cached for 7 days — you can compare snapshots across refreshes",
       "Monthly query quota depends on your plan",
       "Coverage follows the DataForSEO index, so very new or very small sites may show partial data"
     ],
@@ -778,7 +778,7 @@
       },
       {
         "q": "How do I export reports?",
-        "a": "The reports center supports audit and rank reports in PDF and Excel (CSV) formats. PDF and Excel export are included in the Pro plan."
+        "a": "The reports center supports audit and rank reports in PDF and CSV formats. PDF and Excel export are included in the Pro plan."
       }
     ],
     "contact": {
@@ -826,7 +826,7 @@
     "how": {
       "input": "Users create projects and add website domains and keyword lists",
       "process": "SeeO's own crawler fetches pages for technical checks; SerpApi queries keyword rankings; DataForSEO pulls backlink data; a scheduled job refreshes rankings daily and generates volatility alerts",
-      "output": "Health scores with fixes, rank trend curves, competitor comparisons, content optimization suggestions, and exportable PDF / Excel reports"
+      "output": "Health scores with fixes, rank trend curves, competitor comparisons, content optimization suggestions, and exportable PDF / CSV reports"
     },
     "capabilities": [
       {
@@ -1062,7 +1062,8 @@
       "demoModeNoSave": "Demo mode — data will not be saved",
       "demoModeDisabled": "Demo mode · Account system is disabled",
       "notAudited": "Not audited",
-      "rankChange": "Rank change"
+      "rankChange": "Rank change",
+      "loadFailed": "Failed to load data"
     },
     "upgrade": {
       "title": "Upgrade your plan",
@@ -1561,7 +1562,8 @@
       "externalLinksLabel": "External links",
       "h1Label": "H1",
       "canonicalLabel": "Canonical",
-      "descriptionLabel": "Meta description"
+      "descriptionLabel": "Meta description",
+      "crawledPages": "Crawling… {count} pages processed"
     },
     "positionTracking": {
       "title": "Position Tracking",
@@ -1628,7 +1630,7 @@
       "keywordPlaceholder": "e.g. seo tools",
       "targetDomain": "Target domain",
       "domainPlaceholder": "Enter your website domain, e.g. example.com",
-      "addModalHint": "The demo plan allows tracking up to {limit} keywords. Rankings refresh once daily; repeated refreshes on the same day use the cache without extra quota.",
+      "addModalHint": "The {plan} plan allows tracking up to {limit} keywords. Rankings refresh once daily; repeated refreshes on the same day use the cache without extra quota.",
       "confirmDelete": "Confirm delete",
       "deleteModalBody": "Deleting will also erase all historical rank records for this keyword. This cannot be undone. Continue?",
       "createGroupModalTitle": "Create keyword group",
@@ -1656,7 +1658,8 @@
       "removedFromGroup": "Removed from group",
       "emptyTitle": "No tracked keywords yet",
       "emptyHint": "Add a keyword to start monitoring its Google ranking",
-      "emptyAddBtn": "+ Add keyword"
+      "emptyAddBtn": "+ Add keyword",
+      "quotaReached": "You've reached your plan's tracking limit ({limit} keywords). Upgrade to track more keywords."
     },
     "keywords": {
       "overview": {
@@ -1724,13 +1727,13 @@
         "trackAction": "+ Track",
         "trackAdded": "Added to tracking: {keyword}",
         "alreadyTracking": "This keyword is already being tracked",
-        "noProject": "Create a project on the overview page before adding tracking",
         "addFailed": "Failed to add",
         "trackTitle": "Add to tracking",
         "trackedTitle": "Added to tracking",
         "intentInformational": "Informational",
         "intentCommercial": "Commercial",
-        "intentNavigational": "Navigational"
+        "intentNavigational": "Navigational",
+        "selectProjectFirst": "Select a project domain first, then track keywords"
       }
     },
     "competitors": {
@@ -1962,7 +1965,7 @@
       "aboutTitle": "About report export",
       "aboutPdf": "· PDF reports are generated in-browser with html2pdf.js — no server rendering required",
       "aboutCsv": "· CSV exports include a UTF-8 BOM so Chinese text opens correctly in Excel",
-      "aboutEmail": "· Email sending is powered by Resend and requires the RESEND_API_KEY environment variable",
+      "aboutEmail": "· Email reports send a summary to your inbox",
       "aboutData": "· Everything is based on real local SQLite data — no SerpApi quota consumed",
       "previewTitle": "{type} Report Preview",
       "closeLabel": "Close",
@@ -2491,7 +2494,7 @@
     "KEYWORD_GROUP_LIMIT_REACHED": "Your current plan ({plan}) allows at most {limit} keyword groups. Please upgrade.",
     "UPSTREAM_ERROR": "Internal server error. Please try again later.",
     "DATAFORSEO_NOT_CONFIGURED": "DataForSEO credentials are not configured (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD).",
-    "RESEND_NOT_CONFIGURED": "Email is not configured: RESEND_API_KEY environment variable is missing.",
+    "RESEND_NOT_CONFIGURED": "Email reports are currently unavailable. Please try again later.",
     "SEND_FAILED": "Failed to send.",
     "ADMIN_CLIENT_UNAVAILABLE": "Admin client is unavailable.",
     "VERIFY_READ_FAILED": "Sync succeeded but verification read failed. Please retry.",
@@ -2501,7 +2504,7 @@
     "INVALID_URL": "Invalid URL: {detail}",
     "HTTP_ERROR": "Page returned an error: {detail}",
     "UNKNOWN": "Crawl failed: {detail}",
-    "GSC_NOT_CONFIGURED": "Google Search Console is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GSC_TOKEN_ENCRYPTION_KEY, then reconnect.",
+    "GSC_NOT_CONFIGURED": "Google Search Console connection is not available right now. Please try again later.",
     "GSC_NOT_CONNECTED": "This project is not connected to Google Search Console yet. Connect a verified property in settings.",
     "GSC_AUTH_REQUIRED": "Search Console access was denied. Reconnect the property in settings.",
     "GSC_QUOTA_EXCEEDED": "Search Console API rate limit reached. Please retry shortly.",

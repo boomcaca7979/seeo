@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { localizeReportTitle, resolveAuditDetail, resolveAuditSuggestion } from "@/lib/seo/audit-legacy-text";
 import { buildCoverageFromIssues, checkMetaMap, nonCatalogCheckNames, pickText } from "@/lib/seo/audit-checks";
 import { useToast } from "@/components/dashboard/Toast";
+import Modal from "@/components/dashboard/Modal";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
@@ -103,6 +104,7 @@ const typeConfig: Record<ReportType, { badge: string }> = {
 
 export default function ReportsPage() {
   const t = useTranslations("dashboard.reportsPage");
+  const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
   const typeLabel = (type: ReportType) => t(`types.${type}.label`);
   const typeName = (type: ReportType) => t(`types.${type}.name`);
@@ -133,6 +135,8 @@ export default function ReportsPage() {
   const [selectedType, setSelectedType] = useState<ReportType>("ranking");
   const [generating, setGenerating] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name?: string } | null>(null);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailToSend, setEmailToSend] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -451,11 +455,7 @@ export default function ReportsPage() {
       setPreviewOpen(false);
       return;
     }
-    if (window.confirm(t("confirmSave"))) {
-      void handleSaveReport().then(() => setPreviewOpen(false));
-    } else {
-      setPreviewOpen(false);
-    }
+    setSavePromptOpen(true);
   };
 
   const handleSendEmail = async () => {
@@ -491,7 +491,6 @@ export default function ReportsPage() {
   };
 
   const handleDeleteReport = async (id: number) => {
-    if (!window.confirm(t("confirmDelete"))) return;
     try {
       const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
       if (res.ok) {
@@ -745,7 +744,7 @@ export default function ReportsPage() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDeleteReport(r.id)}
+                            onClick={() => setDeleteTarget({ id: r.id })}
                             className="rounded-md p-2 text-ink-40 hover:bg-neg/10 hover:text-neg"
                             aria-label={t("deleteLabel")}
                           >
@@ -875,6 +874,61 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+
+      {/* 删除确认（替代 window.confirm） */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={t("confirmDelete")}
+        footer={
+          <>
+            <button onClick={() => setDeleteTarget(null)} className="btn-secondary">{tc("cancel")}</button>
+            <button
+              onClick={() => {
+                const id = deleteTarget?.id;
+                setDeleteTarget(null);
+                if (typeof id === "number") void handleDeleteReport(id);
+              }}
+              className="btn-primary"
+            >
+              {t("confirmDelete")}
+            </button>
+          </>
+        }
+      >
+        <p className="font-sans text-sm text-ink-60">{t("confirmDelete")}</p>
+      </Modal>
+
+      {/* 预览关闭前保存提示（替代 window.confirm） */}
+      <Modal
+        open={savePromptOpen}
+        onClose={() => setSavePromptOpen(false)}
+        title={t("confirmSave")}
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setSavePromptOpen(false);
+                setPreviewOpen(false);
+              }}
+              className="btn-secondary"
+            >
+              {tc("cancel")}
+            </button>
+            <button
+              onClick={() => {
+                setSavePromptOpen(false);
+                void handleSaveReport().then(() => setPreviewOpen(false));
+              }}
+              className="btn-primary"
+            >
+              {t("saveBtn")}
+            </button>
+          </>
+        }
+      >
+        <p className="font-sans text-sm text-ink-60">{t("confirmSave")}</p>
+      </Modal>
 
       <Toast />
     </div>

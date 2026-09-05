@@ -98,11 +98,17 @@ describe("F1：额度分支（未达额度→Modal，达额度→升级提示）
     expect(fnBody.indexOf("return;")).toBeGreaterThan(-1);
   });
 
-  it("max_projects 从 /api/account/usage 真实读取（不硬编码 2）", () => {
-    expect(SRC).toContain('fetch("/api/account/usage"');
-    expect(SRC).toContain("json.data.limits?.max_projects");
+  it("max_projects 从 EntitlementsContext 单一数据源读取（context 内 fetch /api/account/usage，Topbar 不重复请求）", () => {
+    // Topbar 通过 useEntitlements() 读取 plan + limits（不再自行 fetch，避免 3× 重复请求）
+    expect(SRC).toContain("useEntitlements()");
+    expect(SRC).toContain("entitlementLimits?.max_projects");
+    expect(SRC).not.toContain('fetch("/api/account/usage"');
+    // Provider 内仍以真实 usage API 为数据源
+    const ctxSrc = readFileSync(fileURLToPath(new URL("../billing/EntitlementsContext.tsx", import.meta.url)), "utf-8");
+    expect(ctxSrc).toContain('fetch("/api/account/usage"');
+    expect(ctxSrc).toContain("max_projects");
+    // 不允许硬编码额度
     expect(SRC).not.toMatch(/maxProjects\s*=\s*2\b/);
-    expect(SRC).not.toContain("setMaxProjects(2)");
   });
 
   it("下拉打开时刷新项目列表（loadProjects），避免创建/删除后额度校验用旧数据", () => {

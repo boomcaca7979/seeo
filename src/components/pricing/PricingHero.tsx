@@ -12,7 +12,7 @@ export default function PricingHero() {
   const t = useTranslations("pricing");
 
   return (
-    <header className="mx-auto max-w-[1392px] px-6 pt-10 pb-6">
+    <header className="wide-shell px-6 pt-10 pb-6">
       <h1 className="text-4xl font-semibold leading-[43px] text-ink">
         {t("title")}
       </h1>

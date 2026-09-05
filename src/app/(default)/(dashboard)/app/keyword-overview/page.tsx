@@ -34,8 +34,13 @@ const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
 };
 
 function detectIntent(query: string): string {
-  if (/什么|怎么|为什么|如何|是不是|哪些/.test(query)) return "信息型";
-  if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(query)) return "商业型";
+  const q = query.toLowerCase();
+  // 中文意图规则
+  if (/什么|怎么|为什么|如何|是不是|哪些/.test(q)) return "信息型";
+  if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(q)) return "商业型";
+  // 英文意图规则
+  if (/\b(what|how|why|which|guide|tutorial|learn|is|are|does|do)\b/.test(q)) return "信息型";
+  if (/\b(best|top|review|reviews|compare|comparison|vs|price|pricing|cheap|cheapest|alternative|alternatives|buy|cost)\b/.test(q)) return "商业型";
   return "导航型";
 }
 

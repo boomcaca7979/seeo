@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
+import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { planLabel } from "@/lib/plan-labels";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useCreateProject } from "@/components/dashboard/CreateProjectContext";
@@ -61,31 +62,15 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unread, setUnread] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<string>("free");
-  const [maxProjects, setMaxProjects] = useState<number | null>(null);
+  const { plan: currentPlan, limits: entitlementLimits, loading: entitlementsLoading } = useEntitlements();
+  // 项目额度上限：从 EntitlementsContext limits 派生（单一数据源）
+  const maxProjects =
+    typeof entitlementLimits?.max_projects === "number" ? entitlementLimits.max_projects : null;
   const { openCreateProject } = useCreateProject();
   const bellRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // 拉取当前用户套餐 + 项目额度上限（用于 plan badge 展示 + 新建项目额度校验）
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/account/usage", { cache: "no-store" });
-        const json = await res.json();
-        if (!cancelled && res.ok && json?.data) {
-          if (json.data.plan) setCurrentPlan(json.data.plan as string);
-          const limit = json.data.limits?.max_projects;
-          if (typeof limit === "number") setMaxProjects(limit);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   // 拉取真实项目列表 + 从 localStorage 恢复选中项
   // （下拉打开时也会调用：创建/删除项目后刷新，保证额度校验不用旧数据）
@@ -302,23 +287,8 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
         )}
       </div>
 
-      {/* 搜索框：白底描边 + ⌘K */}
-      <div className="hidden flex-1 max-w-md sm:block">
-        <div className="relative">
-          <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-40">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-            <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            placeholder={t("searchPlaceholder")}
-            className="w-full rounded-md border border-line bg-card py-2 pl-9 pr-14 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-          />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line bg-paper px-2 py-0.5 font-mono text-xs text-ink-40">
-            ⌘K
-          </kbd>
-        </div>
-      </div>
+      {/* 全局搜索暂未提供；占位弹性行保持布局平衡 */}
+      <div className="hidden flex-1 sm:block" aria-hidden="true" />
 
       {/* 右侧 */}
       <div className="flex items-center gap-2">
@@ -404,8 +374,8 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
             onClick={() => setUserMenuOpen((o) => !o)}
             className="flex items-center gap-2 rounded p-1 hover:bg-line-soft"
           >
-            <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
-              {planLabel(currentPlan, locale)}
+            <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${entitlementsLoading ? "bg-line-soft text-ink-40" : (PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free)}`}>
+              {entitlementsLoading ? "…" : planLabel(currentPlan, locale)}
             </span>
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
               {displayName.charAt(0).toUpperCase()}
@@ -422,8 +392,8 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
                   {email}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free}`}>
-                    {planLabel(currentPlan, locale)}
+                  <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${entitlementsLoading ? "bg-line-soft text-ink-40" : (PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free)}`}>
+                    {entitlementsLoading ? "…" : planLabel(currentPlan, locale)}
                   </span>
                   {(currentPlan === "free" || currentPlan === "lite") && (
                     <span className="font-mono text-xs text-ink-40">{t("upgradeHint")}</span>

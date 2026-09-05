@@ -27,6 +27,26 @@ describe("detectIntent（关键词 → 意图分类）", () => {
     expect(detectIntent("建站多少钱")).toBe("商业型");
   });
 
+  it("英文疑问词 → 信息型", () => {
+    expect(detectIntent("how to improve seo")).toBe("信息型");
+    expect(detectIntent("what is technical seo")).toBe("信息型");
+    expect(detectIntent("why is my ranking dropping")).toBe("信息型");
+    expect(detectIntent("seo guide for beginners")).toBe("信息型");
+  });
+
+  it("英文商业词 → 商业型", () => {
+    expect(detectIntent("best seo tools")).toBe("商业型");
+    expect(detectIntent("buy seo software")).toBe("商业型");
+    expect(detectIntent("semrush vs ahrefs")).toBe("商业型");
+    expect(detectIntent("seo audit pricing")).toBe("商业型");
+    expect(detectIntent("cheap keyword research alternative")).toBe("商业型");
+  });
+
+  it("英文品牌词 → 导航型", () => {
+    expect(detectIntent("seeo")).toBe("导航型");
+    expect(detectIntent("seeo login")).toBe("导航型");
+  });
+
   it("其他（品牌/导航/无特征词）→ 导航型", () => {
     expect(detectIntent("semrush 官网")).toBe("导航型");
     expect(detectIntent("toolstep")).toBe("导航型");

@@ -31,10 +31,13 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // 导航项：label 走 messages；href 为逻辑路径，
-  // locale-routed 页（pricing/docs）按 locale 加 /zh 前缀，锚点保持原样
+  // locale-routed 页（pricing/docs）按 locale 加 /zh 前缀
+  // 锚点链接：首页用本地锚点，非首页用完整路径（含 locale 前缀）
+  const isHome = stripLocalePrefix(effectivePath ?? "/") === "/";
+  const homePrefix = locale === "zh" ? "/zh" : "/";
   const navItems = [
-    { label: t("features"), href: "#features" },
-    { label: t("product"), href: "#dashboard" },
+    { label: t("features"), href: isHome ? "#features" : `${homePrefix}#features` },
+    { label: t("product"), href: isHome ? "#dashboard" : `${homePrefix}#dashboard` },
     { label: t("pricing"), href: "/pricing", routed: true },
     { label: t("docs"), href: "/docs", routed: true },
   ];
@@ -109,25 +112,31 @@ export default function Navbar() {
 
         {/* 桌面端导航 */}
         <ul className="hidden items-center gap-8 md:flex">
-          {navItems.map((item) => (
+          {navItems.map((item) => {
+            const isActive = item.routed && effectivePath
+              ? stripLocalePrefix(effectivePath) === item.href
+              : false;
+            return (
             <li key={item.href}>
               {item.routed ? (
                 <LocaleLink
                   href={item.href}
-                  className="text-sm font-medium text-ink-60 transition-colors hover:text-ink"
+                  aria-current={isActive ? "page" : undefined}
+                  className={`text-sm font-medium transition-colors hover:text-ink ${isActive ? "text-ink" : "text-ink-60"}`}
                 >
                   {item.label}
                 </LocaleLink>
               ) : (
-                <Link
+                <a
                   href={item.href}
-                  className="text-sm font-medium text-ink-60 transition-colors hover:text-ink"
+                  className={`text-sm font-medium transition-colors hover:text-ink ${isActive ? "text-ink" : "text-ink-60"}`}
                 >
                   {item.label}
-                </Link>
+                </a>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
 
         {/* 桌面端 CTA */}
@@ -209,27 +218,35 @@ export default function Navbar() {
           className="border-t border-line bg-card md:hidden"
         >
           <ul className="site-shell flex flex-col px-5 py-3 sm:px-8">
-            {navItems.map((item) => (
+            {navItems.map((item) => {
+              const isActive = item.routed && effectivePath
+                ? stripLocalePrefix(effectivePath) === item.href
+                : false;
+              const linkClass = `block py-3 text-sm font-medium transition-colors hover:text-ink ${isActive ? "text-ink" : "text-ink-60"}`;
+              return (
               <li key={item.href}>
                 {item.routed ? (
                   <LocaleLink
                     href={item.href}
                     onClick={closeMobile}
-                    className="block py-3 text-sm font-medium text-ink-60 transition-colors hover:text-ink"
+                    aria-current={isActive ? "page" : undefined}
+                    className={linkClass}
                   >
                     {item.label}
                   </LocaleLink>
                 ) : (
-                  <Link
+                  <a
                     href={item.href}
                     onClick={closeMobile}
-                    className="block py-3 text-sm font-medium text-ink-60 transition-colors hover:text-ink"
+                    aria-current={isActive ? "page" : undefined}
+                    className={linkClass}
                   >
                     {item.label}
-                  </Link>
+                  </a>
                 )}
               </li>
-            ))}
+              );
+            })}
             <li className="mt-2 flex flex-col gap-3 border-t border-line pt-3">
               {showLangSwitch && (
                 <Link

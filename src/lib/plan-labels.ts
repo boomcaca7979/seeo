@@ -16,14 +16,14 @@ export function planLabel(plan: string, locale: Locale): string {
 export const FEATURE_LABELS: Record<Locale, Record<string, string>> = {
   en: {
     pdf_export: "PDF export",
-    excel_export: "Excel export",
+    excel_export: "CSV export (Excel-compatible)",
     full_audit: "Full site audit",
     backlinks: "Backlink analysis",
     email_report: "Email reports",
   },
   zh: {
     pdf_export: "PDF 导出",
-    excel_export: "Excel 导出",
+    excel_export: "CSV 导出（Excel 兼容）",
     full_audit: "完整审计",
     backlinks: "外链分析",
     email_report: "邮件报告",

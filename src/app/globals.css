@@ -179,6 +179,17 @@ html {
   .doc-shell { max-width: 72rem; }
 }
 
+/* wide-shell  Pricing 专用结构容器：87rem(1392px) 基准（Semrush benchmark），
+ * ≥1536px 提升至 96rem(1536px)，与 site-shell 同节奏放宽 */
+.wide-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 87rem;
+}
+@media (min-width: 96rem) {
+  .wide-shell { max-width: 96rem; }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -194,6 +205,11 @@ body {
  * 中文正文/标题恢复自然字距。非分层规则优先于 Tailwind 工具类。 */
 :lang(zh) :is(h1, h2, h3, h4) {
   letter-spacing: normal;
+}
+
+/* 锚点滚动偏移：避免 sticky header（h-16）遮挡目标 section 顶部 */
+[id] {
+  scroll-margin-top: 4rem;
 }
 
 /* 滚动条隐藏 */
@@ -303,6 +319,53 @@ body {
 .btn-lg {
   height: 48px;
   padding: 0 24px;
+}
+
+/* Pill 按钮（40px / radius 20px）：Pricing / marketing CTA 专用
+ * Semrush benchmark 样式：dark filled primary + bordered secondary */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 20px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.btn-pill-primary {
+  background-color: var(--color-brand);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+.btn-pill-primary:hover {
+  background-color: var(--color-ink-60);
+}
+.btn-pill-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-pill-secondary {
+  background-color: var(--color-card);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+.btn-pill-secondary:hover {
+  border-color: var(--color-ink-25);
+}
+
+/* Pill 逆色按钮（白色 bg，深色文字）：用于深色背景区块如 Enterprise band */
+.btn-pill-inverse {
+  background-color: #ffffff;
+  color: var(--color-ink);
+  border: 1px solid transparent;
+}
+.btn-pill-inverse:hover {
+  background-color: var(--color-line-soft);
 }
 
 /* 健康分颜色辅助类 */

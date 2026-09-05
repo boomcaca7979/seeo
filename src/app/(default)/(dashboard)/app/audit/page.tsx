@@ -148,6 +148,9 @@ function AuditPageInner() {
   const [progressPages, setProgressPages] = useState<number | null>(null);
   const [pendingDepth, setPendingDepth] = useState<AuditDepth>("quick");
   const [activeDepth, setActiveDepth] = useState<AuditDepth>("quick");
+  // 展示深度：优先取已加载审计记录中记录的深度（刷新后 state 重置时仍正确）
+  const effectiveDepth: AuditDepth =
+    (audit?.dashboard as { depth?: string } | null | undefined)?.depth === "full" ? "full" : activeDepth;
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -512,13 +515,16 @@ function AuditPageInner() {
       {auditing && (
         <div className="card-a mt-4 p-5 print:hidden">
           <div className="flex items-center justify-between font-sans text-xs text-ink-40">
-            <span>{activeDepth === "quick" ? t("progressQuick") : t("progressFull")}</span>
-            <span className="text-warn">{progressPages !== null ? `${t("crawling")} ${progressPages} / 50` : t("starting")}</span>
+            <span>{effectiveDepth === "quick" ? t("progressQuick") : t("progressFull")}</span>
+            <span className="text-warn">{progressPages !== null ? t("crawledPages", { count: progressPages }) : t("starting")}</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-line-soft">
-            <div className="h-full rounded-full bg-warn transition-all" style={{ width: `${progressPages !== null ? Math.min(100, (progressPages / 50) * 100) : 4}%` }} />
+            <div
+              className={`h-full rounded-full bg-warn transition-all ${effectiveDepth !== "quick" ? "animate-pulse" : ""}`}
+              style={{ width: effectiveDepth === "quick" ? `${progressPages !== null ? Math.min(100, (progressPages / 50) * 100) : 4}%` : "100%" }}
+            />
           </div>
-          <p className="mt-2 font-sans text-xs text-ink-40">{activeDepth === "quick" ? t("etaQuick") : t("etaFull")}</p>
+          <p className="mt-2 font-sans text-xs text-ink-40">{effectiveDepth === "quick" ? t("etaQuick") : t("etaFull")}</p>
         </div>
       )}
 
@@ -573,7 +579,7 @@ function AuditPageInner() {
             <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-neg/15 font-mono text-sm text-neg">!</span>
             <div>
               <div className="font-display text-sm font-semibold text-neg">{t("failedTitle")}</div>
-              <p className="mt-1 font-sans text-sm text-ink-60">{activeDepth === "full" ? t("failedHintFull") : t("failedHintDefault")}</p>
+              <p className="mt-1 font-sans text-sm text-ink-60">{effectiveDepth === "full" ? t("failedHintFull") : t("failedHintDefault")}</p>
               {audit?.error ? <p className="mt-1 break-all font-mono text-xs text-ink-40">{audit.error}</p> : null}
               <div className="mt-3">
                 <button onClick={() => openConfirm("quick")} className="btn-primary">{t("retryBtn")}</button>

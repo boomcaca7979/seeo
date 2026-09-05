@@ -198,13 +198,15 @@ export default function CompetitorsPage() {
       if (res.ok) {
         setCompetitors(json.data ?? []);
         if (json.usage) setUsage(json.usage);
+      } else {
+        show(tc("loadFailed"), "error");
       }
     } catch {
-      // ignore
+      show(tc("networkError"), "error");
     } finally {
       setCompLoading(false);
     }
-  }, []);
+  }, [show, tc]);
 
   // 拉取项目追踪关键词
   const loadKeywords = useCallback(async () => {
@@ -222,11 +224,13 @@ export default function CompetitorsPage() {
           setSelectedKeywordId(filtered[0].id);
         }
         if (json.usage) setUsage(json.usage);
+      } else {
+        show(tc("loadFailed"), "error");
       }
     } catch {
-      // ignore
+      show(tc("networkError"), "error");
     }
-  }, [projectDomain, selectedKeywordId]);
+  }, [projectDomain, selectedKeywordId, show, tc]);
 
   // 拉取 SOV（pid 为前端项目 id string）
   const loadSov = useCallback(async (pid: string) => {
@@ -237,13 +241,15 @@ export default function CompetitorsPage() {
       if (res.ok) {
         setSov(json.data);
         if (json.usage) setUsage(json.usage);
+      } else {
+        show(tc("loadFailed"), "error");
       }
     } catch {
-      // ignore
+      show(tc("networkError"), "error");
     } finally {
       setSovLoading(false);
     }
-  }, []);
+  }, [show, tc]);
 
   // 项目变化时拉取竞品 + SOV（推迟到下一帧避免 effect 同步路径 setState）
   useEffect(() => {
@@ -282,7 +288,7 @@ export default function CompetitorsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, show, tc]);
 
   // projectDomain 变化时拉取关键词
   useEffect(() => {

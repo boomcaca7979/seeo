@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
+import DomainSelect from "@/components/dashboard/DomainSelect";
 import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
 import { formatNumber } from "@/lib/ui-locale";
@@ -47,8 +48,13 @@ const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
 };
 
 export function detectIntent(query: string): string {
-  if (/什么|怎么|为什么|如何|是不是|哪些/.test(query)) return "信息型";
-  if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(query)) return "商业型";
+  const q = query.toLowerCase();
+  // 中文意图规则
+  if (/什么|怎么|为什么|如何|是不是|哪些/.test(q)) return "信息型";
+  if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(q)) return "商业型";
+  // 英文意图规则
+  if (/\b(what|how|why|which|guide|tutorial|learn|is|are|does|do)\b/.test(q)) return "信息型";
+  if (/\b(best|top|review|reviews|compare|comparison|vs|price|pricing|cheap|cheapest|alternative|alternatives|buy|cost)\b/.test(q)) return "商业型";
   return "导航型";
 }
 
@@ -67,6 +73,7 @@ export default function KeywordExpandPage() {
   const [searchValue, setSearchValue] = useState("");
   const [location, setLocation] = useState("中国");
   const [device, setDevice] = useState<Device>("PC");
+  const [trackDomain, setTrackDomain] = useState("");
   const [serp, setSerp] = useState<SerpState>({ loading: false, data: null, error: null, keyword: null });
   const [expand, setExpand] = useState<ExpandState>({ loading: false, data: null, error: null });
   const [usage, setUsage] = useState<UsageBadge | null>(null);
@@ -134,19 +141,16 @@ export default function KeywordExpandPage() {
     }
     setTrackingIds((prev) => ({ ...prev, [keyword]: true }));
     try {
-      const projRes = await fetch("/api/projects", { cache: "no-store" });
-      const projJson = await projRes.json();
-      const userProjects: { domain?: string }[] = projJson?.data ?? [];
-      const firstDomain = userProjects[0]?.domain?.trim();
-      if (!firstDomain) {
-        show(t("noProject"), "error");
+      const targetDomain = trackDomain.trim();
+      if (!targetDomain) {
+        show(t("selectProjectFirst"), "error");
         setTrackingIds((prev) => ({ ...prev, [keyword]: false }));
         return;
       }
       const res = await fetch("/api/tracking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword, location, device, domain: firstDomain }),
+        body: JSON.stringify({ keyword, location, device, domain: targetDomain }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -199,6 +203,11 @@ export default function KeywordExpandPage() {
             <option value="PC">PC</option>
             <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
           </select>
+          <DomainSelect
+            value={trackDomain}
+            onChange={(d) => setTrackDomain(d)}
+            className="h-10 min-w-[180px]"
+          />
         </div>
         <div className="relative flex-1">
           <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-40">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
@@ -8,6 +8,7 @@ import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { localePath } from "@/i18n/seo";
 import { useToast } from "@/components/dashboard/Toast";
+import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { planLabel } from "@/lib/plan-labels";
 
 type NavItem = {
@@ -171,28 +172,13 @@ interface SidebarProps {
 
 export default function Sidebar({ displayName, email, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<string>("free");
+  const { plan: currentPlan, loading: entitlementsLoading } = useEntitlements();
   const pathname = usePathname();
   const { show, Toast } = useToast();
   const t = useTranslations("dashboard.sidebar");
   const locale = useLocale() as "en" | "zh";
 
-  // 拉取当前用户套餐（用于显示套餐标识和升级 CTA）
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/account/usage", { cache: "no-store" });
-        const json = await res.json();
-        if (!cancelled && res.ok && json?.data?.plan) {
-          setCurrentPlan(json.data.plan as string);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // 当前用户套餐：统一从 EntitlementsContext 读取（单一数据源，避免重复 fetch）
 
   const handleLogout = async () => {
     if (!isAuthEnabled) {
@@ -276,7 +262,7 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
           <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs text-ink-40">{t("currentPlan")}</span>
-              <span className="font-sans text-xs font-medium text-ink">{currentPlanLabel}</span>
+              <span className="font-sans text-xs font-medium text-ink">{entitlementsLoading ? "…" : currentPlanLabel}</span>
             </div>
             {showUpgradeCta && (
               <Link

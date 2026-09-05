@@ -258,7 +258,7 @@ function PricingContent() {
       {/* 定价卡 */}
       <div className="pb-0">
         {loading ? (
-          <div className="mx-auto max-w-[1400px] px-6 py-16 text-center font-mono text-xs text-ink-40">
+          <div className="wide-shell px-6 py-16 text-center font-mono text-xs text-ink-40">
             {t("pricing.loading")}
           </div>
         ) : memberCards.length > 0 ? (
@@ -268,7 +268,7 @@ function PricingContent() {
             onCheckout={(plan) => void handleCheckoutClick(plan)}
           />
         ) : (
-          <div className="mx-auto max-w-[1400px] px-6 py-16 text-center font-mono text-xs text-ink-40">
+          <div className="wide-shell px-6 py-16 text-center font-mono text-xs text-ink-40">
             {errorMsg ?? t("pricing.noPlans")}
           </div>
         )}

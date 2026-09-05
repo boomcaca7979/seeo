@@ -54,7 +54,7 @@ export default async function BacklinkAnalysisFeaturePage() {
 
       <div className="doc-shell px-6 py-16">
         <span className="font-mono text-xs text-brand">{s("eyebrow")}</span>
-        <h1 className="mt-3 font-mono text-3xl font-semibold text-ink mb-2">
+        <h1 className="mt-3 font-display text-3xl font-semibold text-ink mb-2">
           {t("title")}
         </h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
@@ -63,7 +63,7 @@ export default async function BacklinkAnalysisFeaturePage() {
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">01</span>
-            <h2 className="font-mono text-lg font-semibold text-ink">
+            <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.whatItDoes")}
             </h2>
             <div className="hairline flex-1" />
@@ -77,7 +77,7 @@ export default async function BacklinkAnalysisFeaturePage() {
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
-            <h2 className="font-mono text-lg font-semibold text-ink">
+            <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.howItWorks")}
             </h2>
             <div className="hairline flex-1" />
@@ -116,14 +116,14 @@ export default async function BacklinkAnalysisFeaturePage() {
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">03</span>
-            <h2 className="font-mono text-lg font-semibold text-ink">
+            <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.fitAndLimits")}
             </h2>
             <div className="hairline flex-1" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="card-a p-4">
-              <h3 className="font-mono text-sm font-semibold text-ink mb-2">{s("fitTitle")}</h3>
+              <h3 className="font-display text-sm font-semibold text-ink mb-2">{s("fitTitle")}</h3>
               <ul className="space-y-1 font-sans text-sm text-ink-60">
                 {who.map((item) => (
                   <li key={item}>· {item}</li>
@@ -131,7 +131,7 @@ export default async function BacklinkAnalysisFeaturePage() {
               </ul>
             </div>
             <div className="card-a p-4">
-              <h3 className="font-mono text-sm font-semibold text-ink mb-2">{s("limitsTitle")}</h3>
+              <h3 className="font-display text-sm font-semibold text-ink mb-2">{s("limitsTitle")}</h3>
               <ul className="space-y-1 font-sans text-sm text-ink-60">
                 {limits.map((item) => (
                   <li key={item}>· {item}</li>
@@ -145,7 +145,7 @@ export default async function BacklinkAnalysisFeaturePage() {
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">04</span>
-            <h2 className="font-mono text-lg font-semibold text-ink">{s("sections.faq")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{s("sections.faq")}</h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
@@ -165,7 +165,7 @@ export default async function BacklinkAnalysisFeaturePage() {
             className="card-a p-4 transition-colors hover:border-brand"
           >
             <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-mono text-sm font-semibold text-ink">
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
               {t("related.seoAudit.title")}
             </h3>
             <p className="mt-1 font-sans text-xs text-ink-60">{t("related.seoAudit.desc")}</p>
@@ -175,7 +175,7 @@ export default async function BacklinkAnalysisFeaturePage() {
             className="card-a p-4 transition-colors hover:border-brand"
           >
             <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-mono text-sm font-semibold text-ink">
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
               {t("related.rankTracking.title")}
             </h3>
             <p className="mt-1 font-sans text-xs text-ink-60">{t("related.rankTracking.desc")}</p>
@@ -183,7 +183,7 @@ export default async function BacklinkAnalysisFeaturePage() {
         </div>
 
         <div className="mt-8 card-a p-6 text-center">
-          <h2 className="font-mono text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("cta.subtitle")}</p>
           <div className="flex items-center justify-center gap-3">
             <Link href={localePath(locale, "/pricing")} className="btn-primary inline-block px-6 py-2">

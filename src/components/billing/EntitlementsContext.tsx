@@ -18,6 +18,7 @@ export type FeatureKey =
 interface EntitlementsData {
   plan: PlanTier;
   features: Record<FeatureKey, boolean>;
+  limits: EntitlementLimits | null;
 }
 
 interface EntitlementsContextValue extends EntitlementsData {
@@ -33,6 +34,7 @@ const EntitlementsContext = createContext<EntitlementsContextValue>({
     backlinks: false,
     email_report: false,
   },
+  limits: null,
   loading: true,
 });
 
@@ -44,6 +46,12 @@ const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   email_report: false,
 };
 
+/** usage API 返回的额度 limits（供 Topbar 等组件复用，避免重复 fetch） */
+export interface EntitlementLimits {
+  max_projects?: number;
+  [key: string]: number | undefined;
+}
+
 interface EntitlementsProviderProps {
   children: ReactNode;
   /** 初始套餐（避免首次渲染闪烁），DashboardShell 传入已获取的 plan */
@@ -53,6 +61,7 @@ interface EntitlementsProviderProps {
 export function EntitlementsProvider({ children, initialPlan }: EntitlementsProviderProps) {
   const [plan, setPlan] = useState<PlanTier>(initialPlan ?? "free");
   const [features, setFeatures] = useState<Record<FeatureKey, boolean>>(DEFAULT_FEATURES);
+  const [limits, setLimits] = useState<EntitlementLimits | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,9 +71,14 @@ export function EntitlementsProvider({ children, initialPlan }: EntitlementsProv
         const res = await fetch("/api/account/usage", { cache: "no-store" });
         const json = await res.json();
         if (!cancelled && res.ok && json?.data) {
-          const data = json.data as { plan?: PlanTier; features?: Record<FeatureKey, boolean> };
+          const data = json.data as {
+            plan?: PlanTier;
+            features?: Record<FeatureKey, boolean>;
+            limits?: EntitlementLimits;
+          };
           if (data.plan) setPlan(data.plan);
           if (data.features) setFeatures(data.features);
+          if (data.limits) setLimits(data.limits);
         }
       } catch {
         // ignore
@@ -76,7 +90,7 @@ export function EntitlementsProvider({ children, initialPlan }: EntitlementsProv
   }, []);
 
   return (
-    <EntitlementsContext.Provider value={{ plan, features, loading }}>
+    <EntitlementsContext.Provider value={{ plan, features, limits, loading }}>
       {children}
     </EntitlementsContext.Provider>
   );

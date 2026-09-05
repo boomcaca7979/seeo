@@ -13,13 +13,15 @@ import {
   YAxis,
 } from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
+import { triggerUpgradeModal } from "@/components/billing/UpgradeModal";
+import { useEntitlements } from "@/components/billing/EntitlementsContext";
+import { planLabel } from "@/lib/plan-labels";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { formatNumber } from "@/lib/ui-locale";
 import { formatRelativeTime } from "@/lib/relative-time";
 import Modal from "@/components/dashboard/Modal";
 import DomainSelect from "@/components/dashboard/DomainSelect";
-import { ChangeBadge, RankBadge } from "@/components/dashboard/Badges";
-import { rankCompetitors } from "@/lib/mock-data";
+
 import {
   COMMON_GRID_PROPS,
   COMMON_XAXIS_PROPS,
@@ -32,6 +34,7 @@ import ChartCard from "@/components/dashboard/charts/ChartCard";
 import RankDistributionDonut from "@/components/dashboard/charts/RankDistributionDonut";
 import MultiRankTrend, { MultiRankSeries } from "@/components/dashboard/charts/MultiRankTrend";
 import RankChangeBars from "@/components/dashboard/charts/RankChangeBars";
+import { ChangeBadge } from "@/components/dashboard/Badges";
 
 const REGION_CITIES: Record<string, string[]> = {
   "中国": ["北京", "上海", "广州", "深圳"],
@@ -83,13 +86,12 @@ export default function PositionTrackingPage() {
   const t = useTranslations("dashboard.positionTracking");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
+  const { plan: currentPlan } = useEntitlements();
   const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const deviceLabel = (d: Device) => (d === "PC" ? "PC" : t("deviceMobile"));
   const { show, Toast } = useToast();
   const [device, setDevice] = useState<Device>("PC");
   const [country, setCountry] = useState(RANK_LOCATIONS[0]);
-  const [cities, setCities] = useState<string[]>(REGION_CITIES[RANK_LOCATIONS[0]]);
-  const [city, setCity] = useState(REGION_CITIES[RANK_LOCATIONS[0]][0]);
   const [tracked, setTracked] = useState<TrackedKeyword[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
@@ -113,9 +115,6 @@ export default function PositionTrackingPage() {
 
   const handleRegionChange = (region: string) => {
     setCountry(region);
-    const next = REGION_CITIES[region] ?? [];
-    setCities(next);
-    setCity(next[0] ?? "");
   };
 
   const loadList = useCallback(async () => {
@@ -127,19 +126,25 @@ export default function PositionTrackingPage() {
         setTracked(json.data);
         if (json.usage) setUsage(json.usage);
         if (json.limit) setTrackingLimit(json.limit);
+      } else {
+        show(tc("loadFailed"), "error");
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      show(tc("networkError"), "error");
+    } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [show, tc]);
 
   const loadGroups = useCallback(async () => {
     try {
       const res = await fetch("/api/keywords/groups", { cache: "no-store" });
       const json = await res.json();
       if (res.ok) setGroups(json.data);
-    } catch { /* ignore */ }
-  }, []);
+    } catch {
+      show(tc("networkError"), "error");
+    }
+  }, [show, tc]);
 
   const didInitRef = useRef(false);
   useEffect(() => {
@@ -154,7 +159,7 @@ export default function PositionTrackingPage() {
     const handler = () => setGroupMenuId(null);
     window.addEventListener("click", handler);
     return () => window.removeEventListener("click", handler);
-  }, [groupMenuId]);
+  }, [groupMenuId, show, tc]);
 
   const filteredTracked = tracked.filter((t) => {
     if (t.location !== country) return false;
@@ -239,10 +244,12 @@ export default function PositionTrackingPage() {
       const res = await fetch(`/api/tracking/history?id=${keywordId}&days=30`);
       const json = await res.json();
       if (res.ok) setHistory(json.data ?? []);
-    } catch { /* ignore */ } finally {
+    } catch {
+      show(tc("networkError"), "error");
+    } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [show, tc]);
 
   const historyFetchRef = useRef<number | null>(null);
   useEffect(() => {
@@ -274,7 +281,7 @@ export default function PositionTrackingPage() {
     up: tracked.filter((t) => t.change !== null && t.change > 0).length,
     down: tracked.filter((t) => t.change !== null && t.change < 0).length,
   };
-  const usagePercent = usage ? (usage.used / usage.limit) * 100 : 0;
+  const usagePercent = usage && usage.limit > 0 ? (usage.used / usage.limit) * 100 : 0;
 
   // 多关键词排名趋势：取当前筛选下前 5 个词的 30 天历史
   const [multiSeries, setMultiSeries] = useState<MultiRankSeries[]>([]);
@@ -418,7 +425,21 @@ export default function PositionTrackingPage() {
         <button onClick={() => setCreateGroupModalOpen(true)} className="btn-secondary">
           <span className="text-base leading-none">+</span> {t("createGroupBtn")}
         </button>
-        <button onClick={() => setAddModalOpen(true)} disabled={remaining <= 0} className="btn-primary disabled:opacity-60">
+        <button
+            onClick={() => {
+              if (remaining <= 0) {
+                triggerUpgradeModal({
+                  currentPlan,
+                  reason: t("quotaReached", { limit: trackingLimit }),
+                  limit: trackingLimit,
+                  used: tracked.length,
+                });
+                return;
+              }
+              setAddModalOpen(true);
+            }}
+            className="btn-primary"
+          >
           <span className="text-base leading-none">+</span> {t("addKeywordBtn")}
         </button>
       </div>
@@ -442,9 +463,6 @@ export default function PositionTrackingPage() {
           <select value={country} onChange={(e) => handleRegionChange(e.target.value)} className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
             {RANK_LOCATIONS.map((c) => (<option key={c} value={c}>{display(c)}</option>))}
           </select>
-          <select value={city} onChange={(e) => setCity(e.target.value)} className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none">
-            {cities.map((c) => (<option key={c} value={c}>{display(c)}</option>))}
-          </select>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-ink-40">{t("device")}</label>
@@ -462,7 +480,7 @@ export default function PositionTrackingPage() {
             {groups.map((g) => (<option key={g.id} value={`group-${g.id}`}>{g.name}</option>))}
           </select>
         </div>
-        <span className="ml-auto text-xs text-ink-40">{t("current", { scope: `${display(country)} · ${display(city)} · ${deviceLabel(device)}` })}</span>
+        <span className="ml-auto text-xs text-ink-40">{t("current", { scope: `${display(country)} · ${deviceLabel(device)}` })}</span>
       </div>
 
       {/* 概览统计 */}
@@ -662,46 +680,6 @@ export default function PositionTrackingPage() {
         </div>
       </div>
 
-      {/* 竞品对比区（mock，标注示意数据） */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[1.0625rem] font-semibold text-ink">{t("competitorTitle")}</h2>
-          <span className="badge-warn">{t("demoData")}</span>
-        </div>
-        <div className="card-a mt-3 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-line-soft bg-line-soft/50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("domain")}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("rank")}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("change")}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankCompetitors.map((c) => (
-                  <tr key={c.domain} className={`border-b border-line-soft/60 ${c.isSelf ? "bg-line-soft/40" : ""}`}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded bg-ink/10 font-mono text-xs font-semibold text-ink">{c.favicon}</span>
-                        <span className={`font-mono text-sm ${c.isSelf ? "font-semibold text-ink" : "text-ink"}`}>{c.domain}</span>
-                        {c.isSelf && <span className="badge-info">{t("selfSite")}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3"><RankBadge rank={c.rank} /></td>
-                    <td className="px-4 py-3"><ChangeBadge value={c.change} /></td>
-                    <td className="px-4 py-3">
-                      {c.rank <= 3 ? <span className="badge-pos">{t("statusLeading")}</span> : c.rank <= 10 ? <span className="badge-warn">{t("statusCatchingUp")}</span> : <span className="badge-info">{t("statusBehind")}</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       {/* 添加追踪关键词模态框 */}
       <Modal
         open={addModalOpen}
@@ -738,7 +716,7 @@ export default function PositionTrackingPage() {
               </select>
             </div>
           </div>
-          <p className="text-xs text-ink-40">{t("addModalHint", { limit: trackingLimit })}</p>
+          <p className="text-xs text-ink-40">{t("addModalHint", { limit: trackingLimit, plan: planLabel(currentPlan, locale) })}</p>
         </form>
       </Modal>
 

@@ -145,6 +145,7 @@ export default function ContentPage() {
   const locale = useLocale() as Locale;
   const { show, Toast } = useToast();
   const [url, setUrl] = useState("");
+  const [domain, setDomain] = useState("");
   const [targetKeywordsInput, setTargetKeywordsInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckResult | null>(null);
@@ -250,8 +251,11 @@ export default function ContentPage() {
         <div className="flex-1">
           <label className="font-mono text-xs text-ink-40">{t("urlLabel")}</label>
           <DomainSelect
-            value=""
-            onChange={(d) => setUrl(`https://${d}`)}
+            value={domain}
+            onChange={(d) => {
+              setDomain(d);
+              setUrl(`https://${d}`);
+            }}
             placeholder={t("domainPlaceholder")}
             className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />

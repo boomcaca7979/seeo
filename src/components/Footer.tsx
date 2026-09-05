@@ -22,9 +22,9 @@ export default function Footer() {
       title: t("colProduct"),
       links: [
         { label: t("colProductLinks.seoAudit"), href: href("/features/seo-audit") },
-        { label: t("colProductLinks.rankTracking"), href: "/features/rank-tracking" },
-        { label: t("colProductLinks.backlinks"), href: "/features/backlink-analysis" },
-        { label: t("colProductLinks.allFeatures"), href: "#features" },
+        { label: t("colProductLinks.rankTracking"), href: href("/features/rank-tracking") },
+        { label: t("colProductLinks.backlinks"), href: href("/features/backlink-analysis") },
+        { label: t("colProductLinks.allFeatures"), href: href("/features/seo-audit") },
       ],
     },
     {
@@ -42,11 +42,11 @@ export default function Footer() {
     {
       title: t("colCompany"),
       links: [
-        { label: t("colCompanyLinks.about"), href: "/about" },
-        { label: t("colCompanyLinks.contact"), href: "/contact" },
-        { label: t("colCompanyLinks.privacy"), href: "/privacy" },
-        { label: t("colCompanyLinks.terms"), href: "/terms" },
-        { label: t("colCompanyLinks.refund"), href: "/refund" },
+        { label: t("colCompanyLinks.about"), href: href("/about") },
+        { label: t("colCompanyLinks.contact"), href: href("/contact") },
+        { label: t("colCompanyLinks.privacy"), href: href("/privacy") },
+        { label: t("colCompanyLinks.terms"), href: href("/terms") },
+        { label: t("colCompanyLinks.refund"), href: href("/refund") },
       ],
     },
   ];
@@ -119,7 +119,7 @@ export default function Footer() {
                 <span className="text-ink-25">·</span>
               </>
             )}
-            <span>v1.0.0</span>
+            <span>v0.1.0</span>
           </div>
         </div>
       </div>
