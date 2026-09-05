@@ -23,52 +23,19 @@ const jetbrainsMono = JetBrains_Mono({
 
 const SITE_URL = "https://www.seeo.asia";
 
-// (default) 组承载工作台（/app）、支付结果与登录注册页（均自带或 robots 禁抓）；
-// 此处为兜底 metadata，须与 [locale]/layout.tsx 营销首页的 title/description 区分
-const siteTitle = "SeeO SEO 工作台：关键词研究、排名追踪与技术审计工具平台";
-const siteDescription =
-  "SeeO 工作台整合关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心模块。登录后可管理多个项目、监控关键词排名的每日变化、执行站点技术审计并导出可视化报告，所有数据集中在一个后台，方便你与团队协作完成日常 SEO 优化与数据复盘工作。";
-
+// (default) 组承载工作台（/app）、支付结果与登录注册页——全部为私有/工具页，
+// 不对搜索引擎开放索引（SEO 审计 S-03）。此处为兜底 metadata：EN 中性文案，
+// 不输出营销 OpenGraph/Twitter（认证页各自的 page metadata 提供完整 OG），
+// 避免出现审计 S-02 的「营销页元数据错挂到认证页」问题。
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: siteTitle,
-  description: siteDescription,
+  title: "SeeO Account",
+  description:
+    "Sign in to SeeO to run technical SEO audits, track keyword rankings daily, and manage your projects.",
   applicationName: "SeeO",
-  openGraph: {
-    type: "website",
-    locale: "zh_CN",
-    url: SITE_URL,
-    siteName: "SeeO",
-    title: siteTitle,
-    description: siteDescription,
-    images: [
-      {
-        url: "/og.jpg",
-        width: 1200,
-        height: 630,
-        alt: "SeeO · SEO 数据分析、排名追踪与审计平台",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: siteTitle,
-    description: siteDescription,
-    images: ["/og.jpg"],
-  },
   robots: {
-    index: true,
+    index: false,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
-  },
-  alternates: {
-    canonical: "/",
   },
 };
 

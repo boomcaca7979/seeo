@@ -13,8 +13,7 @@ import { CookieBanner } from "@/components/cookie-banner";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { routing } from "@/i18n/routing";
-import { defaultLocale, localeToOgLocale, type Locale } from "@/i18n/config";
-import { localeUrl } from "@/i18n/seo";
+import { defaultLocale, type Locale } from "@/i18n/config";
 import "../globals.css";
 
 // 英文主字体：Montserrat（变量字体，build 时经 next/font 自托管）
@@ -32,18 +31,16 @@ const jetbrainsMono = JetBrains_Mono({
 
 const SITE_URL = "https://www.seeo.asia";
 
-const metaText: Record<Locale, { title: string; description: string; ogAlt: string }> = {
+const metaText: Record<Locale, { title: string; description: string }> = {
   en: {
     title: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
     description:
       "SeeO is an all-in-one SEO platform: technical audits, daily rank tracking, keyword research, competitor and backlink analysis, and content optimization.",
-    ogAlt: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
   },
   zh: {
     title: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
     description:
       "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。每日自动刷新 Google 排名数据，生成可视化审计报告与健康评分，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。",
-    ogAlt: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
   },
 };
 
@@ -64,44 +61,16 @@ export async function generateMetadata({
   const loc: Locale = hasLocale(routing.locales, locale) ? locale : defaultLocale;
   const text = metaText[loc];
 
+  // 兜底 metadata：仅 title/description/canonical。
+  // robots / openGraph / twitter 不在此输出——Next metadata 为浅合并，页面级
+  // openGraph 会整体覆盖 layout 字段（曾导致子页缺 og:image/og:type，审计 S-04）；
+  // layout 级 robots 会与 not-found 页的手动 noindex meta 并存形成冲突指令
+  // （审计 S-07）。营销页统一走 seoMetadata()（含 robots/OG/Twitter）。
   return {
     metadataBase: new URL(SITE_URL),
     title: text.title,
     description: text.description,
     applicationName: "SeeO",
-    openGraph: {
-      type: "website",
-      locale: localeToOgLocale[loc],
-      url: localeUrl(loc, "/"),
-      siteName: "SeeO",
-      title: text.title,
-      description: text.description,
-      images: [
-        {
-          url: "/og.jpg",
-          width: 1200,
-          height: 630,
-          alt: text.ogAlt,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: text.title,
-      description: text.description,
-      images: ["/og.jpg"],
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        "max-image-preview": "large",
-        "max-snippet": -1,
-        "max-video-preview": -1,
-      },
-    },
     // canonical 兜底（页面级 generateMetadata 会覆盖各自 canonical）。
     // hreflang 不走 metadata API（Next 16 序列化为 camelCase hrefLang），
     // 由各页面的 <HreflangAlternates /> 渲染标准小写 <link>。

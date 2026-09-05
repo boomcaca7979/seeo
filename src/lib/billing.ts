@@ -498,6 +498,28 @@ export async function getAllPlanInfo(): Promise<PlanInfo[]> {
 }
 
 /**
+ * 服务端展示用套餐数据（同步、纯静态，不触 Supabase/cookies，
+ * 可在静态渲染与 server component 中安全调用）。
+ * 数据与 getAllPlanInfo() 的 fallback 路径同源
+ * （DEFAULT_PLAN_LIMITS + PLAN_DISPLAY_INFO）——Pricing 页 SSR 用它输出
+ * 首屏价格（客户端挂载后再经 /api/plans 刷新 DB 覆盖值），
+ * 保证页面可见价格与 JSON-LD Offer（PLAN_PRICING）三者同源一致。
+ */
+export function getDefaultPlanInfo(): PlanInfo[] {
+  const plans = PLAN_ORDER.map((plan) => ({
+    ...DEFAULT_PLAN_LIMITS[plan],
+    display: PLAN_DISPLAY_INFO[plan],
+  }));
+  const customEntry: PlanInfo = {
+    ...DEFAULT_PLAN_LIMITS.free,
+    plan: CUSTOM_SERVICE_PLAN as unknown as PlanTier,
+    display: PLAN_DISPLAY_INFO.custom,
+    isCustomService: true,
+  };
+  return [...plans, customEntry];
+}
+
+/**
  * 检查用户是否拥有某 Feature 权限
  * 规则：
  *   - 用户套餐等级（effectivePlan，过期会降为 free） >= Feature 所需最低套餐

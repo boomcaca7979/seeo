@@ -46,7 +46,17 @@ interface PlanInfo {
 
 const UNLIMITED = Number.MAX_SAFE_INTEGER;
 
-export default function PricingPage() {
+export interface PricingPageProps {
+  /**
+   * 服务端注入的套餐初始数据（getDefaultPlanInfo()，与 /api/plans fallback
+   * 同源）。传入时首屏价格直接随 SSR HTML 输出（SEO：curl 可见 Lite/Pro 价格，
+   * 与 JSON-LD Offer 同源一致），客户端挂载后仍会拉取 /api/plans 刷新
+   * DB 覆盖值；不传（如直接访问该文件对应路由）保持原有客户端拉取行为。
+   */
+  initialPlans?: PlanInfo[] | null;
+}
+
+export default function PricingPage({ initialPlans = null }: PricingPageProps) {
   return (
     <>
       {/* Checkout 取消回流提示单独包 Suspense：useSearchParams 会触发 CSR bailout，
@@ -54,7 +64,7 @@ export default function PricingPage() {
       <Suspense fallback={null}>
         <CheckoutCancelToast />
       </Suspense>
-      <PricingContent />
+      <PricingContent initialPlans={initialPlans} />
     </>
   );
 }
@@ -73,13 +83,14 @@ function CheckoutCancelToast() {
   return <Toast />;
 }
 
-function PricingContent() {
+function PricingContent({ initialPlans }: { initialPlans: PlanInfo[] | null }) {
   const t = useTranslations();
   const tp = useTranslations("plans");
 
   const { show, Toast } = useToast();
-  const [plans, setPlans] = useState<PlanInfo[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 服务端注入的初始套餐数据 → 首屏价格随 SSR HTML 输出（SEO S-06）
+  const [plans, setPlans] = useState<PlanInfo[] | null>(initialPlans);
+  const [loading, setLoading] = useState(initialPlans === null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // 正在创建支付订单的 plan key（防止重复提交）
   const [purchasing, setPurchasing] = useState<string | null>(null);
@@ -110,7 +121,9 @@ function PricingContent() {
     return () => { cancelled = true; };
   }, []);
 
-  // 从 /api/plans 拉取套餐数据（统一数据源）
+  // 从 /api/plans 拉取套餐数据（统一数据源）。
+  // 有服务端初始数据时仍然刷新（获取 plan_limits 表的 DB 覆盖值），
+  // 但失败不再报错——首屏 SSR 已输出可用价格
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -119,17 +132,17 @@ function PricingContent() {
         const json = await res.json();
         if (!cancelled && res.ok && Array.isArray(json.data)) {
           setPlans(json.data as PlanInfo[]);
-        } else if (!cancelled) {
+        } else if (!cancelled && initialPlans === null) {
           setErrorMsg(t("pricing.loadFailed"));
         }
       } catch {
-        if (!cancelled) setErrorMsg(t("pricing.networkError"));
+        if (!cancelled && initialPlans === null) setErrorMsg(t("pricing.networkError"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [t]);
+  }, [t, initialPlans]);
 
   // 发起 Creem Checkout：
   // POST /api/payment/creem/create → 服务端创建 pending 订单 + Creem checkout → 跳转支付

@@ -182,11 +182,12 @@ describe("回归防护：本轮修复的历史问题不得再现", () => {
     }
   });
 
-  it("EN root layout 与 ZH 布局不再共用同一中文 title（曾致 3 页重复）", () => {
+  it("(default) layout 兜底为私有页 noindex，且兜底 title 不与营销页重复", () => {
     const defaultLayout = read("../app/(default)/layout.tsx");
-    const siteTitle = defaultLayout.match(/const siteTitle = "((?:[^"\\]|\\.)*)"/)?.[1] ?? "";
-    expect(siteTitle.length).toBeGreaterThanOrEqual(TITLE_MIN);
-    expect(siteTitle.length).toBeLessThanOrEqual(TITLE_MAX);
+    // 兜底组只承载 /app、/payment、/login、/signup（全部 noindex，不进 sitemap）
+    expect(defaultLayout).toMatch(/index:\s*false/);
+    const siteTitle = defaultLayout.match(/title:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? "";
+    expect(siteTitle.length).toBeGreaterThan(0);
     // (default) 根布局的兜底 title 不得与任何 locale 页面 title 重复
     for (const locale of ["en", "zh"] as const) {
       for (const [path, meta] of Object.entries(PAGES[locale])) {

@@ -15,6 +15,21 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // SEO 审计 S-13：基础安全响应头（不影响 AdSense / auth / Creem 跳转——
+  // 站点自身不被 iframe，Creem checkout 为外部跳转）。
+  // CSP 涉及 AdSense + Next 内联脚本白名单，留作后续 OPTIONAL HARDENING。
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {

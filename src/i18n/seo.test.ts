@@ -66,10 +66,11 @@ describe("hreflangAlternates", () => {
   it("首页输出正确的 EN / ZH URL", () => {
     const alternates = hreflangAlternates("/");
 
+    // canonical 形式统一不带尾部斜杠：EN 首页 = SITE_URL 本身
     expect(alternates).toEqual([
-      { hreflang: "en", href: `${SITE_URL}/` },
+      { hreflang: "en", href: SITE_URL },
       { hreflang: "zh-CN", href: `${SITE_URL}/zh` },
-      { hreflang: "x-default", href: `${SITE_URL}/` },
+      { hreflang: "x-default", href: SITE_URL },
     ]);
   });
 

@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
-import { alternatesFor } from "@/i18n/seo";
+import { seoMetadata } from "@/i18n/seo";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import FeatureCards from "@/components/FeatureCards";
@@ -20,13 +20,28 @@ interface LocaleHomePageProps {
   params: Promise<{ locale: string }>;
 }
 
-// canonical/hreflang 按 locale 输出（en: / · zh: /zh + 双向 hreflang）
+const homeMeta = {
+  en: {
+    title: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
+    description:
+      "SeeO is an all-in-one SEO platform: technical audits, daily rank tracking, keyword research, competitor and backlink analysis, and content optimization.",
+  },
+  zh: {
+    title: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
+    description:
+      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。每日自动刷新 Google 排名数据，生成可视化审计报告与健康评分，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。",
+  },
+} as const;
+
+// 首页完整 metadata（title/desc + canonical + OG + Twitter + robots）：
+// 页面级输出，不依赖 layout 兜底（layout 的 openGraph 会被页面浅合并覆盖）
 export async function generateMetadata({
   params,
 }: LocaleHomePageProps): Promise<Metadata> {
   const { locale } = await params;
   const loc = isLocale(locale) ? locale : "en";
-  return alternatesFor(loc, "/");
+  const text = homeMeta[loc];
+  return seoMetadata(loc, "/", text.title, text.description);
 }
 
 export default async function LocaleHomePage({ params }: LocaleHomePageProps) {

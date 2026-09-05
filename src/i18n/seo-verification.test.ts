@@ -128,11 +128,30 @@ describe("4. locale → lang / og:locale", () => {
 });
 
 describe("5. schema inLanguage 与 URL", () => {
-  it("Organization/WebSite inLanguage 随 locale", () => {
+  it("Organization/WebSite inLanguage 随 locale；Organization 含 logo/email 实体字段", () => {
     expect(organizationSchema("en").inLanguage).toBe("en");
     expect(organizationSchema("zh").inLanguage).toBe("zh-CN");
     expect(websiteSchema("en").inLanguage).toBe("en");
     expect(websiteSchema("zh").inLanguage).toBe("zh-CN");
+    const org = organizationSchema("en") as {
+      logo: { url: string; width: number; height: number };
+      email: string;
+      description: string;
+    };
+    // logo 指向已部署的生产资源（/og.jpg），邮箱为公开业务邮箱
+    expect(org.logo.url).toBe(`${SITE_URL}/og.jpg`);
+    expect(org.logo.width).toBe(1200);
+    expect(org.logo.height).toBe(630);
+    expect(org.email).toBe("support@seeo.asia");
+    expect(org.description.length).toBeGreaterThan(0);
+    // 无真实社媒账号，不得编造 sameAs
+    expect((organizationSchema() as { sameAs?: unknown }).sameAs).toBeUndefined();
+  });
+
+  it("Organization/SoftwareApplication URL 不带尾部斜杠", () => {
+    expect((organizationSchema() as { url: string }).url).toBe(SITE_URL);
+    const app = softwareApplicationSchema("en") as { url: string };
+    expect(app.url).toBe(SITE_URL);
   });
 
   it("SoftwareApplication inLanguage + offers url 随 locale 且无 /en", () => {
@@ -162,15 +181,24 @@ describe("6. sitemap URL 集合", () => {
   const entries = sitemapFn();
   const urls = entries.map((e) => new URL(e.url).pathname);
 
-  it("收录 EN+ZH 成对 URL + login/signup（数量与 MARKETING_PATHS 派生一致）", () => {
-    // 11 条双语营销路径 × 2 locale + /login + /signup = 24
-    expect(entries.length).toBe(MARKETING_PATHS.length * 2 + 2);
+  it("收录 EN+ZH 成对 URL（数量与 MARKETING_PATHS 派生一致）", () => {
+    // 11 条双语营销路径 × 2 locale = 22
+    expect(entries.length).toBe(MARKETING_PATHS.length * 2);
     for (const p of MARKETING_PATHS) {
       expect(urls).toContain(p);
       expect(urls).toContain(p === "/" ? "/zh" : `/zh${p}`);
     }
-    expect(urls).toContain("/login");
-    expect(urls).toContain("/signup");
+  });
+
+  it("不收录认证页 /login /signup（noindex 工具页）", () => {
+    expect(urls).not.toContain("/login");
+    expect(urls).not.toContain("/signup");
+  });
+
+  it("URL canonical 形式统一不带尾部斜杠", () => {
+    for (const e of entries) {
+      expect(e.url.endsWith("/"), `${e.url} 不应带尾部斜杠`).toBe(false);
+    }
   });
 
   it("不收录 /en/*、/app、/payment、/api", () => {
@@ -187,7 +215,6 @@ describe("6. sitemap URL 集合", () => {
     // 不再读取 sitemap entry 的 alternates.languages。
     for (const e of entries) {
       const path = new URL(e.url).pathname;
-      if (path === "/login" || path === "/signup") continue;
       const enPath = path.startsWith("/zh") ? path.slice(3) || "/" : path;
       for (const a of hreflangAlternates(enPath)) {
         const target = new URL(a.href).pathname;

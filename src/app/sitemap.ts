@@ -5,7 +5,8 @@
 //   - EN（无前缀）+ ZH（/zh 前缀）成对收录，canonical URL only
 //   - 每条 entry 附 hreflang alternates（en / zh-CN / x-default）
 //   - 不收录 /en/*、/app、/payment、/api
-//   - /login、/signup 为单语言实用页（cookie 驱动 UI，无 /zh 对应路由），只出 EN canonical
+//   - 不收录 /login、/signup：认证工具页（noindex），对搜索无价值
+//   - URL canonical 形式统一不带尾部斜杠（EN 首页 = SITE_URL 本身）
 
 import type { MetadataRoute } from "next";
 
@@ -26,9 +27,6 @@ const bilingualPaths = [
   "/contact",
 ];
 
-/** 单语言页（仅 EN canonical，无 ZH 对应路由） */
-const enOnlyPaths = ["/login", "/signup"];
-
 function alternatesFor(path: string): MetadataRoute.Sitemap[number]["alternates"] {
   return {
     languages: {
@@ -44,7 +42,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const bilingual: MetadataRoute.Sitemap = [];
   for (const path of bilingualPaths) {
-    const enPath = path === "/" ? "/" : path;
+    const enPath = path === "/" ? "" : path;
     const zhPath = path === "/" ? "/zh" : `/zh${path}`;
     const priority = path === "/" ? 1.0 : 0.7;
     const changeFrequency = path === "/" ? "weekly" : "monthly";
@@ -66,12 +64,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     });
   }
 
-  const enOnly: MetadataRoute.Sitemap = enOnlyPaths.map((path) => ({
-    url: `${SITE_URL}${path}`,
-    lastModified: now,
-    changeFrequency: "yearly" as const,
-    priority: 0.3,
-  }));
-
-  return [...bilingual, ...enOnly];
+  return bilingual;
 }

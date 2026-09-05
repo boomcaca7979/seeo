@@ -37,11 +37,17 @@ describe("organizationSchema", () => {
     expect(s.url).toBe("https://www.seeo.asia");
   });
 
-  it("无编造字段（无地址/社交/成立年份）", () => {
+  it("无编造字段（仅真实实体字段：logo=已部署 og.jpg / 公开邮箱，无地址/社交/评分）", () => {
     const s = organizationSchema() as Record<string, unknown>;
     expect(Object.keys(s).sort()).toEqual(
-      ["@context", "@type", "name", "url"].sort()
+      ["@context", "@type", "description", "email", "logo", "name", "url"].sort()
     );
+    expect((s.logo as { url: string }).url).toBe("https://www.seeo.asia/og.jpg");
+    expect(s.email).toBe("support@seeo.asia");
+    expect(s).not.toHaveProperty("sameAs");
+    expect(s).not.toHaveProperty("address");
+    expect(s).not.toHaveProperty("foundingDate");
+    expect(s).not.toHaveProperty("aggregateRating");
   });
 });
 
@@ -111,7 +117,7 @@ describe("breadcrumbSchema", () => {
     expect(s["@context"]).toBe(SCHEMA_CONTEXT);
     expect(s["@type"]).toBe("BreadcrumbList");
     expect(s.itemListElement).toEqual([
-      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE_URL}/` },
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
       {
         "@type": "ListItem",
         position: 2,

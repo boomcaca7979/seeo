@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Link as LocaleLink } from "@/i18n/routing";
 
@@ -19,9 +20,11 @@ export default function FinalCTA() {
           {t("ctaSubtitle")}
         </p>
         <div className="mt-6 flex items-center gap-4">
-          <LocaleLink href="/signup" className="btn-pill btn-pill-primary">
+          {/* /signup 为单语言认证页（无 /zh 路由），必须用 next/link：
+              locale-aware Link 会输出 /zh/signup → 404（SEO 审计 S-01） */}
+          <Link href="/signup" className="btn-pill btn-pill-primary">
             {t("ctaStartFree")}
-          </LocaleLink>
+          </Link>
           <LocaleLink href="/features/seo-audit" className="btn-pill btn-pill-secondary">
             {t("ctaExploreFeatures")}
           </LocaleLink>

@@ -9,6 +9,31 @@ export const metadata: Metadata = {
   description:
     "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
   alternates: { canonical: "/login" },
+  openGraph: {
+    type: "website",
+    url: "https://www.seeo.asia/login",
+    siteName: "SeeO",
+    locale: "en_US",
+    title: "Log In to SeeO — SEO Audits & Rank Tracking",
+    description:
+      "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
+    images: [
+      {
+        url: "/og.jpg",
+        width: 1200,
+        height: 630,
+        alt: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Log In to SeeO — SEO Audits & Rank Tracking",
+    description:
+      "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
+    images: ["/og.jpg"],
+  },
+  // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
 };
 
 export default function LoginPage() {

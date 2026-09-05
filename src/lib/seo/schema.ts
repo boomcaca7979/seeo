@@ -34,13 +34,25 @@ const APP_TEXT = {
   },
 } as const;
 
-/** Organization：只声明可验证的最小字段（无真实公司注册信息/社交账号，不编造） */
+/** Organization：真实可验证字段。
+ * logo 用已部署的品牌 OG 图（/og.jpg，1200×630）——public/brand/ 下虽有方形
+ * logo 源文件，但尚未纳入部署，引用会 404；email 为公开业务邮箱
+ * （全站 footer/contact 实际展示）。无真实社媒账号，不加 sameAs（不编造）。 */
 export function organizationSchema(locale?: "en" | "zh") {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: SITE_NAME,
     url: SITE_URL,
+    description:
+      "SeeO is an independent all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.",
+    logo: {
+      "@type": "ImageObject",
+      url: `${SITE_URL}/og.jpg`,
+      width: 1200,
+      height: 630,
+    },
+    email: "support@seeo.asia",
     ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
   };
 }
@@ -157,7 +169,8 @@ export function featureAppSchema(
   };
 }
 
-/** BreadcrumbList：items 为 [首页, ...层级页面]，url 传相对路径（以 / 开头） */
+/** BreadcrumbList：items 为 [首页, ...层级页面]，url 传相对路径（以 / 开头）。
+ * 绝对 URL 统一不带尾部斜杠（与 sitemap / canonical 形式一致） */
 export function breadcrumbSchema(
   items: Array<{ name: string; url: string }>,
   locale?: "en" | "zh"
@@ -170,7 +183,7 @@ export function breadcrumbSchema(
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
-      item: `${SITE_URL}${item.url}`,
+      item: `${SITE_URL}${item.url === "/" ? "" : item.url.replace(/\/+$/, "")}`,
     })),
   };
 }

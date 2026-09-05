@@ -5,8 +5,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { isLocale, localeToOgLocale } from "@/i18n/config";
-import { alternatesFor, localeUrl } from "@/i18n/seo";
+import { isLocale } from "@/i18n/config";
+import { seoMetadata } from "@/i18n/seo";
 import HreflangAlternates from "@/components/HreflangAlternates";
 import DocsPage from "../../(default)/docs/page";
 
@@ -23,13 +23,7 @@ export async function generateMetadata({
   return {
     title: t("title"),
     description: t("description"),
-    openGraph: {
-      url: localeUrl(loc, "/docs"),
-      title: t("title"),
-      description: t("description"),
-      locale: localeToOgLocale[loc],
-    },
-    ...alternatesFor(loc, "/docs"),
+    ...seoMetadata(loc, "/docs", t("title"), t("description")),
   };
 }
 

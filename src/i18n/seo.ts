@@ -7,7 +7,7 @@
 // Dashboard（/app）为私有页面，不进入该体系。
 
 import type { Metadata } from "next";
-import { defaultLocale, type Locale } from "./config";
+import { defaultLocale, localeToOgLocale, type Locale } from "./config";
 
 export const SITE_URL = "https://www.seeo.asia";
 
@@ -19,9 +19,12 @@ export function localePath(locale: Locale, path: string): string {
   return trimmed === "/" ? "/zh" : `/zh${trimmed}`;
 }
 
-/** 生成某条营销路径的绝对 URL（canonical / hreflang 用） */
+/** 生成某条营销路径的绝对 URL（canonical / hreflang / og:url 用）。
+ * 站点 canonical 形式统一不带尾部斜杠（与 Next 对 "/" 的归一化输出、
+ * sitemap.xml 的 EN 首页 URL 保持一致），EN 根路径即 SITE_URL 本身。 */
 export function localeUrl(locale: Locale, path: string): string {
-  return `${SITE_URL}${localePath(locale, path)}`;
+  const p = localePath(locale, path);
+  return `${SITE_URL}${p === "/" ? "" : p}`;
 }
 
 /**
@@ -54,4 +57,64 @@ export function hreflangAlternates(path: string): Array<{
     { hreflang: "zh-CN", href: localeUrl("zh", path) },
     { hreflang: "x-default", href: localeUrl("en", path) },
   ];
+}
+
+const OG_IMAGE = "/og.jpg";
+
+/** 公开营销页 robots 指令（页面级输出；[locale]/layout 不再输出 robots，
+ * 避免与 not-found 页的手动 noindex meta 形成冲突的双指令） */
+export function marketingRobots(): Metadata["robots"] {
+  return {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  };
+}
+
+/**
+ * 公开营销页统一 metadata：title/description + canonical + OpenGraph + Twitter
+ * （og:image / og:type / twitter 全部随页面输出，不再依赖 layout 兜底——
+ * Next metadata 为浅合并，页面定义 openGraph 会整体覆盖 layout 的图片字段）。
+ * hreflang 仍由页面内 <HreflangAlternates /> 渲染（见 alternatesFor 注释）。
+ */
+export function seoMetadata(
+  locale: Locale,
+  path: string,
+  title: string,
+  description: string
+): Metadata {
+  return {
+    title,
+    description,
+    ...alternatesFor(locale, path),
+    openGraph: {
+      type: "website",
+      url: localeUrl(locale, path),
+      siteName: "SeeO",
+      locale: localeToOgLocale[locale],
+      title,
+      description,
+      images: [
+        {
+          url: OG_IMAGE,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [OG_IMAGE],
+    },
+    robots: marketingRobots(),
+  };
 }

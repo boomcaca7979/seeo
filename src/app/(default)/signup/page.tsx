@@ -9,6 +9,31 @@ export const metadata: Metadata = {
   description:
     "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
   alternates: { canonical: "/signup" },
+  openGraph: {
+    type: "website",
+    url: "https://www.seeo.asia/signup",
+    siteName: "SeeO",
+    locale: "en_US",
+    title: "Create a SeeO Account — SEO Audits & Rank Tracking",
+    description:
+      "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
+    images: [
+      {
+        url: "/og.jpg",
+        width: 1200,
+        height: 630,
+        alt: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Create a SeeO Account — SEO Audits & Rank Tracking",
+    description:
+      "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
+    images: ["/og.jpg"],
+  },
+  // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
 };
 
 export default function SignupPage() {

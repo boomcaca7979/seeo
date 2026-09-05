@@ -5,8 +5,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import { isLocale, localeToOgLocale } from "@/i18n/config";
-import { alternatesFor, localePath, localeUrl } from "@/i18n/seo";
+import { isLocale } from "@/i18n/config";
+import { localePath, seoMetadata } from "@/i18n/seo";
+import { getDefaultPlanInfo } from "@/lib/billing";
 import JsonLd from "@/components/JsonLd";
 import HreflangAlternates from "@/components/HreflangAlternates";
 import { breadcrumbSchema } from "@/lib/seo/schema";
@@ -37,17 +38,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const loc = isLocale(locale) ? locale : "en";
   const text = pricingMeta[loc];
-  return {
-    title: text.title,
-    description: text.description,
-    openGraph: {
-      url: localeUrl(loc, "/pricing"),
-      title: text.title,
-      description: text.description,
-      locale: localeToOgLocale[loc],
-    },
-    ...alternatesFor(loc, "/pricing"),
-  };
+  return seoMetadata(loc, "/pricing", text.title, text.description);
 }
 
 export default async function LocalePricingPage({
@@ -72,7 +63,9 @@ export default async function LocalePricingPage({
           loc
         )}
       />
-      <PricingPage />
+      {/* 服务端注入套餐价格（与 /api/plans fallback、JSON-LD Offer 同源）：
+          首屏价格随 SSR HTML 输出，客户端挂载后经 /api/plans 刷新 DB 覆盖值 */}
+      <PricingPage initialPlans={getDefaultPlanInfo()} />
     </>
   );
 }
