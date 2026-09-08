@@ -15,6 +15,18 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 const intlMiddleware = createMiddleware(routing);
 
+// ===== 爬虫专用 locale 路由 =====
+// next-intl 会按 cookie / Accept-Language 协商 locale：携带 zh 语言头的抓取器
+// 访问 EN canonical URL 会被 307 到 /zh/*（Bing 据此将 /contact 判为
+// Indexing allowed: No）。localeDetection: false 下 locale 仅由 URL 前缀决定：
+// EN URL 恒 200 EN、/zh/* 恒 200 ZH，对爬虫输出确定性响应。
+// 普通用户的语言协商不受影响。
+const CRAWLER_UA_PATTERN = /Googlebot|Google-InspectionTool|bingbot|BingPreview/i;
+const crawlerIntlMiddleware = createMiddleware({
+  ...routing,
+  localeDetection: false,
+});
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -31,6 +43,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isLocaleRoutedPath(pathname)) {
+    // 爬虫：跳过语言协商，直接按 URL prefix 输出确定性 locale。
+    if (CRAWLER_UA_PATTERN.test(request.headers.get("user-agent") ?? "")) {
+      return crawlerIntlMiddleware(request);
+    }
     // locale redirect（如 cookie=zh 访问 / → /zh）直接返回；
     // 放行场景由 next-intl 内部 rewrite 命中 [locale] segment。
     // 营销页不做 Supabase session 刷新（dashboard 路径始终走 updateSession）。
