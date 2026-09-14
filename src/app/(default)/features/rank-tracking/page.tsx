@@ -13,6 +13,11 @@ import {
 
 // ===== /features/rank-tracking 内容组件（en: /features/rank-tracking · zh: /zh/features/rank-tracking）=====
 // 文案全部走 messages（rankTracking / featureShared），metadata 由 [locale] 页面按 locale 生成。
+// 结构：定位 → 工作方式 → 追踪维度 → 监控机制 → 结果解读 → 工作流 → 适用与限制 → FAQ
+// 与 seo-audit（技术诊断）明显区分：本页是「持续测量」而非「一次性诊断」。
+
+type NamedItem = { name: string; body: string };
+type Step = { n: string; title: string; body: string };
 
 export default async function RankTrackingFeaturePage() {
   const t = await getTranslations("rankTracking");
@@ -26,6 +31,12 @@ export default async function RankTrackingFeaturePage() {
   const limits = t.raw("limits") as string[];
   const processItems = t.raw("how.process") as string[];
   const outputItems = t.raw("how.output") as string[];
+  const tracks = t.raw("tracks.items") as NamedItem[];
+  const monitoring = t.raw("monitoring.items") as NamedItem[];
+  const reading = t.raw("reading.items") as NamedItem[];
+  const workflow = t.raw("workflow.steps") as Step[];
+
+  const relatedSlugs = ["seo-audit", "backlink-analysis", "keyword-research"];
 
   return (
     <div className="min-h-screen bg-paper">
@@ -59,7 +70,7 @@ export default async function RankTrackingFeaturePage() {
         </h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
 
-        {/* What it does */}
+        {/* 01 What it does */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">01</span>
@@ -73,7 +84,7 @@ export default async function RankTrackingFeaturePage() {
           </p>
         </section>
 
-        {/* About this capability */}
+        {/* 02 How it works */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
@@ -112,10 +123,101 @@ export default async function RankTrackingFeaturePage() {
           </div>
         </section>
 
-        {/* Who + limits */}
+        {/* 03 What SeeO tracks */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">03</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("sections.tracks")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("tracks.intro")}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {tracks.map((item) => (
+              <div key={item.name} className="card-a p-4">
+                <h3 className="font-display text-sm font-semibold text-ink mb-1">{item.name}</h3>
+                <p className="font-sans text-sm text-ink-60">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 04 Continuous monitoring */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">04</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("sections.monitoring")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("monitoring.intro")}
+          </p>
+          <div className="space-y-3">
+            {monitoring.map((item) => (
+              <div key={item.name} className="card-a p-4">
+                <h3 className="font-display text-sm font-semibold text-ink mb-1">{item.name}</h3>
+                <p className="font-sans text-sm text-ink-60">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 05 Reading the data */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">05</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("sections.reading")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("reading.intro")}
+          </p>
+          <div className="space-y-3">
+            {reading.map((item) => (
+              <div key={item.name} className="card-a p-4">
+                <h3 className="font-display text-sm font-semibold text-ink mb-1">{item.name}</h3>
+                <p className="font-sans text-sm text-ink-60">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 06 Workflow */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">06</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("sections.workflow")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("workflow.intro")}
+          </p>
+          <div className="space-y-3">
+            {workflow.map((step) => (
+              <div key={step.n} className="card-a p-4">
+                <div className="flex items-baseline gap-3">
+                  <span className="font-mono text-xs text-brand">{step.n}</span>
+                  <h3 className="font-display text-sm font-semibold text-ink">{step.title}</h3>
+                </div>
+                <p className="mt-1 font-sans text-sm text-ink-60">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 07 Fit & limits */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">07</span>
             <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.fitAndLimits")}
             </h2>
@@ -141,10 +243,10 @@ export default async function RankTrackingFeaturePage() {
           </div>
         </section>
 
-        {/* FAQ */}
+        {/* 08 FAQ */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
-            <span className="font-mono text-sm text-brand">04</span>
+            <span className="font-mono text-sm text-brand">08</span>
             <h2 className="font-display text-lg font-semibold text-ink">{s("sections.faq")}</h2>
             <div className="hairline flex-1" />
           </div>
@@ -158,27 +260,34 @@ export default async function RankTrackingFeaturePage() {
           </div>
         </section>
 
-        {/* Related + CTA */}
-        <div className="mt-12 grid gap-3 sm:grid-cols-2">
+        {/* Related capabilities */}
+        <div className="mt-12 grid gap-3 sm:grid-cols-3">
+          {relatedSlugs.map((slug) => (
+            <Link
+              key={slug}
+              href={localePath(locale, `/features/${slug}`)}
+              className="card-a p-4 transition-colors hover:border-brand"
+            >
+              <span className="font-mono text-xs text-brand">{s("related")}</span>
+              <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+                {t(`related.${slug === "seo-audit" ? "seoAudit" : slug === "backlink-analysis" ? "backlinks" : "keywordResearch"}.title`)}
+              </h3>
+              <p className="mt-1 font-sans text-xs text-ink-60">
+                {t(`related.${slug === "seo-audit" ? "seoAudit" : slug === "backlink-analysis" ? "backlinks" : "keywordResearch"}.desc`)}
+              </p>
+            </Link>
+          ))}
+        </div>
+
+        {/* Supporting guide (contextual internal link) */}
+        <div className="mt-4">
           <Link
-            href={localePath(locale, "/features/seo-audit")}
-            className="card-a p-4 transition-colors hover:border-brand"
+            href={localePath(locale, "/guides/how-to-track-keyword-rankings")}
+            className="card-a block p-4 transition-colors hover:border-brand"
           >
-            <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
-              {t("related.seoAudit.title")}
-            </h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("related.seoAudit.desc")}</p>
-          </Link>
-          <Link
-            href={localePath(locale, "/features/backlink-analysis")}
-            className="card-a p-4 transition-colors hover:border-brand"
-          >
-            <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
-              {t("related.backlinks.title")}
-            </h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("related.backlinks.desc")}</p>
+            <span className="font-mono text-xs text-brand">{s("guideCard")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">{t("guide.title")}</h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">{t("guide.desc")}</p>
           </Link>
         </div>
 

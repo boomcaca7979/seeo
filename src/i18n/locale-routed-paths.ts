@@ -15,6 +15,8 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/alternatives/semrush",
   "/alternatives/ahrefs",
   "/guides/how-to-do-a-technical-seo-audit",
+  "/guides/how-to-track-keyword-rankings",
+  "/guides/how-to-analyze-backlinks",
   "/about",
   "/privacy",
   "/terms",

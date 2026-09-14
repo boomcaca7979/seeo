@@ -211,6 +211,12 @@ export default async function ContentOptimizationFeaturePage() {
             {locale === "zh" ? "技术 SEO 审计指南 →" : "Technical SEO audit guide →"}
           </Link>
           <Link
+            href={localePath(locale, "/guides/how-to-track-keyword-rankings")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "如何追踪优化后的排名 →" : "Track rankings after optimizing →"}
+          </Link>
+          <Link
             href={localePath(locale, "/alternatives/semrush")}
             className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
           >

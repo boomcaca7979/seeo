@@ -10,30 +10,30 @@ import {
   articleSchema,
 } from "@/lib/seo/schema";
 
-// ===== /guides/how-to-do-a-technical-seo-audit 内容组件（en / zh）=====
-// 信息型指南（Informational intent）：真实可复用的审计步骤 + FAQ（FAQ 仅渲染于 DOM，
-// 不输出 FAQPage JSON-LD，避免被判定为 doorway / thin content）。
-// 文案走 messages（guideTechnicalSeoAudit），metadata 由 [locale] 页面按 locale 生成。
+// ===== /guides/how-to-track-keyword-rankings 内容组件（en / zh）=====
+// 信息型指南（Informational intent）：真实可复用的排名追踪流程 + FAQ。
+// FAQ 仅渲染于 DOM，不输出 FAQPage JSON-LD（与既有 guide 保持一致，避免 thin/doorway 判定）。
+// 文案走 messages（guideKeywordRankings），metadata 由 [locale] 页面按 locale 生成。
 // JSON-LD：WebPage + BreadcrumbList + Article（无 FAQPage）。
 
-export default async function GuideTechnicalSeoAuditPage() {
-  const t = await getTranslations("guideTechnicalSeoAudit");
+type GuideStep = { n: string; title: string; body: string; why: string };
+
+export default async function GuideKeywordRankingsPage() {
+  const t = await getTranslations("guideKeywordRankings");
   const locale = (await getLocale()) as "en" | "zh";
-  const path = "/guides/how-to-do-a-technical-seo-audit";
+  const path = "/guides/how-to-track-keyword-rankings";
   const lpath = localePath(locale, path);
 
-  const steps = t.raw("steps") as Array<{ n: string; title: string; body: string }>;
+  const steps = t.raw("steps") as GuideStep[];
   const faqs = t.raw("faqs") as Array<{ q: string; a: string }>;
-  const related = t.raw("related") as Record<
-    string,
-    { title: string; desc: string }
-  >;
+  const caveats = t.raw("caveats.items") as string[];
 
-  const relatedLinks = Object.entries(related).map(([slug, r]) => ({
-    href: localePath(locale, `/features/${slug}`),
-    title: r.title,
-    desc: r.desc,
-  }));
+  const relatedSlugs = ["rank-tracking", "keyword-research", "seo-audit"];
+  const relatedKeys: Record<string, string> = {
+    "rank-tracking": "rankTracking",
+    "keyword-research": "keywordResearch",
+    "seo-audit": "seoAudit",
+  };
 
   return (
     <div className="min-h-screen bg-paper">
@@ -91,15 +91,40 @@ export default async function GuideTechnicalSeoAuditPage() {
                   <h3 className="font-display text-sm font-semibold text-ink">{s.title}</h3>
                 </div>
                 <p className="mt-1 font-sans text-sm text-ink-60">{s.body}</p>
+                <p className="mt-2 font-sans text-xs text-ink-40">
+                  <span className="font-mono">
+                    {locale === "zh" ? "为什么重要" : "WHY IT MATTERS"}
+                  </span>{" "}
+                  · {s.why}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* FAQ (DOM only — no FAQPage schema) */}
+        {/* Caveats */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("caveats.title")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("caveats.intro")}
+          </p>
+          <ul className="space-y-2 font-sans text-sm text-ink-60">
+            {caveats.map((c) => (
+              <li key={c}>· {c}</li>
+            ))}
+          </ul>
+        </section>
+
+        {/* FAQ (DOM only — no FAQPage schema) */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">03</span>
             <h2 className="font-display text-lg font-semibold text-ink">
               {locale === "zh" ? "常见问题" : "FAQ"}
             </h2>
@@ -117,45 +142,21 @@ export default async function GuideTechnicalSeoAuditPage() {
 
         {/* Related SeeO features */}
         <div className="mt-12 grid gap-3 sm:grid-cols-3">
-          {relatedLinks.map((r) => (
+          {relatedSlugs.map((slug) => (
             <Link
-              key={r.href}
-              href={r.href}
+              key={slug}
+              href={localePath(locale, `/features/${slug}`)}
               className="card-a p-4 transition-colors hover:border-brand"
             >
               <span className="font-mono text-xs text-brand">SeeO</span>
-              <h3 className="mt-1 font-display text-sm font-semibold text-ink">{r.title}</h3>
-              <p className="mt-1 font-sans text-xs text-ink-60">{r.desc}</p>
+              <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+                {t(`related.${relatedKeys[slug]}.title`)}
+              </h3>
+              <p className="mt-1 font-sans text-xs text-ink-60">
+                {t(`related.${relatedKeys[slug]}.desc`)}
+              </p>
             </Link>
           ))}
-        </div>
-
-        {/* Explore more (internal linking to both alternatives) */}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link
-            href={localePath(locale, "/alternatives/semrush")}
-            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
-          >
-            {locale === "zh" ? "对比 SeeO 与 Semrush →" : "Compare SeeO vs Semrush →"}
-          </Link>
-          <Link
-            href={localePath(locale, "/alternatives/ahrefs")}
-            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
-          >
-            {locale === "zh" ? "对比 SeeO 与 Ahrefs →" : "Compare SeeO vs Ahrefs →"}
-          </Link>
-          <Link
-            href={localePath(locale, "/guides/how-to-track-keyword-rankings")}
-            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
-          >
-            {locale === "zh" ? "如何追踪关键词排名 →" : "How to track keyword rankings →"}
-          </Link>
-          <Link
-            href={localePath(locale, "/guides/how-to-analyze-backlinks")}
-            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
-          >
-            {locale === "zh" ? "如何分析外链 →" : "How to analyze backlinks →"}
-          </Link>
         </div>
 
         {/* CTA */}
@@ -167,10 +168,10 @@ export default async function GuideTechnicalSeoAuditPage() {
               {locale === "zh" ? "免费注册" : "Start free"}
             </Link>
             <Link
-              href={localePath(locale, "/features/seo-audit")}
+              href={localePath(locale, "/features/rank-tracking")}
               className="btn-secondary inline-block px-6 py-2"
             >
-              {locale === "zh" ? "查看审计工具" : "See the audit tool"}
+              {locale === "zh" ? "查看排名追踪工具" : "See the rank tracker"}
             </Link>
           </div>
         </div>

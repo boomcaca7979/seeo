@@ -211,6 +211,18 @@ export default async function CompetitorAnalysisFeaturePage() {
             {locale === "zh" ? "技术 SEO 审计指南 →" : "Technical SEO audit guide →"}
           </Link>
           <Link
+            href={localePath(locale, "/guides/how-to-analyze-backlinks")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "如何分析外链 →" : "How to analyze backlinks →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/features/backlink-analysis")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "查竞品的外链概况 →" : "Check competitor link profiles →"}
+          </Link>
+          <Link
             href={localePath(locale, "/alternatives/semrush")}
             className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
           >

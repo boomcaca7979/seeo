@@ -202,13 +202,25 @@ export default async function KeywordResearchFeaturePage() {
           </Link>
         </div>
 
-        {/* Explore more (internal linking to guide + alternatives) */}
+        {/* Explore more (internal linking to guides + related capability) */}
         <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href={localePath(locale, "/guides/how-to-do-a-technical-seo-audit")}
             className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
           >
             {locale === "zh" ? "技术 SEO 审计指南 →" : "Technical SEO audit guide →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/guides/how-to-track-keyword-rankings")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "如何追踪关键词排名 →" : "How to track keyword rankings →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/features/rank-tracking")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "把选好的词放进排名追踪 →" : "Track these keywords daily →"}
           </Link>
           <Link
             href={localePath(locale, "/alternatives/semrush")}

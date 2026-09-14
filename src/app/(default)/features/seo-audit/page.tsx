@@ -202,6 +202,28 @@ export default async function SeoAuditFeaturePage() {
           </Link>
         </div>
 
+        {/* Supporting guides (contextual internal linking) */}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href={localePath(locale, "/guides/how-to-do-a-technical-seo-audit")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "技术 SEO 审计指南 →" : "Technical SEO audit guide →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/guides/how-to-track-keyword-rankings")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "如何追踪排名变化 →" : "How to track ranking changes →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/guides/how-to-analyze-backlinks")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "如何分析外链 →" : "How to analyze backlinks →"}
+          </Link>
+        </div>
+
         <div className="mt-8 card-a p-6 text-center">
           <h2 className="font-display text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("cta.subtitle")}</p>

@@ -389,6 +389,7 @@
     "fitTitle": "Who it's for",
     "limitsTitle": "Real limitations",
     "related": "RELATED",
+    "guideCard": "GUIDE",
     "cta": {
       "signup": "Start free",
       "pricing": "View pricing",
@@ -508,46 +509,161 @@
       "description": "SeeO is an SEO rank tracker for keyword rank tracking by keyword, location, and device — daily SERP positions, history trends, and volatility alerts."
     },
     "title": "SEO Rank Tracker for Monitoring Keyword Rankings",
-    "subtitle": "Your real Google positions recorded automatically every day — know immediately when rankings move, with complete SERP position tracking and ranking history per keyword, location, and device",
-    "whatItDoes": "SeeO's keyword rank tracking tool monitors Google search positions across four dimensions: keyword × domain × location × device. As your SEO rank tracker, it refreshes positions automatically once a day and writes every result to ranking history, so you can view a trend curve for each keyword and get an alert whenever rankings move significantly. SERP position tracking covers both desktop and mobile results for the locations you care about, and identical queries are cached for 24 hours to keep usage efficient. This Google rank tracker runs on a daily schedule whether you track ten keywords or hundreds — no manual checks, no spreadsheets, no guessing whether yesterday's optimization actually worked. Every keyword keeps its own trend curve built from the full record of past positions, so \"are we improving?\" becomes a chart instead of a debate. The alert threshold catches genuine movements — a jump into the top 3, a drop off page one, or sudden volatility across the whole keyword set — while daily granularity shows the step-by-step effect of each change you ship. Because desktop and mobile are recorded separately, you can also spot device-specific problems, like a page that ranks well on desktop search but disappears on mobile.",
+    "subtitle": "Your real Google positions recorded automatically every day — SEO rank monitoring across keyword, location, and device, with ranking history and alerts when positions move",
+    "whatItDoes": "Rank tracking is the practice of recording where a domain appears in Google results for a chosen set of keywords, then watching how those positions change over time. SeeO runs this on a fixed daily schedule: it checks each tracked keyword against live Google results, stores the outcome, and compares it with the previous record. The value sits in the time dimension. A one-off rank check tells you where you stand today; a recorded history tells you whether the work you shipped last month actually moved anything. Every keyword keeps its own dated series, so the question \"are we improving?\" becomes a chart instead of an argument. This SEO rank tracker measures four dimensions at once — keyword, domain, location, and device. Desktop and mobile are stored as separate series, and each location is its own series, which is what makes local and international position tracking meaningful: the same keyword can hold a top-three position on desktop in one city while sitting on page three on mobile in another. Positions are read to a depth of 100 results. Movements that cross the alert threshold generate an in-app alert, so a drop off page one or a jump into the top three surfaces without you opening a report.",
     "how": {
       "input": "A keyword list + target domain + location + device (desktop / mobile)",
       "process": [
-        "A daily scheduled job queries rankings (with controlled concurrency so large keyword sets stay stable)",
-        "Identical parameters are cached for 24 hours to avoid duplicate calls and wasted quota",
-        "Each result is compared with the previous record to compute the change",
-        "Movements beyond the threshold generate an alert you can read in-app",
-        "Trend curves are updated from the full ranking history of every keyword",
-        "Rank reports can be exported for client reporting"
+        "A scheduled job runs once a day and refreshes tracked keywords with controlled concurrency, so large keyword sets stay stable",
+        "Identical parameters (keyword + domain + location + device) reuse a 24-hour cache instead of calling the provider again",
+        "Each result is compared with the previous record to compute the change and the status",
+        "Movements beyond the threshold generate an in-app alert, deduplicated so the same event is not reported twice in one day",
+        "Trend direction is summarised from recent history rather than from a single pair of data points",
+        "Rank reports can be exported for client or stakeholder reporting"
       ],
       "output": [
-        "Daily rank records and history trend curves per keyword",
-        "Rank changes (up / down / unchanged) with the delta per refresh",
+        "Daily rank records and a history series per keyword",
+        "Rank change and status for every refresh (improved / declined / stable / new / lost)",
         "Volatility alerts when positions move beyond the threshold",
+        "A summarised trend direction per keyword once there is enough history",
         "Rank reports (exportable for sharing with clients or stakeholders)"
       ],
       "dataSource": "SerpApi (Google SERP data, billed per call; SeeO adds usage counting and circuit-breaker protection)"
+    },
+    "sections": {
+      "tracks": "What SeeO tracks",
+      "monitoring": "Continuous SEO rank monitoring",
+      "reading": "Reading your ranking data",
+      "workflow": "Where rank tracking fits"
+    },
+    "tracks": {
+      "intro": "Every rank record is identified by four independent dimensions. Change any one of them and you are looking at a different series — which is exactly the point, because Google does not return the same results for the same words everywhere.",
+      "items": [
+        {
+          "name": "Keyword",
+          "body": "Each tracked keyword is an independent series. You decide which terms matter: revenue pages, campaign terms, or the head terms your competitors are fighting over."
+        },
+        {
+          "name": "Domain",
+          "body": "Every check is measured against one target domain. Your tracked keyword list also feeds competitor comparison, so the same terms can be read against rival domains."
+        },
+        {
+          "name": "Location",
+          "body": "Location is part of the measurement, not a filter applied afterwards. The same keyword in two cities can return different results, and each is recorded with its own history."
+        },
+        {
+          "name": "Device",
+          "body": "Desktop and mobile are checked and stored separately. Divergence between the two is one of the earliest signals of a mobile-specific problem."
+        }
+      ]
+    },
+    "monitoring": {
+      "intro": "A rank tracker is only useful if the measurement is repeated. Three things in SeeO exist specifically to make the repeated measurement readable.",
+      "items": [
+        {
+          "name": "Daily automatic refresh",
+          "body": "A scheduled job refreshes tracked keywords once a day. You do not need to remember to run it, and you do not need to keep a spreadsheet alongside it."
+        },
+        {
+          "name": "Ranking history",
+          "body": "Every refresh writes a dated record, so the full series behind each keyword stays available. History is read from the database and costs no provider calls."
+        },
+        {
+          "name": "Movement alerts",
+          "body": "After each refresh SeeO compares the new position with the previous one. Significant movements — including a keyword dropping out of the top 100 entirely — produce an in-app alert with the old and new position."
+        },
+        {
+          "name": "Trend direction",
+          "body": "Instead of comparing only two points, SeeO summarises recent direction from a window of past records. When there is not yet enough history to say anything reliable, it returns no direction rather than guessing."
+        }
+      ]
+    },
+    "reading": {
+      "intro": "Most ranking disappointment comes from reading a single number as if it were a verdict. These are the checks that make a rank report useful.",
+      "items": [
+        {
+          "name": "Compare like with like",
+          "body": "Only compare records that share keyword, location, and device. A drop that appears when you switch device is a device signal, not a ranking collapse."
+        },
+        {
+          "name": "Treat small daily movement as noise",
+          "body": "A one-position change between two days usually reflects normal SERP churn. Multi-day direction is the part worth acting on."
+        },
+        {
+          "name": "Separate lost from never ranked",
+          "body": "A keyword that had a position and no longer does is a different situation from one that was never recorded in the top 100. SeeO labels these differently so you do not chase the wrong problem."
+        },
+        {
+          "name": "Read device divergence early",
+          "body": "When desktop holds and mobile falls, the cause is usually page experience on mobile rather than the keyword or the content."
+        },
+        {
+          "name": "Connect movement to what you shipped",
+          "body": "A ranking change is an observation, not an explanation. Pair it with a technical audit or a backlink check before concluding what caused it."
+        }
+      ]
+    },
+    "workflow": {
+      "intro": "Rank tracking works best as the measurement step in a loop, not as a standalone habit.",
+      "steps": [
+        {
+          "n": "01",
+          "title": "Build the keyword set",
+          "body": "Start from keyword research rather than from whatever you happen to be optimising. A stable set is easier to read than one that changes every week."
+        },
+        {
+          "n": "02",
+          "title": "Fix the measurement conditions",
+          "body": "Choose location and device deliberately and then leave them alone. Changing conditions mid-campaign makes the history unreadable."
+        },
+        {
+          "n": "03",
+          "title": "Capture a baseline",
+          "body": "Record where things stand before you change anything. Without a baseline you cannot tell improvement from noise."
+        },
+        {
+          "n": "04",
+          "title": "Let the daily refresh accumulate",
+          "body": "A trend needs several data points. Give the schedule time before drawing conclusions."
+        },
+        {
+          "n": "05",
+          "title": "Investigate real movement",
+          "body": "When a keyword drops, check technical health and link changes before rewriting content. The cause is often not on the page."
+        },
+        {
+          "n": "06",
+          "title": "Report from the same record",
+          "body": "Export rank reports from the stored history so everyone reads the same numbers."
+        }
+      ]
     },
     "who": [
       "Site owners who need daily data to judge whether an optimization actually worked",
       "SEO practitioners managing multi-location, multi-device rankings from one place",
       "Agencies reporting rank trends to clients without manual screenshots",
-      "Anyone who wants SERP position tracking without checking positions by hand every morning"
+      "Anyone who wants SEO position tracking without checking positions by hand every morning"
     ],
     "limits": [
       "Google only (no Bing or Baidu yet)",
+      "Positions are read to a depth of 100 results; beyond that a keyword is recorded as not ranked",
       "Manual refresh processes up to 20 keywords per request",
       "Trackable keyword counts are limited by plan",
+      "Trend direction needs enough recorded history — short series return no direction instead of a guess",
       "SerpApi calls are protected by a system-level circuit breaker, so usage stays predictable"
     ],
     "faqs": [
+      {
+        "q": "What is SEO rank tracking?",
+        "a": "It is the practice of recording where a domain appears in Google results for a set of keywords and reviewing how those positions change. The value comes from repetition: a single check is a snapshot, a recorded history is evidence."
+      },
       {
         "q": "Where does ranking data come from?",
         "a": "From SerpApi's Google search results. SeeO does not currently support Bing, Baidu, or other search engines."
       },
       {
         "q": "How often do rankings refresh?",
-        "a": "Once a day via a scheduled job; you can also trigger a manual refresh on the rank tracking page — up to 20 keywords per request. If a client asks for Tuesday's numbers, trigger a refresh and the trend curve picks up where the scheduled run left off."
+        "a": "Once a day via a scheduled job; you can also trigger a manual refresh on the rank tracking page — up to 20 keywords per request. If a client asks for today's numbers, trigger a refresh and the series picks up where the scheduled run left off."
       },
       {
         "q": "Can I track rankings by location and device?",
@@ -566,8 +682,16 @@
         "a": "Yes. Rank tracking keeps continuous history, so you need a free account to add projects and keywords. The account also keeps your keyword groups and project settings in one place."
       },
       {
+        "q": "How is rank monitoring different from a one-off rank check?",
+        "a": "A one-off check answers \"where are we today\". Rank monitoring answers \"are we moving, in which direction, and since when\" — which requires the same measurement repeated on a fixed schedule and stored as history."
+      },
+      {
+        "q": "Does SeeO track competitor rankings?",
+        "a": "Competitor ranking comparison lives in the competitor analysis tool, which works from the same tracked keyword set and records rival positions for those terms. Keeping both in one account means a ranking drop can be checked against competitor movement in the same place."
+      },
+      {
         "q": "What makes SeeO different from other rank tracking tools?",
-        "a": "The SEO rank tracker sits on the same workbench as technical audits, keyword research, and backlink data, so a ranking drop can be investigated next to the technical issue or lost link that caused it — no exporting between tools. That shortens the loop between \"rankings dropped\" and \"here's why\" to minutes instead of days."
+        "a": "The SEO rank tracker sits on the same workbench as technical audits, keyword research, and backlink data, so a ranking drop can be investigated next to the technical issue or lost link that caused it — no exporting between tools. That shortens the loop between \"rankings dropped\" and \"here's why\"."
       }
     ],
     "related": {
@@ -578,7 +702,15 @@
       "backlinks": {
         "title": "Backlink Analysis Tool →",
         "desc": "Total backlinks and referring domains"
+      },
+      "keywordResearch": {
+        "title": "Keyword Research Tool →",
+        "desc": "Build the keyword set you track"
       }
+    },
+    "guide": {
+      "title": "How to track keyword rankings →",
+      "desc": "A practical walkthrough of rank tracking setup and interpretation"
     },
     "cta": {
       "title": "Start tracking your keywords",
@@ -591,40 +723,175 @@
       "description": "SeeO's backlink analysis tool works as your backlink checker: analyze SEO backlinks, referring domains, Domain Rank, dofollow ratio, and anchor text."
     },
     "title": "Backlink Analysis Tool for SEO Link Profile Analysis",
-    "subtitle": "See the scale, quality, and composition of links pointing to your site — a backlink analysis tool for your entire link profile",
-    "whatItDoes": "Backlink analysis pulls a snapshot of a domain's link profile: total backlinks, referring domains, Domain Rank, and dofollow ratio, plus individual link details — source page, anchor text, target page, and first-seen date. Use it as a backlink checker before a link-building campaign, an SEO backlink analyzer for competitor research, or run it again later to compare how your profile has changed. Results are cached for 7 days, so you can compare snapshots across refreshes to see the net effect of link-building work.",
+    "subtitle": "See the scale, quality, and composition of links pointing to a site — a backlink analysis tool for reading and comparing whole link profiles",
+    "whatItDoes": "Backlink analysis is the process of examining the links pointing to a domain: how many there are, where they come from, which anchors they use, and whether the overall pattern looks natural. SeeO pulls a snapshot of that link profile and stores it, so you can work from the same data later instead of re-querying from scratch. Each query returns a summary — total backlinks, referring domains, Domain Rank, and dofollow ratio — plus individual link records with the source page, anchor text, target page, and first-seen date. Referring domain and anchor text distributions are computed from the stored link list, which is what turns a raw link dump into something you can actually read. SeeO is built for ongoing SEO work rather than for a single instant lookup. Results are cached for seven days per domain, so a profile you pulled this week stays available for comparison next week. The point is to see how a link profile changes after a campaign, not to grab one number and leave. You can run it on your own domain or on a competitor's. Comparing two profiles on the same metrics is usually the fastest way to turn a competitor's link list into a realistic target list.",
     "how": {
       "input": "A domain (e.g. example.com)",
       "process": [
         "Checks the 7-day cache first — a hit returns instantly without consuming quota",
         "On a miss, fetches backlink data from DataForSEO's link database",
-        "Stores results with a 7-day cache so repeat views stay free",
+        "Stores results with a 7-day cache so repeat views stay available for comparison",
         "A 1-hour per-domain cooldown prevents duplicate fetches",
-        "Referring domain and anchor text distributions are computed from the raw link list"
+        "Referring domain and anchor text distributions are computed from the stored link list"
       ],
       "output": [
-        "Total backlinks / referring domains / Domain Rank / dofollow ratio at a glance",
-        "Link details (source, anchor, target, first seen) for every indexed link",
-        "Referring domain and anchor text distributions for link profile analysis"
+        "Total backlinks, referring domains, Domain Rank, and dofollow ratio",
+        "Link-level records: source page, anchor text, target page, dofollow flag, and first-seen date",
+        "Referring domain and anchor text distributions for link profile analysis",
+        "Filtering and sorting so you can isolate the part of the profile you are investigating"
       ],
       "dataSource": "DataForSEO backlink database (billed per call; SeeO enforces a monthly quota)"
+    },
+    "sections": {
+      "metrics": "What the link data includes",
+      "reading": "How to read a link profile",
+      "workflow": "Where backlink analysis fits",
+      "positioning": "SeeO and free instant checkers"
+    },
+    "metrics": {
+      "intro": "These are the fields SeeO returns. Knowing which of them answers which question is most of the skill in link profile analysis.",
+      "summary": [
+        {
+          "name": "Total backlinks",
+          "body": "The number of links found pointing at the domain in the provider's index. Useful as a scale indicator, weak as a quality indicator on its own."
+        },
+        {
+          "name": "Referring domains",
+          "body": "How many distinct domains those links come from. Usually the more informative of the two counts."
+        },
+        {
+          "name": "Domain Rank",
+          "body": "A strength score for the domain supplied by the data provider. Compare it between domains rather than reading it as an absolute value."
+        },
+        {
+          "name": "Dofollow ratio",
+          "body": "The share of links that pass link equity. A profile with many links and a low dofollow ratio is not as strong as the raw count suggests."
+        }
+      ],
+      "linkLevel": [
+        {
+          "name": "Source page",
+          "body": "The page carrying the link. This is what you open when you want to judge whether a link is editorially placed or dumped."
+        },
+        {
+          "name": "Anchor text",
+          "body": "The clickable text. Anchor distribution is where over-optimisation shows up first."
+        },
+        {
+          "name": "Target page",
+          "body": "Which of your pages the link points to. A profile concentrated on one URL looks different from one spread across a site."
+        },
+        {
+          "name": "Dofollow flag",
+          "body": "Whether the link passes equity, recorded per link so the ratio can be recomputed for any subset."
+        },
+        {
+          "name": "First-seen date",
+          "body": "When the provider first observed the link. Useful for correlating profile growth with a campaign period."
+        }
+      ]
+    },
+    "reading": {
+      "intro": "A link profile is a pattern, not a score. These are the checks that turn the stored link list into a judgement.",
+      "items": [
+        {
+          "name": "Read referring domains before total backlinks",
+          "body": "A thousand links from ten domains is a very different profile from a thousand links from nine hundred. Domain count resists the inflation that raw link count is prone to."
+        },
+        {
+          "name": "Put the dofollow ratio in context",
+          "body": "Some nofollow-heavy profiles are completely normal — directories, forums, and social platforms are nofollow by default. Compare against a similar site before treating a low ratio as a problem."
+        },
+        {
+          "name": "Look for anchor concentration",
+          "body": "If one exact-match commercial phrase accounts for most anchors, that is the risk signal worth investigating, regardless of how good the totals look."
+        },
+        {
+          "name": "Use first-seen dates as timing evidence",
+          "body": "Clusters of new links around a date usually mean a campaign, a mention, or a problem. The date tells you where to look."
+        },
+        {
+          "name": "Check target page spread",
+          "body": "A profile where every link points at the homepage is structurally different from one spread across content. Neither is automatically wrong, but they support different strategies."
+        },
+        {
+          "name": "Remember the index is not the web",
+          "body": "Every backlink provider crawls its own index. Counts differ between tools, and very new or very small sites are often under-represented."
+        }
+      ]
+    },
+    "workflow": {
+      "intro": "Backlink analysis pays off when it is attached to a decision rather than run out of curiosity.",
+      "steps": [
+        {
+          "n": "01",
+          "title": "Baseline your own profile",
+          "body": "Capture your current link profile before starting anything. Without a baseline you cannot tell growth from noise."
+        },
+        {
+          "n": "02",
+          "title": "Pull the profiles you are competing against",
+          "body": "Query the domains that already rank for your target keywords. Competitor research works better on real rivals than on whoever is largest."
+        },
+        {
+          "n": "03",
+          "title": "Turn the difference into a target list",
+          "body": "Domains that link to several competitors but not to you are the realistic shortlist."
+        },
+        {
+          "n": "04",
+          "title": "Work the list, then re-query",
+          "body": "Because snapshots are cached for seven days, a re-query after a campaign shows net movement rather than a fresh random sample."
+        },
+        {
+          "n": "05",
+          "title": "Interpret alongside rankings",
+          "body": "Link profile change and ranking movement are two views of the same period. Read them together before attributing a cause."
+        }
+      ]
+    },
+    "positioning": {
+      "intro": "Search results for backlink tools are full of free instant checkers. It is worth being explicit about what SeeO is and is not.",
+      "items": [
+        {
+          "name": "Not an anonymous instant checker",
+          "body": "SeeO requires an account, and backlink analysis is part of the Pro plan. It is a workbench feature, not an open lookup box."
+        },
+        {
+          "name": "Built for comparison over time",
+          "body": "Snapshots are stored and cached for seven days, so you can compare the same domain across weeks. That is the job a one-off checker is not designed to do."
+        },
+        {
+          "name": "One workbench, not one number",
+          "body": "Backlink data sits next to rank tracking, technical audits, and keyword research, so a link change can be checked against ranking movement without exporting anything."
+        },
+        {
+          "name": "Honest about coverage",
+          "body": "Data comes from DataForSEO's index. SeeO does not maintain its own crawl, and coverage follows the provider — including its blind spots."
+        }
+      ]
     },
     "who": [
       "Pro users measuring link-building results against a baseline",
       "SEO practitioners studying competitor link profiles for target lists",
       "Anyone comparing link profiles across refreshes",
-      "Site owners keeping their anchor text mix natural and penalty-safe"
+      "Site owners keeping their anchor text mix natural"
     ],
     "limits": [
       "Included in the Pro plan only",
       "Per-domain data is cached for 7 days — you can compare snapshots across refreshes",
       "Monthly query quota depends on your plan",
+      "A single refresh stores up to 100 backlinks per domain, so very large profiles are sampled rather than fully enumerated",
       "Coverage follows the DataForSEO index, so very new or very small sites may show partial data"
     ],
     "faqs": [
       {
+        "q": "Is SeeO a free backlink checker?",
+        "a": "No. Backlink analysis is a Pro plan feature and requires an account. SeeO is built for storing and comparing link profiles over time rather than for anonymous one-off lookups."
+      },
+      {
         "q": "Where does backlink data come from?",
-        "a": "From DataForSEO's backlink database. SeeO does not build its own link index; results come directly from this third-party data provider. DataForSEO aggregates links from a large crawl of the web, which is why results can differ slightly from other tools — each provider maintains its own index."
+        "a": "From DataForSEO's backlink database. SeeO does not build its own link index; results come directly from this third-party data provider. Each provider maintains its own index, which is why results can differ slightly from other tools."
       },
       {
         "q": "Which plans include backlink analysis?",
@@ -636,7 +903,11 @@
       },
       {
         "q": "Which metrics are provided?",
-        "a": "Total backlinks, referring domains, Domain Rank, dofollow ratio, and per-link details: source page, anchor text, target page, and first-seen date. Distributions are computed across the full link set, not a sample, so percentages reflect the whole profile."
+        "a": "Total backlinks, referring domains, Domain Rank, and dofollow ratio, plus per-link details: source page, anchor text, target page, dofollow flag, and first-seen date. Distributions are computed across the stored link set."
+      },
+      {
+        "q": "How many backlinks do I see per query?",
+        "a": "A refresh stores up to 100 backlinks per domain. For large sites that means you are reading a sample of the profile, not every link in existence — enough to judge composition and anchor patterns, but not a complete inventory."
       },
       {
         "q": "Is there a query limit?",
@@ -644,7 +915,7 @@
       },
       {
         "q": "Can I analyze competitor backlinks?",
-        "a": "Yes — the backlink checker accepts any domain, so you can run link profile analysis on competitor sites and compare their anchor text distribution with yours, within your monthly query quota. Comparing a competitor's referring domains against yours is often the fastest way to build a shortlist of realistic link targets."
+        "a": "Yes — backlink analysis accepts any domain, so you can run link profile analysis on competitor sites and compare their anchor text distribution with yours, within your monthly query quota. Comparing a competitor's referring domains against yours is often the fastest way to build a shortlist of realistic link targets."
       }
     ],
     "related": {
@@ -655,7 +926,15 @@
       "rankTracking": {
         "title": "SEO Rank Tracking Tool →",
         "desc": "Daily Google rank monitoring"
+      },
+      "competitorAnalysis": {
+        "title": "Competitor Analysis Tool →",
+        "desc": "Keyword gap and competitor ranks"
       }
+    },
+    "guide": {
+      "title": "How to analyze backlinks →",
+      "desc": "A practical walkthrough of link profile analysis"
     },
     "cta": {
       "title": "Use backlink analysis",
@@ -2828,6 +3107,250 @@
       "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" }
     },
     "cta": { "title": "Run a free technical audit", "subtitle": "SeeO's free plan includes single-page quick audits" }
+  },
+  "guideKeywordRankings": {
+    "meta": {
+      "title": "How to Track Keyword Rankings - SEO Position Tracking Guide | SeeO",
+      "description": "A practical guide to tracking keyword rankings: fix your measurement conditions, build a stable keyword set, and read ranking movement without fooling yourself."
+    },
+    "title": "How to Track Keyword Rankings",
+    "subtitle": "A practical guide to keyword rank tracking and SEO position monitoring — what to measure, how often, and how to read the result without fooling yourself",
+    "intro": "Almost everyone who starts doing SEO checks their rankings. Far fewer people set that check up so the numbers mean anything three months later. This guide covers the whole job: deciding what to track, fixing the conditions so the data stays comparable, choosing a cadence, and reading movement in a way that survives contact with reality. None of it requires a specific tool, but everything here assumes you are recording results rather than looking them up once.",
+    "steps": [
+      {
+        "n": "01",
+        "title": "Decide what question the tracking answers",
+        "body": "Before adding a keyword, name the decision the data will inform. \"Is our product page gaining ground on the main commercial term?\" is a question. \"Are we ranking well?\" is not — it produces a dashboard nobody acts on. Write the question down; it determines which keywords belong in the set and which do not.",
+        "why": "A keyword set built from a real question stays stable. Sets built from curiosity get changed constantly, and every change resets the history you are trying to read."
+      },
+      {
+        "n": "02",
+        "title": "Fix the measurement conditions",
+        "body": "Choose the search engine, the location, and the device, then leave them alone. Record them somewhere. If you later need a second market or a second device, add it as a separate series rather than editing the existing one.",
+        "why": "Google does not return identical results for the same words in different places or on different devices. If conditions drift mid-campaign, the trend line measures your own inconsistency instead of your SEO."
+      },
+      {
+        "n": "03",
+        "title": "Choose a keyword set you can live with",
+        "body": "Mix a small number of commercially important head terms with a longer tail of specific terms you can realistically win. Group them by intent or by page so a movement points at something. Resist the urge to add every keyword you have ever researched.",
+        "why": "Large, ungrouped sets produce noise. A movement across one group is a signal; a movement across four hundred unrelated terms is weather."
+      },
+      {
+        "n": "04",
+        "title": "Capture a baseline before changing anything",
+        "body": "Record positions first, then start the work. If you change the page and only then begin tracking, you will never know whether the change helped or whether you were already moving.",
+        "why": "Without a baseline there is no before-and-after, only after. Most attribution arguments in SEO come from this single omission."
+      },
+      {
+        "n": "05",
+        "title": "Pick a cadence and keep it",
+        "body": "For most sites daily is right, weekly is acceptable, and ad hoc is useless. What matters more than frequency is consistency: the same interval, the same conditions, indefinitely.",
+        "why": "Trends are comparisons between measurements taken under the same rules. Irregular sampling makes the series unreadable regardless of how often you looked."
+      },
+      {
+        "n": "06",
+        "title": "Read ranges, not single points",
+        "body": "Treat a one- or two-position change between consecutive days as normal churn. Look for direction over several measurements. When a tool summarises trend for you, check how much history it requires before it will commit to a direction.",
+        "why": "SERP results move for reasons that have nothing to do with your site. Reacting to single-day movement produces constant, pointless work."
+      },
+      {
+        "n": "07",
+        "title": "Separate device and location signals",
+        "body": "When desktop holds position and mobile drops, suspect page experience on mobile rather than the content or the keyword. When one city drops and another holds, suspect local competition or localised results rather than a site-wide problem.",
+        "why": "These two splits localise the cause faster than any amount of staring at an aggregate number."
+      },
+      {
+        "n": "08",
+        "title": "Distinguish \"lost\" from \"never ranked\"",
+        "body": "A keyword that had a position and no longer appears is an event worth investigating. A keyword that was never recorded in the tracked range is a different situation entirely — usually a targeting or expectation problem rather than a regression.",
+        "why": "Conflating the two sends teams chasing losses that never existed and missing the drops that did."
+      },
+      {
+        "n": "09",
+        "title": "Investigate before you rewrite",
+        "body": "When a genuine drop appears, check technical health and link changes before touching the content. A lost internal link, a noindex that shipped by accident, or an expired redirect are all far more common causes than a sudden loss of topical relevance.",
+        "why": "Rewriting a page that dropped for technical reasons wastes the rewrite and leaves the real cause in place."
+      },
+      {
+        "n": "10",
+        "title": "Keep the record for reporting",
+        "body": "Export from the stored history rather than from screenshots. Report the question from step one alongside the numbers, so the reader knows what the movement means.",
+        "why": "Reporting that answers the original question gets acted on. Reporting that only shows positions gets skimmed."
+      }
+    ],
+    "caveats": {
+      "title": "What rank tracking cannot tell you",
+      "intro": "Rank tracking is measurement, not diagnosis. Being clear about its limits prevents most of the wasted work that follows a rank report.",
+      "items": [
+        "A position is an observation at one moment under one set of conditions; it is not a verdict on content quality.",
+        "Personalisation and SERP features mean two people can see different results for the same query on the same day.",
+        "Movement tells you something changed, never what changed. Attribution requires a second data source.",
+        "Ranking improvements and traffic improvements are related but not proportional — a rise from page two to the bottom of page one often moves very little traffic.",
+        "Tracking depth is finite. A position beyond the tracked range is recorded as unranked, which is not the same as invisible."
+      ]
+    },
+    "faqs": [
+      {
+        "q": "How often should I check keyword rankings?",
+        "a": "Daily is the practical default if you are actively changing things, weekly if you are maintaining. The important part is consistency rather than frequency — irregular checks produce an unreadable series."
+      },
+      {
+        "q": "Should I track rankings on desktop, mobile, or both?",
+        "a": "Both, if you can. Google indexes primarily from the mobile view, and desktop and mobile results genuinely differ. If you track only one, track the device your audience actually uses."
+      },
+      {
+        "q": "Why do my rankings look different from what I see in a browser?",
+        "a": "Because results vary by location, device, language, and personalisation, and because SERP features occupy space above the first organic result. A tracked position is a controlled measurement, not a screenshot of your browser."
+      },
+      {
+        "q": "How many keywords should I track?",
+        "a": "Enough to answer your question and no more. For most sites that means a handful of commercially important terms plus a few dozen specific ones, grouped by intent or by the page they target."
+      },
+      {
+        "q": "My rankings dropped. What should I do first?",
+        "a": "Confirm the drop is real by checking the full series and the conditions, then look for technical and link changes before editing content. Genuine regressions usually have a mechanical cause."
+      }
+    ],
+    "related": {
+      "rankTracking": {
+        "title": "SEO Rank Tracking Tool →",
+        "desc": "Daily Google positions with history and alerts"
+      },
+      "keywordResearch": {
+        "title": "Keyword Research Tool →",
+        "desc": "Build the keyword set you track"
+      },
+      "seoAudit": {
+        "title": "AI SEO Audit Tool →",
+        "desc": "Find the technical cause behind a drop"
+      }
+    },
+    "cta": {
+      "title": "Track rankings on a schedule instead of by hand",
+      "subtitle": "SeeO records Google positions daily per keyword, location, and device, and keeps the history so the trend is readable"
+    }
+  },
+  "guideBacklinkAnalysis": {
+    "meta": {
+      "title": "How to Analyze Backlinks - Link Profile Analysis Guide | SeeO",
+      "description": "A practical guide to backlink analysis: read referring domains, dofollow ratio, and anchor distribution, then turn a link profile into a decision."
+    },
+    "title": "How to Analyze Backlinks",
+    "subtitle": "A practical guide to backlink analysis and link profile analysis — which numbers matter, how to read anchor and domain patterns, and where the data misleads",
+    "intro": "Backlink data is easy to obtain and easy to misread. A tool will hand you a total, and the total is almost always the least useful number in the report. This guide walks through the job in the order that actually works: start from a question, take a baseline, read the composition rather than the count, compare against the domains you are competing with, and only then decide what to do. It also covers where backlink data genuinely misleads, which is most of the value.",
+    "steps": [
+      {
+        "n": "01",
+        "title": "Start with the question, not the tool",
+        "body": "Decide what you are investigating before you query anything. \"Which domains link to three of our competitors but not to us?\" is actionable. \"How strong is our backlink profile?\" produces a number and no decision.",
+        "why": "The question determines which metrics matter. Chasing a total when the real question is about target domains wastes the query and the afternoon."
+      },
+      {
+        "n": "02",
+        "title": "Take a baseline of your own profile",
+        "body": "Query your own domain first and store the result. Note the total backlinks, referring domains, dofollow ratio, and the shape of the anchor distribution. Do this before you change anything.",
+        "why": "Every later judgement is a comparison. Without a baseline you are reading numbers in a vacuum and will over-interpret ordinary fluctuation."
+      },
+      {
+        "n": "03",
+        "title": "Read referring domains before total backlinks",
+        "body": "Look at how many distinct domains the links come from, not how many links exist. Ten thousand links from twenty domains is a much weaker profile than a thousand links from eight hundred.",
+        "why": "Link counts inflate naturally — one site template can generate thousands of links. Domain counts resist that inflation and correlate better with actual link equity."
+      },
+      {
+        "n": "04",
+        "title": "Put the dofollow ratio in context",
+        "body": "Check what share of links pass equity, then compare it against a similar site rather than against an ideal. Directories, forums, and social platforms are frequently nofollow by default.",
+        "why": "A low dofollow ratio is often just a normal profile shape. Without a comparison you will treat ordinary composition as a defect."
+      },
+      {
+        "n": "05",
+        "title": "Read the anchor text distribution",
+        "body": "Look at how anchors are spread across branded, naked URL, generic, and exact-match commercial phrases. Concentration in one commercial phrase is the signal that matters, not the presence of exact-match anchors.",
+        "why": "Anchor concentration is where over-optimisation becomes visible. Totals and ratios can look healthy right up until the anchor distribution shows the problem."
+      },
+      {
+        "n": "06",
+        "title": "Open the source pages",
+        "body": "Do not judge a link from the domain name. Open a sample of source pages and ask whether the link is editorially placed, sits in relevant content, and would exist if the site owner had not been asked.",
+        "why": "Two links from the same domain can differ enormously in value. Only the source page tells you which kind you have."
+      },
+      {
+        "n": "07",
+        "title": "Check target page spread",
+        "body": "See which of your URLs the links point at. A profile concentrated on the homepage supports different strategies from one spread across content pages.",
+        "why": "Internal link equity follows the target page. If you are trying to rank a specific page, links to the homepage do much less for it than the totals suggest."
+      },
+      {
+        "n": "08",
+        "title": "Compare against the domains that actually outrank you",
+        "body": "Query the sites ranking above you for your target keywords, not the largest sites in your industry. Look for domains appearing in several competitor profiles but not in yours.",
+        "why": "Those shared-but-missing domains are the realistic target list. Links held by a much larger competitor are often not winnable and make a poor plan."
+      },
+      {
+        "n": "09",
+        "title": "Watch change over time, not just snapshot state",
+        "body": "Re-query on a fixed interval and compare like with like. Use first-seen dates to correlate new links with campaign periods.",
+        "why": "A snapshot tells you where you are; a series tells you whether your work is landing. Timing evidence turns a vague impression into a causal claim you can test."
+      },
+      {
+        "n": "10",
+        "title": "Write down what you concluded",
+        "body": "Record the question, the comparison, and the decision. Note what you expect to happen next and when you will check.",
+        "why": "Backlink work compounds slowly. Without a written conclusion, the next review starts from zero and repeats the same analysis."
+      }
+    ],
+    "caveats": {
+      "title": "Where backlink data misleads",
+      "intro": "Backlink data comes from a provider's own crawl, and every number in it carries assumptions. These are the ones that cause the most bad decisions.",
+      "items": [
+        "No provider sees the whole web. Counts differ between tools, and the difference is normal rather than a sign that one of them is wrong.",
+        "Very new and very small sites are systematically under-represented. A thin profile may mean thin coverage as much as thin links.",
+        "Links appear and disappear from an index with a delay, so recent work is usually invisible in the data for a while.",
+        "A large share of stored links for a big domain may be a sample rather than a complete inventory. Composition is still readable; totals are not.",
+        "A high total says nothing about relevance. A small number of topically close links routinely outperforms a large number of unrelated ones."
+      ]
+    },
+    "faqs": [
+      {
+        "q": "What is link profile analysis?",
+        "a": "It is the examination of all links pointing to a domain — where they come from, which anchors they use, which pages they target, and whether the overall pattern looks naturally earned. The output is a judgement about the profile, not a single score."
+      },
+      {
+        "q": "Which matters more, total backlinks or referring domains?",
+        "a": "Referring domains, almost always. Distinct domains resist the inflation that raw link counts are prone to, and they correlate better with real link equity."
+      },
+      {
+        "q": "Why do different tools report different backlink numbers?",
+        "a": "Each provider maintains its own index with its own crawl, discovery rules, and update cadence. Differences are expected; consistency within one tool over time is what makes the data usable."
+      },
+      {
+        "q": "How often should I analyze my backlinks?",
+        "a": "Monthly suits most sites, and around a campaign it is worth checking before and after. The important thing is comparing snapshots taken under the same conditions."
+      },
+      {
+        "q": "Can backlink analysis tell me why my rankings dropped?",
+        "a": "On its own, no. It can show that a link disappeared or that a competitor gained ground, which is evidence to combine with ranking and technical data — not a complete explanation."
+      }
+    ],
+    "related": {
+      "backlinkAnalysis": {
+        "title": "Backlink Analysis Tool →",
+        "desc": "Query and compare whole link profiles"
+      },
+      "competitorAnalysis": {
+        "title": "Competitor Analysis Tool →",
+        "desc": "Keyword gap and competitor ranks"
+      },
+      "rankTracking": {
+        "title": "SEO Rank Tracking Tool →",
+        "desc": "Read ranking movement alongside links"
+      }
+    },
+    "cta": {
+      "title": "Run link profile analysis on a stored snapshot",
+      "subtitle": "SeeO caches each domain query for seven days, so you can compare the same profile across weeks instead of re-sampling"
+    }
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

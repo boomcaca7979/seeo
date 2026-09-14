@@ -16,19 +16,9 @@ import {
 import sitemapFn from "../app/sitemap";
 import robotsFn from "../app/robots";
 
-const MARKETING_PATHS = [
-  "/",
-  "/pricing",
-  "/docs",
-  "/about",
-  "/features/seo-audit",
-  "/features/rank-tracking",
-  "/features/backlink-analysis",
-  "/privacy",
-  "/terms",
-  "/refund",
-  "/contact",
-];
+// 直接派生自 locale 路由白名单：sitemap 与 LOCALE_ROUTED_PATHS 必须始终同步，
+// 新增营销页只改白名单即可，避免再次出现「加了页面但断言数量没跟上」的漂移。
+const MARKETING_PATHS = [...LOCALE_ROUTED_PATHS];
 
 describe("1. canonical（alternatesFor）", () => {
   it("EN canonical = 无前缀自身路径", () => {
@@ -182,7 +172,7 @@ describe("6. sitemap URL 集合", () => {
   const urls = entries.map((e) => new URL(e.url).pathname);
 
   it("收录 EN+ZH 成对 URL（数量与 MARKETING_PATHS 派生一致）", () => {
-    // 11 条双语营销路径 × 2 locale = 22
+    // 双语营销路径（源自 LOCALE_ROUTED_PATHS）× 2 locale
     expect(entries.length).toBe(MARKETING_PATHS.length * 2);
     for (const p of MARKETING_PATHS) {
       expect(urls).toContain(p);
