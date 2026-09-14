@@ -143,6 +143,42 @@ const FEATURE_APP_TEXT = {
         "SeeO 外链分析工具：查询总外链、引用域、Domain Rank、dofollow 比例与锚文本分布，评估外链质量。",
     },
   },
+  keywordResearch: {
+    en: {
+      name: "SeeO Keyword Research Tool",
+      description:
+        "Keyword research tool that expands a seed term into related keywords and returns search volume, SEO difficulty, CPC, competition, search intent, and trend for each term.",
+    },
+    zh: {
+      name: "SeeO 关键词研究工具",
+      description:
+        "SeeO 关键词研究工具：从一个种子词扩展出相关关键词，并返回每个词的搜索量、SEO 难度、CPC、竞争度、搜索意图与趋势。",
+    },
+  },
+  competitorAnalysis: {
+    en: {
+      name: "SeeO Competitor Analysis Tool",
+      description:
+        "Competitor analysis tool that discovers who ranks for your keywords, then shows the keyword gap and shared versus unique terms between your site and a rival.",
+    },
+    zh: {
+      name: "SeeO 竞品分析工具",
+      description:
+        "SeeO 竞品分析工具：发现与你在同一批关键词上竞争的域名，并对比你与竞品之间的关键词差距、共同词与独占词。",
+    },
+  },
+  contentOptimization: {
+    en: {
+      name: "SeeO Content Optimization Tool",
+      description:
+        "Content optimization tool that scores a page or draft for on-page SEO, readability, keyword density, heading structure, internal and external links, and image alt text.",
+    },
+    zh: {
+      name: "SeeO 内容优化工具",
+      description:
+        "SeeO 内容优化工具：对页面或草稿进行页面 SEO、可读性、关键词密度、标题结构、内外链与图片 alt 评分，并给出优化建议。",
+    },
+  },
 } as const;
 
 export type FeatureAppKey = keyof typeof FEATURE_APP_TEXT;
@@ -246,10 +282,39 @@ export function faqPageSchema(
     "@type": "FAQPage",
     url: `${SITE_URL}${url}`,
     ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
-    mainEntity: faqs.map((f) => ({
-      "@type": "Question",
-      name: f.q,
-      acceptedAnswer: { "@type": "Answer", text: f.a },
-    })),
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
+}
+
+/** Article：教学 / 指南类页面（/guides/*）使用。
+ * headline/description 来自页面渲染文案，url 传相对路径（以 / 开头）。 */
+export function articleSchema(
+  input: {
+    name: string;
+    description: string;
+    url: string;
+  },
+  locale: "en" | "zh" = "en"
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: input.name,
+    description: input.description,
+    inLanguage: locale === "zh" ? "zh-CN" : "en",
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${SITE_URL}${input.url}`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: SITE_URL,
+    },
   };
 }

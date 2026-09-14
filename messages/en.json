@@ -77,7 +77,8 @@
           "Volume / CPC"
         ],
         "metricLabel": "Data source",
-        "metricValue": "SerpApi"
+        "metricValue": "SerpApi",
+        "href": "/features/keyword-research"
       },
       {
         "tag": "Tracking",
@@ -90,7 +91,8 @@
           "Volatility alerts"
         ],
         "metricLabel": "Refresh cadence",
-        "metricValue": "Daily"
+        "metricValue": "Daily",
+        "href": "/features/rank-tracking"
       },
       {
         "tag": "Diagnostics",
@@ -103,7 +105,8 @@
           "Fix priority"
         ],
         "metricLabel": "Checks",
-        "metricValue": "20+"
+        "metricValue": "20+",
+        "href": "/features/seo-audit"
       },
       {
         "tag": "Diagnostics",
@@ -116,7 +119,8 @@
           "Profile comparison across refreshes"
         ],
         "metricLabel": "Data source",
-        "metricValue": "DataForSEO"
+        "metricValue": "DataForSEO",
+        "href": "/features/backlink-analysis"
       },
       {
         "tag": "Insights",
@@ -129,7 +133,8 @@
           "Historical trend overlays"
         ],
         "metricLabel": "Dimension",
-        "metricValue": "Share of voice"
+        "metricValue": "Share of voice",
+        "href": "/features/competitor-analysis"
       },
       {
         "tag": "Optimize",
@@ -142,7 +147,8 @@
           "SEO checklist"
         ],
         "metricLabel": "Benchmark",
-        "metricValue": "SERP Top 10"
+        "metricValue": "SERP Top 10",
+        "href": "/features/content-optimization"
       }
     ]
   },
@@ -376,6 +382,7 @@
       "whatItDoes": "What it does",
       "howItWorks": "How it works",
       "checkCoverage": "Check coverage",
+      "capabilities": "Capabilities",
       "fitAndLimits": "Fit & limits",
       "faq": "FAQ"
     },
@@ -989,7 +996,7 @@
   },
   "contactPage": {
     "meta": {
-      "title": "Contact SeeO",
+      "title": "Contact SeeO - Support, Feedback & SEO Questions | SeeO",
       "description": "Contact SeeO, an independent AI SEO software project. Find how to reach the SeeO team for support, feedback, and questions about the SEO platform."
     },
     "title": "Contact SeeO",
@@ -2529,6 +2536,298 @@
     "GITHUB_REPOSITORY_NOT_CONFIGURED": "No repository is mapped to this project. Connect one explicitly.",
     "EXECUTION_TARGET_NOT_FOUND": "The target file for this action could not be determined — manual execution required.",
     "EXECUTION_SCOPE_TOO_LARGE": "The change scope exceeds safety limits. Re-preview or execute manually."
+  },
+  "keywordResearch": {
+    "meta": {
+      "title": "Keyword Research Tool - Search Volume, Difficulty & CPC | SeeO",
+      "description": "SeeO expands a seed keyword into related terms with search volume, SEO difficulty, CPC, search intent, and trend so you can pick high-value targets to target."
+    },
+    "title": "Keyword Research Tool for Real Search Demand",
+    "subtitle": "Turn one seed keyword into a mapped set of opportunities — with the volume, difficulty, intent, and CPC data you need to decide what is actually worth targeting",
+    "whatItDoes": "SeeO's keyword research tool takes a seed term and expands it into a set of related keywords, then attaches the metrics that matter for prioritization: monthly search volume, SEO difficulty (KD), CPC, competition, search intent (informational, commercial, transactional, or navigational), and a recent trend signal. Instead of guessing which terms to chase, you get a side-by-side view of demand and effort so you can spot long-tail and lower-difficulty opportunities that still carry real traffic potential. Keywords can be grouped into saved lists, so the research you do today becomes the input for rank tracking and content optimization tomorrow — no exporting between tools.",
+    "how": {
+      "input": "A seed keyword or short phrase",
+      "process": [
+        "Expands the seed into related and phrase-match keyword variants (SerpApi Google results)",
+        "Enriches each term with volume, difficulty, CPC, competition, intent, and trend from search-data APIs",
+        "Caches results so repeat lookups of the same term stay efficient",
+        "Lets you group keywords into named lists saved to your account",
+        "Feeds grouped keywords straight into rank tracking and content optimization"
+      ],
+      "output": [
+        "Related keyword sets with volume and difficulty for each term",
+        "CPC, competition, search intent, and trend per keyword",
+        "Saved keyword groups you can reuse across modules",
+        "A ready-to-track list for rank monitoring"
+      ],
+      "dataSource": "SerpApi (Google keyword ideas) plus DataForSEO metrics — both billed per call, with usage counting and a circuit breaker"
+    },
+    "capabilities": [
+      { "cat": "Keyword expansion", "items": "From one seed to a full related-keyword set, including phrase matches you might miss by hand" },
+      { "cat": "Keyword metrics", "items": "Search volume, SEO difficulty (KD), CPC, and competition for every returned term" },
+      { "cat": "Search intent", "items": "Each keyword is classified as informational, commercial, transactional, or navigational to match content type" },
+      { "cat": "Keyword grouping", "items": "Save keywords into named groups that flow directly into rank tracking and content optimization" }
+    ],
+    "who": [
+      "Content teams building a topic map before they brief writers",
+      "SEO practitioners sizing demand before committing to a term",
+      "Agencies scoping a keyword set for a new client site",
+      "Site owners looking for lower-difficulty long-tail wins"
+    ],
+    "limits": [
+      "Google keyword data only (no Bing or Baidu yet)",
+      "Tracked and grouped keyword counts are limited by plan",
+      "API calls are billed per request and protected by a circuit breaker, so usage stays predictable",
+      "Trend is a recent signal, not a multi-year history"
+    ],
+    "faqs": [
+      { "q": "Where does keyword data come from?", "a": "Expansion comes from SerpApi's Google keyword ideas, and the per-term metrics (volume, difficulty, CPC, competition, intent, trend) come from DataForSEO. Both are third-party data providers billed per call." },
+      { "q": "Can I group keywords for later use?", "a": "Yes. You can save keywords into named groups in your account, then send a group straight into rank tracking or content optimization without re-exporting." },
+      { "q": "What does the difficulty score mean?", "a": "Difficulty (KD) estimates how hard it is to rank for a term based on the competition already ranking. A lower KD with decent volume is usually the better target for a newer site." },
+      { "q": "Does it classify search intent?", "a": "Yes. Each keyword is tagged as informational, commercial, transactional, or navigational, which helps you match the right page type — a guide for informational, a product or pricing page for transactional." },
+      { "q": "Is there a limit on how many keywords I can track?", "a": "Yes. Tracked and grouped keyword counts depend on your plan (see the pricing page). Expansion itself is metered by API calls rather than by keyword count." },
+      { "q": "How is this different from a spreadsheet?", "a": "SeeO returns the metrics and intent in one pass and connects the list to rank tracking and content optimization on the same workbench, so research turns into tracked progress instead of a static sheet." }
+    ],
+    "related": {
+      "competitorAnalysis": { "title": "Competitor Analysis →", "desc": "See the keyword gap vs rivals" },
+      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages against target terms" }
+    },
+    "cta": { "title": "Start your keyword research", "subtitle": "Expand a seed term on the free plan — no credit card required" }
+  },
+  "competitorAnalysis": {
+    "meta": {
+      "title": "Competitor Analysis Tool - Find Keyword & Ranking Gaps | SeeO",
+      "description": "SeeO finds who competes for your keywords, then shows the keyword gap and shared vs unique terms between your site and a rival."
+    },
+    "title": "Competitor Analysis Tool for the Keyword Gap",
+    "subtitle": "See exactly which keywords your rivals rank for that you don't — and where you already overlap — so you can target gaps instead of guessing",
+    "whatItDoes": "SeeO's competitor analysis tool starts from your own keyword set and discovers the domains that actually compete for those terms in Google. It then compares your rankings against a chosen competitor to surface the keyword gap: terms the competitor ranks for that you don't, terms you own, and terms where you go head to head. Domains that are really just platforms (aggregators, Wikipedia, YouTube, and similar) are filtered out so they don't pollute the comparison. The output is a prioritized list of gaps you can feed straight into content and rank tracking.",
+    "how": {
+      "input": "Your domain plus the keywords you already track",
+      "process": [
+        "Discovers competing domains from the current Google SERPs for your keywords",
+        "Classifies each domain and filters out platforms and aggregators that aren't real rivals",
+        "Compares your positions with a chosen competitor per keyword",
+        "Computes the keyword gap: competitor-only, you-only, and shared terms",
+        "Ranks gaps by opportunity so you know which to attack first"
+      ],
+      "output": [
+        "A list of competing domains discovered from the SERP",
+        "Keyword gap: competitor-only, you-only, and shared terms",
+        "Per-keyword side-by-side ranking comparison",
+        "A prioritized shortlist to feed into content and rank tracking"
+      ],
+      "dataSource": "SeeO's own rank data plus SerpApi SERP lookups, with usage counting and a circuit breaker"
+    },
+    "capabilities": [
+      { "cat": "Competitor discovery", "items": "Find the real domains competing for your keywords directly from live SERPs" },
+      { "cat": "Keyword gap", "items": "See which terms a rival ranks for that you don't, and vice versa" },
+      { "cat": "Shared keywords", "items": "Identify head-to-head terms where small gains move the most traffic" },
+      { "cat": "Domain filtering", "items": "Aggregators and platforms like Wikipedia or YouTube are excluded from the rival set" }
+    ],
+    "who": [
+      "SEO practitioners benchmarking against a known rival",
+      "Agencies building a competitive gap report for a client",
+      "Content teams deciding which topics to prioritize next",
+      "Site owners who suspect a competitor is out-ranking them on key terms"
+    ],
+    "limits": [
+      "Google rankings only (no Bing or Baidu yet)",
+      "Gap analysis depends on the keywords you already track",
+      "SerpApi SERP lookups are billed per call and circuit-breaker protected",
+      "Discovery covers the keywords you provide, not the rival's entire site"
+    ],
+    "faqs": [
+      { "q": "Where does the competitor data come from?", "a": "SeeO compares your tracked rankings with live Google SERP data via SerpApi, and filters out platforms and aggregators so the rival set reflects real competition." },
+      { "q": "Do I need to enter a competitor manually?", "a": "Discovery starts from the SERP, so SeeO finds who actually competes for your keywords. You then pick one domain to compare the keyword gap against." },
+      { "q": "What is a keyword gap?", "a": "It is the set of terms a competitor ranks for that you don't (and vice versa). Gaps are usually the fastest, most defensible content opportunities." },
+      { "q": "Does it exclude Wikipedia and YouTube?", "a": "Yes. Domains that are platforms rather than true business rivals are filtered from the comparison so they don't distort the gap." },
+      { "q": "How is this different from rank tracking?", "a": "Rank tracking watches your own positions over time; competitor analysis adds the rival dimension so you can see where you lag and where you lead." },
+      { "q": "Can I act on the gaps directly?", "a": "Yes. A prioritized gap list can be sent into content optimization and rank tracking, so discovery turns into tracked work." }
+    ],
+    "related": {
+      "keywordResearch": { "title": "Keyword Research →", "desc": "Build the set you compare against" },
+      "rankTracking": { "title": "SEO Rank Tracking →", "desc": "Watch your positions daily" }
+    },
+    "cta": { "title": "Run a competitor gap analysis", "subtitle": "Connect your keyword set on the free plan to see who competes" }
+  },
+  "contentOptimization": {
+    "meta": {
+      "title": "Content Optimization Tool - SEO Content Scoring | SeeO",
+      "description": "SeeO scores a page or draft for on-page SEO, readability, keyword use, headings, links, and image alt text, then tells you what to fix."
+    },
+    "title": "Content Optimization Tool for On-Page SEO",
+    "subtitle": "Paste a URL or a draft and get a content score plus a concrete checklist — keyword use, structure, readability, and the on-page basics search engines look for",
+    "whatItDoes": "SeeO's content optimization tool analyzes a page or a plain-text draft and returns a content score with a breakdown of what helps and what hurts. It parses the HTML (cheerio) to measure word count, readability, keyword density, heading structure, internal and external link counts, images missing alt text, and the length of the title and meta description. The point is not a vanity score but a prioritized checklist: which terms to add, whether the structure reads well, and which on-page basics are missing — so a writer can act without guessing.",
+    "how": {
+      "input": "A page URL or a pasted text draft, plus an optional target keyword",
+      "process": [
+        "Fetches and parses the page HTML (cheerio) or reads the pasted draft",
+        "Computes word count, readability, and keyword density across the text",
+        "Maps the heading structure (H1-H6) and counts internal and external links",
+        "Flags images without alt text and checks title and meta description length",
+        "Rolls the signals into a single content score with a prioritized checklist"
+      ],
+      "output": [
+        "A content score (0-100) with a breakdown by signal",
+        "Keyword density and missing-term suggestions",
+        "Heading structure and link-count checks",
+        "A prioritized list of on-page fixes"
+      ],
+      "dataSource": "On-page analysis runs on the fetched page or draft — no third-party index required for the core checks"
+    },
+    "capabilities": [
+      { "cat": "Content score", "items": "One number that reflects on-page strength across multiple signals" },
+      { "cat": "Keyword density", "items": "See how often target terms appear and which related terms are missing" },
+      { "cat": "Readability", "items": "A readability score shows whether the text is easy to read for the audience" },
+      { "cat": "On-page structure", "items": "Heading hierarchy, internal and external links, and image alt text in one view" }
+    ],
+    "who": [
+      "Writers who want a pre-publish on-page check",
+      "Editors reviewing drafts before they go live",
+      "SEO practitioners auditing existing pages for quick wins",
+      "Teams standardizing on-page quality across many authors"
+    ],
+    "limits": [
+      "Analysis is on-page only — it does not judge content quality or intent",
+      "Very large pages may be truncated to a practical limit",
+      "Readability scoring is a heuristic, not a substitute for editing judgment",
+      "It does not rewrite the content for you"
+    ],
+    "faqs": [
+      { "q": "What does the content score mean?", "a": "It is a 0-100 roll-up of on-page signals — keyword use, structure, readability, links, and alt text. A higher score means fewer obvious on-page gaps, not guaranteed rankings." },
+      { "q": "Can I analyze a draft before publishing?", "a": "Yes. You can paste plain text instead of a URL, so the score works during writing, not just after the page is live." },
+      { "q": "Does it check keyword stuffing?", "a": "It reports keyword density so you can see whether a term is underused or overused. Healthy density varies by topic; the tool shows the number, you make the call." },
+      { "q": "Does it look at internal links?", "a": "Yes. It counts internal and external links and flags images missing alt text, since both are basic on-page signals search engines use." },
+      { "q": "Will it rewrite my content?", "a": "No. It returns a prioritized checklist of fixes; the writing stays with you. That keeps you in control of tone and accuracy." },
+      { "q": "How does this connect to the other modules?", "a": "Target keywords often come from keyword research, and the same page can be watched in rank tracking after you publish the fixes." }
+    ],
+    "related": {
+      "keywordResearch": { "title": "Keyword Research →", "desc": "Find the terms to optimize for" },
+      "seoAudit": { "title": "Technical SEO Audit →", "desc": "Catch site-level issues too" }
+    },
+    "cta": { "title": "Score your next page", "subtitle": "Paste a URL or draft on the free plan to see the checklist" }
+  },
+  "alternativesSemrush": {
+    "meta": {
+      "title": "SeeO vs Semrush: A Practical Comparison for SEO Teams | SeeO",
+      "description": "A neutral SeeO vs Semrush comparison: how SeeO's six-module workbench stacks up against Semrush's broad suite — including where Semrush leads."
+    },
+    "title": "SeeO vs Semrush: Which SEO Tool Fits Your Team?",
+    "subtitle": "Both are SEO platforms, but they are built differently. Here is an honest, side-by-side look at what each does well — including where Semrush leads.",
+    "intro": "Both SeeO and Semrush help you improve organic search, but they are shaped differently. Semrush is a long-established, broad marketing suite with a very large keyword and backlink database and a wide range of PPC, social, and competitive-research features. SeeO is a focused workbench that combines the six core SEO modules — keyword research, rank tracking, technical audit, competitor analysis, content optimization, and backlink analysis — and adds AI search monitoring and an MCP server for agentic workflows. This page compares them on the dimensions that matter for an SEO team, and points out where Semrush is the stronger choice so you can decide without the hype.",
+    "comparison": [
+      { "dim": "Keyword research", "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.", "other": "Very large keyword database with extensive historical volume and many filters." },
+      { "dim": "Rank tracking", "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.", "other": "Broad rank tracking across many search engines and large historical sets." },
+      { "dim": "Technical audit", "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.", "other": "Site audit with a large issue catalog and scheduling." },
+      { "dim": "Competitor analysis", "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.", "other": "Deep competitive research including traffic estimates and ad insights." },
+      { "dim": "Content optimization", "seeo": "Scores a page or draft for on-page SEO, readability, and structure.", "other": "Writing assistant with a large recommendation engine and templated briefs." },
+      { "dim": "Backlink analysis", "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).", "other": "One of the largest backlink indexes in the industry with rich link analytics." },
+      { "dim": "AI search monitoring", "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).", "other": "AI features are expanding but not its original focus." },
+      { "dim": "API / agent access", "seeo": "Ships an MCP server so AI agents can call SEO tools directly.", "other": "REST API and integrations, oriented to developers and pipelines." },
+      { "dim": "Pricing model", "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).", "other": "Monthly subscription tiers that scale with seats and data limits." }
+    ],
+    "seeoFits": [
+      "You want the six core SEO modules in one place without a large monthly commitment",
+      "You care about AI search / brand-monitoring visibility, not just classic blue links",
+      "You want an MCP server so agents can run SEO work as part of an automated workflow",
+      "You prefer a simple, transparent one-time membership over seat-based pricing"
+    ],
+    "otherFits": [
+      "You need the deepest possible keyword and backlink databases at enterprise scale",
+      "You also run PPC, social, or extensive competitive-ad research in one suite",
+      "You want long historical data and large team/seat management features",
+      "Your workflow already centers on Semrush reports and exports"
+    ],
+    "faqs": [
+      { "q": "Is SeeO a replacement for Semrush?", "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Semrush offers a broader marketing suite with very large databases and PPC/social tooling. If you need enterprise-scale data and multi-channel marketing in one place, Semrush may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit." },
+      { "q": "Does SeeO have as much backlink data as Semrush?", "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Semrush is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Semrush is the stronger choice." },
+      { "q": "Which is better for a small team or solo SEO?", "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Semrush can be worth it once you need its breadth and database scale." },
+      { "q": "Can I use SeeO alongside Semrush?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Semrush for its databases — they are not mutually exclusive." }
+    ],
+    "related": {
+      "keywordResearch": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
+      "competitorAnalysis": { "title": "Competitor Analysis →", "desc": "Keyword gap vs rivals" },
+      "seoAudit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+    },
+    "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
+  },
+  "alternativesAhrefs": {
+    "meta": {
+      "title": "SeeO vs Ahrefs: An Honest Comparison for SEO Teams | SeeO",
+      "description": "A neutral SeeO vs Ahrefs comparison across keyword research, rank tracking, site audit, backlinks, content, and AI search — including where Ahrefs leads."
+    },
+    "title": "SeeO vs Ahrefs: Which SEO Tool Fits Your Team?",
+    "subtitle": "Both are SEO platforms, but they are shaped differently. Here is an honest, side-by-side look at what each does well — including where Ahrefs leads.",
+    "intro": "Both SeeO and Ahrefs help you earn organic traffic, but they are shaped differently. Ahrefs is a long-established SEO toolset famous for one of the largest backlink indexes in the industry, alongside Site Audit, Keyword Explorer, and Content Explorer. SeeO is a focused workbench that combines the six core SEO modules — keyword research, rank tracking, technical audit, competitor analysis, content optimization, and backlink analysis — and adds AI search monitoring and an MCP server for agentic workflows. This page compares them on the dimensions that matter for an SEO team, and points out where Ahrefs is the stronger choice so you can decide without the hype.",
+    "comparison": [
+      { "dim": "Keyword research", "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.", "other": "Keyword Explorer with a large database and click/share-of-voice estimates." },
+      { "dim": "Rank tracking", "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.", "other": "Rank Tracker with broad search-engine coverage and position history." },
+      { "dim": "Technical audit", "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.", "other": "Site Audit with a large issue catalog and crawl scheduling." },
+      { "dim": "Competitor analysis", "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.", "other": "Competing Domains and content gap tools with large index coverage." },
+      { "dim": "Content optimization", "seeo": "Scores a page or draft for on-page SEO, readability, and structure.", "other": "Content Explorer plus on-page recommendations and briefs." },
+      { "dim": "Backlink analysis", "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).", "other": "One of the largest backlink indexes in the industry with rich link analytics." },
+      { "dim": "AI search monitoring", "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).", "other": "AI features are expanding but not its original focus." },
+      { "dim": "API / agent access", "seeo": "Ships an MCP server so AI agents can call SEO tools directly.", "other": "API and integrations oriented to developers and pipelines." },
+      { "dim": "Pricing model", "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).", "other": "Monthly subscription tiers that scale with seats and data limits." }
+    ],
+    "seeoFits": [
+      "You want the six core SEO modules in one place without a large monthly commitment",
+      "You care about AI search / brand-monitoring visibility, not just classic blue links",
+      "You want an MCP server so agents can run SEO work as part of an automated workflow",
+      "You prefer a simple, transparent one-time membership over seat-based pricing"
+    ],
+    "otherFits": [
+      "You need the deepest possible backlink index at enterprise scale",
+      "You rely on Content Explorer and large-scale link prospecting",
+      "You want long historical data and large team/seat management features",
+      "Your workflow already centers on Ahrefs reports and exports"
+    ],
+    "faqs": [
+      { "q": "Is SeeO a replacement for Ahrefs?", "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Ahrefs is renowned for its backlink index and link-building toolset. If backlink depth and link prospecting are your top priority, Ahrefs may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit." },
+      { "q": "Does SeeO have as much backlink data as Ahrefs?", "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Ahrefs is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Ahrefs is the stronger choice." },
+      { "q": "Which is better for a small team or solo SEO?", "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Ahrefs can be worth it once you need its breadth and database scale." },
+      { "q": "Can I use SeeO alongside Ahrefs?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Ahrefs for its backlink index — they are not mutually exclusive." }
+    ],
+    "related": {
+      "keywordResearch": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
+      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" },
+      "seoAudit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+    },
+    "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
+  },
+  "guideTechnicalSeoAudit": {
+    "meta": {
+      "title": "How to Do a Technical SEO Audit: Step-by-Step Guide | SeeO",
+      "description": "A step-by-step technical SEO audit guide: crawl the site, check indexability, on-page basics, speed, mobile, security, structured data, then prioritize fixes."
+    },
+    "title": "How to Do a Technical SEO Audit (Step-by-Step)",
+    "subtitle": "A practical framework for auditing a website's technical health — what to check, in what order, and how to prioritize fixes that actually move rankings",
+    "intro": "A technical SEO audit reviews the foundation a site is built on: can search engines crawl and index it, is the on-page markup correct, does it load fast, and is it secure and mobile-friendly? This guide walks through a repeatable audit process you can run yourself, whether you use SeeO's audit tool or another crawler. Each step lists what to look for and why it matters, so you can turn a long to-do list into a prioritized plan.",
+    "steps": [
+      { "n": "01", "title": "Crawl the site and inventory pages", "body": "Start with a full crawl from your sitemap (or a crawler) so you have every indexable URL. Note the total page count and any crawl errors. A crawl is the baseline — without it you are guessing." },
+      { "n": "02", "title": "Check indexability", "body": "Review robots.txt, the XML sitemap, canonical tags, and noindex rules. Look for pages blocked from indexing, canonicals pointing to the wrong URL, and redirect chains that waste crawl budget." },
+      { "n": "03", "title": "On-page basics", "body": "For each important page, check the title tag, meta description, H1 hierarchy, and image alt text. These are the fundamentals search engines use to understand and rank a page." },
+      { "n": "04", "title": "Site architecture and internal links", "body": "Map how pages link to each other. Fix orphaned pages (no internal links), tighten deep click paths, and make sure important pages are reachable within a few clicks from the homepage." },
+      { "n": "05", "title": "Page speed and Core Web Vitals", "body": "Measure LCP, INP, and CLS. Slow pages hurt both rankings and users; prioritize templates and pages with the most traffic." },
+      { "n": "06", "title": "Mobile-friendliness", "body": "Confirm the site renders correctly on mobile, uses a responsive layout, and passes mobile usability checks. Most indexing is mobile-first, so this is not optional." },
+      { "n": "07", "title": "HTTPS and security", "body": "Verify the SSL certificate is valid and every page redirects to HTTPS. Mixed content and expired certificates are easy, high-impact fixes." },
+      { "n": "08", "title": "Structured data", "body": "Validate schema markup (Organization, Product, FAQ, BreadcrumbList, and others). Correct structured data can unlock rich results and clearer indexing." },
+      { "n": "09", "title": "Backlinks and off-page signals", "body": "Review the link profile: total backlinks, referring domains, and anchor text distribution. A sudden drop in referring domains often explains a rankings drop." },
+      { "n": "10", "title": "Prioritize and track fixes", "body": "Score issues by impact and sort them into a fix list. Re-audit after changes so you can prove the health score and rankings improved." }
+    ],
+    "faqs": [
+      { "q": "How often should I run a technical SEO audit?", "a": "At least once per quarter, and immediately after any redesign, migration, or platform change. Continuous monitoring catches regressions between full audits." },
+      { "q": "Do I need a paid tool to audit a site?", "a": "You can start with free crawlers and Search Console, but a tool like SeeO's audit automates the 20+ checks and keeps history so you can compare runs. The method in this guide works with any crawler." },
+      { "q": "What is the most important audit metric?", "a": "There is no single number, but indexability issues (pages that should be indexed but aren't) and Core Web Vitals tend to have the widest impact. Start there before cosmetic fixes." },
+      { "q": "How do I know if my fixes worked?", "a": "Re-run the audit and compare the health score and issue count against the previous run. Pair it with rank tracking so you can connect a fix to a ranking change." }
+    ],
+    "related": {
+      "seoAudit": { "title": "Technical SEO Audit Tool →", "desc": "Run 20+ checks automatically" },
+      "keywordResearch": { "title": "Keyword Research →", "desc": "Find terms worth targeting" },
+      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" }
+    },
+    "cta": { "title": "Run a free technical audit", "subtitle": "SeeO's free plan includes single-page quick audits" }
   },
   "notFoundPage": {
     "title": "Page Not Found | SeeO",

@@ -11,18 +11,18 @@ import {
   featureAppSchema,
 } from "@/lib/seo/schema";
 
-// ===== /features/seo-audit 内容组件（en: /features/seo-audit · zh: /zh/features/seo-audit）=====
-// 文案全部走 messages（seoAudit / featureShared），metadata 由 [locale] 页面按 locale 生成。
+// ===== /features/competitor-analysis 内容组件（en / zh）=====
+// 文案走 messages（competitorAnalysis / featureShared），metadata 由 [locale] 页面按 locale 生成。
 
-export default async function SeoAuditFeaturePage() {
-  const t = await getTranslations("seoAudit");
+export default async function CompetitorAnalysisFeaturePage() {
+  const t = await getTranslations("competitorAnalysis");
   const s = await getTranslations("featureShared");
   const locale = (await getLocale()) as "en" | "zh";
-  const path = "/features/seo-audit";
+  const path = "/features/competitor-analysis";
   const lpath = localePath(locale, path);
 
   const faqs = t.raw("faqs") as Array<{ q: string; a: string }>;
-  const checks = t.raw("checks") as Array<{ cat: string; items: string }>;
+  const capabilities = t.raw("capabilities") as Array<{ cat: string; items: string }>;
   const who = t.raw("who") as string[];
   const limits = t.raw("limits") as string[];
   const processItems = t.raw("how.process") as string[];
@@ -32,11 +32,7 @@ export default async function SeoAuditFeaturePage() {
     <div className="min-h-screen bg-paper">
       <JsonLd
         schema={webPageSchema(
-          {
-            name: t("title"),
-            description: t("subtitle"),
-            url: lpath,
-          },
+          { name: t("title"), description: t("subtitle"), url: lpath },
           locale
         )}
       />
@@ -50,7 +46,7 @@ export default async function SeoAuditFeaturePage() {
         )}
       />
       <JsonLd schema={faqPageSchema(lpath, faqs, locale)} />
-      <JsonLd schema={featureAppSchema("seoAudit", lpath, locale)} />
+      <JsonLd schema={featureAppSchema("competitorAnalysis", lpath, locale)} />
       <Navbar />
 
       <div className="doc-shell px-6 py-16">
@@ -74,7 +70,7 @@ export default async function SeoAuditFeaturePage() {
           </p>
         </section>
 
-        {/* About this capability (AI citation-friendly) */}
+        {/* How it works */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">02</span>
@@ -113,17 +109,17 @@ export default async function SeoAuditFeaturePage() {
           </div>
         </section>
 
-        {/* Check categories */}
+        {/* Capabilities */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">03</span>
             <h2 className="font-display text-lg font-semibold text-ink">
-              {s("sections.checkCoverage")}
+              {s("sections.capabilities")}
             </h2>
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
-            {checks.map((c) => (
+            {capabilities.map((c) => (
               <div key={c.cat} className="card-a p-4">
                 <h3 className="font-display text-sm font-semibold text-ink">{c.cat}</h3>
                 <p className="mt-1 font-sans text-sm text-ink-60">{c.items}</p>
@@ -132,7 +128,7 @@ export default async function SeoAuditFeaturePage() {
           </div>
         </section>
 
-        {/* Who + limits */}
+        {/* Fit & limits */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
             <span className="font-mono text-sm text-brand">04</span>
@@ -178,8 +174,20 @@ export default async function SeoAuditFeaturePage() {
           </div>
         </section>
 
-        {/* Related + CTA */}
+        {/* Related */}
         <div className="mt-12 grid gap-3 sm:grid-cols-2">
+          <Link
+            href={localePath(locale, "/features/keyword-research")}
+            className="card-a p-4 transition-colors hover:border-brand"
+          >
+            <span className="font-mono text-xs text-brand">{s("related")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+              {t("related.keywordResearch.title")}
+            </h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">
+              {t("related.keywordResearch.desc")}
+            </p>
+          </Link>
           <Link
             href={localePath(locale, "/features/rank-tracking")}
             className="card-a p-4 transition-colors hover:border-brand"
@@ -188,20 +196,35 @@ export default async function SeoAuditFeaturePage() {
             <h3 className="mt-1 font-display text-sm font-semibold text-ink">
               {t("related.rankTracking.title")}
             </h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("related.rankTracking.desc")}</p>
-          </Link>
-          <Link
-            href={localePath(locale, "/features/backlink-analysis")}
-            className="card-a p-4 transition-colors hover:border-brand"
-          >
-            <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
-              {t("related.backlinks.title")}
-            </h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("related.backlinks.desc")}</p>
+            <p className="mt-1 font-sans text-xs text-ink-60">
+              {t("related.rankTracking.desc")}
+            </p>
           </Link>
         </div>
 
+        {/* Explore more (internal linking to guide + alternatives) */}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href={localePath(locale, "/guides/how-to-do-a-technical-seo-audit")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "技术 SEO 审计指南 →" : "Technical SEO audit guide →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/alternatives/semrush")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "对比 SeeO 与 Semrush →" : "Compare SeeO vs Semrush →"}
+          </Link>
+          <Link
+            href={localePath(locale, "/alternatives/ahrefs")}
+            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+          >
+            {locale === "zh" ? "对比 SeeO 与 Ahrefs →" : "Compare SeeO vs Ahrefs →"}
+          </Link>
+        </div>
+
+        {/* CTA */}
         <div className="mt-8 card-a p-6 text-center">
           <h2 className="font-display text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("cta.subtitle")}</p>
@@ -229,7 +252,7 @@ export default async function SeoAuditFeaturePage() {
           </Link>
         </div>
       </div>
-        <Footer />
+      <Footer />
     </div>
   );
 }

@@ -10,6 +10,7 @@ export default function FeatureCards() {
     bullets: string[];
     metricLabel: string;
     metricValue: string;
+    href?: string;
   }>;
 
   return (
@@ -70,9 +71,9 @@ export default function FeatureCards() {
                 ))}
               </ul>
 
-              {/* 底部链接 */}
+              {/* 底部链接（指向各功能独立页，强化内部链接） */}
               <Link
-                href="/app"
+                href={f.href ?? "/app"}
                 className="mt-6 inline-flex items-center gap-2 font-sans text-sm font-semibold text-accent transition-colors hover:text-ink"
               >
                 {t("cardLink")}

@@ -33,9 +33,9 @@ const SITE_URL = "https://www.seeo.asia";
 
 const metaText: Record<Locale, { title: string; description: string }> = {
   en: {
-    title: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
+    title: "SeeO — SEO Tool: Site Audits, Rank Tracking & Keyword Research",
     description:
-      "SeeO is an all-in-one SEO platform: technical audits, daily rank tracking, keyword research, competitor and backlink analysis, and content optimization.",
+      "SeeO is an all-in-one SEO tool: technical site audits, daily rank tracking, keyword research, competitor and backlink analysis, and content optimization.",
   },
   zh: {
     title: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
