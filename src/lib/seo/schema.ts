@@ -205,6 +205,35 @@ export function featureAppSchema(
   };
 }
 
+/** WebApplication：公开免费工具页（如 /tools/*）。
+ * 仅用于「无需账号即可直接使用」的真实可用工具；offers 价格固定为 0（免费预览），
+ * 不声明评分、安装量等无法验证的字段。url 传 locale 相对路径（含 /zh 前缀）。 */
+export function webApplicationSchema(
+  input: {
+    name: string;
+    description: string;
+    url: string;
+  },
+  locale: "en" | "zh" = "en"
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: input.name,
+    description: input.description,
+    url: `${SITE_URL}${input.url}`,
+    applicationCategory: "SEO Software",
+    operatingSystem: "Web",
+    browserRequirements: "Requires JavaScript",
+    inLanguage: locale === "zh" ? "zh-CN" : "en",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+  };
+}
+
 /** BreadcrumbList：items 为 [首页, ...层级页面]，url 传相对路径（以 / 开头）。
  * 绝对 URL 统一不带尾部斜杠（与 sitemap / canonical 形式一致） */
 export function breadcrumbSchema(
@@ -282,13 +311,12 @@ export function faqPageSchema(
     "@type": "FAQPage",
     url: `${SITE_URL}${url}`,
     ...(locale ? { inLanguage: locale === "zh" ? "zh-CN" : "en" } : {}),
-  mainEntity: faqs.map((f) => ({
-    "@type": "Question",
-    name: f.q,
-    acceptedAnswer: { "@type": "Answer", text: f.a },
-  })),
-};
-
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
 }
 
 /** Article：教学 / 指南类页面（/guides/*）使用。

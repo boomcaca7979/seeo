@@ -390,6 +390,7 @@
     "limitsTitle": "Real limitations",
     "related": "RELATED",
     "guideCard": "GUIDE",
+    "toolCard": "FREE TOOL",
     "cta": {
       "signup": "Start free",
       "pricing": "View pricing",
@@ -854,8 +855,8 @@
       "intro": "Search results for backlink tools are full of free instant checkers. It is worth being explicit about what SeeO is and is not.",
       "items": [
         {
-          "name": "Not an anonymous instant checker",
-          "body": "SeeO requires an account, and backlink analysis is part of the Pro plan. It is a workbench feature, not an open lookup box."
+          "name": "Free preview up front, full analysis behind the account",
+          "body": "Anyone can run a free backlink preview without signing in — that is what the /tools/backlink-checker page is for. What the account and the Pro plan unlock is the complete workflow: stored link rows, filtering, and competitor comparison."
         },
         {
           "name": "Built for comparison over time",
@@ -935,6 +936,13 @@
     "guide": {
       "title": "How to analyze backlinks →",
       "desc": "A practical walkthrough of link profile analysis"
+    },
+    "freeTool": {
+      "freeTool": {
+        "title": "Try the free backlink checker →",
+        "desc": "Run a preview on any domain without an account — summary metrics plus the strongest linking pages",
+        "cta": "Check a domain for free"
+      }
     },
     "cta": {
       "title": "Use backlink analysis",
@@ -2769,6 +2777,14 @@
     "AUDIT_COOLDOWN": "This domain is in audit cooldown. One audit per hour per mode; try the other mode or retry later.",
     "AUDIT_IN_PROGRESS": "An audit is already running for this domain. Please wait for it to finish.",
     "BACKLINK_COOLDOWN": "Backlink data for this domain is in cooldown. One fetch per hour; please retry later.",
+    "PRIVATE_HOST": "That host cannot be checked. Enter a public domain.",
+    "PAYLOAD_TOO_LARGE": "The request body is too large.",
+    "METHOD_NOT_ALLOWED": "This endpoint accepts POST requests only.",
+    "CHECKER_RATE_LIMITED": "Too many requests. Please slow down and try again shortly.",
+    "CHECKER_DAILY_LIMIT": "You have reached the free daily limit for new domain lookups.",
+    "CHECKER_BUDGET_EXHAUSTED": "The free checker has used its shared lookup budget for today. Please try again tomorrow.",
+    "UPSTREAM_TIMEOUT": "The data provider did not respond in time. Please try again.",
+    "CHECKER_UNAVAILABLE": "The checker is temporarily unavailable. Please try again shortly.",
     "QUOTA_EXCEEDED": "Monthly API quota exhausted ({used}/{limit}). Resets on the 1st of next month.",
     "FREE_QUOTA_EXCEEDED": "Monthly free quota exhausted. Resets on the 1st of next month.",
     "FEATURE_NOT_AVAILABLE": "Your current plan ({plan}) does not include this feature: {feature}.",
@@ -2779,7 +2795,7 @@
     "COMPETITOR_LIMIT_REACHED": "Your current plan ({plan}) allows at most {limit} competitors. Please upgrade.",
     "KEYWORD_GROUP_LIMIT_REACHED": "Your current plan ({plan}) allows at most {limit} keyword groups. Please upgrade.",
     "UPSTREAM_ERROR": "Internal server error. Please try again later.",
-    "DATAFORSEO_NOT_CONFIGURED": "DataForSEO credentials are not configured (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD).",
+    "DATAFORSEO_NOT_CONFIGURED": "Backlink data is temporarily unavailable. Please try again later.",
     "RESEND_NOT_CONFIGURED": "Email reports are currently unavailable. Please try again later.",
     "SEND_FAILED": "Failed to send.",
     "ADMIN_CLIENT_UNAVAILABLE": "Admin client is unavailable.",
@@ -3350,6 +3366,213 @@
     "cta": {
       "title": "Run link profile analysis on a stored snapshot",
       "subtitle": "SeeO caches each domain query for seven days, so you can compare the same profile across weeks instead of re-sampling"
+    }
+  },
+  "backlinkChecker": {
+    "meta": {
+      "title": "Free Backlink Checker - Check Any Domain's Backlinks | SeeO",
+      "description": "Check backlinks on any domain for free: total backlinks, referring domains, Domain Rank, and a sample of the strongest linking pages. No account needed."
+    },
+    "eyebrow": "FREE TOOL",
+    "title": "Free Backlink Checker",
+    "subtitle": "Enter a domain and see a real backlink preview: how many links point at it, how many distinct sites link to it, what its Domain Rank is, and a sample of the strongest links. No account, no credit card, no email.",
+    "dataNote": "Data from DataForSEO · snapshots cached for 7 days",
+    "checker": {
+      "label": "Domain",
+      "placeholder": "example.com",
+      "submit": "Check backlinks",
+      "submitting": "Checking…",
+      "note": "Free preview. No account required.",
+      "loading": "Fetching backlink data. The first lookup for a domain takes a few seconds; repeat lookups are instant.",
+      "errInvalidDomain": "Enter a domain like example.com.",
+      "errPrivateHost": "That host cannot be checked. Enter a public domain.",
+      "errCooldown": "This domain was checked moments ago and its snapshot is still being stored. Please try again in a few minutes.",
+      "errIpLimit": "You have reached the free daily limit for new domain lookups. Domains already cached can still be checked, and a free SeeO account unlocks the full analysis.",
+      "errBurst": "That was a lot of requests at once. Please wait a moment and try again.",
+      "errBudget": "The free checker has used its shared lookup budget for today. Please try again tomorrow.",
+      "errUnavailable": "The checker is temporarily unavailable. Please try again shortly.",
+      "errTimeout": "The data provider did not respond in time. Please try again.",
+      "errUpstream": "We could not retrieve backlink data for that domain. Check the spelling and try again.",
+      "errGeneric": "Something went wrong. Please try again.",
+      "errRetryAfter": "You can try again in about {minutes} minutes."
+    },
+    "results": {
+      "heading": "Backlink preview for {domain}",
+      "freshFetched": "Fetched {date} · live provider lookup",
+      "freshFromCache": "Snapshot {date} · served from cache",
+      "metricsNote": "The four summary metrics describe the whole domain. Snapshots are cached for {days} days, so re-checking the same domain is free and instant.",
+      "metrics": {
+        "totalBacklinks": "Total backlinks",
+        "referringDomains": "Referring domains",
+        "domainRank": "Domain Rank",
+        "dofollowPct": "Dofollow share"
+      },
+      "sampleTitle": "Sample backlinks",
+      "sampleMeta": "Showing {shown} of {stored} stored links, highest source rank first",
+      "sampleEmptyMeta": "No individual links stored in this snapshot",
+      "sampleEmpty": "The provider returned no individual links for this domain. The summary metrics above are still the domain-wide totals.",
+      "sampleNote": "The free preview shows the top {sampleLimit} links by source rank. Full SeeO backlink analysis exposes up to {storedLimit} stored rows per domain with filtering and sorting.",
+      "sampleDofollow": "{dofollow} of {total} sampled links are dofollow.",
+      "thSource": "Source page",
+      "thAnchor": "Anchor text",
+      "thType": "Type",
+      "thRank": "Source rank",
+      "thFirstSeen": "First seen",
+      "dofollow": "Dofollow",
+      "nofollow": "Nofollow"
+    },
+    "metrics": {
+      "eyebrow": "METRICS",
+      "title": "What the numbers mean",
+      "intro": "Four numbers, four different questions. They disagree with each other often, and that disagreement is the useful part.",
+      "items": [
+        {
+          "name": "Total backlinks",
+          "body": "Every link the provider found pointing at the domain. It is a raw count: 10,000 links from a single blog is not the same as 10,000 links from 10,000 different sites."
+        },
+        {
+          "name": "Referring domains",
+          "body": "How many distinct sites link to the domain. This is usually the number that tracks with authority, which is why it sits next to the raw total rather than behind it."
+        },
+        {
+          "name": "Domain Rank",
+          "body": "The provider's 0-100 authority score for the domain as a whole. Read it against the sites you compete with, never against an absolute target."
+        },
+        {
+          "name": "Dofollow share",
+          "body": "The percentage of links that pass ranking signals. A profile that is mostly nofollow is common and is not automatically a problem — what matters is which pages carry the dofollow links."
+        }
+      ]
+    },
+    "reading": {
+      "eyebrow": "HOW TO READ IT",
+      "title": "How to read a backlink profile",
+      "intro": "A backlink count on its own does not tell you much. These four habits turn the preview into an actual judgment.",
+      "items": [
+        {
+          "name": "Start with referring domains",
+          "body": "One strong site linking to you moves more than a thousand links from a directory nobody reads. When the two numbers diverge sharply, the smaller one is usually the honest one."
+        },
+        {
+          "name": "Compare against whoever outranks you",
+          "body": "Run the same check on the pages above yours. A gap in referring domains explains a ranking gap far more often than a gap in total links does."
+        },
+        {
+          "name": "Read source ranks, not totals",
+          "body": "Look at the ranks of the linking pages in the sample below. Five links from respected sites tell a different story from five links from freshly registered domains."
+        },
+        {
+          "name": "Re-check later instead of judging once",
+          "body": "Link profiles change slowly. One snapshot is a photograph; the same snapshot taken a month apart is evidence of whether your outreach is working."
+        }
+      ]
+    },
+    "scope": {
+      "eyebrow": "SCOPE",
+      "title": "What this free checker gives you",
+      "intro": "The preview is deliberately useful on its own, and deliberately bounded. Here is exactly where the line sits.",
+      "includedTitle": "Included in the free preview",
+      "included": [
+        "Total backlinks, referring domains, Domain Rank, and dofollow share for the domain",
+        "The top 5 links by source rank, with anchor text, dofollow status, and first-seen date",
+        "The timestamp of the snapshot, so you know how fresh the data is",
+        "No account, no credit card, and no email address",
+        "Re-checking a cached domain is instant and does not count against your daily lookups",
+        "Plain-language errors instead of silent failures"
+      ],
+      "excludedTitle": "Not covered by this tool",
+      "excluded": [
+        "The full link table — a free preview shows 5 links, not the stored rows",
+        "Filtering and sorting by source page, target page, anchor text, or dofollow status",
+        "A one-link-per-domain view, which reads referring domains as entities rather than as rows",
+        "Side-by-side competitor comparison under one account",
+        "Historical link profiles: SeeO stores one snapshot per domain and refreshes it, it does not archive a timeline"
+      ]
+    },
+    "full": {
+      "eyebrow": "FULL ANALYSIS",
+      "title": "What full SeeO backlink analysis adds",
+      "intro": "The free preview answers whether a profile is worth a closer look. SeeO's backlink analysis is the workspace for that closer look.",
+      "items": [
+        "Up to 100 stored link rows per domain instead of a 5-link sample",
+        "Filter and sort by source page, target page, anchor text, and dofollow status",
+        "A one-link-per-domain view for reading referring domains as entities",
+        "Compare your profile against competitors under the same account",
+        "Saved in your workspace, so you reopen a profile instead of re-querying it",
+        "Link data next to rank tracking, audits, and keyword research in one project"
+      ],
+      "cta": "See the full backlink analysis"
+    },
+    "faqs": [
+      {
+        "q": "Is this backlink checker really free?",
+        "a": "Yes. The preview on this page needs no account and no payment. It returns the domain-wide summary metrics plus a sample of the strongest links. The full link table, the filters, and competitor comparison are part of SeeO's backlink analysis feature, which requires an account."
+      },
+      {
+        "q": "Where does the data come from?",
+        "a": "Backlink data comes from DataForSEO. SeeO does not run its own backlink crawl, so coverage follows that provider's index, including its blind spots."
+      },
+      {
+        "q": "How current is the data?",
+        "a": "Each domain is fetched on demand and then cached for seven days. The result shows the timestamp of the snapshot and whether you are looking at a cached copy or a freshly fetched one."
+      },
+      {
+        "q": "Why do I only see five links?",
+        "a": "The free preview shows the top five links by source rank. A single refresh stores up to 100 link rows per domain, and that fuller set is what the account-based analysis displays."
+      },
+      {
+        "q": "Why do these numbers differ from another backlink tool?",
+        "a": "Every backlink index is built by crawling, and each vendor crawls a different slice of the web. Different indexes produce different totals, so compare a tool against itself over time rather than expecting two vendors to agree."
+      },
+      {
+        "q": "Do I need an account to check a domain?",
+        "a": "No. Enter a domain and run the check. An account is only needed for the full backlink analysis workspace."
+      },
+      {
+        "q": "Is there a limit on how many domains I can check?",
+        "a": "Yes. New domain lookups are limited per visitor and there is a shared daily budget, which is what keeps the tool open to everyone without a paywall. Re-checking a domain that is already cached is free and does not count against that limit."
+      },
+      {
+        "q": "Can I check a competitor's backlinks?",
+        "a": "Yes. Any public domain works, whether or not you own it. The preview returns the same summary metrics, which is usually enough to see whether a competitor has a materially stronger link profile."
+      }
+    ],
+    "related": {
+      "eyebrow": "SEE ALSO",
+      "title": "Related pages",
+      "items": [
+        {
+          "path": "/features/backlink-analysis",
+          "title": "Backlink analysis",
+          "desc": "The full workspace: stored link rows, filters, and competitor comparison"
+        },
+        {
+          "path": "/guides/how-to-analyze-backlinks",
+          "title": "How to analyze backlinks",
+          "desc": "A step-by-step method for reading a link profile without fooling yourself"
+        },
+        {
+          "path": "/features/competitor-analysis",
+          "title": "Competitor analysis",
+          "desc": "See who ranks for your keywords and where the gap actually is"
+        },
+        {
+          "path": "/features/rank-tracking",
+          "title": "Rank tracking",
+          "desc": "Daily keyword positions, so a link change can be checked against ranking movement"
+        }
+      ]
+    },
+    "linkCard": {
+      "eyebrow": "FREE TOOL",
+      "title": "Free backlink checker",
+      "desc": "Check your own domain first: run a real preview with no account and see whether the profile is worth a deeper look"
+    },
+    "cta": {
+      "title": "Want deeper backlink analysis?",
+      "subtitle": "The checker stops at the preview. SeeO keeps the full link profile, the filters, and the competitor comparison in one workspace.",
+      "primary": "See the full backlink analysis",
+      "secondary": "Start free"
     }
   },
   "notFoundPage": {

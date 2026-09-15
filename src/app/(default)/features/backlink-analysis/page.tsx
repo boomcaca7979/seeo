@@ -15,7 +15,8 @@ import {
 // 文案全部走 messages（backlinks / featureShared），metadata 由 [locale] 页面按 locale 生成。
 // 结构：定位 → 工作方式 → 数据字段 → 概况解读 → 工作流 → 与免费即时工具的差异 → 适用与限制 → FAQ
 // 与 rank-tracking（持续测量）区分：本页是「外链概况的读取与跨时间对比」。
-// 定位必须诚实：SeeO 不是免登录的即时 checker，而是存储并对比外链概况的 SaaS 能力。
+// 定位必须诚实：免费预览由 /tools/backlink-checker 承担（免登录、可拿到真实结果），
+// 本页承担的是完整分析工作台（留存记录、筛选、竞品对比），需要账号与 Pro 计划。
 
 type NamedItem = { name: string; body: string };
 type Step = { n: string; title: string; body: string };
@@ -222,6 +223,16 @@ export default async function BacklinkAnalysisFeaturePage() {
           <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
             {t("positioning.intro")}
           </p>
+          {/* 免费工具入口：正面回应「搜索者期待免费 checker，而完整分析需要账号」这一落差 */}
+          <p className="mb-4 font-mono text-xs text-ink-40">
+            {s("toolCard")}{" · "}
+            <Link
+              href={localePath(locale, "/tools/backlink-checker")}
+              className="text-brand underline-offset-2 hover:underline"
+            >
+              {t("freeTool.cta")}
+            </Link>
+          </p>
           <div className="space-y-3">
             {positioning.map((item) => (
               <div key={item.name} className="card-a p-4">
@@ -295,8 +306,16 @@ export default async function BacklinkAnalysisFeaturePage() {
           ))}
         </div>
 
-        {/* Supporting guide (contextual internal link) */}
-        <div className="mt-4">
+        {/* Free tool + supporting guide（Tool ↔ Feature ↔ Guide 主题集群的内链出口） */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Link
+            href={localePath(locale, "/tools/backlink-checker")}
+            className="card-a block p-4 transition-colors hover:border-brand"
+          >
+            <span className="font-mono text-xs text-brand">{s("toolCard")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">{t("freeTool.title")}</h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">{t("freeTool.desc")}</p>
+          </Link>
           <Link
             href={localePath(locale, "/guides/how-to-analyze-backlinks")}
             className="card-a block p-4 transition-colors hover:border-brand"

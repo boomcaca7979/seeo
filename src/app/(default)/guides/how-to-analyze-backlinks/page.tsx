@@ -20,6 +20,7 @@ type GuideStep = { n: string; title: string; body: string; why: string };
 
 export default async function GuideBacklinkAnalysisPage() {
   const t = await getTranslations("guideBacklinkAnalysis");
+  const tb = await getTranslations("backlinkChecker");
   const locale = (await getLocale()) as "en" | "zh";
   const path = "/guides/how-to-analyze-backlinks";
   const lpath = localePath(locale, path);
@@ -157,6 +158,18 @@ export default async function GuideBacklinkAnalysisPage() {
               </p>
             </Link>
           ))}
+        </div>
+
+        {/* Free tool（Guide → Tool 内链，Guide ↔ Tool ↔ Feature 集群的一部分） */}
+        <div className="mt-4">
+          <Link
+            href={localePath(locale, "/tools/backlink-checker")}
+            className="card-a block p-4 transition-colors hover:border-brand"
+          >
+            <span className="font-mono text-xs text-brand">{tb("linkCard.eyebrow")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">{tb("linkCard.title")}</h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">{tb("linkCard.desc")}</p>
+          </Link>
         </div>
 
         {/* CTA */}

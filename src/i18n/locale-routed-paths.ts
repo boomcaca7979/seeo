@@ -17,6 +17,7 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/guides/how-to-do-a-technical-seo-audit",
   "/guides/how-to-track-keyword-rankings",
   "/guides/how-to-analyze-backlinks",
+  "/tools/backlink-checker",
   "/about",
   "/privacy",
   "/terms",

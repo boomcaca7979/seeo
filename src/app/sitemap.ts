@@ -29,6 +29,7 @@ const bilingualPaths = [
   "/guides/how-to-do-a-technical-seo-audit",
   "/guides/how-to-track-keyword-rankings",
   "/guides/how-to-analyze-backlinks",
+  "/tools/backlink-checker",
   "/privacy",
   "/terms",
   "/refund",
