@@ -853,6 +853,10 @@
     },
     "positioning": {
       "intro": "Search results for backlink tools are full of free instant checkers. It is worth being explicit about what SeeO is and is not.",
+      "unavailableFirst": {
+        "name": "Full analysis behind the account",
+        "body": "The complete backlink workflow — stored link rows, filtering, comparison over time, and competitor analysis — runs inside the signed-in workspace. A public no-login checker is planned, but it is not open yet, so there is no free preview to hand out today."
+      },
       "items": [
         {
           "name": "Free preview up front, full analysis behind the account",
@@ -3372,6 +3376,18 @@
     "meta": {
       "title": "Free Backlink Checker - Check Any Domain's Backlinks | SeeO",
       "description": "Check backlinks on any domain for free: total backlinks, referring domains, Domain Rank, and a sample of the strongest linking pages. No account needed."
+    },
+    "metaUnavailable": {
+      "title": "Free Backlink Checker - Not Open Yet | SeeO",
+      "description": "The free backlink checker is not open yet: production access to our backlink data provider is still being set up, so this page does not return real backlink data today."
+    },
+    "unavailable": {
+      "badge": "FREE TOOL · NOT OPEN YET",
+      "heading": "Free Backlink Checker (not open yet)",
+      "body": "This public checker is not open yet. It is built to return real backlink data from our data provider, and that production access is still being set up — so we are keeping the page out of the public index instead of publishing a tool that cannot return real results.",
+      "status": "STATUS · NOT AVAILABLE YET",
+      "explain": "No backlink data is shown on this page, and nothing here is a demo or placeholder result.",
+      "cta": "See the full backlink analysis capability"
     },
     "eyebrow": "FREE TOOL",
     "title": "Free Backlink Checker",

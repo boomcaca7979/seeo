@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { alternatesFor, localePath, localeUrl, hreflangAlternates, SITE_URL } from "./seo";
 import { localeToHreflang, localeToHtmlLang, localeToOgLocale } from "./config";
 import { isLocaleRoutedPath, stripLocalePrefix, LOCALE_ROUTED_PATHS } from "./locale-routed-paths";
+import { isPublicPathEnabled, DISABLED_PUBLIC_PATHS } from "../lib/seo/public-tools";
 import {
   organizationSchema,
   websiteSchema,
@@ -19,6 +20,10 @@ import robotsFn from "../app/robots";
 // 直接派生自 locale 路由白名单：sitemap 与 LOCALE_ROUTED_PATHS 必须始终同步，
 // 新增营销页只改白名单即可，避免再次出现「加了页面但断言数量没跟上」的漂移。
 const MARKETING_PATHS = [...LOCALE_ROUTED_PATHS];
+
+// sitemap 收录范围 = 营销路径 − 当前暂缓上线的公开工具页
+// （暂缓上线的页面仍可直达，但不应作为正式 SEO 落地页被收录）
+const SITEMAP_PATHS = MARKETING_PATHS.filter((p) => isPublicPathEnabled(p));
 
 describe("1. canonical（alternatesFor）", () => {
   it("EN canonical = 无前缀自身路径", () => {
@@ -171,12 +176,19 @@ describe("6. sitemap URL 集合", () => {
   const entries = sitemapFn();
   const urls = entries.map((e) => new URL(e.url).pathname);
 
-  it("收录 EN+ZH 成对 URL（数量与 MARKETING_PATHS 派生一致）", () => {
-    // 双语营销路径（源自 LOCALE_ROUTED_PATHS）× 2 locale
-    expect(entries.length).toBe(MARKETING_PATHS.length * 2);
-    for (const p of MARKETING_PATHS) {
+  it("收录 EN+ZH 成对 URL（数量与营销路径派生一致）", () => {
+    // 双语营销路径（源自 LOCALE_ROUTED_PATHS，扣除暂缓上线项）× 2 locale
+    expect(entries.length).toBe(SITEMAP_PATHS.length * 2);
+    for (const p of SITEMAP_PATHS) {
       expect(urls).toContain(p);
       expect(urls).toContain(p === "/" ? "/zh" : `/zh${p}`);
+    }
+  });
+
+  it("暂缓上线的公开路径不进入 sitemap（EN/ZH 均不收录）", () => {
+    for (const p of DISABLED_PUBLIC_PATHS) {
+      expect(urls, `${p} 不应被 sitemap 收录`).not.toContain(p);
+      expect(urls, `/zh${p} 不应被 sitemap 收录`).not.toContain(`/zh${p}`);
     }
   });
 

@@ -9,12 +9,14 @@ import {
   webPageSchema,
   articleSchema,
 } from "@/lib/seo/schema";
+import { BACKLINK_CHECKER_ENABLED } from "@/lib/seo/public-tools";
 
 // ===== /guides/how-to-analyze-backlinks 内容组件（en / zh）=====
 // 信息型指南（Informational intent）：外链分析 / 外链概况解读的可复用流程 + FAQ。
 // FAQ 仅渲染于 DOM，不输出 FAQPage JSON-LD。
 // 文案走 messages（guideBacklinkAnalysis），metadata 由 [locale] 页面按 locale 生成。
 // JSON-LD：WebPage + BreadcrumbList + Article（无 FAQPage）。
+// 注：Guide → Tool 的免费工具入口在工具暂缓上线期间下线（见 src/lib/seo/public-tools.ts）。
 
 type GuideStep = { n: string; title: string; body: string; why: string };
 
@@ -160,17 +162,22 @@ export default async function GuideBacklinkAnalysisPage() {
           ))}
         </div>
 
-        {/* Free tool（Guide → Tool 内链，Guide ↔ Tool ↔ Feature 集群的一部分） */}
-        <div className="mt-4">
-          <Link
-            href={localePath(locale, "/tools/backlink-checker")}
-            className="card-a block p-4 transition-colors hover:border-brand"
-          >
-            <span className="font-mono text-xs text-brand">{tb("linkCard.eyebrow")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">{tb("linkCard.title")}</h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{tb("linkCard.desc")}</p>
-          </Link>
-        </div>
+        {/* Free tool（Guide → Tool 内链，Guide ↔ Tool ↔ Feature 集群的一部分）
+            工具暂缓上线期间下线该入口，恢复开关后自动回到集群内链。 */}
+        {BACKLINK_CHECKER_ENABLED && (
+          <div className="mt-4">
+            <Link
+              href={localePath(locale, "/tools/backlink-checker")}
+              className="card-a block p-4 transition-colors hover:border-brand"
+            >
+              <span className="font-mono text-xs text-brand">{tb("linkCard.eyebrow")}</span>
+              <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+                {tb("linkCard.title")}
+              </h3>
+              <p className="mt-1 font-sans text-xs text-ink-60">{tb("linkCard.desc")}</p>
+            </Link>
+          </div>
+        )}
 
         {/* CTA */}
         <div className="mt-8 card-a p-6 text-center">

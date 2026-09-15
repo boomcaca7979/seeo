@@ -10,6 +10,7 @@ import {
   faqPageSchema,
   featureAppSchema,
 } from "@/lib/seo/schema";
+import { BACKLINK_CHECKER_ENABLED } from "@/lib/seo/public-tools";
 
 // ===== /features/backlink-analysis 内容组件（en: /features/backlink-analysis · zh: /zh/features/backlink-analysis）=====
 // 文案全部走 messages（backlinks / featureShared），metadata 由 [locale] 页面按 locale 生成。
@@ -17,6 +18,10 @@ import {
 // 与 rank-tracking（持续测量）区分：本页是「外链概况的读取与跨时间对比」。
 // 定位必须诚实：免费预览由 /tools/backlink-checker 承担（免登录、可拿到真实结果），
 // 本页承担的是完整分析工作台（留存记录、筛选、竞品对比），需要账号与 Pro 计划。
+//
+// ⚠️ 免费工具当前暂缓上线（见 src/lib/seo/public-tools.ts）：
+//   本页不得再声明「已有免登录免费预览」——相关入口与话术按开关下线，
+//   等工具真正可用时自动恢复。不虚构可用状态，也不改成假 demo。
 
 type NamedItem = { name: string; body: string };
 type Step = { n: string; title: string; body: string };
@@ -37,7 +42,18 @@ export default async function BacklinkAnalysisFeaturePage() {
   const linkMetrics = t.raw("metrics.linkLevel") as NamedItem[];
   const reading = t.raw("reading.items") as NamedItem[];
   const workflow = t.raw("workflow.steps") as Step[];
-  const positioning = t.raw("positioning.items") as NamedItem[];
+  const positioningRaw = t.raw("positioning.items") as NamedItem[];
+  // 免费工具暂缓上线时，「免登录即可跑免费预览」不再成立 → 用如实的现状说明替换该条
+  const positioning: NamedItem[] = BACKLINK_CHECKER_ENABLED
+    ? positioningRaw
+    : positioningRaw.map((item, index) =>
+        index === 0
+          ? {
+              name: t("positioning.unavailableFirst.name"),
+              body: t("positioning.unavailableFirst.body"),
+            }
+          : item
+      );
 
   const relatedMap: Array<[string, string]> = [
     ["seo-audit", "seoAudit"],
@@ -223,16 +239,19 @@ export default async function BacklinkAnalysisFeaturePage() {
           <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
             {t("positioning.intro")}
           </p>
-          {/* 免费工具入口：正面回应「搜索者期待免费 checker，而完整分析需要账号」这一落差 */}
-          <p className="mb-4 font-mono text-xs text-ink-40">
-            {s("toolCard")}{" · "}
-            <Link
-              href={localePath(locale, "/tools/backlink-checker")}
-              className="text-brand underline-offset-2 hover:underline"
-            >
-              {t("freeTool.cta")}
-            </Link>
-          </p>
+          {/* 免费工具入口：正面回应「搜索者期待免费 checker，而完整分析需要账号」这一落差。
+              工具暂缓上线期间不对外导流（避免把访客带到不可用的页面）。 */}
+          {BACKLINK_CHECKER_ENABLED && (
+            <p className="mb-4 font-mono text-xs text-ink-40">
+              {s("toolCard")}{" · "}
+              <Link
+                href={localePath(locale, "/tools/backlink-checker")}
+                className="text-brand underline-offset-2 hover:underline"
+              >
+                {t("freeTool.cta")}
+              </Link>
+            </p>
+          )}
           <div className="space-y-3">
             {positioning.map((item) => (
               <div key={item.name} className="card-a p-4">
@@ -306,16 +325,21 @@ export default async function BacklinkAnalysisFeaturePage() {
           ))}
         </div>
 
-        {/* Free tool + supporting guide（Tool ↔ Feature ↔ Guide 主题集群的内链出口） */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Link
-            href={localePath(locale, "/tools/backlink-checker")}
-            className="card-a block p-4 transition-colors hover:border-brand"
-          >
-            <span className="font-mono text-xs text-brand">{s("toolCard")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">{t("freeTool.title")}</h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("freeTool.desc")}</p>
-          </Link>
+        {/* Free tool + supporting guide（Tool ↔ Feature ↔ Guide 主题集群的内链出口）
+            工具暂缓上线期间只保留 Guide 出口，恢复开关后自动回到双卡布局。 */}
+        <div className={BACKLINK_CHECKER_ENABLED ? "mt-4 grid gap-3 sm:grid-cols-2" : "mt-4"}>
+          {BACKLINK_CHECKER_ENABLED && (
+            <Link
+              href={localePath(locale, "/tools/backlink-checker")}
+              className="card-a block p-4 transition-colors hover:border-brand"
+            >
+              <span className="font-mono text-xs text-brand">{s("toolCard")}</span>
+              <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+                {t("freeTool.title")}
+              </h3>
+              <p className="mt-1 font-sans text-xs text-ink-60">{t("freeTool.desc")}</p>
+            </Link>
+          )}
           <Link
             href={localePath(locale, "/guides/how-to-analyze-backlinks")}
             className="card-a block p-4 transition-colors hover:border-brand"

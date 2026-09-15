@@ -6,9 +6,13 @@
 //   - 每条 entry 附 hreflang alternates（en / zh-CN / x-default）
 //   - 不收录 /en/*、/app、/payment、/api
 //   - 不收录 /login、/signup：认证工具页（noindex），对搜索无价值
+//   - 不收录「暂缓上线」的公开工具页（见 src/lib/seo/public-tools.ts）：
+//     provider 未配置时工具拿不到真实结果，不应作为正式 SEO 落地页对外收录；
+//     启用后自动恢复收录，无需改动本文件结构。
 //   - URL canonical 形式统一不带尾部斜杠（EN 首页 = SITE_URL 本身）
 
 import type { MetadataRoute } from "next";
+import { DISABLED_PUBLIC_PATHS } from "@/lib/seo/public-tools";
 
 const SITE_URL = "https://www.seeo.asia";
 
@@ -36,6 +40,9 @@ const bilingualPaths = [
   "/contact",
 ];
 
+/** 实际收录进 sitemap 的路径：排除当前暂缓上线的公开工具页 */
+const sitemapPaths = bilingualPaths.filter((p) => !DISABLED_PUBLIC_PATHS.includes(p));
+
 function alternatesFor(path: string): MetadataRoute.Sitemap[number]["alternates"] {
   return {
     languages: {
@@ -50,7 +57,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
   const bilingual: MetadataRoute.Sitemap = [];
-  for (const path of bilingualPaths) {
+  for (const path of sitemapPaths) {
     const enPath = path === "/" ? "" : path;
     const zhPath = path === "/" ? "/zh" : `/zh${path}`;
     const priority = path === "/" ? 1.0 : 0.7;
