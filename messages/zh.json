@@ -3038,9 +3038,9 @@
       { "q": "SeeO 能和 Semrush 一起用吗？", "a": "可以。很多团队用 SeeO 做 AI 搜索监控与 MCP 智能体接入，同时保留 Semrush 的数据库——二者并不互斥。" }
     ],
     "related": {
-      "keywordResearch": { "title": "关键词研究 →", "desc": "SeeO 的关键词扩展与指标" },
-      "competitorAnalysis": { "title": "竞品分析 →", "desc": "与竞品的关键词差距" },
-      "seoAudit": { "title": "技术 SEO 审计 →", "desc": "20+ 项检查与健康分" }
+      "keyword-research": { "title": "关键词研究 →", "desc": "SeeO 的关键词扩展与指标" },
+      "competitor-analysis": { "title": "竞品分析 →", "desc": "与竞品的关键词差距" },
+      "seo-audit": { "title": "技术 SEO 审计 →", "desc": "20+ 项检查与健康分" }
     },
     "cta": { "title": "免费试用 SeeO", "subtitle": "从免费版开始，无需信用卡" }
   },
@@ -3082,9 +3082,9 @@
       { "q": "SeeO 能和 Ahrefs 一起用吗？", "a": "可以。很多团队用 SeeO 做 AI 搜索监控与 MCP 智能体接入，同时保留 Ahrefs 的外链索引——二者并不互斥。" }
     ],
     "related": {
-      "keywordResearch": { "title": "关键词研究 →", "desc": "SeeO 的关键词扩展与指标" },
-      "contentOptimization": { "title": "内容优化 →", "desc": "给页面做页面 SEO 评分" },
-      "seoAudit": { "title": "技术 SEO 审计 →", "desc": "20+ 项检查与健康分" }
+      "keyword-research": { "title": "关键词研究 →", "desc": "SeeO 的关键词扩展与指标" },
+      "content-optimization": { "title": "内容优化 →", "desc": "给页面做页面 SEO 评分" },
+      "seo-audit": { "title": "技术 SEO 审计 →", "desc": "20+ 项检查与健康分" }
     },
     "cta": { "title": "免费试用 SeeO", "subtitle": "从免费版开始，无需信用卡" }
   },
@@ -3115,9 +3115,9 @@
       { "q": "怎么知道修复起效了？", "a": "再跑一次审计，把健康分与问题数和上一次对比。再配合排名追踪，就能把一个修复和一次排名变化连起来。" }
     ],
     "related": {
-      "seoAudit": { "title": "技术 SEO 审计工具 →", "desc": "一键跑 20+ 项检查" },
-      "keywordResearch": { "title": "关键词研究 →", "desc": "找到值得做的词" },
-      "contentOptimization": { "title": "内容优化 →", "desc": "给页面做页面 SEO 评分" }
+      "seo-audit": { "title": "技术 SEO 审计工具 →", "desc": "一键跑 20+ 项检查" },
+      "keyword-research": { "title": "关键词研究 →", "desc": "找到值得做的词" },
+      "content-optimization": { "title": "内容优化 →", "desc": "给页面做页面 SEO 评分" }
     },
     "cta": { "title": "免费跑一次技术审计", "subtitle": "SeeO 免费版包含单页快速审计" }
   },

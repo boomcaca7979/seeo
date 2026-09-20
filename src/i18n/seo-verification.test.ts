@@ -3,6 +3,8 @@
 //       sitemap URL 集合（EN+ZH 成对、无 /en、无私有路径）/ robots / llms.txt
 
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { alternatesFor, localePath, localeUrl, hreflangAlternates, SITE_URL } from "./seo";
 import { localeToHreflang, localeToHtmlLang, localeToOgLocale } from "./config";
 import { isLocaleRoutedPath, stripLocalePrefix, LOCALE_ROUTED_PATHS } from "./locale-routed-paths";
@@ -267,5 +269,58 @@ describe("9. localePath 边界", () => {
     expect(localePath("zh", "/")).toBe("/zh");
     expect(localePath("en", "/pricing")).toBe("/pricing");
     expect(localePath("zh", "/pricing")).toBe("/zh/pricing");
+  });
+});
+
+// ===== 10. 内链 slug 契约 =====
+// AlternativesPageContent 与 how-to-do-a-technical-seo-audit 指南把 messages 中
+// related 对象的「键」直接当作 /features/<slug> 使用（key == slug，见
+// `Object.entries(related).map(([slug]) => localePath(locale, `/features/${slug}`))`）。
+// 因此这些命名空间的键必须与真实路由段一致（小写 kebab），否则会静默渲染出 404 内链。
+// 回归背景：2026-09-14 批次使用了 camelCase 键，导致 /features/seoAudit 等 404。
+// 注意：仅这 3 个命名空间走「键即 slug」；其余命名空间的 related 键由页面的
+// relatedKeys 映射表按 camelCase 查找，改动它们会破坏那些页面。
+const SLUG_CONSUMED_NAMESPACES = [
+  "alternativesSemrush",
+  "alternativesAhrefs",
+  "guideTechnicalSeoAudit",
+] as const;
+
+describe("10. 内链 slug 契约（messages 键 == 真实路由段）", () => {
+  const readMessages = (loc: string): Record<string, { related: Record<string, unknown> }> =>
+    JSON.parse(readFileSync(join(process.cwd(), "messages", `${loc}.json`), "utf8"));
+
+  it("slug 型 related 键必须为小写 kebab（不得含大写字母）", () => {
+    for (const loc of ["en", "zh"]) {
+      const messages = readMessages(loc);
+      for (const ns of SLUG_CONSUMED_NAMESPACES) {
+        for (const key of Object.keys(messages[ns].related)) {
+          expect(
+            key,
+            `${loc}.${ns}.related 的键 "${key}" 不能含大写字母（该键会被直接当作 URL slug）`
+          ).toBe(key.toLowerCase());
+        }
+      }
+    }
+  });
+
+  it("每个 slug 键都对应真实存在的 features 路由目录", () => {
+    const messages = readMessages("en");
+    for (const ns of SLUG_CONSUMED_NAMESPACES) {
+      for (const slug of Object.keys(messages[ns].related)) {
+        for (const group of ["(default)", "[locale]"]) {
+          const dir = join(process.cwd(), "src", "app", group, "features", slug);
+          expect(existsSync(dir), `缺少路由目录 src/app/${group}/features/${slug}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("EN / ZH 的 related 键集合一致", () => {
+    const en = readMessages("en");
+    const zh = readMessages("zh");
+    for (const ns of SLUG_CONSUMED_NAMESPACES) {
+      expect(Object.keys(zh[ns].related)).toEqual(Object.keys(en[ns].related));
+    }
   });
 });

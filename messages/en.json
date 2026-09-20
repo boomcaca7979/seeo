@@ -3045,9 +3045,9 @@
       { "q": "Can I use SeeO alongside Semrush?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Semrush for its databases — they are not mutually exclusive." }
     ],
     "related": {
-      "keywordResearch": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
-      "competitorAnalysis": { "title": "Competitor Analysis →", "desc": "Keyword gap vs rivals" },
-      "seoAudit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+      "keyword-research": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
+      "competitor-analysis": { "title": "Competitor Analysis →", "desc": "Keyword gap vs rivals" },
+      "seo-audit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
     },
     "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
   },
@@ -3089,9 +3089,9 @@
       { "q": "Can I use SeeO alongside Ahrefs?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Ahrefs for its backlink index — they are not mutually exclusive." }
     ],
     "related": {
-      "keywordResearch": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
-      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" },
-      "seoAudit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+      "keyword-research": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
+      "content-optimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" },
+      "seo-audit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
     },
     "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
   },
@@ -3122,9 +3122,9 @@
       { "q": "How do I know if my fixes worked?", "a": "Re-run the audit and compare the health score and issue count against the previous run. Pair it with rank tracking so you can connect a fix to a ranking change." }
     ],
     "related": {
-      "seoAudit": { "title": "Technical SEO Audit Tool →", "desc": "Run 20+ checks automatically" },
-      "keywordResearch": { "title": "Keyword Research →", "desc": "Find terms worth targeting" },
-      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" }
+      "seo-audit": { "title": "Technical SEO Audit Tool →", "desc": "Run 20+ checks automatically" },
+      "keyword-research": { "title": "Keyword Research →", "desc": "Find terms worth targeting" },
+      "content-optimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" }
     },
     "cta": { "title": "Run a free technical audit", "subtitle": "SeeO's free plan includes single-page quick audits" }
   },
