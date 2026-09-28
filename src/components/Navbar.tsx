@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Link as LocaleLink } from "@/i18n/routing";
+import { Link as LocaleLink, useRouter } from "@/i18n/routing";
 import { isLocaleRoutedPath, stripLocalePrefix } from "@/i18n/locale-routed-paths";
 import { localePath } from "@/i18n/seo";
 import { isAuthEnabled } from "@/lib/auth-config";
@@ -52,6 +52,16 @@ export default function Navbar() {
     otherLocale,
     stripLocalePrefix(effectivePath ?? "/")
   );
+
+  // 语言切换必须经 next-intl 的 client router：它会在导航前写 NEXT_LOCALE cookie
+  // （syncLocaleCookie），否则 next-intl middleware 会按 Accept-Language 把
+  // 无前缀英文 URL（/、/pricing）307 回 /zh —— 表现为「点了没反应」。
+  // href 仍保留（右键新标签 / JS 未接管时的兜底），preventDefault 后由 router 接管。
+  const router = useRouter();
+  const switchLocale = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.replace(stripLocalePrefix(effectivePath ?? "/"), { locale: otherLocale });
+  };
 
   // Session 感知：loading 时不渲染「登录」，避免已登录用户看到误导性登录入口
   const [authState, setAuthState] = useState<"loading" | "authed" | "anon">("loading");
@@ -144,6 +154,7 @@ export default function Navbar() {
           {showLangSwitch && (
             <Link
               href={switchHref}
+              onClick={switchLocale}
               className="font-mono text-xs font-medium text-ink-60 transition-colors hover:text-ink"
             >
               {t("switchLang")}
@@ -251,7 +262,10 @@ export default function Navbar() {
               {showLangSwitch && (
                 <Link
                   href={switchHref}
-                  onClick={closeMobile}
+                  onClick={(e) => {
+                    closeMobile();
+                    switchLocale(e);
+                  }}
                   className="block py-2 font-mono text-xs font-medium text-ink-60 transition-colors hover:text-ink"
                 >
                   {t("switchLang")}

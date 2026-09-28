@@ -48,3 +48,7 @@ next-env.d.ts
 /data/*.db-journal
 /data/*.db-wal
 /data/*.db-shm
+
+# E｜潜客数据库（内部数据，含真实联系人邮箱，禁止提交/禁止进 client bundle）
+/seo-growth/leads.csv
+/seo-growth/leads.csv.tmp

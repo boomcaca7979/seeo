@@ -1,0 +1,537 @@
+// ===== E｜潜客数据库（Lead Master）测试 =====
+// 覆盖验收 1–12：新增、去重、状态机、suppression、跟进、特定问题、
+// 模板关联、归因、历史数据不丢、访问控制。
+// 存储测试全部在临时目录中进行，绝不碰真实的 seo-growth/leads.csv。
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import {
+  LEAD_FIELDS,
+  LEAD_STATUSES,
+  LEAD_TYPES,
+  LEAD_TEMPLATE_IDS,
+  STATUS_TRANSITIONS,
+  emptyLead,
+  isDateOnly,
+  type Lead,
+} from "./schema";
+import { normalizeDomain, normalizeEmail, normalizeLeadType, makeLeadId } from "./normalize";
+import { parseCsv, serializeCsv } from "./csv";
+import {
+  buildLeadAuditUrl,
+  canTransition,
+  checkTransition,
+  dueFollowUps,
+  fillAttribution,
+  isFollowUpDue,
+  isFollowUpEligible,
+  isSuppressed,
+  nextFollowUpStatus,
+  validateLead,
+} from "./pipeline";
+import { LEAD_MASTER_RELATIVE_PATH, addLead, readLeads, searchLeads, updateLead, writeLeads } from "./store";
+
+// ---------------- 临时工作目录 ----------------
+let tmp: string;
+beforeEach(() => {
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "seeo-leads-"));
+});
+afterEach(() => {
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+function baseLead(overrides: Partial<Lead> = {}): Lead {
+  const l = emptyLead();
+  l.website = "example.com";
+  l.company = "Example Inc";
+  l.contact_name = "Yuki";
+  l.email = "yuki@example.com";
+  l.lead_type = "SaaS";
+  l.specific_issue = "Duplicate title tags on /pricing and /";
+  l.status = "New";
+  return { ...l, ...overrides };
+}
+
+// ================= E1 / E2：主库与数据模型 =================
+describe("E1/E2 主库与数据模型", () => {
+  it("Lead Master 只有一份，路径固定且不落在 public/", () => {
+    expect(LEAD_MASTER_RELATIVE_PATH).toBe("seo-growth/leads.csv");
+    expect(LEAD_MASTER_RELATIVE_PATH.startsWith("public/")).toBe(false);
+    expect(LEAD_MASTER_RELATIVE_PATH.startsWith("src/app")).toBe(false);
+  });
+
+  it("字段覆盖 identity / classification / seo / marketing / pipeline / notes 六大组", () => {
+    const required = [
+      // identity
+      "lead_id", "website", "company", "contact_name", "email", "role",
+      // classification
+      "lead_type", "company_size", "industry",
+      // seo
+      "specific_issue", "issue_type", "audit_url", "audit_date",
+      // marketing
+      "source", "campaign", "template", "utm_content",
+      "first_contacted_at", "last_contacted_at", "next_followup_at",
+      // pipeline
+      "status", "reply_status", "interest", "signup", "activation", "paid",
+      // notes
+      "notes", "last_action", "next_action",
+    ];
+    for (const f of required) expect(LEAD_FIELDS).toContain(f);
+  });
+
+  it("新增 Lead 可持久化并原样读回（含中文与逗号）", () => {
+    const r = addLead({
+      website: "https://www.Example.com/",
+      company: "示例公司",
+      contact_name: "Yuki",
+      email: "Yuki@Example.com",
+      lead_type: "SaaS",
+      specific_issue: "首页 title 与 /pricing 重复",
+      notes: "注意：含逗号, 与引号\"",
+      status: "New",
+    }, { cwd: tmp });
+
+    expect(r.ok).toBe(true);
+    const rows = readLeads(tmp);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].company).toBe("示例公司");
+    expect(rows[0].notes).toBe("注意：含逗号, 与引号\"");
+    expect(rows[0].email).toBe("yuki@example.com"); // 已归一化
+    expect(rows[0].lead_id).toBeTruthy();
+    expect(rows[0].created_at).toBeTruthy();
+  });
+
+  it("字段校验：非法 status / lead_type / 日期会被拒绝", () => {
+    const l = baseLead({ status: "Contacted Already" as never });
+    expect(validateLead(l).some((i) => i.field === "status")).toBe(true);
+
+    const l2 = baseLead({ lead_type: "saas company" as never });
+    expect(validateLead(l2).some((i) => i.field === "lead_type")).toBe(true);
+
+    const l3 = baseLead({ next_followup_at: "28/09/2026" });
+    expect(validateLead(l3).some((i) => i.field === "next_followup_at")).toBe(true);
+  });
+});
+
+// ================= E3：Lead Type 标准化 =================
+describe("E3 Lead 类型标准化", () => {
+  it("常见随手写法都能收敛到标准值", () => {
+    expect(normalizeLeadType("saas")).toBe("SaaS");
+    expect(normalizeLeadType("SaaS company")).toBe("SaaS");
+    expect(normalizeLeadType("software")).toBe("SaaS");
+    expect(normalizeLeadType("SEO agency")).toBe("Agency");
+    expect(normalizeLeadType("freelancer")).toBe("SEO Freelancer");
+    expect(normalizeLeadType("e-commerce")).toBe("Ecommerce");
+    expect(normalizeLeadType("content site")).toBe("Content Site");
+  });
+
+  it("无法识别的输入返回 null（要求人工选择，不猜成 Other）", () => {
+    expect(normalizeLeadType("区块链公司")).toBeNull();
+    expect(normalizeLeadType("")).toBeNull();
+  });
+
+  it("标准集合固定为 9 类", () => {
+    expect([...LEAD_TYPES]).toEqual([
+      "SaaS", "Agency", "SEO Freelancer", "Blog", "Affiliate",
+      "Ecommerce", "Content Site", "Startup", "Other",
+    ]);
+  });
+});
+
+// ================= E4：状态机 =================
+describe("E4 Status pipeline", () => {
+  it("完整链路可走通：New → Ready to Contact → Contacted → Follow-up 1 → Follow-up 2 → Replied", () => {
+    const chain: Array<[string, string]> = [
+      ["New", "Ready to Contact"],
+      ["Ready to Contact", "Contacted"],
+      ["Contacted", "Follow-up 1"],
+      ["Follow-up 1", "Follow-up 2"],
+      ["Follow-up 2", "Replied"],
+    ];
+    for (const [from, to] of chain) expect(canTransition(from, to)).toBe(true);
+    expect(LEAD_STATUSES).toContain("Paid");
+  });
+
+  it("非法迁移被拒绝（New → Paid）", () => {
+    expect(canTransition("New", "Paid")).toBe(false);
+    const r = updateLead("L1", { status: "Paid" }, { cwd: tmp });
+    expect(r.ok).toBe(false); // 连 lead 都不存在，先被拦
+  });
+
+  it("Contacted = 已发首封：必须有 specific_issue 与 template", () => {
+    const noIssue = baseLead({ status: "Ready to Contact", specific_issue: "" });
+    expect(checkTransition(noIssue, "Contacted").ok).toBe(false);
+
+    const noTemplate = baseLead({ status: "Ready to Contact", template: "" });
+    expect(checkTransition(noTemplate, "Contacted").ok).toBe(false);
+
+    const ok = baseLead({ status: "Ready to Contact", template: "A_website_issue_v1" });
+    expect(checkTransition(ok, "Contacted").ok).toBe(true);
+  });
+
+  it("Replied ≠ Interested：两个状态独立存在，语义不合并", () => {
+    expect(LEAD_STATUSES).toContain("Replied");
+    expect(LEAD_STATUSES).toContain("Interested");
+    expect(canTransition("Replied", "Interested")).toBe(true);
+    // 回复了不代表有兴趣，因此 Replied 不应自动等于 Interested
+    expect(canTransition("Replied", "Trial")).toBe(false);
+  });
+
+  it("每个状态都定义了明确的后继集合", () => {
+    for (const s of LEAD_STATUSES) {
+      expect(Array.isArray(STATUS_TRANSITIONS[s]), `${s} 缺少迁移定义`).toBe(true);
+    }
+  });
+});
+
+// ================= E5：去重 =================
+describe("E5 去重", () => {
+  it("www / 大小写 / 端口差异识别为同一 website，不产生第二条", () => {
+    expect(normalizeDomain("https://www.Example.com/")).toBe("example.com");
+    expect(normalizeDomain("http://example.com:8080/path")).toBe("example.com");
+    expect(normalizeDomain("example.com")).toBe("example.com");
+    expect(normalizeEmail("Yuki@Example.com")).toBe("yuki@example.com");
+
+    const first = addLead({ website: "example.com", email: "yuki@example.com", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    expect(first.ok).toBe(true);
+
+    const dup = addLead({ website: "https://www.EXAMPLE.com/", email: "YUKI@example.com", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    expect(dup.ok).toBe(false);
+    expect(dup.reason).toContain("重复");
+    expect(readLeads(tmp)).toHaveLength(1);
+  });
+
+  it("同一网站、邮箱缺失时也不产生第二条（提示去更新已有 Lead）", () => {
+    addLead({ website: "example.com", email: "", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    const dup = addLead({ website: "www.example.com", email: "", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    expect(dup.ok).toBe(false);
+    expect(readLeads(tmp)).toHaveLength(1);
+  });
+
+  it("同一网站的不同联系人：允许新增，但必须带告警（不静默）", () => {
+    addLead({ website: "example.com", email: "a@example.com", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    const second = addLead({ website: "example.com", email: "b@example.com", lead_type: "SaaS", status: "New" }, { cwd: tmp });
+    expect(second.ok).toBe(true);
+    expect(second.warnings?.[0]).toContain("同一网站已有其他联系人");
+    expect(readLeads(tmp)).toHaveLength(2);
+  });
+
+  it("lead_id 对同一 website+email 稳定（重跑不串号）", () => {
+    expect(makeLeadId("www.example.com", "A@B.com")).toBe(makeLeadId("example.com", "a@b.com"));
+  });
+});
+
+// ================= E6：真实 SEO 问题 =================
+describe("E6 Specific SEO issue", () => {
+  it("specific_issue 能保存并原样读回", () => {
+    const r = addLead({
+      website: "shop.example.com",
+      email: "hi@shop.com",
+      lead_type: "Ecommerce",
+      specific_issue: "Missing meta description on 14 category pages",
+      issue_type: "missing_meta_description",
+      audit_date: "2026-09-28",
+      status: "Researching",
+    }, { cwd: tmp });
+    expect(r.ok).toBe(true);
+    expect(readLeads(tmp)[0].specific_issue).toBe("Missing meta description on 14 category pages");
+    expect(readLeads(tmp)[0].issue_type).toBe("missing_meta_description");
+  });
+
+  it("没有记录真实问题 → 不得进入 Contacted", () => {
+    const r = addLead({ website: "x.com", email: "a@x.com", lead_type: "Blog", specific_issue: "", status: "New" }, { cwd: tmp });
+    expect(r.ok).toBe(true);
+    const id = r.lead!.lead_id;
+    const upd = updateLead(id, { status: "Contacted" }, { cwd: tmp });
+    expect(upd.ok).toBe(false);
+    expect(upd.reasons?.join(" ")).toContain("specific_issue");
+  });
+});
+
+// ================= E7：跟进 =================
+describe("E7 Follow-up", () => {
+  const TODAY = "2026-09-28";
+
+  it("首封自动写 first/last_contacted_at（走 New → Ready to Contact → Contacted）", () => {
+    const r = addLead({
+      website: "a.com", email: "a@a.com", lead_type: "SaaS",
+      specific_issue: "Duplicate title tags", template: "A_website_issue_v1", status: "New",
+    }, { cwd: tmp });
+    const id = r.lead!.lead_id;
+    expect(updateLead(id, { status: "Ready to Contact" }, { cwd: tmp }).ok).toBe(true);
+    const upd = updateLead(id, { status: "Contacted" }, { cwd: tmp, now: new Date(`${TODAY}T10:00:00Z`) });
+    expect(upd.ok).toBe(true);
+    expect(upd.lead!.first_contacted_at).toBe(TODAY);
+    expect(upd.lead!.last_contacted_at).toBe(TODAY);
+  });
+
+  it("未走 Ready to Contact 直接 New → Contacted 被拒绝（保持流程纪律）", () => {
+    const r = addLead({
+      website: "b.com", email: "b@b.com", lead_type: "SaaS",
+      specific_issue: "Missing canonical", template: "A_website_issue_v1", status: "New",
+    }, { cwd: tmp });
+    const upd = updateLead(r.lead!.lead_id, { status: "Contacted" }, { cwd: tmp });
+    expect(upd.ok).toBe(false);
+    expect(upd.reasons?.join(" ")).toContain("不允许的状态迁移");
+  });
+
+  it("下次跟进状态：Contacted → Follow-up 1 → Follow-up 2（序列到此结束）", () => {
+    expect(nextFollowUpStatus(baseLead({ status: "Contacted" }))).toBe("Follow-up 1");
+    expect(nextFollowUpStatus(baseLead({ status: "Follow-up 1" }))).toBe("Follow-up 2");
+    expect(nextFollowUpStatus(baseLead({ status: "Follow-up 2" }))).toBeNull();
+  });
+
+  it("到期可筛出今天该联系谁；未到期不出现", () => {
+    const due = baseLead({ status: "Contacted", next_followup_at: "2026-09-28" });
+    const future = baseLead({ status: "Contacted", next_followup_at: "2026-10-05" });
+    const noDate = baseLead({ status: "Contacted", next_followup_at: "" });
+    expect(isFollowUpDue(due, TODAY)).toBe(true);
+    expect(isFollowUpDue(future, TODAY)).toBe(false);
+    expect(isFollowUpDue(noDate, TODAY)).toBe(false);
+    expect(dueFollowUps([due, future, noDate], TODAY).map((l) => l.website)).toEqual([due.website]);
+  });
+
+  it("Replied / Interested / Trial / Activated / Paid 不进入普通 cold follow-up", () => {
+    for (const s of ["Replied", "Interested", "Trial", "Activated", "Paid"]) {
+      const l = baseLead({ status: s as never, next_followup_at: "2026-09-01" });
+      expect(isFollowUpEligible(l), `${s} 不应进入 follow-up`).toBe(false);
+      expect(isFollowUpDue(l, TODAY)).toBe(false);
+    }
+  });
+});
+
+// ================= E8：Suppression =================
+describe("E8 Suppression", () => {
+  it("Suppressed 永不进入 follow-up 队列", () => {
+    const l = baseLead({ status: "Suppressed", next_followup_at: "2026-09-01" });
+    expect(isSuppressed(l)).toBe(true);
+    expect(isFollowUpEligible(l)).toBe(false);
+    expect(dueFollowUps([l], "2026-09-28")).toHaveLength(0);
+  });
+
+  it("Suppressed 是终态：任何迁出都被拒绝（含 Paid / Contacted）", () => {
+    const l = baseLead({ status: "Suppressed" });
+    for (const to of ["Contacted", "New", "Paid", "Ready to Contact"]) {
+      const check = checkTransition(l, to);
+      expect(check.ok, `Suppressed → ${to} 应被拒绝`).toBe(false);
+      expect(check.reasons.join(" ")).toContain("Suppressed");
+    }
+    expect(STATUS_TRANSITIONS["Suppressed"]).toEqual([]);
+  });
+
+  it("Not Interested 也不进入 follow-up", () => {
+    expect(isFollowUpEligible(baseLead({ status: "Not Interested" }))).toBe(false);
+    expect(dueFollowUps([baseLead({ status: "Not Interested", next_followup_at: "2026-09-01" })], "2026-09-28")).toHaveLength(0);
+  });
+});
+
+// ================= E9：模板关联 =================
+describe("E9 Email template linkage", () => {
+  it("只接受 C 阶段已注册的模板 ID，不另造模板", () => {
+    expect(LEAD_TEMPLATE_IDS).toEqual([
+      "A_website_issue_v1", "B_free_audit_v1", "C_followup1_v1",
+      "D_followup2_v1", "E_saas_founder_v1", "F_agency_v1", "G_content_site_v1",
+    ]);
+
+    const ok = addLead({
+      website: "t.com", email: "t@t.com", lead_type: "Agency",
+      specific_issue: "Missing canonical", template: "F_agency_v1", status: "New",
+    }, { cwd: tmp });
+    expect(ok.ok).toBe(true);
+
+    const bad = addLead({
+      website: "u.com", email: "u@u.com", lead_type: "Agency",
+      specific_issue: "Missing canonical", template: "agency_v1", status: "New",
+    }, { cwd: tmp });
+    expect(bad.ok).toBe(false);
+    expect(bad.reasons?.join(" ")).toContain("template");
+  });
+
+  it("template 能保存并在后续更新中读回", () => {
+    const r = addLead({
+      website: "v.com", email: "v@v.com", lead_type: "Content Site",
+      specific_issue: "Thin category pages", template: "G_content_site_v1", status: "Ready to Contact",
+    }, { cwd: tmp });
+    const upd = updateLead(r.lead!.lead_id, { status: "Contacted" }, { cwd: tmp });
+    expect(upd.ok).toBe(true);
+    expect(upd.lead!.template).toBe("G_content_site_v1");
+  });
+});
+
+// ================= E10：归因 =================
+describe("E10 Attribution（复用 B/C）", () => {
+  it("审计链接携带 outbound UTM 且 utm_content 取模板", () => {
+    const l = baseLead({ template: "A_website_issue_v1" });
+    const url = buildLeadAuditUrl(l);
+    expect(url).toContain("utm_source=email");
+    expect(url).toContain("utm_medium=outbound");
+    expect(url).toContain("utm_campaign=cold_email");
+    expect(url).toContain("utm_content=A_website_issue_v1");
+  });
+
+  it("source / campaign / template 可保存，campaign 缺省为 cold_email", () => {
+    const filled = fillAttribution(baseLead({ source: "reddit", template: "B_free_audit_v1" }));
+    expect(filled.campaign).toBe("cold_email");
+    expect(filled.utm_content).toBe("B_free_audit_v1");
+    expect(filled.audit_url).toContain("utm_medium=outbound");
+  });
+
+  it("自定义 campaign 不被覆盖", () => {
+    const filled = fillAttribution(baseLead({ campaign: "reddit_outreach", template: "B_free_audit_v1" }));
+    expect(filled.campaign).toBe("reddit_outreach");
+  });
+});
+
+// ================= E11：历史数据不丢失 =================
+describe("E11 历史数据完整性", () => {
+  it("追加新 Lead 时，已有行一字不改地保留", () => {
+    const seed: Lead[] = [
+      baseLead({ lead_id: "L001", website: "old1.com", email: "old1@old1.com", status: "Contacted", notes: "历史备注 A" }),
+      baseLead({ lead_id: "L002", website: "old2.com", email: "old2@old2.com", status: "Replied", notes: "历史备注 B" }),
+    ];
+    writeLeads(seed, tmp);
+    const before = fs.readFileSync(path.join(tmp, LEAD_MASTER_RELATIVE_PATH), "utf-8");
+
+    addLead({ website: "new.com", email: "n@new.com", lead_type: "SaaS", specific_issue: "Slow CWV", status: "New" }, { cwd: tmp });
+
+    const rows = readLeads(tmp);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].lead_id).toBe("L001");
+    expect(rows[0].notes).toBe("历史备注 A");
+    expect(rows[1].notes).toBe("历史备注 B");
+    // 前两行文本原样保留
+    const after = fs.readFileSync(path.join(tmp, LEAD_MASTER_RELATIVE_PATH), "utf-8");
+    expect(after.startsWith(before.split("\n").slice(0, 3).join("\n"))).toBe(true);
+  });
+
+  it("更新单条 Lead 不影响其他行", () => {
+    const seed: Lead[] = [
+      baseLead({ lead_id: "L001", website: "old1.com", email: "old1@old1.com", status: "New" }),
+      baseLead({ lead_id: "L002", website: "old2.com", email: "old2@old2.com", status: "New", notes: "保留我" }),
+    ];
+    writeLeads(seed, tmp);
+    updateLead("L001", { company: "New Name Inc" }, { cwd: tmp });
+    const rows = readLeads(tmp);
+    expect(rows[0].company).toBe("New Name Inc");
+    expect(rows[1].notes).toBe("保留我");
+  });
+
+  it("搜索能按域名/公司/邮箱命中", () => {
+    writeLeads([
+      baseLead({ lead_id: "L001", website: "alpha.com", company: "Alpha", email: "a@alpha.com" }),
+      baseLead({ lead_id: "L002", website: "beta.com", company: "Beta", email: "b@beta.com" }),
+    ], tmp);
+    expect(searchLeads("alpha", tmp)).toHaveLength(1);
+    expect(searchLeads("b@beta.com", tmp)[0].lead_id).toBe("L002");
+    expect(searchLeads("不存在", tmp)).toHaveLength(0);
+  });
+
+  it("既有外链/目录跟踪 CSV 不被 E 改动（内容仍在且无 lead 列）", () => {
+    const repoRoot = process.cwd();
+    for (const f of ["seo-growth/outreach-crm.csv", "seo-growth/directory-crm.csv"]) {
+      const full = path.join(repoRoot, f);
+      if (!fs.existsSync(full)) continue;
+      const text = fs.readFileSync(full, "utf-8");
+      const header = parseCsv(text)[0] ?? [];
+      if (f.endsWith("outreach-crm.csv")) {
+        expect(header).toContain("website");
+        expect(header).not.toContain("lead_id"); // 仍是外链表，未被 E 改写
+      }
+    }
+  });
+});
+
+// ================= E12：隐私 / 访问控制 =================
+describe("E12 隐私与访问控制", () => {
+  it("leads 模块无 'use client'，且不含任何 NEXT_PUBLIC_ 前缀", () => {
+    const dir = path.join(process.cwd(), "src/lib/leads");
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith(".ts")) continue;
+      if (file.includes(".test.")) continue; // 测试文件自身不含业务代码
+      const src = fs.readFileSync(path.join(dir, file), "utf-8");
+      expect(src, `${file} 不得是客户端组件`).not.toContain('"use client"');
+      expect(src, `${file} 不得出现 NEXT_PUBLIC_`).not.toContain("NEXT_PUBLIC_");
+    }
+  });
+
+  it("没有任何 app 路由 / 页面 / public 资产引用 lead 数据", () => {
+    const root = path.join(process.cwd(), "src");
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(e.name) || e.name.includes(".test.")) continue;
+        if (full.startsWith(path.join(root, "lib/leads"))) continue;
+        const src = fs.readFileSync(full, "utf-8");
+        if (/["']@\/lib\/leads["']|["']\.\.\/leads["']|["']\.\/leads["']/.test(src)) offenders.push(full);
+      }
+    };
+    walk(root);
+    expect(offenders, `以下文件引用了内部 lead 数据：${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("主库不在 public/ 下，不会被静态托管", () => {
+    expect(fs.existsSync(path.join(process.cwd(), "public", "leads.csv"))).toBe(false);
+    expect(LEAD_MASTER_RELATIVE_PATH.startsWith("public")).toBe(false);
+  });
+
+  it("主库被 .gitignore 屏蔽，避免潜客邮箱被提交到仓库", () => {
+    const gi = fs.readFileSync(path.join(process.cwd(), ".gitignore"), "utf-8");
+    expect(gi).toMatch(/leads\.csv/);
+  });
+});
+
+// ================= 真实主库数据质量守卫 =================
+describe("真实 Lead Master 数据质量（手工编辑也能兜住）", () => {
+  it("主库若存在：无重复、status/lead_type/template 全部合法", () => {
+    const realPath = path.join(process.cwd(), LEAD_MASTER_RELATIVE_PATH);
+    if (!fs.existsSync(realPath)) return; // 尚未初始化时跳过
+    const rows = readLeads();
+    if (rows.length === 0) return;
+
+    // 去重守卫：按归一化域名+邮箱不得重复
+    const seen = new Map<string, string>();
+    for (const l of rows) {
+      const key = `${normalizeDomain(l.website)}|${normalizeEmail(l.email)}`;
+      expect(seen.has(key), `主库存在重复 Lead：${key}（已有 ${seen.get(key)}，又出现 ${l.lead_id}）`).toBe(false);
+      seen.set(key, l.lead_id);
+    }
+    // 取值守卫
+    for (const l of rows) {
+      expect(LEAD_STATUSES).toContain(l.status);
+      expect(LEAD_TYPES).toContain(l.lead_type);
+      if (l.template) expect(LEAD_TEMPLATE_IDS).toContain(l.template);
+      if (l.next_followup_at) expect(isDateOnly(l.next_followup_at)).toBe(true);
+    }
+    //  suppression 守卫：Suppressed 一律不得出现在跟进队列里
+    for (const l of rows) {
+      if (l.status === "Suppressed") expect(isFollowUpEligible(l)).toBe(false);
+    }
+  });
+});
+
+// ================= CSV 解析健壮性 =================
+describe("CSV 解析", () => {
+  it("支持引号内逗号、换行与转义引号", () => {
+    const rows = parseCsv('a,b\n"x,1","line1\nline2","say ""hi"""\n');
+    expect(rows[0]).toEqual(["a", "b"]);
+    expect(rows[1]).toEqual(["x,1", "line1\nline2", 'say "hi"']);
+  });
+
+  it("序列化后再解析是恒等的", () => {
+    const header = ["a", "b"];
+    const data = [["含,逗号", "含\"引号\""], ["普通", "x"]];
+    const text = serializeCsv(header, data);
+    const back = parseCsv(text);
+    expect(back[0]).toEqual(header);
+    expect(back[1]).toEqual(data[0]);
+    expect(back[2]).toEqual(data[1]);
+  });
+});

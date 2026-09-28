@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "leads": "node --no-warnings scripts/leads.mts",
+    "content": "node --no-warnings scripts/content.mts",
+    "community": "node --no-warnings scripts/community.mts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
