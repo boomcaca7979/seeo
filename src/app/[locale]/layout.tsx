@@ -10,6 +10,7 @@ import { Montserrat, JetBrains_Mono } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
+import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { routing } from "@/i18n/routing";
@@ -114,8 +115,10 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
         <JsonLd schema={websiteSchema(loc)} />
         <NextIntlClientProvider messages={messages}>
           {children}
+          {/* CookieBanner 在 Provider 内：文案随 locale 输出 en/zh */}
+          <CookieBanner />
+          <AnalyticsBootstrap />
         </NextIntlClientProvider>
-        <CookieBanner />
       </body>
     </html>
   );

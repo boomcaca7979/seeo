@@ -212,6 +212,20 @@ async function handleCheckoutCompleted(obj: CreemCheckoutCompletedObject) {
     });
     throw new Error(result.error ?? "completeOrder failed"); // 返回 500 让 Creem 重试
   }
+  // Analytics（B 阶段）：仅在本次真实开通（opened=true，幂等重投不会重复触发）时
+  // 记录 payment_completed —— 点击/创建 intent/访问 checkout 均不算付费。
+  if (result.opened) {
+    try {
+      const { recordPaymentCompleted } = await import("@/lib/analytics/server");
+      await recordPaymentCompleted({
+        userId: order.user_id,
+        outTradeNo,
+        plan: order.plan,
+      });
+    } catch (analyticsErr) {
+      console.error("[CreemWebhook] analytics payment_completed 记录失败:", analyticsErr);
+    }
+  }
   console.log("[CreemWebhook] checkout.completed 处理完成:", {
     outTradeNo,
     plan: order.plan,

@@ -91,9 +91,10 @@ export async function finishAudit(
   }
 ): Promise<void> {
   const db = await getAdapter();
+  const finalStatus = params.status ?? "completed";
   // WHERE 含 status = 'running'：runAudit 收尾时 audit 必为 running（不受影响）；
   // reapStaleRunningAudit 回收时只覆盖仍 running 的行，已 completed 的不会被误改为 failed。
-  await db.run(`
+  const res = await db.run(`
     UPDATE audits
     SET health_score = ?, errors = ?, warnings = ?, notices = ?, status = ?, finished_at = datetime('now'),
         comparison = COALESCE(?, comparison),
@@ -108,7 +109,7 @@ export async function finishAudit(
     params.errors,
     params.warnings,
     params.notices,
-    params.status ?? "completed",
+    finalStatus,
     params.comparison ?? null,
     params.error ?? null,
     params.pages_detail ?? null,
@@ -118,6 +119,18 @@ export async function finishAudit(
     id,
     userId
   ]);
+
+  // Analytics（B 阶段）：注册用户首次拥有已完成的审计 → activation_completed。
+  // 仅在本次确实完成（UPDATE 命中）时判定；guest/demo 不计入，同一用户只记一次。
+  // 失败不影响业务。
+  if (finalStatus === "completed" && Number(res.changes ?? 0) > 0) {
+    try {
+      const { trackActivationIfFirst } = await import("@/lib/analytics/server");
+      await trackActivationIfFirst(userId);
+    } catch {
+      // analytics 失败不阻断审计收尾
+    }
+  }
 }
 
 export async function getAuditById(userId: string, id: number): Promise<AuditRow | null> {
@@ -235,4 +248,33 @@ export async function getAuditsSince(userId: string, sinceISO: string): Promise<
     SELECT * FROM audits WHERE date(started_at) >= ? AND user_id = ? ORDER BY started_at ASC
   `, [sinceDate, userId]) as Record<string, unknown>[];
   return rows.map(rowToAudit);
+}
+
+/**
+ * 认领访客审计：登录/注册成功后，把同一 IP 在近 24h 内以 guest:{ip} 创建的
+ * 审计记录（及关联问题清单）转移到当前账号，使注册后能立即看到审计前的结果。
+ * @returns 转移的审计记录条数
+ */
+export async function claimGuestAudits(guestUserId: string, userId: string, domain?: string): Promise<number> {
+  const db = await getAdapter();
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  // started_at 为 SQLite datetime('now')（UTC "YYYY-MM-DD HH:MM:SS"），cutoff 同格式
+  const domainFilter = domain ? " AND domain = ?" : "";
+
+  // 先转移问题清单（audits 仍持 guest 归属，可按 audit_id 关联），再转移审计行
+  await db.run(
+    `UPDATE audit_issues SET user_id = ?
+     WHERE user_id = ?
+       AND audit_id IN (SELECT id FROM audits WHERE user_id = ? AND started_at >= ?${domainFilter})`,
+    domain ? [userId, guestUserId, guestUserId, cutoff, domain] : [userId, guestUserId, guestUserId, cutoff]
+  );
+
+  const res = await db.run(
+    `UPDATE audits SET user_id = ? WHERE user_id = ? AND started_at >= ?${domainFilter}`,
+    domain ? [userId, guestUserId, cutoff, domain] : [userId, guestUserId, cutoff]
+  );
+  return Number(res.changes ?? 0);
 }

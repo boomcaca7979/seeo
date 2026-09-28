@@ -32,6 +32,7 @@ const h = vi.hoisted(() => {
     markOrderFailedMock: vi.fn(async () => {}),
     syncSubscriptionPeriodMock: vi.fn(async () => true),
     handleRefundSuccessMock: vi.fn(async () => ({ ok: true })),
+    recordPaymentCompletedMock: vi.fn(async () => {}),
   };
 });
 
@@ -61,6 +62,10 @@ vi.mock("@/lib/orders/service", () => ({
   }),
   listUserOrders: vi.fn(async () => []),
   parseOrderParam: vi.fn(() => ({})),
+}));
+
+vi.mock("@/lib/analytics/server", () => ({
+  recordPaymentCompleted: h.recordPaymentCompletedMock,
 }));
 
 const { orderDb } = h;
@@ -390,6 +395,57 @@ describe("幂等 / 重放", () => {
     const res = await POST(makeWebhookRequest(event));
     expect(res.status).toBe(200);
     expect(mockComplete).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("analytics payment_completed（B9）", () => {
+  it("真实开通（opened=true）→ 记录 payment_completed（含 user_id / 订单号 / plan）", async () => {
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({
+          metadata: { out_trade_no: "S20260831120000ABCDEF" },
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(h.recordPaymentCompletedMock).toHaveBeenCalledTimes(1);
+    expect(h.recordPaymentCompletedMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      outTradeNo: "S20260831120000ABCDEF",
+      plan: "lite",
+    });
+  });
+
+  it("支付失败（order.status=failed）→ 不产生 payment_completed", async () => {
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({
+          orderStatus: "failed",
+          metadata: { out_trade_no: "S20260831120000ABCDEF" },
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(h.recordPaymentCompletedMock).not.toHaveBeenCalled();
+  });
+
+  it("重复投递（第二次 opened=false）→ 不重复记录 payment_completed", async () => {
+    mockComplete.mockResolvedValueOnce({
+      ok: true,
+      order: baseOrder({ payment_status: "paid" }) as unknown as import("@/lib/orders/service").OrderRecord,
+      opened: true,
+    });
+    mockComplete.mockResolvedValueOnce({
+      ok: true,
+      order: baseOrder({ payment_status: "paid" }) as unknown as import("@/lib/orders/service").OrderRecord,
+      opened: false,
+    });
+    const event = checkoutCompletedEvent({
+      metadata: { out_trade_no: "S20260831120000ABCDEF" },
+    });
+    await POST(makeWebhookRequest(event));
+    await POST(makeWebhookRequest(event));
+    expect(h.recordPaymentCompletedMock).toHaveBeenCalledTimes(1);
   });
 });
 

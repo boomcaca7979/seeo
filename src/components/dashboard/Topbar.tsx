@@ -12,10 +12,13 @@ import { formatRelativeTime } from "@/lib/relative-time";
 import { useCreateProject } from "@/components/dashboard/CreateProjectContext";
 import { triggerUpgradeModal } from "@/components/billing/UpgradeModal";
 import { resolveApiErrorMessage } from "@/lib/billing-error-client";
+import { track } from "@/lib/analytics/client";
 
 interface TopbarProps {
   displayName: string;
   email: string;
+  /** 访客审计模式（未登录使用 /app/audit）：用户菜单显示登录入口而非登出 */
+  isGuest?: boolean;
   /** 移动端（<lg）打开侧边抽屉 */
   onMobileMenuClick?: () => void;
 }
@@ -51,7 +54,7 @@ const alertDotColor: Record<string, string> = {
 // SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
 
 
-export default function Topbar({ displayName, email, onMobileMenuClick }: TopbarProps) {
+export default function Topbar({ displayName, email, isGuest, onMobileMenuClick }: TopbarProps) {
   const t = useTranslations("dashboard.topbar");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
@@ -195,6 +198,8 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
       return;
     }
     const supabase = createBrowser();
+    // 漏斗事件：在会话仍有效时上报登出（await 保证 user_id 落库）
+    await track("logout");
     // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
     await supabase.auth.signOut({ scope: "global" });
     // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
@@ -416,7 +421,15 @@ export default function Topbar({ displayName, email, onMobileMenuClick }: Topbar
                   {t("docs")}
                 </Link>
               </div>
-              {isAuthEnabled ? (
+              {isGuest ? (
+                <Link
+                  href="/login"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="block px-4 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"
+                >
+                  {t("login")}
+                </Link>
+              ) : isAuthEnabled ? (
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 font-sans text-sm text-ink-60 hover:bg-line-soft transition-colors duration-150"

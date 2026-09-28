@@ -10,14 +10,16 @@ import { CreateProjectProvider } from "@/components/dashboard/CreateProjectConte
 interface DashboardShellProps {
   displayName: string;
   email: string;
+  /** 访客审计模式（未登录使用 /app/audit）：侧栏/头像菜单显示登录入口而非登出 */
+  isGuest?: boolean;
   children: React.ReactNode;
 }
 
-export default function DashboardShell({ displayName, email, children }: DashboardShellProps) {
+export default function DashboardShell({ displayName, email, isGuest, children }: DashboardShellProps) {
   return (
     <CreateProjectProvider>
       <EntitlementsProvider>
-        <DashboardShellInner displayName={displayName} email={email}>
+        <DashboardShellInner displayName={displayName} email={email} isGuest={isGuest}>
           {children}
         </DashboardShellInner>
       </EntitlementsProvider>
@@ -25,7 +27,7 @@ export default function DashboardShell({ displayName, email, children }: Dashboa
   );
 }
 
-function DashboardShellInner({ displayName, email, children }: DashboardShellProps) {
+function DashboardShellInner({ displayName, email, isGuest, children }: DashboardShellProps) {
   const { plan } = useEntitlements();
   const { modal } = useUpgradeModalProvider(plan);
   // 移动端（<lg）侧边抽屉；桌面端 sidebar 常驻，此状态无效
@@ -43,6 +45,7 @@ function DashboardShellInner({ displayName, email, children }: DashboardShellPro
       <Sidebar
         displayName={displayName}
         email={email}
+        isGuest={isGuest}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
       />
@@ -50,6 +53,7 @@ function DashboardShellInner({ displayName, email, children }: DashboardShellPro
         <Topbar
           displayName={displayName}
           email={email}
+          isGuest={isGuest}
           onMobileMenuClick={() => setMobileNavOpen(true)}
         />
         <main className="flex-1 overflow-y-auto bg-paper text-ink">{children}</main>

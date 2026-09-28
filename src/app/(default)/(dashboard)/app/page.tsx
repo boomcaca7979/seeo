@@ -16,7 +16,7 @@ export default async function WorkbenchPage() {
     const projects = await listProjectsWithMetrics("demo-user");
     // 无项目时显示首次使用 Onboarding，跳过 alerts/预警区块
     if (projects.length === 0) {
-      return <Onboarding displayName={ts("demoUser")} />;
+      return <Onboarding displayName={ts("demoUser")} mode="demo" />;
     }
     const alerts = await listAlerts("demo-user", 50);
     const unread = await countUnreadAlerts("demo-user");
@@ -59,7 +59,7 @@ export default async function WorkbenchPage() {
 
   // 无项目时显示首次使用 Onboarding
   if (projects.length === 0) {
-    return <Onboarding displayName={displayName} />;
+    return <Onboarding displayName={displayName} mode="live" />;
   }
 
   const alerts = await listAlerts(user.id, 50);

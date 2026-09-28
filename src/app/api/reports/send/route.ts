@@ -3,7 +3,8 @@
 
 import { NextResponse } from "next/server";
 import { getReport } from "@/lib/db";
-import { sendReportEmail, buildReportEmailHtml, isEmailConfigured } from "@/lib/email/resend";
+import { sendTransactionalEmail, isEmailProviderConfigured } from "@/lib/email/service";
+import { buildReportEmailHtml } from "@/lib/email/templates/report";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { requireFeature, FeatureNotAllowedError, billingErrorToResponse } from "@/lib/guards";
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "邮箱格式不正确", code: "EMAIL_INVALID" }, { status: 400 });
   }
 
-  if (!isEmailConfigured()) {
+  if (!isEmailProviderConfigured()) {
     return NextResponse.json(
       { error: "邮件功能未配置：缺少 RESEND_API_KEY 环境变量", code: "RESEND_NOT_CONFIGURED" },
       { status: 503 }
@@ -96,14 +97,28 @@ export async function POST(req: Request) {
     report.created_at
   );
 
-  const result = await sendReportEmail(
+  // 走统一发送层：事务性通道（不受营销退订影响），失败不阻塞业务且留 email_log
+  const result = await sendTransactionalEmail({
+    userId,
     email,
-    `【SeeO】${typeLabel[report.type] ?? "SEO"} 报告：${report.title}`,
-    html
-  );
+    templateKey: "report_email_v1",
+    subject: `【SeeO】${typeLabel[report.type] ?? "SEO"} 报告：${report.title}`,
+    html,
+    automationKey: `report_email:${reportId}:${Date.now()}`,
+  });
 
-  if (!result.success) {
-    return NextResponse.json({ error: result.error ?? "发送失败", code: "SEND_FAILED" }, { status: 502 });
+  if (result.status === "skipped_no_provider") {
+    return NextResponse.json(
+      { error: "邮件功能未配置：缺少 RESEND_API_KEY 环境变量", code: "RESEND_NOT_CONFIGURED" },
+      { status: 503 }
+    );
+  }
+
+  if (result.status !== "sent") {
+    return NextResponse.json(
+      { error: result.reason ?? "发送失败", code: "SEND_FAILED" },
+      { status: 502 }
+    );
   }
 
   return NextResponse.json({ data: { success: true, messageId: result.messageId } });

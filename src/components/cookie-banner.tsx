@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 const CONSENT_EVENT = "seeo:cookie-consent-change";
 
@@ -20,6 +21,7 @@ function subscribeConsent(callback: () => void): () => void {
 }
 
 export function CookieBanner() {
+  const t = useTranslations("cookieBanner");
   const consent = useSyncExternalStore(subscribeConsent, getConsentSnapshot, () => "ssr" as string | null);
 
   const setConsent = useCallback((value: "accepted" | "declined") => {
@@ -34,21 +36,21 @@ export function CookieBanner() {
     <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-line bg-card p-4">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
         <p className="font-sans text-sm text-ink-60">
-          我们使用 Cookie 来改善体验。必要的 Cookie 始终启用，分析 Cookie 需要您的同意。
-          <Link href="/privacy" className="ml-1 text-brand hover:underline">了解更多</Link>
+          {t("notice")}
+          <Link href="/privacy" className="ml-1 text-brand hover:underline">{t("learnMore")}</Link>
         </p>
         <div className="flex shrink-0 gap-2">
           <button
             onClick={() => setConsent("declined")}
             className="btn-secondary px-4 py-2 text-sm"
           >
-            拒绝
+            {t("decline")}
           </button>
           <button
             onClick={() => setConsent("accepted")}
             className="btn-primary px-4 py-2 text-sm"
           >
-            同意
+            {t("accept")}
           </button>
         </div>
       </div>

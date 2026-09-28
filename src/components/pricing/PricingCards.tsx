@@ -124,8 +124,8 @@ function MemberCard({
             {purchasing ? t("paymentStarting") : state.ctaLabel}
           </button>
         )}
-        {/* Secondary action：参考 Semrush "or subscribe" */}
-        {display.plan !== "free" && state.kind !== "none" && (
+        {/* Secondary action：仅当前套餐续费态展示（匿名/新用户无「续费」语义） */}
+        {display.plan !== "free" && state.badge === "current" && (
           <p className="mt-2 text-center font-sans text-sm text-ink-40">
             {t("orRenew")}
           </p>

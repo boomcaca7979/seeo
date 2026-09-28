@@ -23,6 +23,8 @@ interface EntitlementsData {
 
 interface EntitlementsContextValue extends EntitlementsData {
   loading: boolean;
+  /** /api/account/usage 是否成功返回（false = 访客或查询失败），用于审计页访客 CTA */
+  authenticated: boolean;
 }
 
 const EntitlementsContext = createContext<EntitlementsContextValue>({
@@ -36,6 +38,7 @@ const EntitlementsContext = createContext<EntitlementsContextValue>({
   },
   limits: null,
   loading: true,
+  authenticated: false,
 });
 
 const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
@@ -63,6 +66,7 @@ export function EntitlementsProvider({ children, initialPlan }: EntitlementsProv
   const [features, setFeatures] = useState<Record<FeatureKey, boolean>>(DEFAULT_FEATURES);
   const [limits, setLimits] = useState<EntitlementLimits | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +83,7 @@ export function EntitlementsProvider({ children, initialPlan }: EntitlementsProv
           if (data.plan) setPlan(data.plan);
           if (data.features) setFeatures(data.features);
           if (data.limits) setLimits(data.limits);
+          setAuthenticated(true);
         }
       } catch {
         // ignore
@@ -90,7 +95,7 @@ export function EntitlementsProvider({ children, initialPlan }: EntitlementsProv
   }, []);
 
   return (
-    <EntitlementsContext.Provider value={{ plan, features, limits, loading }}>
+    <EntitlementsContext.Provider value={{ plan, features, limits, loading, authenticated }}>
       {children}
     </EntitlementsContext.Provider>
   );

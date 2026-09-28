@@ -51,4 +51,40 @@ describe("getAdapter：Turso URL_INVALID 防护", () => {
     // demo 模式（auth-disabled）忽略无效配置并回退本地 SQLite
     expect(src).toContain("falling back to local SQLite");
   });
+
+  it("analytics 表随 migration 建立（B 阶段）", async () => {
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "seeo-analytics-"));
+    process.env.NEXT_PUBLIC_ENABLE_AUTH = "false";
+    process.env.TURSO_DATABASE_URL = `file://${dir}/test.db`;
+    process.env.TURSO_AUTH_TOKEN = "test-token";
+
+    try {
+      const { getAdapter } = await loadModule();
+      const db = await getAdapter();
+      const tables = await db.query(
+        `SELECT name FROM sqlite_master WHERE type='table'
+           AND (name LIKE 'analytics_%' OR name LIKE 'email_%')`
+      ) as Array<{ name: string }>;
+      const names = tables.map((t) => t.name).sort();
+      // B 阶段 analytics + C 阶段 email 表
+      expect(names).toEqual(["analytics_events", "analytics_identities", "email_log", "email_preferences"]);
+      // 关键索引存在
+      const idx = await db.query(
+        `SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_analytics_%'`
+      ) as Array<{ name: string }>;
+      expect(idx.length).toBeGreaterThanOrEqual(5);
+      // C 阶段幂等底线：email_log 必须带 UNIQUE(user_id, automation_key)，
+      // 否则「同一用户同一 automation 只发一次」无法在数据库层保证
+      const ddl = await db.query(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='email_log'`
+      ) as Array<{ sql: string }>;
+      expect(ddl[0]?.sql ?? "").toMatch(/UNIQUE\s*\(\s*user_id\s*,\s*automation_key\s*\)/i);
+      await db.close();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

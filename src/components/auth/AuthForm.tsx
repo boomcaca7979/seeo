@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
+import { track } from "@/lib/analytics/client";
 import { useToast } from "@/components/dashboard/Toast";
 
 interface AuthFormProps {
@@ -31,6 +32,23 @@ export default function AuthForm({ mode }: AuthFormProps) {
   // 切换登录/注册时保留 redirect 参数
   const switchHref = isSignup ? "/login" : "/signup";
   const switchHrefWithRedirect = redirectTarget ? `${switchHref}?redirect=${encodeURIComponent(redirectTarget)}` : switchHref;
+
+  // 认领访客审计：把本 IP 近 24h 内未登录时跑的审计转移到当前账号，
+  // 使「先审计 → 后注册」的用户注册后能立即看到此前的结果（失败静默，不阻塞跳转）
+  const claimGuestAudits = async () => {
+    try {
+      let domain: string | undefined;
+      const dom = new URLSearchParams(redirectTarget?.split("?")[1] ?? "").get("domain");
+      if (dom) domain = dom;
+      await fetch("/api/audit/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(domain ? { domain } : {}),
+      });
+    } catch {
+      // ignore
+    }
+  };
 
   const validate = (): string | null => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,6 +79,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
     setLoading(true);
     const supabase = createBrowser();
+    // 漏斗事件：提交注册表单（是否成功由 signup_completed 判定）
+    if (isSignup) track("signup_started");
 
     if (isSignup) {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -75,6 +95,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return;
       }
       // 注册成功后直接跳转（已关闭邮箱验证）
+      track("signup_completed");
+      await claimGuestAudits();
       router.push(safeRedirect);
       router.refresh();
       return;
@@ -90,6 +112,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
       setLoading(false);
       return;
     }
+    track("login_completed");
+    await claimGuestAudits();
     router.push(safeRedirect);
     router.refresh();
   };

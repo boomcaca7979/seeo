@@ -3,6 +3,7 @@ import { Montserrat, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
+import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { localeToHtmlLang } from "@/i18n/config";
@@ -74,8 +75,10 @@ export default async function RootLayout({
         <JsonLd schema={websiteSchema()} />
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
+          {/* CookieBanner 在 Provider 内：文案随 NEXT_LOCALE 输出 en/zh */}
+          <CookieBanner />
+          <AnalyticsBootstrap />
         </NextIntlClientProvider>
-        <CookieBanner />
       </body>
     </html>
   );

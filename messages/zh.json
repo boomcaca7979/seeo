@@ -14,11 +14,17 @@
     "closeMenu": "关闭菜单",
     "switchLang": "EN"
   },
+  "cookieBanner": {
+  "notice": "我们使用 Cookie 来改善体验。必要的 Cookie 始终启用，分析 Cookie 仅在您同意后启用。",
+  "learnMore": "了解更多",
+  "decline": "拒绝",
+  "accept": "同意"
+},
   "hero": {
     "badge": "每日追踪 · SEO 审计 · 排名监控",
     "title": "看清搜索流量的走向",
     "subtitle": "把关键词、排名、外链、技术审计、竞品和内容优化放在同一张工作台上。SeeO 帮你从一堆搜索数据里，看出下一步该做什么。",
-    "primaryCta": "开始分析你的网站",
+    "primaryCta": "免费开始",
     "secondaryCta": "看看能做什么",
     "panel": {
       "sample": "示例",
@@ -27,7 +33,7 @@
     },
     "auditBox": {
       "placeholder": "输入你的网站域名，如 example.com",
-      "submit": "开始 SEO 审计",
+      "submit": "免费开始 SEO 审计",
       "submitting": "跳转中…",
       "errEmpty": "请输入网站域名",
       "errInvalid": "域名格式无效，如 example.com",
@@ -1309,6 +1315,8 @@
       "settings": "设置",
       "currentPlan": "当前套餐",
       "upgradeCta": "升级套餐 →",
+      "guestUser": "访客",
+      "login": "登录",
       "logout": "退出登录",
       "expand": "展开侧边栏",
       "collapse": "折叠侧边栏",
@@ -1335,6 +1343,7 @@
       "pricing": "定价方案",
       "docs": "帮助文档",
       "logout": "退出登录",
+      "login": "登录",
       "demoMode": "演示模式 · 账号系统未启用",
       "upgradeHint": "点击下方升级"
     },
@@ -1804,7 +1813,11 @@
       "auditHistoryTableSub": "每次审计的分数、发现数与引擎版本",
       "thDate": "日期",
       "engineVersion": "引擎",
-      "tabOverview": "概览",
+      "guestCtaTitle": "保存这次结果 —— 创建免费账号",
+    "guestCtaBody": "审计无需登录即可运行。注册免费账号后，报告会保存到你的工作台，并可持续追踪修复效果。",
+    "guestCtaBtn": "免费注册",
+    "guestExportNote": "创建免费账号后即可将报告保存到工作台并导出 PDF。",
+    "tabOverview": "概览",
       "tabIssues": "问题",
       "tabPages": "抓取页面",
       "tabLinking": "内链",
@@ -2535,6 +2548,7 @@
       "onboarding": {
         "eyebrowWelcome": "欢迎来到 SeeO",
         "eyebrowUpdated": "数据更新时间 · 演示模式",
+      "eyebrowUpdatedLive": "数据每日自动更新 · 正式账号",
         "greeting": "你好，{name}",
         "subtitle": "还没有项目。按下面 3 步完成首次 SEO 审计，看看你的网站表现如何。",
         "sectionTitle": "开始使用",
@@ -2772,6 +2786,7 @@
     "PLAN_DOWNGRADE_NOT_ALLOWED": "当前套餐不支持该购买：Pro 会员不可降级购买 Lite",
     "AUDIT_RATE_LIMITED": "今日审计次数已达上限，请稍后再试",
     "AUDIT_COOLDOWN": "该域名审计冷却中（同模式 1 小时内仅允许一次，可切另一种模式或稍后再试）",
+    "AUDIT_CLAIM_FAILED": "无法转移你近期的审计结果到当前账号，可重新运行审计查看。",
     "AUDIT_IN_PROGRESS": "该域名审计正在进行中，请等待完成",
     "BACKLINK_COOLDOWN": "该域名外链数据冷却中（1 小时内仅允许拉取一次，请稍后再试）",
     "PRIVATE_HOST": "该主机无法查询，请输入公网域名",

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { isAuthEnabled } from "@/lib/auth-config";
 
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
 
@@ -53,15 +52,10 @@ export default function UrlAuditBox() {
     }
 
     setLoading(true);
-    // 构建审计页完整路径
+    // Free SEO Audit 漏斗入口：访客可直接审计（无需先注册），
+    // 登录/未登录都进入同一审计页；未登录时由审计页提供注册衔接 CTA
     const auditPath = `/app/audit?domain=${encodeURIComponent(domain)}`;
-    if (isAuthEnabled) {
-      // auth 模式：先登录，登录后自动返回审计页
-      router.push(`/login?redirect=${encodeURIComponent(auditPath)}`);
-    } else {
-      // demo 模式：直接进入审计页
-      router.push(auditPath);
-    }
+    router.push(auditPath);
   }
 
   return (

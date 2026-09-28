@@ -563,6 +563,89 @@ async function migrate(db: DBAdapter): Promise<void> {
       ON mcp_api_keys(key_hash);
     CREATE INDEX IF NOT EXISTS idx_mcp_api_keys_user
       ON mcp_api_keys(user_id);
+
+    -- ===== Marketing Analytics（B 阶段）=====
+    -- 事件表：只存归因/漏斗必要字段；props 为白名单化后的 JSON（不存 token/密码/cookie）
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_name TEXT NOT NULL,
+      user_id TEXT,
+      anonymous_id TEXT,
+      session_id TEXT,
+      path TEXT,
+      locale TEXT,
+      referrer TEXT,
+      source TEXT,
+      medium TEXT,
+      campaign TEXT,
+      landing_page TEXT,
+      ref_id TEXT,
+      props TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_analytics_events_time
+      ON analytics_events(created_at);
+    CREATE INDEX IF NOT EXISTS idx_analytics_events_name_time
+      ON analytics_events(event_name, created_at);
+    CREATE INDEX IF NOT EXISTS idx_analytics_events_user
+      ON analytics_events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_analytics_events_anon
+      ON analytics_events(anonymous_id);
+
+    -- 匿名身份与 UTM 归因：first_touch 只写一次不覆盖，last_touch 随新渠道访问更新
+    CREATE TABLE IF NOT EXISTS analytics_identities (
+      anonymous_id TEXT PRIMARY KEY,
+      user_id TEXT,
+      first_touch_source TEXT,
+      first_touch_medium TEXT,
+      first_touch_campaign TEXT,
+      first_touch_content TEXT,
+      first_touch_term TEXT,
+      first_landing_page TEXT,
+      first_referrer TEXT,
+      last_touch_source TEXT,
+      last_touch_medium TEXT,
+      last_touch_campaign TEXT,
+      last_landing_page TEXT,
+      last_referrer TEXT,
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      bound_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_analytics_identities_user
+      ON analytics_identities(user_id);
+
+    -- ===== Email 营销基础设施（C 阶段）=====
+    -- 邮件日志 + 幂等：UNIQUE(user_id, automation_key) 保证同一邮件对同一用户只发一次
+    CREATE TABLE IF NOT EXISTS email_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      template TEXT NOT NULL,
+      automation_key TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      provider_message_id TEXT,
+      failure_reason TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      sent_at TEXT,
+      UNIQUE (user_id, automation_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_email_log_user
+      ON email_log(user_id);
+    CREATE INDEX IF NOT EXISTS idx_email_log_time
+      ON email_log(created_at);
+
+    -- 用户邮件偏好：营销退订（不影响事务性邮件）
+    CREATE TABLE IF NOT EXISTS email_preferences (
+      user_id TEXT PRIMARY KEY,
+      email TEXT,
+      unsubscribe_token TEXT UNIQUE,
+      marketing_unsubscribed_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // projects 表升级：旧表 domain 是全局 UNIQUE，多用户下同域名冲突，重建为 (user_id, domain) 联合唯一

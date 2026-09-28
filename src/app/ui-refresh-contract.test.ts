@@ -141,9 +141,10 @@ describe("Hero 信息层级（搜索入口为第一互动 CTA）", () => {
     expect(URL_AUDIT_BOX).not.toContain("placeholder:text-ink-25");
   });
 
-  it("UrlAuditBox 提交走域名审计路径（demo 直达 / auth 先登录）", () => {
+  it("UrlAuditBox 提交直达审计页（Free SEO Audit 漏斗：审计前不设注册墙）", () => {
     expect(URL_AUDIT_BOX).toContain("/app/audit?domain=");
-    expect(URL_AUDIT_BOX).toContain("isAuthEnabled");
+    // 漏斗 A2：审计入口不得把访客先重定向到登录页
+    expect(URL_AUDIT_BOX).not.toContain("/login");
   });
 });
 

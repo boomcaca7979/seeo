@@ -11,6 +11,8 @@ import type { AuditRow, AuditIssueRow } from "@/lib/db";
 // ---- mock auth：始终放行 ----
 vi.mock("@/lib/auth", () => ({
   requireAuthOrDemo: vi.fn(async () => ({ allowed: true, user: { id: "user-1" } })),
+  requireAuthAllowGuest: vi.fn(async () => ({ allowed: true, user: { id: "user-1" } })),
+  guestUserId: vi.fn(() => "guest:0.0.0.0"),
 }));
 
 // ---- mock DB：可按用例注入 audit 与 issues ----

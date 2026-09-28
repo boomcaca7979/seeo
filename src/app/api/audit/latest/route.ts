@@ -7,7 +7,7 @@ import { allCheckMeta, checkMetaMap, getExecutedCheckIds, nonCatalogCheckNames, 
 import type { DashboardSnapshot } from "@/lib/seo/audit-dashboard";
 import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
 import type { AuditHistoryComparison } from "@/lib/seo/audit-history";
-import { requireAuthOrDemo } from "@/lib/auth";
+import { requireAuthAllowGuest, guestUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -163,11 +163,12 @@ function localizeComparison(
 }
 
 export async function GET(req: Request) {
-  const auth = await requireAuthOrDemo();
+  const auth = await requireAuthAllowGuest();
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
-  const userId = auth.user?.id ?? "demo-user";
+  // 与 /api/audit/start 同源：登录按账号、访客按 IP（guest:{ip}）
+  const userId = auth.user?.id ?? guestUserId(req);
   const { searchParams } = new URL(req.url);
   const domain = (searchParams.get("domain") ?? "").trim().toLowerCase();
 

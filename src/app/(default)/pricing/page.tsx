@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useToast } from "@/components/dashboard/Toast";
 import { getPlanCardState } from "@/lib/pricing-plan-state";
+import { track } from "@/lib/analytics/client";
 import PricingHero from "@/components/pricing/PricingHero";
 import PricingCards from "@/components/pricing/PricingCards";
 import FeatureComparison from "@/components/pricing/FeatureComparison";
@@ -88,6 +89,10 @@ function PricingContent({ initialPlans }: { initialPlans: PlanInfo[] | null }) {
   const tp = useTranslations("plans");
 
   const { show, Toast } = useToast();
+  // 漏斗事件：Pricing 页真实访问（挂载一次）
+  useEffect(() => {
+    track("pricing_viewed");
+  }, []);
   // 服务端注入的初始套餐数据 → 首屏价格随 SSR HTML 输出（SEO S-06）
   const [plans, setPlans] = useState<PlanInfo[] | null>(initialPlans);
   const [loading, setLoading] = useState(initialPlans === null);
@@ -161,11 +166,14 @@ function PricingContent({ initialPlans }: { initialPlans: PlanInfo[] | null }) {
         body: JSON.stringify({ plan }),
       });
       if (res.status === 401) {
-        show(t("pricing.loginRequired"), "info");
+        // 未登录点击付费套餐：直接带来源跳注册（漏斗 A6，不留 toast 死端）
+        window.location.assign(`/signup?redirect=${encodeURIComponent("/pricing")}`);
         return;
       }
       const json = await res.json().catch(() => null);
       if (res.ok && json?.data?.checkoutUrl) {
+        // 业务事件：支付意图已在服务端真实创建（订单已落库），跳转 Checkout
+        track("upgrade_started", { plan });
         window.location.assign(json.data.checkoutUrl as string);
         return; // 跳转后组件卸载，无需复位 purchasing
       }
@@ -219,7 +227,8 @@ function PricingContent({ initialPlans }: { initialPlans: PlanInfo[] | null }) {
             ? tp("cta.upgradePro")
             : tp("cta.start"),
       checkoutPlan: p.display.checkoutPlan as "lite" | "pro" | undefined,
-      ctaHref: p.display.ctaHref,
+      // 未登录时 Free 卡「Start free」直达注册（/app 会被弹去登录，对新用户是断点）
+      ctaHref: planKey === "free" && currentPlan === null ? "/signup" : p.display.ctaHref,
       highlighted: p.display.highlighted,
     };
     const state = getPlanCardState(

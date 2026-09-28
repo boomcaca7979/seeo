@@ -3,17 +3,18 @@
 
 import { NextResponse } from "next/server";
 import { getAuditById } from "@/lib/db";
-import { requireAuthOrDemo } from "@/lib/auth";
+import { requireAuthAllowGuest, guestUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = await requireAuthOrDemo();
+  const auth = await requireAuthAllowGuest();
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
-  const userId = auth.user?.id ?? "demo-user";
+  // 与 /api/audit/start 同源：登录按账号、访客按 IP（guest:{ip}）
+  const userId = auth.user?.id ?? guestUserId(req);
   const { searchParams } = new URL(req.url);
   const idParam = searchParams.get("id");
   if (!idParam) {

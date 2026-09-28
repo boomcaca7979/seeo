@@ -6,7 +6,7 @@
 import { NextResponse, after } from "next/server";
 import { createAudit, getLatestAudit, reapStaleRunningAudit, tryIncrementAuditDailyUsage } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
-import { requireAuthOrDemo } from "@/lib/auth";
+import { requireAuthAllowGuest, guestUserId } from "@/lib/auth";
 import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
 import { FeatureNotAllowedError, PlanLimitError, billingErrorToResponse } from "@/lib/guards";
 import { requireFeature } from "@/lib/guards";
@@ -25,11 +25,12 @@ function todayStr(): string {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuthOrDemo();
+  const auth = await requireAuthAllowGuest();
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
-  const userId = auth.user?.id ?? "demo-user";
+  // 登录用户按账号归属；未登录访客按 IP 归属（guest:{ip}，与匿名限流维度一致）
+  const userId = auth.user?.id ?? guestUserId(req);
   const isAuthed = !!auth.user;
   const plan = auth.plan;
   const auditDailyLimit = auth.limits.audit_daily_limit;

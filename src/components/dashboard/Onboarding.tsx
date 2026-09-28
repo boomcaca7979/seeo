@@ -5,9 +5,11 @@ import { useTranslations } from "next-intl";
 
 interface OnboardingProps {
   displayName: string;
+  /** demo = 演示模式（无账号）；live = 真实账号。演示标识只应在 demo 模式出现 */
+  mode?: "demo" | "live";
 }
 
-export default function Onboarding({ displayName }: OnboardingProps) {
+export default function Onboarding({ displayName, mode = "demo" }: OnboardingProps) {
   const t = useTranslations("dashboard.shared.onboarding");
 
   const STEPS = [
@@ -33,7 +35,7 @@ export default function Onboarding({ displayName }: OnboardingProps) {
       {/* eyebrow 行 */}
       <div className="flex items-center justify-between font-sans text-xs text-ink-40">
         <span>{t("eyebrowWelcome")}</span>
-        <span>{t("eyebrowUpdated")}</span>
+        <span>{mode === "demo" ? t("eyebrowUpdated") : t("eyebrowUpdatedLive")}</span>
       </div>
 
       {/* 主标题 */}

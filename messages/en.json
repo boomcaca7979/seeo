@@ -14,11 +14,17 @@
     "closeMenu": "Close menu",
     "switchLang": "中文"
   },
+  "cookieBanner": {
+  "notice": "We use cookies to improve your experience. Essential cookies are always on; analytics cookies are only set with your consent.",
+  "learnMore": "Learn more",
+  "decline": "Decline",
+  "accept": "Accept"
+},
   "hero": {
     "badge": "Daily rank updates · SEO audits · Rank tracking",
     "title": "Track rankings. Audit technical SEO. Find the keywords that matter.",
     "subtitle": "SeeO brings keyword research, rank tracking, backlink analysis, technical audits, competitor analysis, and content optimization together on one workbench — so you always know what to do next.",
-    "primaryCta": "Run your first audit",
+    "primaryCta": "Start free",
     "secondaryCta": "Explore features",
     "panel": {
       "sample": "Sample",
@@ -27,7 +33,7 @@
     },
     "auditBox": {
       "placeholder": "Enter your website domain, e.g. example.com",
-      "submit": "Run SEO audit",
+      "submit": "Run free SEO audit",
       "submitting": "Redirecting…",
       "errEmpty": "Please enter a website domain",
       "errInvalid": "Invalid domain format, e.g. example.com",
@@ -1316,6 +1322,8 @@
       "settings": "Settings",
       "currentPlan": "Current plan",
       "upgradeCta": "Upgrade →",
+      "guestUser": "Guest",
+      "login": "Log in",
       "logout": "Log out",
       "expand": "Expand sidebar",
       "collapse": "Collapse sidebar",
@@ -1342,6 +1350,7 @@
       "pricing": "Pricing",
       "docs": "Docs",
       "logout": "Log out",
+      "login": "Log in",
       "demoMode": "Demo mode · Account system is disabled",
       "upgradeHint": "Upgrade below"
     },
@@ -1811,7 +1820,11 @@
       "auditHistoryTableSub": "Scores, findings and engine version per audit",
       "thDate": "Date",
       "engineVersion": "Engine",
-      "tabOverview": "Overview",
+      "guestCtaTitle": "Save this result — create a free account",
+    "guestCtaBody": "Audits run without an account. Sign up free to keep this report in your workspace and track fixes over time.",
+    "guestCtaBtn": "Sign up free",
+    "guestExportNote": "Create a free account to save reports to your workspace and export PDFs.",
+    "tabOverview": "Overview",
       "tabIssues": "Issues",
       "tabPages": "Crawled Pages",
       "tabLinking": "Internal Linking",
@@ -2542,6 +2555,7 @@
       "onboarding": {
         "eyebrowWelcome": "Welcome to SeeO",
         "eyebrowUpdated": "Data updated · Demo mode",
+      "eyebrowUpdatedLive": "Data updates daily · Real account",
         "greeting": "Hi, {name}",
         "subtitle": "No projects yet. Follow these 3 steps to run your first SEO audit and see how your site performs.",
         "sectionTitle": "Get started",
@@ -2779,6 +2793,7 @@
     "PLAN_DOWNGRADE_NOT_ALLOWED": "Your current plan does not allow this purchase: Pro members cannot downgrade to Lite.",
     "AUDIT_RATE_LIMITED": "Daily audit limit reached. Please try again later.",
     "AUDIT_COOLDOWN": "This domain is in audit cooldown. One audit per hour per mode; try the other mode or retry later.",
+    "AUDIT_CLAIM_FAILED": "Could not transfer your recent audit results to this account. You can rerun the audit to view them.",
     "AUDIT_IN_PROGRESS": "An audit is already running for this domain. Please wait for it to finish.",
     "BACKLINK_COOLDOWN": "Backlink data for this domain is in cooldown. One fetch per hour; please retry later.",
     "PRIVATE_HOST": "That host cannot be checked. Enter a public domain.",

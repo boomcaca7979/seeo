@@ -9,6 +9,7 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import { localePath } from "@/i18n/seo";
 import { useToast } from "@/components/dashboard/Toast";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
+import { track } from "@/lib/analytics/client";
 import { planLabel } from "@/lib/plan-labels";
 
 type NavItem = {
@@ -165,12 +166,14 @@ const navItems: NavItem[] = [
 interface SidebarProps {
   displayName?: string;
   email?: string;
+  /** 访客审计模式（未登录使用 /app/audit）：底部显示登录入口而非登出 */
+  isGuest?: boolean;
   /** 移动端（<lg）抽屉开合状态；桌面端 sidebar 常驻 */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export default function Sidebar({ displayName, email, mobileOpen = false, onMobileClose }: SidebarProps) {
+export default function Sidebar({ displayName, email, isGuest, mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { plan: currentPlan, loading: entitlementsLoading } = useEntitlements();
   const pathname = usePathname();
@@ -186,6 +189,8 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
       return;
     }
     const supabase = createBrowser();
+    // 漏斗事件：在会话仍有效时上报登出（await 保证 user_id 落库）
+    await track("logout");
     // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
     await supabase.auth.signOut({ scope: "global" });
     // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
@@ -304,17 +309,41 @@ export default function Sidebar({ displayName, email, mobileOpen = false, onMobi
                 {userEmail}
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              title={t("logout")}
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
-              aria-label={t("logout")}
-            >
-              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            {isGuest ? (
+              <Link
+                href="/login"
+                title={t("login")}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
+                aria-label={t("login")}
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+                  <path d="M9 12h11m0 0-4-4m4 4-4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            ) : (
+              <button
+                onClick={handleLogout}
+                title={t("logout")}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
+                aria-label={t("logout")}
+              >
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+                  <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
           </div>
+        ) : isGuest ? (
+          <Link
+            href="/login"
+            title={t("login")}
+            className="mx-auto flex h-8 w-8 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
+            aria-label={t("login")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+              <path d="M9 12h11m0 0-4-4m4 4-4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         ) : (
           <button
             onClick={handleLogout}

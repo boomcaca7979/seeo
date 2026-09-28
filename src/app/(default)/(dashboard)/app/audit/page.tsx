@@ -21,6 +21,7 @@ import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import AuditScoreTrend from "@/components/dashboard/charts/AuditScoreTrend";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
+import { track } from "@/lib/analytics/client";
 import AuditOverview, { type HistoryItem, type ComparisonData } from "@/components/audit/Overview";
 import IssuesCenter from "@/components/audit/IssuesCenter";
 import CrawledPages from "@/components/audit/CrawledPages";
@@ -88,9 +89,10 @@ function AuditPageInner() {
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as Locale;
   const { show, Toast } = useToast();
-  const { features, loading: entitlementsLoading } = useEntitlements();
+  const { features, loading: entitlementsLoading, authenticated } = useEntitlements();
   const canFullAudit = entitlementsLoading ? false : features.full_audit;
   const canExportPdf = entitlementsLoading ? false : features.pdf_export;
+  const isGuest = !entitlementsLoading && !authenticated;
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -249,6 +251,12 @@ function AuditPageInner() {
         show(message, "error");
         return;
       }
+      // 业务事件：服务端已受理审计任务（非按钮点击）
+      track("audit_started", {
+        refId: json.data?.auditId,
+        domain: domain.trim(),
+        depth,
+      });
       try {
         localStorage.setItem("seeo:last-audit-domain", domain.trim());
       } catch {
@@ -293,6 +301,13 @@ function AuditPageInner() {
         const finalAudit = await loadLatest(domain);
         if (finalAudit?.status === "completed" || finalStatus === "completed") {
           show(t("toastDone", { score: finalAudit?.healthScore ?? 0, pages: finalAudit?.dashboard?.pagesCrawled ?? finalAudit?.pagesCrawled ?? 0 }), "success");
+          // 业务事件：轮询确认为 completed（真实完成，非点击）
+          track("audit_completed", {
+            refId: json.data?.auditId,
+            domain: domain.trim(),
+            depth,
+            healthScore: finalAudit?.healthScore ?? 0,
+          });
         } else if (finalAudit?.status === "failed" || finalStatus === "failed") {
           const apiErr = finalAudit?.error || json?.error;
           const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
@@ -305,6 +320,12 @@ function AuditPageInner() {
       } else {
         if (json.data?.status === "completed") {
           show(t("toastDone", { score: json.data?.healthScore ?? 0, pages: json.data?.pagesCrawled ?? 0 }), "success");
+          track("audit_completed", {
+            refId: json.data?.auditId,
+            domain: domain.trim(),
+            depth,
+            healthScore: json.data?.healthScore ?? 0,
+          });
         } else if (json.data?.status === "failed") {
           const apiErr = json.data?.error || json?.error;
           const hint = depth === "full" ? t("hintTimeoutFull") : t("hintRetry");
@@ -404,6 +425,9 @@ function AuditPageInner() {
   const hasFailed = audit && audit.status === "failed";
   const hasDashboard = !!audit?.dashboard;
 
+  // 访客注册跳转：带上当前域名，注册后直接回到同域名的审计页
+  const signupHref = `/signup?redirect=${encodeURIComponent(domain.trim() ? `/app/audit?domain=${encodeURIComponent(domain.trim())}` : "/app/audit")}`;
+
   const formatTime = (iso: string | null): string => {
     if (!iso) return "—";
     try {
@@ -470,6 +494,19 @@ function AuditPageInner() {
           )}
         </div>
       </div>
+
+      {/* ===== 访客 CTA：Free SEO Audit 漏斗的「看到结果 → 注册」衔接（不遮挡审计功能） ===== */}
+      {isGuest && (
+        <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3 sm:flex-row sm:items-center print:hidden">
+          <div className="min-w-0">
+            <div className="font-sans text-sm font-medium text-ink">{t("guestCtaTitle")}</div>
+            <p className="mt-0.5 font-sans text-xs text-ink-60">{t("guestCtaBody")}</p>
+          </div>
+          <Link href={signupHref} className="btn-primary flex-none">
+            {t("guestCtaBtn")}
+          </Link>
+        </div>
+      )}
 
       {/* ===== Audit Meta 条（域名 / 状态 / 时间 / 页数 / 模式） ===== */}
       {!projectsLoading && (
@@ -665,18 +702,27 @@ function AuditPageInner() {
       <Modal open={exportOpen} onClose={() => setExportOpen(false)} title={t("exportTitle")}>
         <div className="space-y-3">
           <p className="font-sans text-xs text-ink-60">{t("exportMeta", { domain: audit?.domain ?? "", score: audit?.healthScore ?? 0 })}</p>
-          <div className="flex flex-col gap-2">
-            {canExportPdf ? (
-              <button onClick={handleDownloadPdf} disabled={exporting || saving} className="btn-primary disabled:opacity-60">
-                {exporting ? t("generating") : t("downloadPdf")}
+          {isGuest ? (
+            <>
+              <Link href={signupHref} className="btn-primary flex items-center justify-center">
+                {t("guestCtaBtn")}
+              </Link>
+              <p className="font-sans text-xs text-ink-40">{t("guestExportNote")}</p>
+            </>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {canExportPdf ? (
+                <button onClick={handleDownloadPdf} disabled={exporting || saving} className="btn-primary disabled:opacity-60">
+                  {exporting ? t("generating") : t("downloadPdf")}
+                </button>
+              ) : (
+                <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-2">{t("upgradePdf")}</Link>
+              )}
+              <button onClick={handleSaveToReports} disabled={exporting || saving} className="btn-secondary disabled:opacity-60">
+                {saving ? t("saving") : t("saveToReports")}
               </button>
-            ) : (
-              <Link href="/pricing" className="btn-primary inline-flex items-center justify-center gap-2">{t("upgradePdf")}</Link>
-            )}
-            <button onClick={handleSaveToReports} disabled={exporting || saving} className="btn-secondary disabled:opacity-60">
-              {saving ? t("saving") : t("saveToReports")}
-            </button>
-          </div>
+            </div>
+          )}
           <p className="font-sans text-xs text-ink-40">
             {t("exportNote1")}<br />
             {t("exportNote2")}
