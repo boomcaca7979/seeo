@@ -1,4 +1,8 @@
-data/
+# 根锚定：只排除仓库根目录的本地数据库目录。
+# 不能写成 `data/` —— 该写法在 gitignore 语义下会匹配**任意层级**的 data 目录，
+# 从而把源码目录 src/lib/data/ 一起排除出部署上传，
+# 导致 Vercel 构建报 `Cannot find module '../data/csv.ts'`（本地因文件在磁盘上无法复现）。
+/data/
 *.db
 *.db-journal
 *.db-wal
