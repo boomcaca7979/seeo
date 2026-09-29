@@ -18,6 +18,18 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/guides/how-to-track-keyword-rankings",
   "/guides/how-to-analyze-backlinks",
   "/tools/backlink-checker",
+  // H｜SEO 获客基地：问题型（症状诊断）搜索入口
+  // 与 /features/*（功能说明）分工不同，内容来自 src/lib/seo/landing-pages.ts
+  "/seo-issues",
+  "/seo-issues/duplicate-title-tags",
+  "/seo-issues/missing-canonical",
+  "/seo-issues/pages-not-indexed",
+  "/seo-issues/broken-internal-links",
+  "/seo-issues/sitemap-errors",
+  "/seo-issues/slow-pages",
+  "/seo-issues/thin-content",
+  "/seo-issues/orphan-pages",
+  "/seo-issues/keyword-cannibalization",
   "/about",
   "/privacy",
   "/terms",
