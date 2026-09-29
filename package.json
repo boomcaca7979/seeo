@@ -13,7 +13,8 @@
     "content": "node --no-warnings scripts/content.mts",
     "community": "node --no-warnings scripts/community.mts",
     "product-hunt": "node --no-warnings scripts/product-hunt.mts",
-    "referral": "node --no-warnings scripts/referral.mts"
+    "referral": "node --no-warnings scripts/referral.mts",
+    "ops": "node --no-warnings scripts/ops.mts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
