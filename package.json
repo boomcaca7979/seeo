@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "leads": "node --no-warnings scripts/leads.mts",
     "content": "node --no-warnings scripts/content.mts",
-    "community": "node --no-warnings scripts/community.mts"
+    "community": "node --no-warnings scripts/community.mts",
+    "product-hunt": "node --no-warnings scripts/product-hunt.mts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
