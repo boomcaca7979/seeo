@@ -158,13 +158,18 @@ export {
  * 事由 2026-10-08（Filebase 事件）：prospecting 的 sitemap 判定规则有缺陷，在规则修正
  * 并复核完已发批次之前，暂停一切新的冷启动发送。
  *
+ * 2026-10-08 已解除：sitemap 判定已统一（`src/lib/seo/sitemap-rules.ts`）、
+ * 已发批次已复核、历史 Contacted 已对账（`npm run leads -- backfill-contacted`），
+ * 且生产发布验证通过（commit b3b2374）。
+ *
  * 注意：本层**没有任何发送实现**，这个开关不会「阻止」什么自动流程 —— 它是给人工执行者
- * 看的硬性状态位，`ops -- today / doctor` 会显著提示。恢复发送必须由用户显式改回 false。
+ * 看的硬性状态位，`ops -- today / doctor` 会在 active 时显著提示。置位 / 复位**必须由用户显式操作**。
  */
 export const OUTREACH_SEND_HOLD: { active: boolean; since: string; reason: string } = {
-  active: true,
+  active: false,
   since: "2026-10-08",
-  reason: "sitemap 判定规则误报（Filebase 事件）；规则修正 + 已发批次复核完成前暂停新 outreach",
+  reason:
+    "Sitemap verification and historical outreach reconciliation completed; production release verified.",
 };
 
 // ================= Daily Log =================

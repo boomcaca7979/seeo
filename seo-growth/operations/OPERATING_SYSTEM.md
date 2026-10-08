@@ -9,19 +9,22 @@
 
 ---
 
-## ⛔ 当前状态：Outreach 发送暂停（自 2026-10-08）
+## ✅ 当前状态：Outreach 已恢复（暂停期 2026-10-08 → 2026-10-08）
 
-机器可读开关：`OUTREACH_SEND_HOLD`（`src/lib/operations/index.ts`），当前 `active = true`。
-`npm run ops -- today` / `ops -- doctor` 会显著提示。
+机器可读开关：`OUTREACH_SEND_HOLD`（`src/lib/operations/index.ts`），当前 `active = false`。
+`active = true` 期间 `npm run ops -- today` / `ops -- doctor` 会显著提示。
 
-**暂停期间：不发新的 cold outreach、不回复、不发 follow-up。**
+**暂停期间（2026-10-08）**：不发新的 cold outreach、不回复、不发 follow-up。
 
 事由：2026-10-02 Filebase 回复指出我们的「no sitemap」判定是错的 —— prospecting 把
 `/sitemap.xml` 返回 404 直接当成「站点没有 sitemap」，而对方 `robots.txt` 明确声明了
 `sitemap-index.xml`（HTTP 200 / 有效 sitemapindex）。规则缺陷已修正（见 §2.1），
-已发批次已复核（见 `SITEMAP_FALSE_POSITIVE_REVIEW.md`）。
+已发批次已复核（见 `SITEMAP_FALSE_POSITIVE_REVIEW.md`），历史 `Contacted` 已按真实发送
+事实对账（`npm run leads -- backfill-contacted`，见 `../LEAD_MASTER.md`）。
 
-**恢复发送必须由用户显式把 `active` 改回 `false`**，不得由任何自动化或脚本代改。
+**解除**：2026-10-08 生产发布（统一 sitemap 判定 + Lead 状态对账）验证通过后，**由用户显式**
+把 `active` 改回 `false`。这个开关**永远只能由用户显式操作**（暂停同样由用户显式置为 `true`），
+不得由任何自动化或脚本代改。
 
 ---
 
