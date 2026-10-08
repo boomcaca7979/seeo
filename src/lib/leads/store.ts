@@ -17,6 +17,13 @@ import {
   planContactedBackfill,
   type ReconcilePlan,
 } from "./reconcile.ts";
+import {
+  applyLedgerReconciliation,
+  planLedgerReconciliation,
+  readSendLedger,
+  type LedgerPlan,
+} from "./send-ledger.ts";
+import { COMPLAINT_SUPPRESSION_NOTE } from "./prospecting-rules.ts";
 
 /** 相对仓库根目录的主库路径（唯一 Lead Master） */
 export const LEAD_MASTER_RELATIVE_PATH = "seo-growth/leads.csv";
@@ -282,4 +289,94 @@ export function backfillContacted(
 /** 主库里已被对账过的行数（只读，供报告 / doctor 使用） */
 export function countReconciledLeads(cwd: string = process.cwd()): number {
   return readLeads(cwd).filter((l) => isReconciled(l)).length;
+}
+
+// ---------------- Send Ledger 对账（Resend 权威发件记录） ----------------
+
+export interface ReconcileLedgerResult {
+  ok: boolean;
+  /** true = 只算不写（默认）；false = 已写库 */
+  dryRun: boolean;
+  plan: LedgerPlan;
+  /** 实际写盘的行数（dry-run 恒为 0） */
+  written: number;
+  /** ledger 文件是否存在（被 gitignore，CI / 新克隆可能没有） */
+  ledgerPresent: boolean;
+  reasons?: string[];
+}
+
+/**
+ * 用 Resend 权威发件记录对账 Lead Master（CLI：`npm run leads -- reconcile-ledger`）。
+ *
+ * 行为边界：只回填**缺失的真实 email**、把**退信**记进 `reply_status`、把
+ * 「收件域名 ≠ 主库 website 域名」写进 notes 留痕。绝不改 `website` / `status` /
+ * `template` / 触达日期，也绝不新增发送计数。默认 dry-run（写库必须显式 `--apply`）。
+ */
+export function reconcileSendLedger(
+  opts: { cwd?: string; apply?: boolean; now?: Date } = {}
+): ReconcileLedgerResult {
+  const cwd = opts.cwd ?? process.cwd();
+  const now = opts.now ?? new Date();
+  const apply = opts.apply ?? false;
+
+  const leads = readLeads(cwd);
+  const ledger = readSendLedger(cwd);
+  const plan = planLedgerReconciliation(leads, ledger);
+  const ledgerPresent = ledger.length > 0;
+
+  if (!apply) return { ok: true, dryRun: true, plan, written: 0, ledgerPresent };
+
+  if (!ledgerPresent) {
+    return {
+      ok: false,
+      dryRun: false,
+      plan,
+      written: 0,
+      ledgerPresent: false,
+      reasons: ["send-ledger.csv 不存在或为空 —— 拒绝在无权威记录的情况下对账"],
+    };
+  }
+
+  const next = applyLedgerReconciliation(leads, plan, {
+    noteDate: todayDate(now),
+    nowIso: now.toISOString(),
+  });
+
+  // 安全网：写盘前把全表再校验一次，任何一行不合法就整批不写（原子性）
+  const reasons: string[] = [];
+  for (const l of next) {
+    for (const issue of validateLead(l)) reasons.push(`${l.lead_id} ${issue.field}: ${issue.message}`);
+  }
+  if (reasons.length > 0) return { ok: false, dryRun: false, plan, written: 0, ledgerPresent, reasons };
+
+  const changed = next.filter((l, i) => l !== leads[i]).length;
+  if (changed === 0) return { ok: true, dryRun: false, plan, written: 0, ledgerPresent };
+  writeLeads(next, cwd);
+  return { ok: true, dryRun: false, plan, written: changed, ledgerPresent };
+}
+
+// ---------------- 投诉压制 ----------------
+
+/**
+ * 投诉压制：收件人把邮件标成垃圾邮件 = 明确拒绝。
+ *
+ * 走**官方状态机**（`Contacted → Suppressed`），并把用户指定的标准句子**追加**到 notes
+ * （保留原有证据链，不覆盖历史）。同时清空 `next_followup_at`，确保 due / follow-up /
+ * candidate 查询永久排除它（`Suppressed` 是终态，见 `NEVER_FOLLOWUP_STATUSES`）。
+ */
+export function suppressComplaint(
+  leadId: string,
+  opts: { cwd?: string; now?: Date } = {}
+): UpdateLeadResult {
+  const cwd = opts.cwd ?? process.cwd();
+  const current = readLeads(cwd).find((l) => l.lead_id === leadId);
+  if (!current) return { ok: false, reasons: [`未找到 lead_id=${leadId}`] };
+
+  if (current.notes.includes(COMPLAINT_SUPPRESSION_NOTE)) {
+    // 幂等：已经记过这条投诉，不重复追加
+    return { ok: true, lead: current };
+  }
+
+  const notes = `${current.notes}${current.notes ? " " : ""}${COMPLAINT_SUPPRESSION_NOTE}`;
+  return updateLead(leadId, { status: "Suppressed", next_followup_at: "", notes }, { cwd, now: opts.now });
 }

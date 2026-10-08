@@ -23,6 +23,7 @@ import {
   LEAD_TEMPLATE_IDS,
   LEAD_TYPES,
   RECONCILE_NOTE_MARKER,
+  SEND_LEDGER_RELATIVE_PATH,
   addLead,
   backfillContacted,
   dueFollowUps,
@@ -30,7 +31,9 @@ import {
   nextFollowUpStatus,
   normalizeLeadType,
   readLeads,
+  reconcileSendLedger,
   searchLeads,
+  suppressComplaint,
   updateLead,
   writeLeads,
   type Lead,
@@ -298,6 +301,98 @@ function cmdBackfillContacted(flags: Args): void {
   }
 }
 
+// ---------------- suppress-complaint（投诉压制） ----------------
+//
+// 收件人把邮件标成垃圾邮件 = 明确拒绝。走官方状态机（Contacted → Suppressed），
+// 并把标准投诉句子**追加**到 notes（不覆盖原有证据链），同时清空 next_followup_at。
+// 之后该 Lead 永久排除出 due / follow-up / candidate 查询（Suppressed 是终态）。
+// 不发任何邮件，无任何网络调用。
+
+function cmdSuppressComplaint(positional: string[]): void {
+  const id = positional[0];
+  if (!id) {
+    console.error("缺少 lead_id");
+    process.exitCode = 1;
+    return;
+  }
+  const r = suppressComplaint(id);
+  if (!r.ok) {
+    console.error(`投诉压制失败：${r.reasons?.join("; ")}`);
+    process.exitCode = 1;
+    return;
+  }
+  const lead = r.lead!;
+  console.log(`已按投诉压制：${lead.lead_id} ${lead.website}`);
+  console.log(`  status        : ${lead.status}`);
+  console.log(`  next_followup : ${lead.next_followup_at || "(空)"}`);
+  console.log(`  可被 follow-up: ${isFollowUpEligible(lead)}（必须为 false）`);
+  console.log("保证：只追加 notes 与置 Suppressed；未发任何邮件、未修改触达日期、未新增发送。");
+}
+
+// ---------------- reconcile-ledger（Resend 权威发件记录对账） ----------------
+//
+// Resend 的**实际发件记录**是「历史 outreach 事实」的最高可信来源。
+// 只做三件事：回填缺失的真实 email、把退信记进 reply_status、把收件域名不一致写进 notes 留痕。
+// 绝不改 website / status / template / 触达日期，也绝不新增发送计数。
+// 默认 dry-run（只算不写），写库必须显式 --apply。无网络调用。
+
+function cmdReconcileLedger(flags: Args): void {
+  const apply = "apply" in flags;
+  const r = reconcileSendLedger({ apply });
+  const s = r.plan.summary;
+
+  console.log(`=== leads reconcile-ledger（${apply ? "APPLY 写库" : "DRY-RUN 只算不写"}）===`);
+  console.log(`ledger：${SEND_LEDGER_RELATIVE_PATH}（${r.ledgerPresent ? "已读取" : "不存在或为空"}）`);
+  console.log(`主库  ：${LEAD_MASTER_RELATIVE_PATH}\n`);
+
+  console.log(`records（ledger 行数）        : ${s.records}`);
+  console.log(`outreach sends（真实发送次数）: ${s.outreachSends}`);
+  console.log(`distinct recipients（唯一收件人）: ${s.distinctRecipients}`);
+  console.log("---");
+  console.log(`matched（主库与 ledger 一致）  : ${s.matched}`);
+  console.log(`backfilled email（本次待回填） : ${s.backfilledEmail}`);
+  console.log(`domain mismatch（累计事实）    : ${s.domainMismatch}`);
+  console.log(`unmatched（有触达却无记录）    : ${s.unmatched}`);
+  console.log(`duplicate（重复发送的收件人）  : ${s.duplicate}`);
+  console.log(`complaint（垃圾邮件投诉）      : ${s.complaint}`);
+  console.log(`bounce（退信）                 : ${s.bounce}`);
+  console.log(`\n会写库行数：${s.writable}`);
+
+  const interesting = r.plan.entries.filter(
+    (e) =>
+      !e.reconciled &&
+      (e.writes ||
+        e.actions.includes("domain-mismatch") ||
+        e.actions.includes("unmatched") ||
+        e.actions.includes("duplicate-send") ||
+        e.actions.includes("complaint"))
+  );
+  if (interesting.length > 0) {
+    console.log("\n明细：");
+    for (const e of interesting.slice(0, 60)) {
+      console.log(`  ${apply && e.writes ? "→" : "·"} ${e.lead_id.padEnd(10)} ${e.actions.join(",").padEnd(34)} ${e.reason}`);
+    }
+    if (interesting.length > 60) console.log(`  …还有 ${interesting.length - 60} 条`);
+  } else {
+    console.log("\n明细：（没有需要处理的差异）");
+  }
+
+  if (r.plan.unmatchedRecipients.length > 0) {
+    console.log(`\n⚠ ledger 里有、主库完全没有对应行的收件地址：${r.plan.unmatchedRecipients.length} 个`);
+  }
+
+  if (!r.ok) {
+    console.error(`\n写库被拒绝：\n  ${r.reasons?.join("\n  ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(
+    `\n结论：${r.dryRun ? "DRY-RUN，未写入任何内容（加 --apply 才写）" : `已写 ${r.written} 行（幂等：再跑一次应为 0）`}`
+  );
+  console.log("保证：未修改 website / status / template / first_contacted_at / last_contacted_at；未新增任何发送；未发任何邮件。");
+}
+
 function main(): void {
   const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
   switch (cmd) {
@@ -322,11 +417,17 @@ function main(): void {
     case "suppress":
       cmdSuppress(positional, flags);
       break;
+    case "suppress-complaint":
+      cmdSuppressComplaint(positional);
+      break;
     case "backfill-contacted":
       cmdBackfillContacted(flags);
       break;
+    case "reconcile-ledger":
+      cmdReconcileLedger(flags);
+      break;
     default:
-      console.log(`用法：node scripts/leads.ts <init|add|due|list|show|update|suppress|backfill-contacted> [选项]
+      console.log(`用法：node scripts/leads.ts <init|add|due|list|show|update|suppress|suppress-complaint|backfill-contacted|reconcile-ledger> [选项]
   init                       初始化主库（仅表头）
   add   --website= --lead-type= [--email= --specific-issue= --template= --source= ...]
   due   [--today=YYYY-MM-DD] 列出今天该跟进的 Lead
@@ -334,11 +435,15 @@ function main(): void {
   show  <lead_id>
   update <lead_id> --status=... [--next-followup=... --notes=...]
   suppress <lead_id> --reason="..."   标记永不联系
+  suppress-complaint <lead_id>        投诉压制（追加 [complaint] 记录 + Suppressed）
   backfill-contacted [--apply]        历史 Contacted 对账（默认 dry-run）
+  reconcile-ledger   [--apply]        Resend 权威发件记录对账（默认 dry-run）
 
 状态机纪律：新发送必须走 New → Ready to Contact → Contacted（update 逐次迁移）。
 不得用 add --status=Contacted 绕过；历史已发信的行用 backfill-contacted 对账。
-主库：${LEAD_MASTER_RELATIVE_PATH}`);
+邮箱纪律：只能发到官网公开显示的邮箱（notes 需带 public-email:<url> 证据），禁止推测。
+主库：${LEAD_MASTER_RELATIVE_PATH}
+Ledger：${SEND_LEDGER_RELATIVE_PATH}`);
   }
 }
 

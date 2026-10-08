@@ -29,6 +29,13 @@ import { classifySitemap } from "../seo/sitemap-rules.ts";
 // E 的「状态 ↔ 真实触达事实」对账判定：同样只有一份实现，L 只读复用（第 13 项自检）
 import { isContactedOrLater, type Lead } from "../leads/schema.ts";
 import { RECONCILE_FROZEN_STATUSES, inspectContactFact } from "../leads/reconcile.ts";
+// E 的 Send Ledger 对账（Resend 权威发件记录）与潜客获取规则：L 只读复用，不复制第二份
+import {
+  planLedgerReconciliation,
+  readSendLedger,
+} from "../leads/send-ledger.ts";
+import { auditPublicEmailRule, PUBLIC_EMAIL_RULE } from "../leads/prospecting-rules.ts";
+import { isFollowUpEligible } from "../leads/pipeline.ts";
 
 // ================= 目录与文件（唯一事实来源清单） =================
 
@@ -151,6 +158,28 @@ export {
   classifySitemap,
   extractSitemapDeclarations,
 } from "../seo/sitemap-rules.ts";
+
+// 潜客获取规则（公开邮箱 / 候选池来源 / 发送硬门槛）与 Send Ledger：唯一实现在 E，
+// 这里同样只 re-export —— 文档、CLI、doctor 都引用同一份，避免规则漂移。
+export {
+  PUBLIC_EMAIL_RULE,
+  ALLOWED_EMAIL_EVIDENCE_SOURCES,
+  FORBIDDEN_EMAIL_SOURCES,
+  GENERIC_EMAIL_LOCALPARTS,
+  PUBLIC_EMAIL_EVIDENCE_PATTERN,
+  PUBLIC_EMAIL_RULE_EFFECTIVE_FROM,
+  CANDIDATE_SOURCE_PREFIX,
+  CANDIDATE_VERIFICATION_STEPS,
+  DAY2_SEND_GATES,
+  DAY2_SEND_CHECKLIST,
+  COMPLAINT_SUPPRESSION_NOTE,
+} from "../leads/prospecting-rules.ts";
+
+export {
+  SEND_LEDGER_RELATIVE_PATH,
+  SEND_LEDGER_FIELDS,
+  LEDGER_NOTE_MARKER,
+} from "../leads/send-ledger.ts";
 
 /**
  * 冷启动 outreach 发送暂停开关（人工置位 / 复位）。
@@ -306,6 +335,10 @@ export const OPS_MANUAL_CHECKS: readonly string[] = [
   "确认今天产出的每条 outreach 都先观察过对方的真实问题",
   "确认今天指出的问题都按核验规则实测过（sitemap 类必须走完 SITEMAP_VERIFICATION_STEPS，不得凭 /sitemap.xml 404 断言无 sitemap）",
   "确认没有任何 outreach 绕过状态机写入（必须 New → Ready to Contact → Contacted；历史已发信的行用 `npm run leads -- backfill-contacted` 对账，不得 add --status=Contacted）",
+  "确认每封新邮件都发往**官网公开显示**的邮箱（notes 必须有 `public-email:<url>` 证据；禁止 info@domain 之类推测、禁止爬邮箱/买名单）",
+  "确认候选公司来自可追溯的公开目录（source 形如 `public-directory:<source-name>`），候选池只提供 company + domain，邮箱一律由官网逐个核验",
+  "确认发送前已对「Lead Master + Resend 发件记录（send-ledger）」双向去重，避免 NodePing 类重复发送",
+  "确认收到垃圾邮件投诉后立即 `npm run leads -- suppress-complaint <lead_id>`（投诉 = 明确拒绝，永久停止联系）",
   "确认写入 community-posts 的每一条都真的已经发布（含 url 与时间）",
   "确认 daily-log 的 signup/activation/payment 三个数字来自 B，而不是估计",
   "确认没有把任何运营文件放进公开站点或 client bundle",
@@ -351,6 +384,8 @@ export interface OpsAudit {
   filesPresent: Record<string, boolean>;
   counts: Record<string, number>;
   funnelInSync: boolean;
+  /** Send Ledger（Resend 权威发件记录）是否存在并被实际核对过 */
+  ledgerVerified: boolean;
   issues: OpsIssue[];
   manualChecks: readonly string[];
   openItems: readonly { id: string; owner: string; status: string; detail: string }[];
@@ -567,6 +602,55 @@ export function auditOperations(cwd: string = process.cwd()): OpsAudit {
     }
   }
 
+  // ---- 14/15/16. E：投诉压制、Send Ledger 一致性、公开邮箱规则 ----
+  //
+  // 背景（2026-10-08 全量发件核查）：Lead Master 的 email/website 字段不足以支撑去重，
+  // 且历史批次里出现过「凭空构造收件地址」与 1 起垃圾邮件投诉未被记录。
+  // 因此把 Resend 的**实际发件记录**（`seo-growth/send-ledger.csv`）确立为历史 outreach 的
+  // 最高可信来源，并在 doctor 里钉住三条硬门槛。规则本体在 E（leads 模块），L 只读复用。
+  const ledger = readSendLedger(cwd);
+  // ledger 被 gitignore：CI / 新克隆没有它，此时跳过 14/15（16 不依赖 ledger，始终执行）
+  const ledgerVerified = ledger.length > 0;
+  if (ledgerVerified) {
+    const plan = planLedgerReconciliation(leads as unknown as Lead[], ledger);
+    const s = plan.summary;
+    const byId = new Map((leads as unknown as Lead[]).map((l) => [l.lead_id, l]));
+
+    // 14. 投诉压制：被标为垃圾邮件 = 明确拒绝，必须 Suppressed 且永久排除出一切队列
+    for (const e of plan.entries) {
+      if (!e.actions.includes("complaint")) continue;
+      const lead = byId.get(e.lead_id);
+      if (!lead) continue;
+      if (lead.status !== "Suppressed") {
+        push(
+          "complaint",
+          `${e.lead_id} ${e.website} 收到垃圾邮件投诉但 status=${lead.status} —— 必须压制（npm run leads -- suppress-complaint ${e.lead_id}）`
+        );
+      }
+      if (isFollowUpEligible(lead)) {
+        push("complaint", `${e.lead_id} 已投诉但仍可进入 follow-up —— 必须排除出一切队列`);
+      }
+    }
+
+    // 15. Send Ledger 一致性：主库必须与权威发件记录对齐（dedupe 基才是可信的）
+    if (s.unmatched > 0) {
+      push("sendLedger", `${s.unmatched} 行主库记载了触达但 ledger 无对应记录 —— 需人工核对（不得反向补 Contacted）`);
+    }
+    if (s.writable > 0) {
+      push("sendLedger", `${s.writable} 行与 ledger 存在未落库差异 —— 跑 npm run leads -- reconcile-ledger --apply`);
+    }
+    if (s.backfilledEmail > 0) {
+      push("sendLedger", `${s.backfilledEmail} 行 email 缺失但 ledger 有真实收件地址 —— 跑 npm run leads -- reconcile-ledger --apply`);
+    }
+  }
+
+  // 16. 公开邮箱规则：只允许官网公开显示的邮箱（禁止推测 / 抓取 / 买名单）。
+  // 只判「即将发送」与「规则生效日之后已发送」的行；历史行不追溯（见 prospecting-rules.ts）。
+  const emailAudit = auditPublicEmailRule(leads as unknown as Lead[]);
+  for (const i of emailAudit.issues) {
+    push("publicEmail", `${i.lead_id} ${i.website}：${i.message}（${PUBLIC_EMAIL_RULE}）`);
+  }
+
   const counts: Record<string, number> = {
     leads: leads.length,
     content: content.length,
@@ -576,7 +660,15 @@ export function auditOperations(cwd: string = process.cwd()): OpsAudit {
     dailyLog: logRows.length,
   };
 
-  return { filesPresent, counts, funnelInSync, issues, manualChecks: OPS_MANUAL_CHECKS, openItems: OPS_OPEN_ITEMS };
+  return {
+    filesPresent,
+    counts,
+    funnelInSync,
+    ledgerVerified,
+    issues,
+    manualChecks: OPS_MANUAL_CHECKS,
+    openItems: OPS_OPEN_ITEMS,
+  };
 }
 
 /** 生成今天应执行的清单（只描述动作，不执行） */

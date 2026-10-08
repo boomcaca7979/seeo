@@ -28,6 +28,33 @@
 
 ---
 
+## ⛔ Day 2 新邮件发送门槛（2026-10-08 设立）
+
+`OUTREACH_SEND_HOLD.active = false`（全局暂停已解除）**不等于**可以立刻开始下一批新 outreach。
+2026-10-08 的全量发件核查发现了三个必须先修的问题，修完之前**不得发出任何新的首次触达**：
+
+1. **1 起垃圾邮件投诉**（收件人把邮件标为 spam）此前被 daily-log 误记为「送达」→ 已修正，投诉方已压制；
+2. **主库 `email` / `website` 字段不足以去重** → 已建立 Send Ledger 并完成对账；
+3. **历史批次里有「凭空构造收件地址」** → 已设立「只发官网公开邮箱」规则。
+
+恢复发送前必须同时满足（`ops -- doctor` 会逐条列出状态）：
+
+| 门槛 | 要求 |
+|---|---|
+| Lead Master + Resend ledger dedupe | `PASS` |
+| Complaint suppression | `PASS`（投诉方已 `Suppressed`，且不可进入任何队列） |
+| Public-email-only rule | `PASS`（无公开来源证据不发） |
+| Sitemap verification | `PASS`（按 §2.1 走完 6 步） |
+| Specific issue evidence | `PASS`（每条都有实测证据） |
+
+发送时每条还必须满足：一次一封 · 真实公开邮箱 · 个性化具体问题 · 使用既有 sender
+（**SeeO Team**，发件域名 `seeo.asia`，地址见 C 阶段模板）· 保留退订机制 / `List-Unsubscribe` ·
+发送后立即把真实 recipient 与 Resend message id 记入 Lead Master 与 Send Ledger。
+
+机器可读清单：`DAY2_SEND_GATES` / `DAY2_SEND_CHECKLIST`（`src/lib/leads/prospecting-rules.ts`）。
+
+---
+
 ## 0. 数据来源：只读，不重建
 
 运营层**不拥有任何数据**。它只读下面这些已经存在的唯一来源：
@@ -145,6 +172,44 @@ Find prospects → Personalize outreach → Follow up → Community participatio
 
 ---
 
+### 2.2 邮箱来源核验（2026-10-08 起，禁止跳步）
+
+**规则唯一来源：`src/lib/leads/prospecting-rules.ts`**（`PUBLIC_EMAIL_RULE`）。
+**红线：只能发送到对方官网真实公开显示过的邮箱。地址本身没在公开网页上出现，就不得发送。**
+
+允许的来源：
+
+- 官网公开的 `mailto:` 链接
+- 官网 Contact / About / Support 页面明确显示的邮箱
+- 官网公开的企业联系人信息（含 Imprint / Legal notice）
+
+禁止的来源：按域名模式推测（`info@域名` / `hello@域名` / `sales@域名`）、
+按公司名或域名猜联系人姓名生成邮箱、第三方邮箱数据库或买名单、爬取邮箱、
+以及任何未在公开网页上真实显示过的地址。
+
+**录入时必须把证据写进 `notes`**：`public-email:<该地址所在的公开页面 URL>`。
+没有这条证据的行一律**视为猜测**，不得发送。
+
+> 通用角色前缀（`info` / `hello` / `sales` / `contact` / `support` …）**本身不违规** ——
+> 官网自己把它印在 Contact 页上就完全合规；用了这些前缀才**必须**有公开来源证据。
+>
+> 背景：2026-09-29 批次至少有 2 封发给了**凭空构造**的地址，对方站点上只有 web form、
+> 没有任何公开邮箱。这违反 C 阶段模板开头写下的边界「不买名单、不爬邮箱」。
+
+### 2.3 候选池来源（目录只发现公司，不提供邮箱）
+
+允许用公开的 startup / SaaS / SMB 公司目录发现候选，但 `source` 必须可追溯，形如
+`public-directory:<source-name>`。目录**只提供 `company + domain`**，邮箱一律由官网逐个核验。
+
+每个候选进入 `Ready to Contact` 之前必须逐项通过：
+`website` → `public email`（含证据 URL）→ `specific SEO issue` → `issue evidence` →
+`sitemap verification`（§2.1 六步）→ `dedupe against Lead Master` →
+`dedupe against authoritative Resend send history`（见 §3.1）。
+
+机器可读：`CANDIDATE_VERIFICATION_STEPS`。
+
+---
+
 ## 3. Outreach 流程（C 是唯一发送基础）
 
 三类可复用骨架：
@@ -163,6 +228,43 @@ Find prospects → Personalize outreach → Follow up → Community participatio
 
 **禁止（2026-10-08 增补，源自 Filebase 事件）**：仅凭 `/sitemap.xml` 返回 404 就断言对方
 「没有 sitemap」。sitemap 类问题必须先走完 §2.1 的 6 步核验；核验不通过就不发信。
+
+**禁止（2026-10-08 增补，源自发件记录核查）**：发送到**未经公开显示**的收件地址（见 §2.2）；
+以及在没有对 Send Ledger 去重的情况下发送（见 §3.1）。
+
+### 3.1 Send Ledger：历史 outreach 的最高可信来源
+
+**`seo-growth/send-ledger.csv`**（与 `leads.csv` 同级敏感、同样被 `.gitignore` 屏蔽）是
+Resend **实际发件记录**的导出。它不是第二份潜客库，而是**对账单**：只读、只用于对账与去重。
+
+为什么必须有它：主库的 `email` / `website` 字段**不足以**去重 —— 部分已联系行的 `email` 为空、
+部分行的「主库网站域名」与「实际收件域名」不是同一个域。只按主库去重会漏掉已联系过的人，
+2026-09-29 的 NodePing 重复发送就是这么来的。**所以去重必须同时查主库与 ledger。**
+
+对账（默认 dry-run）：
+
+```bash
+npm run leads -- reconcile-ledger
+npm run leads -- reconcile-ledger --apply
+```
+
+它只回填**缺失的真实 email**、把**退信**记进 `reply_status`、把**收件域名不一致 / 重复发送**
+写进 `notes` 留痕；绝不修改 `website` / `status` / `template` / 触达日期，绝不新增发送计数，幂等。
+详细规则见 `../LEAD_MASTER.md` §九。
+
+### 3.2 投诉 = 明确拒绝（永久压制）
+
+收件人把邮件标成垃圾邮件（Resend 的 `complained`）**等同于明确拒绝**：
+
+```bash
+npm run leads -- suppress-complaint <lead_id>
+```
+
+走官方状态机（`Contacted → Suppressed`），把标准句子**追加**到 `notes`（保留原证据链），
+并清空 `next_followup_at`；此后永久排除出 due / follow-up / candidate 查询。
+
+> 2026-10-08 核查发现：2026-09-29 有 1 起投诉，但 daily-log 当时把它误记成「送达」
+> （写成 76 delivered）。已按权威发件记录修正为 **75 delivered / 1 bounced / 1 complained**。
 
 模板只是骨架，**实际发送必须人工个性化**，且 L 不含任何发送实现。
 
@@ -289,15 +391,21 @@ What should we repeat next week?
 ## 13. Operations CLI
 
 ```text
-npm run ops -- doctor    文件 / schema / 引用 / 虚假记录 / 隐私 / 反自动化
+npm run ops -- doctor    文件 / schema / 引用 / 虚假记录 / 隐私 / 反自动化 / 发送门槛
 npm run ops -- today     只输出今天要做什么
 npm run ops -- weekly    本周动作 + B 来源结果 + 未完成项
 npm run ops -- log       写入人工确认后的运营动作
+
+npm run leads -- due                 今天该跟进谁
+npm run leads -- backfill-contacted  历史 Contacted 对账（默认 dry-run）
+npm run leads -- reconcile-ledger    与 Resend 权威发件记录对账（默认 dry-run）
+npm run leads -- suppress-complaint  投诉压制（永久停止联系）
 ```
 
 `doctor` 会检查：文件是否存在、daily-log schema、E 的状态枚举、F/G/I/H 的引用有效性、
 是否出现第二份 Master、是否伪造发布记录、运营文件是否被站点引用、
-核心漏斗是否与 B 的契约一致、**以及模块内是否存在真实网络调用形态**。
+核心漏斗是否与 B 的契约一致、**模块内是否存在真实网络调用形态**，
+以及 §Day 2 门槛的五项（投诉压制 / Send Ledger 一致性 / 公开邮箱规则 / sitemap 规则 / 触达事实状态）。
 
 ---
 

@@ -19,9 +19,12 @@ import {
   CORE_FUNNEL,
   DAILY_LOG_FIELDS,
   DAILY_QUOTAS,
+  DAY2_SEND_GATES,
   OPS_FILES,
   OUTREACH_SEND_HOLD,
+  PUBLIC_EMAIL_RULE,
   QUOTA_DISCLAIMER,
+  SEND_LEDGER_RELATIVE_PATH,
   auditOperations,
   buildLogRow,
   dailyChecklist,
@@ -63,6 +66,27 @@ function cmdDoctor(): void {
   for (const [k, n] of Object.entries(a.counts)) console.log(`  ${k.padEnd(16)} ${n}`);
   console.log(`\n核心漏斗与 B 契约一致：${a.funnelInSync ? "yes" : "NO"}`);
   console.log(`  漏斗：${CORE_FUNNEL.join(" → ")}`);
+
+  // ---- Send Ledger / 合规门槛状态 ----
+  // ledger 被 gitignore：CI / 新克隆没有它，此时跳过（不代表失败）
+  console.log(
+    `\nSend Ledger（Resend 权威发件记录）：${
+      a.ledgerVerified ? `已核对 ${SEND_LEDGER_RELATIVE_PATH}` : "未找到 —— CI / 新克隆属正常，跳过相关自检"
+    }`
+  );
+  console.log(`公开邮箱规则：${PUBLIC_EMAIL_RULE}`);
+  const areaOfGate: Record<string, string> = {
+    complaint: "complaint",
+    dedupe: "sendLedger",
+    "public-email": "publicEmail",
+    sitemap: "sitemapRule",
+  };
+  console.log("\nDay 2 发送硬门槛（不 PASS 不得恢复 outreach）：");
+  for (const g of DAY2_SEND_GATES) {
+    const area = areaOfGate[g.id];
+    const failed = area ? a.issues.filter((i) => i.area === area).length > 0 : false;
+    console.log(`  ${failed ? "✗" : "✓"} ${g.requirement}`);
+  }
 
   console.log("\n每日起始配额（不是成功承诺）：");
   const q = DAILY_QUOTAS;

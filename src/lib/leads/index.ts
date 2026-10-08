@@ -7,4 +7,6 @@ export * from "./normalize.ts";
 export * from "./csv.ts";
 export * from "./pipeline.ts";
 export * from "./reconcile.ts";
+export * from "./send-ledger.ts";
+export * from "./prospecting-rules.ts";
 export * from "./store.ts";

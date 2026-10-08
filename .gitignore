@@ -52,3 +52,8 @@ next-env.d.ts
 # E｜潜客数据库（内部数据，含真实联系人邮箱，禁止提交/禁止进 client bundle）
 /seo-growth/leads.csv
 /seo-growth/leads.csv.tmp
+
+# E｜Send Ledger（Resend 实际发件记录导出，含真实收件地址，禁止提交）
+# 这是「历史 outreach 的最高可信来源」，与 leads.csv 同级敏感；只做对账，不是第二份潜客库。
+/seo-growth/send-ledger.csv
+/seo-growth/send-ledger.csv.tmp
