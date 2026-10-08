@@ -34,14 +34,19 @@ npm run leads -- update L0HPSCTX --status="Follow-up 1"
 # 4) 对方要求别再联系
 npm run leads -- suppress L0HPSCTX --reason="asked to stop"
 
-# 5) 查 / 筛
+# 5) 历史批量写入的 Contacted 对账（默认 dry-run，加 --apply 才写）
+npm run leads -- backfill-contacted
+npm run leads -- backfill-contacted --apply
+
+# 6) 查 / 筛
 npm run leads -- list
 npm run leads -- list --status=Contacted
 npm run leads -- show L0HPSCTX
 ```
 
 也可以直接用表格软件打开 `seo-growth/leads.csv` 批量查看与筛选；
-但**新增和状态变更建议走上面的命令**，因为去重与状态机只在命令里强制。
+但**新增和状态变更建议走上面的命令**，因为去重与状态机只在命令里强制
+（手工直接改 CSV 会绕过状态机 —— 2026-09-29 的 Day 1 批次就是这么来的）。
 
 ---
 
@@ -92,6 +97,39 @@ npm run leads -- show L0HPSCTX
 
 允许的迁移在 `src/lib/leads/schema.ts` 的 `STATUS_TRANSITIONS`；不在表里的一律拒绝。
 硬性前置：**没有 `specific_issue` 不能进入 `Contacted`** —— 没亲眼确认过问题就不能发。
+
+### 唯一合法进入 `Contacted` 的路径
+
+`New → Ready to Contact → Contacted`（两次 `update`，中间那次要求 `specific_issue`）。
+`add --status=Contacted` 会被**直接拒绝**（2026-10-08 起）：批量新建一条 `Contacted`
+正是 2026-09-29 Day 1 批次绕过状态机的写法，这个口子已封。
+
+### 历史批量写入的豁免（`backfill-contacted`）
+
+2026-09-29 的 76 条是**批量直接写入** `Contacted` 的：发送是真的（Resend 有
+delivered / bounced 记录），但没有经过状态机，而且这批行都**没有记录 `template`**。
+
+处理方式是对账，不是补写事实：
+
+```bash
+npm run leads -- backfill-contacted          # dry-run：只算不写（默认）
+npm run leads -- backfill-contacted --apply   # 写库
+```
+
+它只做三件事，且**幂等**（重跑写 0 行，靠 `notes` 里的 `[reconcile-contacted]` 标记判断）：
+
+| 情况 | 动作 |
+|---|---|
+| 有真实触达事实（两个触达日期 + 发送记录）但状态还没到 `Contacted` | 把 `status` 补成 `Contacted` |
+| 有事实、状态已在 `Contacted` 及之后、但没有 `template` | 在 `notes` 追加**历史豁免**记录（证明这行是批量写入的） |
+| 没有任何触达事实（普通 `New`） | **一律不动** —— 绝不自动升级 |
+
+绝不修改 `first_contacted_at` / `last_contacted_at` / `next_followup_at` / `last_action`，
+绝不新增一次发送，也**绝不虚构 `template`**（没有证据就是没有）。
+`Suppressed` / `Not Interested` / `No Response` 是对账冻结状态，一字不改。
+
+机器可读实现是 `src/lib/leads/reconcile.ts`（唯一一份）；`ops -- doctor` 会持续校验
+「有触达事实的行状态是否已经跟上」，防止再次出现批量绕过。
 
 ---
 

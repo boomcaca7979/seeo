@@ -26,6 +26,7 @@ import {
   type StructuredDataReport,
 } from "./structured-data";
 import type { RobotsReport, SitemapReport, LlmsTxtReport } from "./site-reports";
+import { classifySitemap } from "./sitemap-rules";
 
 export { pickText };
 export type { LText, LocalizedText };
@@ -1139,15 +1140,21 @@ const siteRules: AuditRule[] = [
     scoreWeight: 1,
     recommendation: { en: "Publish a sitemap.xml and reference it in robots.txt", zh: "发布 sitemap.xml 并在 robots.txt 中声明" },
     check: (ctx) => {
-      const sitemap = ctx.sitemap;
-      if (sitemap?.found) return [];
-      if (sitemap && sitemap.httpStatus !== null) return []; // 有响应但无效 → sitemap-invalid 负责
-      const declared = ctx.robots.sitemapUrls.length > 0;
-      if (declared) return []; // 已声明但完全不可达 → sitemap-invalid 负责
+      // 判定走共享规则（src/lib/seo/sitemap-rules.ts），不在此处重写 if/else。
+      // 历史事故：只探 /sitemap.xml 得到 404 就判 no-sitemap，而 robots.txt 其实声明了 sitemap。
+      const { verdict } = classifySitemap({
+        found: ctx.sitemap?.found ?? false,
+        declaredUrls: ctx.robots.sitemapUrls,
+        firstResponseStatus: ctx.sitemap?.httpStatus ?? null,
+      });
+      if (verdict !== "no-sitemap") return [];
       return [
         {
           url: `${ctx.origin}/robots.txt`,
-          message: { en: "robots.txt does not declare a Sitemap", zh: "robots.txt 中未声明 Sitemap" },
+          message: {
+            en: "robots.txt does not declare a Sitemap and none of the common locations expose one",
+            zh: "robots.txt 中未声明 Sitemap，常见 sitemap 入口也未发现可访问的 sitemap",
+          },
         },
       ];
     },
@@ -1166,32 +1173,50 @@ const siteRules: AuditRule[] = [
     recommendation: { en: "Fix the sitemap URL or regenerate a valid XML sitemap", zh: "修正 sitemap 地址，或重新生成有效的 XML sitemap" },
     check: (ctx) => {
       const sitemap = ctx.sitemap;
-      if (!sitemap || sitemap.found) return [];
-      const declared = ctx.robots.sitemapUrls.length > 0;
-      if (sitemap.httpStatus !== null && sitemap.httpStatus >= 400) {
+      const declared = ctx.robots.sitemapUrls;
+      const { verdict } = classifySitemap({
+        found: sitemap?.found ?? false,
+        declaredUrls: declared,
+        firstResponseStatus: sitemap?.httpStatus ?? null,
+      });
+      if (verdict !== "sitemap-invalid") return [];
+
+      const httpStatus = sitemap?.httpStatus ?? null;
+      const url = declared[0] ?? sitemap?.sitemapUrls[0] ?? `${ctx.origin}/sitemap.xml`;
+      const hasDeclared = declared.length > 0;
+
+      if (httpStatus !== null && httpStatus >= 400) {
         return [
           {
-            url: sitemap.sitemapUrls[0] ?? `${ctx.origin}/sitemap.xml`,
+            url,
             message: {
-              en: `Sitemap returns HTTP ${sitemap.httpStatus}${declared ? " (declared in robots.txt)" : ""}`,
-              zh: `Sitemap 返回 HTTP ${sitemap.httpStatus}${declared ? "（robots.txt 已声明）" : ""}`,
+              en: `Sitemap returns HTTP ${httpStatus}${hasDeclared ? " (declared in robots.txt)" : ""}`,
+              zh: `Sitemap 返回 HTTP ${httpStatus}${hasDeclared ? "（robots.txt 已声明）" : ""}`,
             },
-            metrics: { httpStatus: sitemap.httpStatus },
+            metrics: { httpStatus },
           },
         ];
       }
-      if (sitemap.httpStatus !== null) {
+      if (httpStatus === null) {
         return [
           {
-            url: sitemap.sitemapUrls[0] ?? `${ctx.origin}/sitemap.xml`,
+            url,
             message: {
-              en: "Sitemap responds but does not contain a valid urlset/sitemapindex structure",
-              zh: "Sitemap 可访问但不包含有效的 urlset/sitemapindex 结构",
+              en: "Declared sitemap could not be fetched (network error or timeout)",
+              zh: "robots.txt 声明的 sitemap 无法获取（网络错误或超时）",
             },
           },
         ];
       }
-      return [];
+      return [
+        {
+          url,
+          message: {
+            en: "Sitemap responds but does not contain a valid urlset/sitemapindex structure",
+            zh: "Sitemap 可访问但不包含有效的 urlset/sitemapindex 结构",
+          },
+        },
+      ];
     },
   },
   {

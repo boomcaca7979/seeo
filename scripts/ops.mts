@@ -20,6 +20,7 @@ import {
   DAILY_LOG_FIELDS,
   DAILY_QUOTAS,
   OPS_FILES,
+  OUTREACH_SEND_HOLD,
   QUOTA_DISCLAIMER,
   auditOperations,
   buildLogRow,
@@ -49,6 +50,11 @@ function parseArgs(argv: string[]): { cmd: string; flags: Flags } {
 function cmdDoctor(): void {
   const a = auditOperations();
   console.log("=== Operations doctor ===");
+  if (OUTREACH_SEND_HOLD.active) {
+    console.log(
+      `\n⛔ OUTREACH 发送暂停中（自 ${OUTREACH_SEND_HOLD.since}）—— ${OUTREACH_SEND_HOLD.reason}\n`
+    );
+  }
   console.log("\n文件：");
   for (const [k, v] of Object.entries(a.filesPresent)) {
     console.log(`  ${v ? "✓" : "✗"} ${k.padEnd(18)} ${OPS_FILES[k as keyof typeof OPS_FILES]}`);
@@ -80,6 +86,11 @@ function cmdToday(): void {
   const { items, due } = dailyChecklist();
   const today = new Date().toISOString().slice(0, 10);
   console.log(`=== 今天要做什么（${today}）===\n`);
+  if (OUTREACH_SEND_HOLD.active) {
+    console.log(`  ⛔ OUTREACH 发送暂停中（自 ${OUTREACH_SEND_HOLD.since}）`);
+    console.log(`     事由：${OUTREACH_SEND_HOLD.reason}`);
+    console.log("     暂停期间：不发新 cold outreach、不回复、不发 follow-up。\n");
+  }
   for (const i of items) console.log(`  [ ] ${i}`);
   console.log(`\n${QUOTA_DISCLAIMER}`);
   console.log(`\n到期跟进（读自 ${OPS_FILES.leads}，只读）：`);

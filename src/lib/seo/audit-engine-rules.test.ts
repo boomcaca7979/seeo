@@ -4,7 +4,7 @@
 // robots（不可达 / 整站阻断）、AI 爬虫访问、llms.txt、内容量阈值、text-html 比例、
 // 语义化 HTML。
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   auditRules,
   runAuditRules,
@@ -14,8 +14,20 @@ import {
   type FetchRecord,
   type RuleFinding,
 } from "@/lib/seo/audit-checks";
-import type { RobotsReport, SitemapReport, LlmsTxtReport } from "@/lib/seo/site-reports";
+import {
+  fetchRobotsReport,
+  fetchSitemapReport,
+  type RobotsReport,
+  type SitemapReport,
+  type LlmsTxtReport,
+} from "@/lib/seo/site-reports";
+import { classifySitemap, detectSitemapLinkTag, extractSitemapDeclarations } from "@/lib/seo/sitemap-rules";
 import type { PageData } from "@/lib/crawl";
+
+// 端到端场景会 stub 全局 fetch（stubFetch），每个用例后必须还原，避免污染其他用例
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ---------- 构造 ----------
 
@@ -411,5 +423,213 @@ describe("runAuditRules 站点级联动", () => {
     expect(siteRules.every((e) => e.findings.length === 0)).toBe(true);
     // 页面级规则照常执行（失败页面触发 missing-title 等）
     expect(execs.some((e) => e.rule.pageLevel === "page" && e.findings.length > 0)).toBe(true);
+  });
+});
+
+// ---------- sitemap 端到端行为（robots.txt → 声明的 sitemap → 子 sitemap → 兜底入口 → verdict） ----------
+//
+// 这一组**不是**字符串断言：stub 掉 fetch 之后真实跑
+//   fetchRobotsReport() → fetchSitemapReport() → classifySitemap() → auditRules
+// 再断言最终结论与审计规则产出。
+//
+// 回归红线（2026-10-02 Filebase 事故）：只探 `/sitemap.xml` 拿到 404 就判 `no-sitemap`。
+// 下面场景 1 / 2 / 4 / 6 中 `/sitemap.xml` 都返回 404，若旧逻辑回归会立刻变红。
+
+const ORIGIN = "https://example.com";
+
+function resp(body: string, status = 200, contentType = "text/plain"): Response {
+  return new Response(body, { status, headers: { "content-type": contentType } });
+}
+
+const XML_TYPE = "application/xml";
+
+function xmlUrlset(urls: string[]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls
+    .map((u) => `<url><loc>${u}</loc></url>`)
+    .join("")}</urlset>`;
+}
+
+function xmlIndex(children: string[]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${children
+    .map((u) => `<sitemap><loc>${u}</loc></sitemap>`)
+    .join("")}</sitemapindex>`;
+}
+
+type RouteMatcher = string | RegExp | ((url: string) => boolean);
+type RouteReply = () => Response | Promise<Response>;
+
+/** 按 URL 匹配的 fetch stub；未命中返回 404（模拟「这个路径没有文件」） */
+function stubFetch(routes: Array<[RouteMatcher, RouteReply]>, fallback?: RouteReply) {
+  const matches = (m: RouteMatcher, url: string): boolean => {
+    if (typeof m === "string") return url.includes(m);
+    if (m instanceof RegExp) return m.test(url);
+    return m(url);
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      for (const [m, reply] of routes) {
+        if (matches(m, url)) return reply();
+      }
+      return fallback ? fallback() : resp("not found", 404);
+    })
+  );
+}
+
+/** 真实跑完发现链路，并给出「判定结论 + 两条审计规则产出」 */
+async function discover(routes: Array<[RouteMatcher, RouteReply]>, fallback?: RouteReply) {
+  stubFetch(routes, fallback);
+  const robots = await fetchRobotsReport(ORIGIN);
+  const sitemap = await fetchSitemapReport(ORIGIN, robots, new Map());
+  const c = ctx({ robots, sitemap });
+  const verdict = classifySitemap({
+    found: sitemap.found,
+    declaredUrls: robots.sitemapUrls,
+    firstResponseStatus: sitemap.httpStatus,
+  });
+  return {
+    robots,
+    sitemap,
+    verdict,
+    noSitemapFindings: run("no-sitemap", c),
+    sitemapInvalidFindings: run("sitemap-invalid", c),
+  };
+}
+
+describe("sitemap 端到端行为（robots → 声明 → 子 sitemap → 兜底 → verdict）", () => {
+  it("场景1：/sitemap.xml 404 + robots 声明 /sitemap-index.xml → 不是 no-sitemap", async () => {
+    // 关键：/sitemap.xml 没有文件（404），但 robots.txt 声明了另一个地址
+    const { robots, sitemap, verdict, noSitemapFindings, sitemapInvalidFindings } = await discover([
+      [
+        "/robots.txt",
+        () => resp("User-agent: *\nDisallow:\nSitemap: https://example.com/sitemap-index.xml"),
+      ],
+      [/\/sitemap-index\.xml$/, () => resp(xmlIndex(["https://example.com/sitemap-pages.xml"]), 200, XML_TYPE)],
+      ["/sitemap-pages.xml", () => resp(xmlUrlset(["https://example.com/", "https://example.com/pricing"]), 200, XML_TYPE)],
+    ]);
+
+    // 先证明「旧逻辑会踩坑」：裸探 /sitemap.xml 确实是 404
+    const naive = await fetch(`${ORIGIN}/sitemap.xml`);
+    expect(naive.status).toBe(404);
+
+    // robots 声明被正确提取（走共享解析函数，不是本地一份）
+    expect(robots.sitemapUrls).toEqual(["https://example.com/sitemap-index.xml"]);
+    expect(extractSitemapDeclarations(robots.text ?? "")).toEqual(["https://example.com/sitemap-index.xml"]);
+
+    // 结论：找到了，不是 no-sitemap
+    expect(sitemap.found).toBe(true);
+    expect(verdict.verdict).toBe("found");
+    expect(noSitemapFindings.length).toBe(0);
+    expect(sitemapInvalidFindings.length).toBe(0);
+  });
+
+  it("场景2：sitemap index → 子 sitemap 200 → 正常存在（跟随子 sitemap）", async () => {
+    const child = "https://example.com/child-sitemap.xml";
+    const { sitemap, verdict, noSitemapFindings } = await discover([
+      ["/robots.txt", () => resp("User-agent: *\nDisallow:\nSitemap: https://example.com/sitemap.xml")],
+      ["/sitemap.xml", () => resp(xmlIndex([child]), 200, XML_TYPE)],
+      ["/child-sitemap.xml", () => resp(xmlUrlset(["https://example.com/a", "https://example.com/b"]), 200, XML_TYPE)],
+    ]);
+
+    expect(sitemap.found).toBe(true);
+    expect(sitemap.isIndex).toBe(true);
+    expect(sitemap.childSitemaps).toContain(child);
+    // 子 sitemap 被真实抓取，其 URL 进入收集结果
+    expect(sitemap.urls).toEqual(expect.arrayContaining(["https://example.com/a", "https://example.com/b"]));
+    expect(verdict.verdict).toBe("found");
+    expect(noSitemapFindings.length).toBe(0);
+  });
+
+  it("场景3：robots 声明 sitemap 但该地址返回 404 → sitemap-invalid（不是 no-sitemap）", async () => {
+    const { robots, sitemap, verdict, noSitemapFindings, sitemapInvalidFindings } = await discover([
+      ["/robots.txt", () => resp("User-agent: *\nDisallow:\nSitemap: https://example.com/sitemap.xml")],
+      // /sitemap.xml 未配置路由 → 默认 404
+    ]);
+
+    expect(robots.sitemapUrls).toEqual(["https://example.com/sitemap.xml"]);
+    expect(sitemap.found).toBe(false);
+    expect(sitemap.httpStatus).toBe(404);
+    expect(verdict.verdict).toBe("sitemap-invalid");
+
+    // 审计规则：sitemap-invalid 命中；no-sitemap 不命中
+    expect(sitemapInvalidFindings.length).toBe(1);
+    expect(sitemapInvalidFindings[0].url).toBe("https://example.com/sitemap.xml");
+    expect(pickText(sitemapInvalidFindings[0].message, "zh")).toContain("404");
+    expect(noSitemapFindings.length).toBe(0);
+  });
+
+  it("场景4：robots 无声明 + /sitemap_index.xml 存在 → 正常存在（走兜底入口）", async () => {
+    const { robots, sitemap, verdict, noSitemapFindings } = await discover([
+      ["/robots.txt", () => resp("User-agent: *\nDisallow:")],
+      // /sitemap.xml 未配置 → 默认 404（旧逻辑会在这里判 no-sitemap）
+      ["/sitemap_index.xml", () => resp(xmlUrlset(["https://example.com/", "https://example.com/about"]), 200, XML_TYPE)],
+    ]);
+
+    expect(robots.sitemapUrls).toEqual([]);
+    // 确实先探了 /sitemap.xml（404）再落到 /sitemap_index.xml
+    expect(sitemap.sitemapUrls).toContain("https://example.com/sitemap.xml");
+    expect(sitemap.sitemapUrls).toContain("https://example.com/sitemap_index.xml");
+
+    const naive = await fetch(`${ORIGIN}/sitemap.xml`);
+    expect(naive.status).toBe(404);
+
+    expect(sitemap.found).toBe(true);
+    expect(verdict.verdict).toBe("found");
+    expect(noSitemapFindings.length).toBe(0);
+  });
+
+  it("场景5：所有入口都不存在 → no-sitemap", async () => {
+    const { robots, sitemap, verdict, noSitemapFindings, sitemapInvalidFindings } = await discover(
+      [
+        ["/robots.txt", () => resp("User-agent: *\nDisallow:")],
+        // 首页存在，但没有 <link rel="sitemap">
+        [(u) => u === ORIGIN || u === `${ORIGIN}/`, () => resp("<html><head><title>Home</title></head><body>hi</body></html>")],
+      ],
+      // 其余（全部兜底入口 + 页内 URL 抽检）统一 404
+      () => resp("not found", 404)
+    );
+
+    expect(robots.sitemapUrls).toEqual([]);
+    // 五个兜底入口全部尝试过
+    expect(sitemap.sitemapUrls).toEqual(
+      expect.arrayContaining([
+        `${ORIGIN}/sitemap.xml`,
+        `${ORIGIN}/sitemap_index.xml`,
+        `${ORIGIN}/sitemap-index.xml`,
+        `${ORIGIN}/wp-sitemap.xml`,
+        `${ORIGIN}/sitemap/`,
+      ])
+    );
+    expect(sitemap.found).toBe(false);
+    expect(verdict.verdict).toBe("no-sitemap");
+
+    expect(noSitemapFindings.length).toBe(1);
+    expect(noSitemapFindings[0].url).toBe(`${ORIGIN}/robots.txt`);
+    expect(sitemapInvalidFindings.length).toBe(0);
+  });
+
+  it("场景6：robots 无声明但首页 <link rel=\"sitemap\"> 指向可用地址 → 正常存在", async () => {
+    const homeHtml =
+      '<html><head><link rel="alternate sitemap" href="/sitemap-custom.xml" /></head><body>hi</body></html>';
+    const { sitemap, verdict, noSitemapFindings } = await discover(
+      [
+        ["/robots.txt", () => resp("User-agent: *\nDisallow:")],
+        [(u) => u === ORIGIN || u === `${ORIGIN}/`, () => resp(homeHtml)],
+        ["/sitemap-custom.xml", () => resp(xmlUrlset(["https://example.com/"]), 200, XML_TYPE)],
+      ],
+      () => resp("not found", 404)
+    );
+
+    // 共享解析函数确实能从 HTML 里认出 rel 多值的 <link rel="... sitemap">
+    expect(detectSitemapLinkTag(homeHtml)).toBe("/sitemap-custom.xml");
+
+    const naive = await fetch(`${ORIGIN}/sitemap.xml`);
+    expect(naive.status).toBe(404);
+
+    expect(sitemap.found).toBe(true);
+    expect(sitemap.sitemapUrls).toContain(`${ORIGIN}/sitemap-custom.xml`);
+    expect(verdict.verdict).toBe("found");
+    expect(noSitemapFindings.length).toBe(0);
   });
 });

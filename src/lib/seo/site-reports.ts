@@ -3,6 +3,13 @@
 // 供全部站点级规则复用，避免 N× 请求。
 
 import { fetchUrlStatus } from "@/lib/crawl";
+import {
+  buildFallbackCandidates,
+  classifySitemap,
+  detectSitemapLinkTag,
+  extractSitemapDeclarations,
+  type SitemapClassification,
+} from "@/lib/seo/sitemap-rules";
 
 // ---------- robots.txt ----------
 
@@ -82,17 +89,8 @@ export function parseRobotsGroups(
   return groups;
 }
 
-function extractSitemapUrls(text: string): string[] {
-  const urls: string[] = [];
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (/^sitemap:/i.test(line)) {
-      const url = line.replace(/^sitemap:/i, "").trim();
-      if (url) urls.push(url);
-    }
-  }
-  return urls;
-}
+// Sitemap: 声明的解析是共享规则（src/lib/seo/sitemap-rules.ts），此处不另写一份。
+// 历史事故：曾只探 /sitemap.xml 并把它当成「站点没有 sitemap」的唯一依据。
 
 /** 读取并解析 robots.txt（一次请求） */
 export async function fetchRobotsReport(origin: string): Promise<RobotsReport> {
@@ -162,7 +160,7 @@ export async function fetchRobotsReport(origin: string): Promise<RobotsReport> {
     text,
     universalDisallow,
     disallowAll,
-    sitemapUrls: extractSitemapUrls(text),
+    sitemapUrls: extractSitemapDeclarations(text),
     aiCrawlers,
   };
 }
@@ -183,11 +181,15 @@ export interface SitemapUrlStatus {
 }
 
 export interface SitemapReport {
-  /** 是否找到可访问的 sitemap */
+  /** 是否找到可访问且结构有效的 sitemap（urlset 或 sitemapindex） */
   found: boolean;
-  /** 尝试过的 sitemap URL（robots 声明的 + 默认 /sitemap.xml） */
+  /**
+   * 尝试过的 sitemap URL（robots 声明的；未声明时为常见兜底入口）。
+   * 注意：这里列出「尝试过」的地址，不等于「站点没有 sitemap」——
+   * 判定必须用 classifySitemap()（共享规则），不要只看这个数组。
+   */
   sitemapUrls: string[];
-  /** 成功抓取的 sitemap 的 HTTP 状态 */
+  /** 成功抓取的 sitemap 的 HTTP 状态；未找到时为首个有响应的候选状态（供 sitemap-invalid 归因） */
   httpStatus: number | null;
   /** XML 结构是否有效（urlset / sitemapindex） */
   xmlValid: boolean;
@@ -206,6 +208,8 @@ const SITEMAP_STATUS_CHECK_LIMIT = 100;
 const SITEMAP_STATUS_CONCURRENCY = 5;
 /** sitemap index 子 sitemap 抓取上限 */
 const SITEMAP_CHILD_LIMIT = 10;
+/** 读取首页 HTML 以找 <link rel="sitemap"> 的超时（仅在 robots 未声明时发生一次） */
+const HOMEPAGE_LINK_TIMEOUT_MS = 8000;
 
 async function fetchText(url: string, timeoutMs: number): Promise<{ status: number; text: string } | null> {
   try {
@@ -240,8 +244,27 @@ function extractLoc(text: string): { urls: string[]; childSitemaps: string[] } {
   return { urls, childSitemaps };
 }
 
+/** 解析出的 sitemap 形态 */
+type SitemapShape = "urlset" | "sitemapindex" | null;
+
+function shapeOf(text: string): SitemapShape {
+  if (/<sitemapindex/i.test(text)) return "sitemapindex";
+  if (/<urlset/i.test(text)) return "urlset";
+  return null;
+}
+
 /**
- * 抓取并解析 sitemap（一次请求；index 则跟随子 sitemap，有上限）。
+ * 抓取并解析 sitemap。
+ *
+ * 发现顺序（与 src/lib/seo/sitemap-rules.ts 的 SITEMAP_VERIFICATION_STEPS 一致）：
+ *   1) robots.txt 声明的 sitemap（可能有多个）→ 逐个请求
+ *   2) 声明的响应是 sitemapindex → 跟随至少一个子 sitemap
+ *   3) robots.txt **未声明**时才兜底：常见入口（/sitemap.xml、/sitemap_index.xml、
+ *      /sitemap-index.xml、/wp-sitemap.xml、/sitemap/），再查站点 HTML 的 <link rel="sitemap">
+ *   4) 全部失败才由 classifySitemap() 判成 no-sitemap / sitemap-invalid
+ *
+ * **绝不因为 `/sitemap.xml` 返回 404 就判定「站点没有 sitemap」。**
+ *
  * @param knownStatuses 已爬取页面的状态（url → {status, hops}），避免重复抽检
  */
 export async function fetchSitemapReport(
@@ -249,36 +272,42 @@ export async function fetchSitemapReport(
   robots: RobotsReport,
   knownStatuses: Map<string, { status: number; hops: number }>
 ): Promise<SitemapReport> {
-  const candidates = robots.sitemapUrls.length > 0
-    ? robots.sitemapUrls
-    : [`${origin}/sitemap.xml`];
+  const declared = robots.sitemapUrls;
+  const isDeclaredCase = declared.length > 0;
+
+  // 1) robots 声明的候选；未声明时用常见兜底入口（共享规则给出的路径列表）
+  const candidates: string[] = isDeclaredCase ? [...declared] : buildFallbackCandidates(origin);
+  const tried: string[] = [...candidates];
 
   const collected = new Set<string>();
   const childSitemaps: string[] = [];
   let found = false;
   let httpStatus: number | null = null;
+  let firstResponseStatus: number | null = null;
   let xmlValid = false;
   let isIndex = false;
 
-  for (const candidate of candidates) {
+  /** 尝试一个候选；命中可用 sitemap 返回 true */
+  const tryCandidate = async (candidate: string): Promise<boolean> => {
     const res = await fetchText(candidate, SITEMAP_TIMEOUT_MS);
-    if (!res) continue;
-    // 记录首个有响应的候选状态（4xx/5xx 也记录，供 sitemap-invalid 规则判定"已声明但不可达"）
-    if (httpStatus === null) httpStatus = res.status;
-    if (res.status >= 400 || !res.text) continue;
-    const text = res.text;
-    const isUrlset = /<urlset/i.test(text);
-    const isSitemapIndex = /<sitemapindex/i.test(text);
-    if (!isUrlset && !isSitemapIndex) continue;
+    if (!res) return false;
+    // 记录首个有响应的候选状态（4xx/5xx 也记录，供 sitemap-invalid 归因「已声明但不可达」）
+    if (firstResponseStatus === null) firstResponseStatus = res.status;
+    if (res.status >= 400 || !res.text) return false;
+
+    const shape = shapeOf(res.text);
+    if (!shape) return false;
 
     found = true;
     xmlValid = true;
-    isIndex = isSitemapIndex;
-    const { urls } = extractLoc(text);
+    isIndex = shape === "sitemapindex";
+    httpStatus = res.status;
+
+    const { urls } = extractLoc(res.text);
     for (const u of urls) collected.add(u);
 
-    if (isSitemapIndex) {
-      // sitemap index：子 sitemap 也在 <loc> 中，按上限跟随
+    if (shape === "sitemapindex") {
+      // sitemap index：子 sitemap 也在 <loc> 中，按上限跟随（至少验证一个）
       const children = urls.slice(0, SITEMAP_CHILD_LIMIT);
       childSitemaps.push(...children);
       for (const child of children) {
@@ -289,8 +318,35 @@ export async function fetchSitemapReport(
         for (const u of childUrls) collected.add(u);
       }
     }
-    break; // 只采用第一个可用的 sitemap 声明
+    return true;
+  };
+
+  for (const candidate of candidates) {
+    if (await tryCandidate(candidate)) break;
   }
+
+  // 3) robots 未声明且常见入口都没命中 → 再查站点 HTML 的 <link rel="sitemap">
+  if (!found && !isDeclaredCase) {
+    const home = await fetchText(origin, HOMEPAGE_LINK_TIMEOUT_MS);
+    if (home && home.status < 400 && home.text) {
+      const href = detectSitemapLinkTag(home.text);
+      if (href) {
+        let linkUrl: string | null = null;
+        try {
+          linkUrl = new URL(href, origin).toString();
+        } catch {
+          linkUrl = null;
+        }
+        if (linkUrl && !tried.includes(linkUrl)) {
+          tried.push(linkUrl);
+          await tryCandidate(linkUrl);
+        }
+      }
+    }
+  }
+
+  // 未找到时把「首个有响应的候选状态」暴露出去，供 sitemap-invalid 说明原因
+  if (!found) httpStatus = firstResponseStatus;
 
   // 同域过滤 + 规范化
   const urls: string[] = [];
@@ -339,7 +395,7 @@ export async function fetchSitemapReport(
 
   return {
     found,
-    sitemapUrls: candidates,
+    sitemapUrls: tried,
     httpStatus,
     xmlValid,
     isIndex,
@@ -347,6 +403,23 @@ export async function fetchSitemapReport(
     urls,
     urlStatuses,
   };
+}
+
+/**
+ * 本次发现的 sitemap 判定结论（走共享规则，不在这里重写 if/else）。
+ * 供仪表盘/审计报告展示与测试断言使用。
+ */
+export function classifySitemapReport(
+  origin: string,
+  robots: RobotsReport,
+  sitemap: SitemapReport | null
+): SitemapClassification {
+  return classifySitemap({
+    found: sitemap?.found ?? false,
+    declaredUrls: robots.sitemapUrls,
+    firstResponseStatus: sitemap?.httpStatus ?? null,
+    xmlInvalid: (sitemap?.httpStatus ?? null) !== null && !(sitemap?.xmlValid ?? false),
+  });
 }
 
 // ---------- llms.txt ----------

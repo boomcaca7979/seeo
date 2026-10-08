@@ -71,6 +71,15 @@ const legacyDetailStatic: StaticEntry[] = [
   { zh: "缺少 llms.txt（AI 搜索可见性优化机会）", en: "llms.txt is missing (opportunity for AI search visibility)" },
   { zh: 'robots.txt 包含 "Disallow: /"，阻断整个站点', en: 'robots.txt contains "Disallow: /" which blocks the entire site' },
   { zh: "URL 在 sitemap 中列出，但被 robots.txt 阻断", en: "URL is listed in the sitemap but blocked by robots.txt" },
+  // 2026-10-08 sitemap 判定规则修正后新增的文案（上面的旧文案保留，供历史 audit_issues 行读取）
+  {
+    zh: "robots.txt 中未声明 Sitemap，常见 sitemap 入口也未发现可访问的 sitemap",
+    en: "robots.txt does not declare a Sitemap and none of the common locations expose one",
+  },
+  {
+    zh: "robots.txt 声明的 sitemap 无法获取（网络错误或超时）",
+    en: "Declared sitemap could not be fetched (network error or timeout)",
+  },
 ];
 
 // ---------- detail（message）动态模板 ----------

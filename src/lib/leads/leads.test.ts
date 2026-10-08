@@ -14,7 +14,9 @@ import {
   LEAD_TYPES,
   LEAD_TEMPLATE_IDS,
   STATUS_TRANSITIONS,
+  CONTACTED_OR_LATER_STATUSES,
   emptyLead,
+  isContactedOrLater,
   isDateOnly,
   type Lead,
 } from "./schema";
@@ -32,7 +34,27 @@ import {
   nextFollowUpStatus,
   validateLead,
 } from "./pipeline";
-import { LEAD_MASTER_RELATIVE_PATH, addLead, readLeads, searchLeads, updateLead, writeLeads } from "./store";
+import {
+  RECONCILE_NOTE_MARKER,
+  applyContactedBackfill,
+  buildReconcileNote,
+  countOutboundSendRecords,
+  hasOutboundContactFact,
+  inspectContactFact,
+  isReconciled,
+  planContactedBackfill,
+  type ReconcilePlan,
+} from "./reconcile";
+import {
+  LEAD_MASTER_RELATIVE_PATH,
+  addLead,
+  backfillContacted,
+  countReconciledLeads,
+  readLeads,
+  searchLeads,
+  updateLead,
+  writeLeads,
+} from "./store";
 
 // ---------------- 临时工作目录 ----------------
 let tmp: string;
@@ -490,9 +512,13 @@ describe("E12 隐私与访问控制", () => {
 
 // ================= 真实主库数据质量守卫 =================
 describe("真实 Lead Master 数据质量（手工编辑也能兜住）", () => {
-  it("主库若存在：无重复、status/lead_type/template 全部合法", () => {
+  it("主库若存在：无重复，status/lead_type/template 合法，日期字段格式一致", () => {
+    // 注意：`seo-growth/leads.csv` 被 .gitignore 屏蔽（含真实联系人邮箱），
+    // 因此在没有该文件的环境（CI / 新克隆）里必须**跳过**而不是失败 ——
+    // 这不是「冷启动假设」，而是数据不在版本控制内的必然结果。
+    // 但只要文件存在，其内容就必须完全合法。
     const realPath = path.join(process.cwd(), LEAD_MASTER_RELATIVE_PATH);
-    if (!fs.existsSync(realPath)) return; // 尚未初始化时跳过
+    if (!fs.existsSync(realPath)) return;
     const rows = readLeads();
     if (rows.length === 0) return;
 
@@ -503,16 +529,351 @@ describe("真实 Lead Master 数据质量（手工编辑也能兜住）", () => 
       expect(seen.has(key), `主库存在重复 Lead：${key}（已有 ${seen.get(key)}，又出现 ${l.lead_id}）`).toBe(false);
       seen.set(key, l.lead_id);
     }
-    // 取值守卫
+
+    // 取值守卫：真实运营已开始，状态必须是 E 的合法枚举（不得写口语小写形式）
     for (const l of rows) {
-      expect(LEAD_STATUSES).toContain(l.status);
-      expect(LEAD_TYPES).toContain(l.lead_type);
+      expect(LEAD_STATUSES, `${l.lead_id} 的 status 非法：${l.status}`).toContain(l.status);
+      expect(LEAD_TYPES, `${l.lead_id} 的 lead_type 非法：${l.lead_type}`).toContain(l.lead_type);
       if (l.template) expect(LEAD_TEMPLATE_IDS).toContain(l.template);
-      if (l.next_followup_at) expect(isDateOnly(l.next_followup_at)).toBe(true);
+      // 日期字段必须是 date-only（E schema 的 isDateOnly），不得混用 ISO 时间戳
+      for (const f of ["first_contacted_at", "last_contacted_at", "next_followup_at", "audit_date"] as const) {
+        if (l[f]) expect(isDateOnly(l[f]), `${l.lead_id} 的 ${f} 必须是 YYYY-MM-DD，实际：${l[f]}`).toBe(true);
+      }
+      // 已发首封的 Lead 必须留下具体问题记录（没确认过问题就不该发）
+      if (l.status === "Contacted" || l.status === "Follow-up 1" || l.status === "Follow-up 2") {
+        expect(l.specific_issue.trim(), `${l.lead_id} 已发信但缺 specific_issue`).not.toBe("");
+      }
+      // 时间顺序：last_contacted_at 不得早于 first_contacted_at
+      if (l.first_contacted_at && l.last_contacted_at) {
+        expect(l.last_contacted_at >= l.first_contacted_at, `${l.lead_id} 的 last 早于 first`).toBe(true);
+      }
     }
-    //  suppression 守卫：Suppressed 一律不得出现在跟进队列里
+
+    // suppression 守卫：Suppressed 一律不得出现在跟进队列里
     for (const l of rows) {
       if (l.status === "Suppressed") expect(isFollowUpEligible(l)).toBe(false);
+    }
+  });
+});
+
+// ================= E13：历史 Contacted 回填 / 状态机对账 =================
+// 背景：2026-09-29 的 Day 1 批次把 76 条 Lead 批量直接写成 `status = Contacted`，
+// 没有经过 New → Ready to Contact → Contacted，而且都没记 template。
+// 本组测试锁定「对账机制」的边界：只补状态、不伪造发送、不升级 New、幂等、不发信。
+
+describe("E13 历史 Contacted 回填（backfill-contacted）", () => {
+  const NOTE_DATE = "2026-10-08";
+  const NOW = new Date(`${NOTE_DATE}T10:00:00Z`);
+
+  /** 一条「批量写入」的历史 Lead：真的有发送事实，但没有 template */
+  function historicContacted(overrides: Partial<Lead> = {}): Lead {
+    return baseLead({
+      lead_id: "HIST1",
+      website: "hist.com",
+      email: "hi@hist.com",
+      status: "Contacted",
+      first_contacted_at: "2026-09-29",
+      last_contacted_at: "2026-09-29",
+      template: "",
+      last_action: "Day 1 outreach sent via Resend: delivered",
+      notes: "sent 2026-09-29, delivered",
+      ...overrides,
+    });
+  }
+
+  it("contact fact 判定：必须有真实发送记录，准备发 / 草稿都不算", () => {
+    const real = historicContacted();
+    expect(hasOutboundContactFact(real)).toBe(true);
+    expect(inspectContactFact(real).evidence.join(" ")).toContain("first_contacted_at=2026-09-29");
+
+    // 只有日期、没有发送记录 → 不算事实
+    const noRecord = historicContacted({ last_action: "", notes: "" });
+    expect(hasOutboundContactFact(noRecord)).toBe(false);
+    expect(inspectContactFact(noRecord).missing.join(" ")).toContain("没有 outbound 发送记录");
+
+    // 「准备发」不算事实
+    const draft = historicContacted({ last_action: "Draft prepared, not sent yet", notes: "" });
+    expect(hasOutboundContactFact(draft)).toBe(false);
+
+    // 日期不合法 / 时序倒挂 → 不算事实
+    expect(hasOutboundContactFact(historicContacted({ first_contacted_at: "2026/09/29" }))).toBe(false);
+    expect(
+      hasOutboundContactFact(historicContacted({ first_contacted_at: "2026-09-30", last_contacted_at: "2026-09-29" }))
+    ).toBe(false);
+  });
+
+  it("有真实 contact fact 但状态未到 Contacted → 补成 Contacted（触达时间原样保留）", () => {
+    writeLeads(
+      [
+        historicContacted({
+          lead_id: "FACT1",
+          status: "Ready to Contact",
+          next_followup_at: "2026-10-06",
+        }),
+      ],
+      tmp
+    );
+
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.ok).toBe(true);
+    expect(r.dryRun).toBe(false);
+    expect(r.plan.summary.promoteToContacted).toBe(1);
+    expect(r.plan.summary.statusChanges).toBe(1);
+    expect(r.written).toBe(1);
+
+    const after = readLeads(tmp);
+    expect(after[0].status).toBe("Contacted");
+    // 历史事实未被改写
+    expect(after[0].first_contacted_at).toBe("2026-09-29");
+    expect(after[0].last_contacted_at).toBe("2026-09-29");
+    // 没有顺手排一个 follow-up
+    expect(after[0].next_followup_at).toBe("2026-10-06");
+    expect(isReconciled(after[0])).toBe(true);
+  });
+
+  it("没有 contact fact 的 New → 保持 New（绝不自动升级）", () => {
+    writeLeads(
+      [
+        baseLead({ lead_id: "NEW1", website: "new1.com", email: "n1@new1.com", status: "New" }),
+        baseLead({ lead_id: "NEW2", website: "new2.com", email: "n2@new2.com", status: "Researching" }),
+        baseLead({ lead_id: "NEW3", website: "new3.com", email: "n3@new3.com", status: "Ready to Contact" }),
+      ],
+      tmp
+    );
+
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.plan.summary.skippedNoFact).toBe(3);
+    expect(r.plan.summary.statusChanges).toBe(0);
+    expect(r.written).toBe(0);
+
+    const after = readLeads(tmp);
+    expect(after.map((l) => l.status)).toEqual(["New", "Researching", "Ready to Contact"]);
+    for (const l of after) {
+      expect(l.notes).toBe("");
+      expect(isReconciled(l)).toBe(false);
+    }
+  });
+
+  it("重复执行 backfill → 数据完全不变（幂等）", () => {
+    writeLeads([historicContacted(), baseLead({ lead_id: "NEW1", website: "new1.com", email: "n1@new1.com", status: "New" })], tmp);
+
+    const first = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(first.written).toBe(1);
+    const snapshot = JSON.stringify(readLeads(tmp));
+
+    const second = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(second.written).toBe(0);
+    expect(second.plan.summary.alreadyReconciled).toBe(1);
+    expect(second.plan.summary.recordGrandfather).toBe(0);
+
+    const third = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(third.written).toBe(0);
+
+    expect(JSON.stringify(readLeads(tmp))).toBe(snapshot);
+    expect(countReconciledLeads(tmp)).toBe(1);
+    // 标记只出现一次
+    const notes = readLeads(tmp)[0].notes;
+    expect(notes.split(RECONCILE_NOTE_MARKER).length - 1).toBe(1);
+  });
+
+  it("已经 Contacted 的历史行 → 只登记豁免（notes 追加），status 与日期不变；重跑不再写", () => {
+    writeLeads([historicContacted()], tmp);
+    const before = readLeads(tmp)[0];
+
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.plan.summary.recordGrandfather).toBe(1);
+    expect(r.plan.summary.statusChanges).toBe(0); // 不改 status
+    expect(r.written).toBe(1); // 但写入了 provenance
+
+    const after = readLeads(tmp)[0];
+    expect(after.status).toBe("Contacted");
+    expect(after.status).toBe(before.status);
+    expect(after.first_contacted_at).toBe(before.first_contacted_at);
+    expect(after.last_contacted_at).toBe(before.last_contacted_at);
+    expect(after.template).toBe(""); // 无证据就不虚构
+    expect(after.notes.startsWith(before.notes)).toBe(true);
+    expect(after.notes).toContain(RECONCILE_NOTE_MARKER);
+    expect(after.notes).toContain("template 无证据可回填");
+
+    const again = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(again.written).toBe(0);
+    expect(readLeads(tmp)[0].notes).toBe(after.notes);
+  });
+
+  it("已经 Contacted 且已记录 template（走过状态机）→ 完全不动", () => {
+    writeLeads([historicContacted({ template: "A_website_issue_v1" })], tmp);
+    const before = readLeads(tmp)[0];
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.plan.summary.alreadyConsistent).toBe(1);
+    expect(r.plan.summary.writable).toBe(0);
+    expect(r.written).toBe(0);
+    expect(readLeads(tmp)[0]).toEqual(before);
+  });
+
+  it("默认是 dry-run：只算不写", () => {
+    writeLeads([historicContacted()], tmp);
+    const before = JSON.stringify(readLeads(tmp));
+    const r = backfillContacted({ cwd: tmp, now: NOW }); // 没有 apply
+    expect(r.dryRun).toBe(true);
+    expect(r.written).toBe(0);
+    expect(r.plan.summary.recordGrandfather).toBe(1); // 计划里有，但没落盘
+    expect(JSON.stringify(readLeads(tmp))).toBe(before);
+  });
+
+  it("backfill 不增加发送次数、不改触达时间、不改 last_action", () => {
+    writeLeads(
+      [
+        historicContacted({ lead_id: "A", website: "a.com", email: "a@a.com" }),
+        historicContacted({ lead_id: "B", website: "b.com", email: "b@b.com", status: "Ready to Contact" }),
+        baseLead({ lead_id: "C", website: "c.com", email: "c@c.com", status: "New" }),
+      ],
+      tmp
+    );
+
+    const before = readLeads(tmp);
+    const sendsBefore = countOutboundSendRecords(before);
+    expect(sendsBefore).toBe(2);
+
+    backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    const after = readLeads(tmp);
+
+    // ① 「有发送记录的行数」不变 → 没有凭空多出一次触达
+    expect(countOutboundSendRecords(after)).toBe(sendsBefore);
+    // ② 逐行比对：触达时间与发送记录一字未改
+    for (let i = 0; i < before.length; i++) {
+      expect(after[i].first_contacted_at).toBe(before[i].first_contacted_at);
+      expect(after[i].last_contacted_at).toBe(before[i].last_contacted_at);
+      expect(after[i].next_followup_at).toBe(before[i].next_followup_at);
+      expect(after[i].last_action).toBe(before[i].last_action);
+      expect(after[i].created_at).toBe(before[i].created_at);
+      expect(after[i].reply_status).toBe(before[i].reply_status);
+    }
+    // ③ 对账注记本身不得被误读成一次发送
+    expect(after[0].notes).toContain(RECONCILE_NOTE_MARKER);
+    expect(hasOutboundContactFact(after[0])).toBe(true);
+  });
+
+  it("backfill 不触发发送：模块与 CLI 分支都没有网络调用", () => {
+    const files = [
+      path.join(process.cwd(), "src/lib/leads/reconcile.ts"),
+      path.join(process.cwd(), "src/lib/leads/store.ts"),
+      path.join(process.cwd(), "scripts/leads.mts"),
+    ];
+    for (const f of files) {
+      const src = fs.readFileSync(f, "utf-8");
+      for (const bad of [/\bfetch\s*\(/, /axios/, /nodemailer/, /resend\.emails/, /https?\.request/]) {
+        expect(src, `${path.basename(f)} 不得出现网络调用 ${bad}`).not.toMatch(bad);
+      }
+    }
+  });
+
+  it("有发送事实但缺 specific_issue → 拒绝推进（交人工），不写库", () => {
+    writeLeads([historicContacted({ specific_issue: "", status: "Ready to Contact" })], tmp);
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.plan.summary.blockedMissingIssue).toBe(1);
+    expect(r.plan.summary.statusChanges).toBe(0);
+    expect(r.written).toBe(0);
+    expect(readLeads(tmp)[0].status).toBe("Ready to Contact");
+  });
+
+  it("Suppressed / Not Interested / No Response 一律不动（终态）", () => {
+    writeLeads(
+      [
+        historicContacted({ lead_id: "S1", website: "s1.com", email: "s1@s1.com", status: "Suppressed" }),
+        historicContacted({ lead_id: "S2", website: "s2.com", email: "s2@s2.com", status: "Not Interested" }),
+        historicContacted({ lead_id: "S3", website: "s3.com", email: "s3@s3.com", status: "No Response" }),
+      ],
+      tmp
+    );
+    const before = JSON.stringify(readLeads(tmp));
+    const r = backfillContacted({ cwd: tmp, apply: true, now: NOW });
+    expect(r.plan.summary.skippedFrozen).toBe(3);
+    expect(r.written).toBe(0);
+    expect(JSON.stringify(readLeads(tmp))).toBe(before);
+  });
+
+  it("planContactedBackfill / applyContactedBackfill 是纯函数（不改入参）", () => {
+    const leads = [historicContacted(), baseLead({ lead_id: "N", website: "n.com", email: "n@n.com" })];
+    const snapshot = JSON.stringify(leads);
+    const plan: ReconcilePlan = planContactedBackfill(leads);
+    const out = applyContactedBackfill(leads, plan, { noteDate: NOTE_DATE, nowIso: `${NOTE_DATE}T00:00:00.000Z` });
+    expect(JSON.stringify(leads)).toBe(snapshot); // 入参未被改动
+    expect(out).not.toBe(leads);
+    expect(out[0]).not.toBe(leads[0]); // 被写的行是新对象
+    expect(out[1]).toBe(leads[1]); // 未列入写入的行复用原对象
+    expect(buildReconcileNote(plan.entries[0], NOTE_DATE)).toContain(RECONCILE_NOTE_MARKER);
+  });
+
+  it("状态机纪律：新建时不得直接写 Contacted（唯一的绕过路径已封）", () => {
+    // add --status=Contacted 被拒（这就是 Day 1 批量写入的写法）
+    const direct = addLead(
+      {
+        website: "bypass.com",
+        email: "b@bypass.com",
+        lead_type: "SaaS",
+        specific_issue: "Missing canonical",
+        template: "A_website_issue_v1",
+        status: "Contacted",
+      },
+      { cwd: tmp }
+    );
+    expect(direct.ok).toBe(false);
+    expect(direct.reasons?.join(" ")).toContain("backfill-contacted");
+
+    // New → Contacted 依旧被拒（必须经过 Ready to Contact）
+    const created = addLead(
+      {
+        website: "flow.com",
+        email: "f@flow.com",
+        lead_type: "SaaS",
+        specific_issue: "Missing canonical",
+        template: "A_website_issue_v1",
+        status: "New",
+      },
+      { cwd: tmp }
+    );
+    expect(created.ok).toBe(true);
+    const id = created.lead!.lead_id;
+    expect(updateLead(id, { status: "Contacted" }, { cwd: tmp }).ok).toBe(false);
+
+    // 正式路径仍然可用：New → Ready to Contact → Contacted
+    expect(updateLead(id, { status: "Ready to Contact" }, { cwd: tmp }).ok).toBe(true);
+    const sent = updateLead(id, { status: "Contacted" }, { cwd: tmp, now: NOW });
+    expect(sent.ok).toBe(true);
+    expect(sent.lead!.status).toBe("Contacted");
+    expect(sent.lead!.first_contacted_at).toBe(NOTE_DATE);
+
+    // 合法的初始状态仍然允许（不能因为堵绕过而堵掉正常录入）
+    for (const s of ["New", "Researching", "Not Interested", "Suppressed"]) {
+      const r = addLead(
+        { website: `${s.replace(/\s/g, "").toLowerCase()}.example.com`, email: `x@${s.replace(/\s/g, "").toLowerCase()}.com`, lead_type: "Blog", specific_issue: "Missing canonical", status: s },
+        { cwd: tmp }
+      );
+      expect(r.ok, `初始状态 ${s} 应被允许`).toBe(true);
+    }
+  });
+
+  it("CONTACTED_OR_LATER_STATUSES 与状态机一致：都从 Contacted 可达，且不含未触达状态", () => {
+    for (const s of CONTACTED_OR_LATER_STATUSES) {
+      expect(isContactedOrLater(s)).toBe(true);
+      expect(STATUS_TRANSITIONS["Ready to Contact"]).toContain("Contacted");
+    }
+    for (const s of ["New", "Researching", "Ready to Contact", "Suppressed", "No Response", "Not Interested"]) {
+      expect(isContactedOrLater(s), `${s} 不应算作「已触达」`).toBe(false);
+    }
+  });
+
+  it("真实主库：有发送事实的行必须已经到 Contacted 或更靠后（防止再次批量绕过）", () => {
+    // leads.csv 被 .gitignore 屏蔽：文件不存在时跳过（不是冷启动假设，是数据不在版本控制内）
+    if (!fs.existsSync(path.join(process.cwd(), LEAD_MASTER_RELATIVE_PATH))) return;
+    const rows = readLeads();
+    if (rows.length === 0) return;
+    for (const l of rows) {
+      const fact = inspectContactFact(l);
+      if (!fact.hasFact) continue;
+      // 有真实发送事实的行，状态必须已经承认这次触达（或处于冻结终态）
+      const ok = isContactedOrLater(l.status) || ["Suppressed", "Not Interested", "No Response"].includes(l.status);
+      expect(ok, `${l.lead_id} 有发送事实但状态仍是 ${l.status} —— 请跑 npm run leads -- backfill-contacted`).toBe(true);
     }
   });
 });

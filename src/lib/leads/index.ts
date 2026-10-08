@@ -6,4 +6,5 @@ export * from "./schema.ts";
 export * from "./normalize.ts";
 export * from "./csv.ts";
 export * from "./pipeline.ts";
+export * from "./reconcile.ts";
 export * from "./store.ts";

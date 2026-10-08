@@ -24,6 +24,11 @@ import { CASE_STATUSES, CASE_FIELDS } from "../cases/schema.ts";
 // `@/lib/db/migrations` 别名，Node 直跑 TS 的 CLI 无法解析。改为从 B 的源码解析事件名
 // （仍在读同一份事实来源，没有复制第二份契约）。
 import { LOCALE_ROUTED_PATHS } from "../../i18n/locale-routed-paths.ts";
+// sitemap 判定规则：唯一来源在产品层共享模块（见下方 re-export 处的说明）
+import { classifySitemap } from "../seo/sitemap-rules.ts";
+// E 的「状态 ↔ 真实触达事实」对账判定：同样只有一份实现，L 只读复用（第 13 项自检）
+import { isContactedOrLater, type Lead } from "../leads/schema.ts";
+import { RECONCILE_FROZEN_STATUSES, inspectContactFact } from "../leads/reconcile.ts";
 
 // ================= 目录与文件（唯一事实来源清单） =================
 
@@ -127,6 +132,40 @@ export const OUTREACH_RULE = "先指出真实问题 → 再提供帮助 → 再�
 
 /** 默认 CTA 优先免费审计，不强推付费 */
 export const DEFAULT_CTA_POLICY = "默认 CTA = Free SEO Audit；只有在对方明确询问付费能力时才讨论套餐。";
+
+// ================= sitemap 核验规则：唯一来源在产品层，L 只复用不复制 =================
+//
+// 规则本体在 `src/lib/seo/sitemap-rules.ts`（产品层共享模块）。产品审计引擎
+// （`src/lib/seo/site-reports.ts` 负责发现、`src/lib/seo/audit-checks.ts` 负责出结论）
+// 与运营层（本文件）都从那一份取用 —— 2026-10-02 的 Filebase 事故正是因为
+// 「同一条规则在不同地方各写了一份、且只探了一个路径」。
+//
+// 依赖方向：**L → 产品共享模块**。绝不允许产品层反向 import L（营销运营数据与规则
+// 不得进入产品代码或 client bundle）。所以这里只 re-export，不重新定义。
+
+export {
+  SITEMAP_VERIFICATION_STEPS,
+  SITEMAP_VERDICT_RULES,
+  SITEMAP_FALLBACK_PATHS,
+  PROSPECTING_VERIFICATION_RULE,
+  classifySitemap,
+  extractSitemapDeclarations,
+} from "../seo/sitemap-rules.ts";
+
+/**
+ * 冷启动 outreach 发送暂停开关（人工置位 / 复位）。
+ *
+ * 事由 2026-10-08（Filebase 事件）：prospecting 的 sitemap 判定规则有缺陷，在规则修正
+ * 并复核完已发批次之前，暂停一切新的冷启动发送。
+ *
+ * 注意：本层**没有任何发送实现**，这个开关不会「阻止」什么自动流程 —— 它是给人工执行者
+ * 看的硬性状态位，`ops -- today / doctor` 会显著提示。恢复发送必须由用户显式改回 false。
+ */
+export const OUTREACH_SEND_HOLD: { active: boolean; since: string; reason: string } = {
+  active: true,
+  since: "2026-10-08",
+  reason: "sitemap 判定规则误报（Filebase 事件）；规则修正 + 已发批次复核完成前暂停新 outreach",
+};
 
 // ================= Daily Log =================
 
@@ -260,6 +299,8 @@ export const STAGE_HANDOFFS = {
 export const OPS_MANUAL_CHECKS: readonly string[] = [
   "用 doctor 确认四个既有 Master 与三个运营文件全部存在且 schema 正确",
   "确认今天产出的每条 outreach 都先观察过对方的真实问题",
+  "确认今天指出的问题都按核验规则实测过（sitemap 类必须走完 SITEMAP_VERIFICATION_STEPS，不得凭 /sitemap.xml 404 断言无 sitemap）",
+  "确认没有任何 outreach 绕过状态机写入（必须 New → Ready to Contact → Contacted；历史已发信的行用 `npm run leads -- backfill-contacted` 对账，不得 add --status=Contacted）",
   "确认写入 community-posts 的每一条都真的已经发布（含 url 与时间）",
   "确认 daily-log 的 signup/activation/payment 三个数字来自 B，而不是估计",
   "确认没有把任何运营文件放进公开站点或 client bundle",
@@ -480,6 +521,47 @@ export function auditOperations(cwd: string = process.cwd()): OpsAudit {
     }
   }
 
+  // ---- 12. sitemap 判定规则自检（回归 2026-10-02 Filebase 事故）----
+  // 直接消费共享规则跑三个标准场景：一旦规则退化成「/sitemap.xml 404 ⇒ no-sitemap」，这里立刻报警。
+  const declaredButUnreachable = classifySitemap({
+    found: false,
+    declaredUrls: ["https://example.com/sitemap-index.xml"],
+    firstResponseStatus: 404,
+  });
+  if (declaredButUnreachable.verdict !== "sitemap-invalid") {
+    push(
+      "sitemapRule",
+      `判定规则退化：robots 已声明 sitemap 但不可达，应记 sitemap-invalid，实际得到 ${declaredButUnreachable.verdict}`
+    );
+  }
+  const nothingDeclared = classifySitemap({ found: false, declaredUrls: [], firstResponseStatus: 404 });
+  if (nothingDeclared.verdict !== "no-sitemap") {
+    push(
+      "sitemapRule",
+      `判定规则退化：robots 未声明且兜底入口全部失败，应记 no-sitemap，实际得到 ${nothingDeclared.verdict}`
+    );
+  }
+  const foundSomewhere = classifySitemap({ found: true, declaredUrls: [], firstResponseStatus: 200 });
+  if (foundSomewhere.verdict !== "found") {
+    push("sitemapRule", `判定规则退化：已发现可访问 sitemap，实际得到 ${foundSomewhere.verdict}`);
+  }
+
+  // ---- 13. E：状态与真实触达事实是否一致（历史 Contacted 对账的持续守卫）----
+  // 只读。有 outbound contact 事实的行，状态必须已经承认这次触达（Contacted 及之后）或处于冻结终态；
+  // 否则说明又出现了「批量写库但没更新状态」的绕过 —— 修复动作是 `npm run leads -- backfill-contacted`。
+  // 判定逻辑复用 E 的唯一实现（src/lib/leads/reconcile.ts），L 不复制第二份。
+  for (const [i, r] of leads.entries()) {
+    const lead = r as unknown as Lead;
+    if (!inspectContactFact(lead).hasFact) continue;
+    const statusOk = isContactedOrLater(r.status ?? "") || RECONCILE_FROZEN_STATUSES.includes(r.status ?? "");
+    if (!statusOk) {
+      push(
+        "leadsReconcile",
+        `第 ${i + 2} 行 ${r.lead_id || "(无 lead_id)"} 有 outbound contact 事实但 status=${r.status} —— 跑 npm run leads -- backfill-contacted`
+      );
+    }
+  }
+
   const counts: Record<string, number> = {
     leads: leads.length,
     content: content.length,
@@ -497,7 +579,7 @@ export function dailyChecklist(cwd: string = process.cwd()): { items: string[]; 
   const q = DAILY_QUOTAS;
   const items = [
     `${q.newProspects} new prospects → 只写入 ${OPS_FILES.leads}`,
-    `${q.personalizedOutreach} personalized outreach（先观察真实问题）`,
+    `${q.personalizedOutreach} personalized outreach（先观察真实问题；sitemap 类必须按 SITEMAP_VERIFICATION_STEPS 核验）`,
     `${q.followupsMin}–${q.followupsMax} follow-ups`,
     `${q.communityInteractions} community interactions（有实际价值，不强贴链接）`,
     `${q.contentPublished} content publication（从 ${OPS_FILES.contentBank} 选 status=Ready）`,

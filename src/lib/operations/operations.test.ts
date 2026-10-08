@@ -15,10 +15,15 @@ import {
   DAILY_LOOP,
   DAILY_LOG_FIELDS,
   DAILY_QUOTAS,
+  NUMERIC_LOG_FIELDS,
   OPS_DIR,
   OPS_FILES,
   OUTREACH_TEMPLATE_KINDS,
   OUTREACH_FORBIDDEN,
+  OUTREACH_SEND_HOLD,
+  PROSPECTING_VERIFICATION_RULE,
+  SITEMAP_VERDICT_RULES,
+  SITEMAP_VERIFICATION_STEPS,
   SOLE_MASTER_NAMES,
   STAGE_HANDOFFS,
   auditOperations,
@@ -76,10 +81,14 @@ describe("L1-01 canonical sources", () => {
   });
 
   it("不拥有 E/F/G/I/H 的数据：L 只读引用，不复制任何行", () => {
-    // L 自己的文件里没有任何潜客/内容/案例的**数据行**
-    const opsFiles = fs.readdirSync(path.join(ROOT, OPS_DIR));
+    // L 自己的文件里没有任何潜客/内容/案例的**数据行**。
+    // 运营目录下允许有子目录（如 day1/ 与事故复核记录），只检查其中的**文件**。
+    const opsFiles = fs
+      .readdirSync(path.join(ROOT, OPS_DIR), { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => e.name);
+    expect(opsFiles).toContain("OPERATING_SYSTEM.md");
     for (const f of opsFiles) {
-      if (f === "daily-log.csv") continue;
       const text = read(path.join(OPS_DIR, f));
       // 潜客库与内容库的表头不应出现在运营文档里整表复制
       expect(text).not.toContain("lead_id,website,company,contact_name,email");
@@ -303,12 +312,14 @@ describe("L1-11 analytics contract", () => {
 
 // ================= L1-12 daily log =================
 describe("L1-12 daily log schema", () => {
-  it("列与要求完全一致", () => {
+  it("表头列与要求完全一致", () => {
     expect(DAILY_LOG_FIELDS).toEqual([
       "date", "new_leads", "outreach_sent", "followups_sent", "community_interactions",
       "content_published", "positive_replies", "signup_count", "activation_count", "payment_count", "notes",
     ]);
-    expect(read(path.join(OPS_DIR, "daily-log.csv")).trim()).toBe(DAILY_LOG_FIELDS.join(","));
+    // 表头行必须逐字一致（真实仓库已经写入运营记录，不能再假设文件只有表头）
+    const headerLine = read(path.join(OPS_DIR, "daily-log.csv")).split("\n")[0].trim();
+    expect(headerLine).toBe(DAILY_LOG_FIELDS.join(","));
   });
 
   it("所有数值列都必须是非负整数（不能写估计值）", () => {
@@ -316,12 +327,27 @@ describe("L1-12 daily log schema", () => {
     expect(bad.reasons?.join(" ")).toMatch(/非负整数/);
   });
 
-  it("真实仓库的 daily-log 为空（0 条运营记录，无伪造数据）", () => {
+  it("真实仓库的 daily-log 已含真实运营记录，且 schema 合法（不再假设为空）", () => {
+    // 真实运营已于 2026-09-29（Day 1）开始：assert 的是「记录合法」，不是「记录为空」。
     const rows = readCsvRows(ROOT, OPS_FILES.dailyLog);
-    expect(rows).toHaveLength(0);
+    expect(rows.length).toBeGreaterThan(0);
+
     const a = auditOperations(ROOT);
-    expect(a.counts.dailyLog).toBe(0);
+    expect(a.counts.dailyLog).toBe(rows.length);
     expect(a.issues.filter((i) => i.area === "dailyLog")).toEqual([]);
+
+    // 一天一行（日期唯一）
+    const dates = rows.map((r) => r.date ?? "");
+    expect(new Set(dates).size).toBe(dates.length);
+
+    for (const r of rows) {
+      expect(r.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      for (const f of NUMERIC_LOG_FIELDS) expect(r[f] ?? "", `${r.date} 的 ${f} 必须是非负整数`).toMatch(/^\d+$/);
+      expect((r.notes ?? "").trim().length, `${r.date} 的 notes 不能为空`).toBeGreaterThan(0);
+      // 有结果类计数时必须标注 B 来源（[B]），没有数据就填 0
+      const hasCount = ["signup_count", "activation_count", "payment_count"].some((f) => Number(r[f] ?? 0) > 0);
+      if (hasCount) expect(r.notes).toContain(B_PROVENANCE_MARKER);
+    }
   });
 });
 
@@ -386,11 +412,16 @@ describe("L1-14 privacy", () => {
     }
   });
 
-  it("运营文档中不得出现任何真实邮箱或手机号", () => {
-    for (const rel of ["seo-growth/operations/OPERATING_SYSTEM.md", "seo-growth/operations/WEEKLY_REVIEW.md", "seo-growth/operations/daily-log.csv"]) {
+  it("运营文档中不得出现任何真实邮箱或手机号（运营目录下所有文件）", () => {
+    const opsFiles = fs
+      .readdirSync(path.join(ROOT, OPS_DIR), { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => path.join(OPS_DIR, e.name));
+    expect(opsFiles.length).toBeGreaterThan(3); // 规则文档 + 周报 + daily-log + 复核记录
+    for (const rel of opsFiles) {
       const t = read(rel);
       expect(t, `${rel} 含邮箱形态`).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
-      expect(t).not.toMatch(/(?:\+?86[-\s]?)?1[3-9]\d{9}/);
+      expect(t, `${rel} 含手机号形态`).not.toMatch(/(?:\+?86[-\s]?)?1[3-9]\d{9}/);
     }
   });
 });
@@ -426,6 +457,58 @@ describe("L1-15 no automation", () => {
   });
 });
 
+// ================= L1-16 sitemap 核验规则与暂停开关（Filebase 事故后） =================
+describe("L1-16 sitemap verification contract", () => {
+  // 判定「站点没有 sitemap」必须走过的要素；机器可读常量与 canonical 文档都要覆盖。
+  const REQUIRED = ["robots.txt", "Sitemap:", "sitemapindex", "NO SITEMAP", "sitemap-invalid"];
+
+  it("机器可读规则是 6 步，顺序为 robots → 声明 → 验证 → index/子 sitemap → 兜底 → verdict", () => {
+    expect(SITEMAP_VERIFICATION_STEPS).toHaveLength(6);
+    expect(SITEMAP_VERIFICATION_STEPS[0]).toMatch(/robots\.txt/);
+    expect(SITEMAP_VERIFICATION_STEPS[1]).toMatch(/Sitemap:/);
+    expect(SITEMAP_VERIFICATION_STEPS[3]).toMatch(/sitemapindex/);
+    expect(SITEMAP_VERIFICATION_STEPS[4]).toMatch(/框架|兜底|fallback|默认入口/i);
+    expect(SITEMAP_VERIFICATION_STEPS[5]).toMatch(/NO SITEMAP/);
+
+    const declared = `${SITEMAP_VERIFICATION_STEPS.join(" ")} ${SITEMAP_VERDICT_RULES.join(" ")}`;
+    for (const kw of REQUIRED) expect(declared, `机器可读规则缺少 ${kw}`).toContain(kw);
+  });
+
+  it("红线：/sitemap.xml 404 ≠ 没有 sitemap；声明了但不可达是 sitemap-invalid", () => {
+    expect(SITEMAP_VERDICT_RULES.join(" ")).toMatch(/404/);
+    expect(SITEMAP_VERDICT_RULES.join(" ")).toMatch(/不能|不得|≠/);
+    expect(SITEMAP_VERDICT_RULES.join(" ")).toMatch(/sitemap-invalid/);
+    expect(PROSPECTING_VERIFICATION_RULE).toMatch(/SITEMAP_VERIFICATION_STEPS/);
+    expect(PROSPECTING_VERIFICATION_RULE).toMatch(/不发信|不得进入 outreach/);
+  });
+
+  it("OPERATING_SYSTEM.md 与机器可读规则描述同一件事（不得只写一处）", () => {
+    const doc = read(path.join(OPS_DIR, "OPERATING_SYSTEM.md"));
+    for (const kw of REQUIRED) expect(doc, `OPERATING_SYSTEM.md 缺少核验要素 ${kw}`).toContain(kw);
+    // 文档必须引用常量名，避免两处各维护一套文字
+    expect(doc).toContain("SITEMAP_VERIFICATION_STEPS");
+    expect(doc).toContain("SITEMAP_VERDICT_RULES");
+    // 且必须写明「/sitemap.xml 返回 404 ≠ 站点没有 sitemap」
+    expect(doc.replace(/\s+/g, " ")).toMatch(/sitemap\.xml`?\s*返回\s*404[\s\S]{0,40}≠/);
+  });
+
+  it("outreach 暂停开关：有明确事由与起始日，文档记录，且需人工恢复", () => {
+    expect(typeof OUTREACH_SEND_HOLD.active).toBe("boolean");
+    expect(OUTREACH_SEND_HOLD.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(OUTREACH_SEND_HOLD.reason.trim().length).toBeGreaterThan(10);
+
+    const doc = read(path.join(OPS_DIR, "OPERATING_SYSTEM.md"));
+    expect(doc).toContain("OUTREACH_SEND_HOLD");
+    expect(doc).toMatch(/暂停/);
+    // 恢复必须由用户显式操作，不得由脚本代改
+    expect(doc).toMatch(/用户显式|显式把/);
+
+    // CLI 必须真的把开关呈现出来（源码级断言，不需要真跑一遍）
+    const cli = read("scripts/ops.mts");
+    expect(cli).toContain("OUTREACH_SEND_HOLD");
+  });
+});
+
 // ================= 数据源唯一性（doctor 实测） =================
 describe("doctor 实测", () => {
   it("真实仓库体检：0 问题（文件齐全、引用自洽、无泄漏）", () => {
@@ -436,7 +519,10 @@ describe("doctor 实测", () => {
     expect(a.filesPresent.leads).toBe(true);
     expect(a.funnelInSync).toBe(true);
     expect(a.counts.cases).toBe(0);
-    expect(a.counts.dailyLog).toBe(0);
+    // 运营已经开始：leads 与 daily-log 都非空，且 doctor 的计数与实际行数一致。
+    // 这里**不要求**任何 Master 为空 —— 空仓库不是业务目标，数据合法才是。
+    expect(a.counts.leads).toBe(readCsvRows(ROOT, OPS_FILES.leads).length);
+    expect(a.counts.dailyLog).toBe(readCsvRows(ROOT, OPS_FILES.dailyLog).length);
     expect(a.issues, a.issues.map((i) => `[${i.area}] ${i.message}`).join("\n")).toEqual([]);
   });
 

@@ -11,6 +11,12 @@ import { LEAD_FIELDS, emptyLead, type Lead } from "./schema.ts";
 import { parseCsv, serializeCsv } from "./csv.ts";
 import { makeLeadId, normalizeDomain, normalizeEmail } from "./normalize.ts";
 import { checkTransition, validateLead, fillAttribution } from "./pipeline.ts";
+import {
+  applyContactedBackfill,
+  isReconciled,
+  planContactedBackfill,
+  type ReconcilePlan,
+} from "./reconcile.ts";
 
 /** 相对仓库根目录的主库路径（唯一 Lead Master） */
 export const LEAD_MASTER_RELATIVE_PATH = "seo-growth/leads.csv";
@@ -48,7 +54,14 @@ export function readLeads(cwd: string = process.cwd()): Lead[] {
   });
 }
 
-/** 全量写回（调用方负责保证数据完整：历史行必须原样带回来） */
+/**
+ * 全量写回（调用方负责保证数据完整：历史行必须原样带回来）。
+ *
+ * ⚠️ 这是**底层原语**，不是业务入口：任何「把某条 Lead 改成 Contacted」的业务动作
+ * 都必须走 `updateLead()`（受状态机校验）或 `backfillContacted()`（历史对账）。
+ * 禁止再出现「直接拼一行 status=Contacted 然后 writeLeads」的代码路径 ——
+ * 2026-09-29 的 Day 1 批量写入就是这么绕过状态机的。
+ */
 export function writeLeads(leads: readonly Lead[], cwd: string = process.cwd()): void {
   const file = leadMasterPath(cwd);
   const dir = path.dirname(file);
@@ -118,6 +131,22 @@ export function addLead(
   lead.email = email;
   lead.lead_id = input.lead_id?.trim() || makeLeadId(lead.website, email);
   if (!lead.status) lead.status = "New";
+  // 状态机守卫（2026-10-08 补）：新建时的初始状态必须能从 `New` 合法到达。
+  // 典型被拒：`--status=Contacted` —— 这正是 Day 1 批次绕过状态机的写法。
+  // 已发过首封的历史行要用 `backfill-contacted` 对账，不是再 add 一条。
+  if (lead.status !== "New") {
+    const entry: Lead = { ...lead, status: "New" };
+    const check = checkTransition(entry, lead.status);
+    if (!check.ok) {
+      const reasons = [...check.reasons];
+      if (lead.status === "Contacted") {
+        reasons.push(
+          "不允许直接新建 Contacted：已发首封的历史 Lead 请用 `npm run leads -- backfill-contacted --apply` 对账；新的发送必须走 New → Ready to Contact → Contacted"
+        );
+      }
+      return { ok: false, reasons };
+    }
+  }
   const stamp = now.toISOString();
   if (!lead.created_at) lead.created_at = stamp;
   lead.updated_at = stamp;
@@ -195,4 +224,62 @@ export function searchLeads(query: string, cwd: string = process.cwd()): Lead[] 
       .toLowerCase()
       .includes(q)
   );
+}
+
+export interface BackfillContactedResult {
+  ok: boolean;
+  /** true = 只算不写（默认）；false = 已写库 */
+  dryRun: boolean;
+  plan: ReconcilePlan;
+  /** 实际写盘的行数（dry-run 恒为 0） */
+  written: number;
+  /** 写盘被拒绝的原因（校验不通过时） */
+  reasons?: string[];
+}
+
+/**
+ * 历史 Contacted 回填 / 对账（唯一入口，CLI：`npm run leads -- backfill-contacted`）。
+ *
+ * 行为边界（与 reconcile.ts 的模块注释一致）：
+ *   - 只处理**确实存在 outbound contact 事实**的 Lead（两个触达日期 + 发送记录）
+ *   - 绝不把没有事实的 `New` 升级为 `Contacted`
+ *   - 绝不修改 `first_contacted_at` / `last_contacted_at` / `next_followup_at` / `last_action`
+ *   - 幂等：第二次执行不会产生任何写入
+ *   - 无网络调用、不发送任何邮件
+ *
+ * 默认 `apply = false`（dry-run）——写库必须显式开启。
+ */
+export function backfillContacted(
+  opts: { cwd?: string; apply?: boolean; now?: Date } = {}
+): BackfillContactedResult {
+  const cwd = opts.cwd ?? process.cwd();
+  const now = opts.now ?? new Date();
+  const apply = opts.apply ?? false;
+
+  const leads = readLeads(cwd);
+  const plan = planContactedBackfill(leads);
+
+  if (!apply) return { ok: true, dryRun: true, plan, written: 0 };
+
+  const next = applyContactedBackfill(leads, plan, {
+    noteDate: todayDate(now),
+    nowIso: now.toISOString(),
+  });
+
+  // 安全网：写盘前把全表再校验一次，任何一行不合法就整批不写（原子性）
+  const reasons: string[] = [];
+  for (const l of next) {
+    for (const issue of validateLead(l)) reasons.push(`${l.lead_id} ${issue.field}: ${issue.message}`);
+  }
+  if (reasons.length > 0) return { ok: false, dryRun: false, plan, written: 0, reasons };
+
+  const changed = next.filter((l, i) => l !== leads[i]).length;
+  if (changed === 0) return { ok: true, dryRun: false, plan, written: 0 };
+  writeLeads(next, cwd);
+  return { ok: true, dryRun: false, plan, written: changed };
+}
+
+/** 主库里已被对账过的行数（只读，供报告 / doctor 使用） */
+export function countReconciledLeads(cwd: string = process.cwd()): number {
+  return readLeads(cwd).filter((l) => isReconciled(l)).length;
 }

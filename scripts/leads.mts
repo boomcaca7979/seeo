@@ -12,6 +12,7 @@
 //   node scripts/leads.ts show <lead_id>
 //   node scripts/leads.ts update <lead_id> --status=Contacted --next-followup=2026-10-05
 //   node scripts/leads.ts suppress <lead_id> --reason="asked to stop"
+//   node scripts/leads.ts backfill-contacted [--apply]   历史 Contacted 对账（默认 dry-run）
 //
 // 注意：--lead-type 支持随手写法（saas / software / SEO agency …），会自动收敛到标准值；
 // 无法识别时会列出标准值并要求人工选择，绝不猜成 Other。
@@ -21,7 +22,9 @@ import {
   LEAD_STATUSES,
   LEAD_TEMPLATE_IDS,
   LEAD_TYPES,
+  RECONCILE_NOTE_MARKER,
   addLead,
+  backfillContacted,
   dueFollowUps,
   isFollowUpEligible,
   nextFollowUpStatus,
@@ -240,6 +243,61 @@ function cmdSuppress(positional: string[], flags: Args): void {
   console.log(`已标记 Suppressed：${id}（此后永不进入跟进队列：${isFollowUpEligible(r.lead!) === false}）`);
 }
 
+// ---------------- backfill-contacted（历史 Contacted 回填 / 对账） ----------------
+//
+// 只做对账：把「真实 outbound contact 事实」与「状态机模型」对齐。
+// 默认 dry-run（只算不写）；写库必须显式 --apply。
+// 不改触达时间、不新增发送、不发任何邮件、无任何网络调用。
+
+function cmdBackfillContacted(flags: Args): void {
+  const apply = "apply" in flags;
+  const r = backfillContacted({ apply });
+
+  console.log(`=== leads backfill-contacted（${apply ? "APPLY 写库" : "DRY-RUN 只算不写"}）===`);
+  console.log(`主库：${LEAD_MASTER_RELATIVE_PATH}`);
+  console.log(`标记：${RECONCILE_NOTE_MARKER}\n`);
+
+  const s = r.plan.summary;
+  console.log(`总数 ${s.total}`);
+  console.log(`  会补状态为 Contacted（有事实但状态未到） : ${s.promoteToContacted}`);
+  console.log(`  登记历史豁免（有事实、无 template）        : ${s.recordGrandfather}`);
+  console.log(`  已与状态机一致                            : ${s.alreadyConsistent}`);
+  console.log(`  已对账过（幂等，重跑不动）                : ${s.alreadyReconciled}`);
+  console.log(`  拒绝推进（有事实但缺 specific_issue）     : ${s.blockedMissingIssue}`);
+  console.log(`  无发送事实不动（不会自动升级 New）        : ${s.skippedNoFact}`);
+  console.log(`  冻结状态不动（Suppressed / Not Interested / No Response）: ${s.skippedFrozen}`);
+  console.log(`\nstatus 变更行数：${s.statusChanges}　会写库行数：${s.writable}`);
+
+  const interesting = r.plan.entries.filter((e) => e.writes || e.action === "blocked-missing-issue");
+  if (interesting.length > 0) {
+    console.log("\n明细：");
+    const shown = interesting.slice(0, 50);
+    for (const e of shown) {
+      console.log(`  ${apply ? "→" : "·"} ${e.lead_id.padEnd(10)} ${e.statusBefore.padEnd(14)} → ${e.statusAfter.padEnd(14)} ${e.action}`);
+      console.log(`      ${e.reason}`);
+    }
+    if (interesting.length > shown.length) console.log(`  …还有 ${interesting.length - shown.length} 条（同上，未逐条列出）`);
+  } else {
+    console.log("\n明细：（没有需要改动的行）");
+  }
+
+  if (!r.ok) {
+    console.error(`\n写库被拒绝（全表校验未通过，未写入任何内容）：\n  ${r.reasons?.join("\n  ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(
+    `\n结论：${r.dryRun ? "DRY-RUN，未写入任何内容（加 --apply 才写）" : `已写 ${r.written} 行（幂等：再跑一次应为 0）`}`
+  );
+  console.log("保证：未修改 first_contacted_at / last_contacted_at / next_followup_at；未新增任何发送；未发任何邮件。");
+
+  if (s.blockedMissingIssue > 0) {
+    console.error(`\n⚠ ${s.blockedMissingIssue} 条有发送事实但缺 specific_issue —— 需人工补录后再对账。`);
+    process.exitCode = 1;
+  }
+}
+
 function main(): void {
   const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
   switch (cmd) {
@@ -264,8 +322,11 @@ function main(): void {
     case "suppress":
       cmdSuppress(positional, flags);
       break;
+    case "backfill-contacted":
+      cmdBackfillContacted(flags);
+      break;
     default:
-      console.log(`用法：node scripts/leads.ts <init|add|due|list|show|update|suppress> [选项]
+      console.log(`用法：node scripts/leads.ts <init|add|due|list|show|update|suppress|backfill-contacted> [选项]
   init                       初始化主库（仅表头）
   add   --website= --lead-type= [--email= --specific-issue= --template= --source= ...]
   due   [--today=YYYY-MM-DD] 列出今天该跟进的 Lead
@@ -273,6 +334,10 @@ function main(): void {
   show  <lead_id>
   update <lead_id> --status=... [--next-followup=... --notes=...]
   suppress <lead_id> --reason="..."   标记永不联系
+  backfill-contacted [--apply]        历史 Contacted 对账（默认 dry-run）
+
+状态机纪律：新发送必须走 New → Ready to Contact → Contacted（update 逐次迁移）。
+不得用 add --status=Contacted 绕过；历史已发信的行用 backfill-contacted 对账。
 主库：${LEAD_MASTER_RELATIVE_PATH}`);
   }
 }

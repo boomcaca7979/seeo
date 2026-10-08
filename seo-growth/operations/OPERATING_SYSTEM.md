@@ -9,6 +9,22 @@
 
 ---
 
+## ⛔ 当前状态：Outreach 发送暂停（自 2026-10-08）
+
+机器可读开关：`OUTREACH_SEND_HOLD`（`src/lib/operations/index.ts`），当前 `active = true`。
+`npm run ops -- today` / `ops -- doctor` 会显著提示。
+
+**暂停期间：不发新的 cold outreach、不回复、不发 follow-up。**
+
+事由：2026-10-02 Filebase 回复指出我们的「no sitemap」判定是错的 —— prospecting 把
+`/sitemap.xml` 返回 404 直接当成「站点没有 sitemap」，而对方 `robots.txt` 明确声明了
+`sitemap-index.xml`（HTTP 200 / 有效 sitemapindex）。规则缺陷已修正（见 §2.1），
+已发批次已复核（见 `SITEMAP_FALSE_POSITIVE_REVIEW.md`）。
+
+**恢复发送必须由用户显式把 `active` 改回 `false`**，不得由任何自动化或脚本代改。
+
+---
+
 ## 0. 数据来源：只读，不重建
 
 运营层**不拥有任何数据**。它只读下面这些已经存在的唯一来源：
@@ -94,6 +110,38 @@ Find prospects → Personalize outreach → Follow up → Community participatio
 
 ---
 
+### 2.1 问题核验（写 `specific_issue` 之前必须做，禁止跳步）
+
+**规则唯一来源：`src/lib/seo/sitemap-rules.ts`（产品层共享模块）**。
+产品审计引擎（`src/lib/seo/site-reports.ts` 发现 + `src/lib/seo/audit-checks.ts` 出结论）
+与运营层（`src/lib/operations/index.ts` re-export）都复用这一份，**不得在别处再写一套**。
+机器可读名：`SITEMAP_VERIFICATION_STEPS` / `SITEMAP_VERDICT_RULES`；判定函数：`classifySitemap()`。
+
+**红线：`/sitemap.xml` 返回 404 ≠ 站点没有 sitemap。**
+
+判定「站点没有 sitemap」必须依次走完：
+
+1. 请求 `/robots.txt`（跟随跳转，取最终响应体）
+2. 提取其中所有 `Sitemap:` 行（大小写不敏感，可以有多条）
+3. 逐个请求声明出来的 sitemap URL，记录 HTTP 状态
+4. 若响应是 `sitemapindex`，继续抓取至少一个子 sitemap，确认能解析出 URL
+5. `robots.txt` 未声明时，才走兜底：依次检查常见入口
+   （`/sitemap.xml`、`/sitemap_index.xml`、`/sitemap-index.xml`、`/wp-sitemap.xml`、`/sitemap/`）
+   与站点 HTML 的 `<link rel="sitemap">`
+6. **只有以上全部确认不存在可发现的 sitemap**，才能标记 `NO SITEMAP`
+
+判定映射（写 `issue_type` 时不得含糊）：
+
+| 实际情况 | 正确的 issue_type |
+|---|---|
+| `/sitemap.xml` 404，但 robots.txt 声明了可用的 sitemap | **不是问题，不得发信** |
+| robots.txt 声明了 `Sitemap:`，但该 URL 返回 4xx/5xx | `sitemap-invalid`（不是 `no-sitemap`） |
+| robots.txt 未声明，且兜底入口也查不到 | `no-sitemap` |
+
+核验必须发生在写 `specific_issue` 之前；**写不出 `robots.txt` 的实际内容，就不算核验过**。
+
+---
+
 ## 3. Outreach 流程（C 是唯一发送基础）
 
 三类可复用骨架：
@@ -109,6 +157,9 @@ Find prospects → Personalize outreach → Follow up → Community participatio
 默认 CTA = **Free SEO Audit**，不强推付费；只有对方明确问付费能力时才谈套餐。
 
 **禁止**：`Best SEO tool`、`#1 platform`、`revolutionary` 之类无证据断言；虚构客户案例/quote/使用体验/排名/流量/营收；群发同一条未个性化模板；声称"我看过你的站"但实际没看过。
+
+**禁止（2026-10-08 增补，源自 Filebase 事件）**：仅凭 `/sitemap.xml` 返回 404 就断言对方
+「没有 sitemap」。sitemap 类问题必须先走完 §2.1 的 6 步核验；核验不通过就不发信。
 
 模板只是骨架，**实际发送必须人工个性化**，且 L 不含任何发送实现。
 
