@@ -25,6 +25,9 @@ import { getAdProvider } from "@/lib/admin/ads";
 import { normalizeWindow, ADMIN_WINDOW_LABELS } from "@/lib/admin/funnel";
 import { NotifyRetryButton } from "./notify-retry-button";
 
+import { checkAdmin } from "@/lib/admin/auth";
+import AdminGuardMessage from "@/components/admin/guard-message";
+
 export const dynamic = "force-dynamic";
 
 interface CurrencyRow {
@@ -56,6 +59,10 @@ export default async function AdminRevenuePage({
 }: {
   searchParams: Promise<{ days?: string; import?: string; imported?: string; errors?: string }>;
 }) {
+  // 页面级 fail-closed 守卫：layout 与 page 并行渲染，layout 正常 return 不阻止本页
+  // RSC payload 流式输出（官方 authentication 指南），因此取数前必须自行鉴权。
+  const guard = await checkAdmin();
+  if (!guard.ok) return <AdminGuardMessage code={guard.code} error={guard.error} />;
   const sp = await searchParams;
   const days = normalizeWindow(sp.days);
   const summary = await getRevenueSummary(days);

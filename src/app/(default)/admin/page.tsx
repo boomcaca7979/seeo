@@ -30,6 +30,9 @@ import {
 } from "@/lib/admin/previous-window";
 import { getRecentPayments, type RecentPaymentRow } from "@/lib/admin/recent-payments";
 
+import { checkAdmin } from "@/lib/admin/auth";
+import AdminGuardMessage from "@/components/admin/guard-message";
+
 export const dynamic = "force-dynamic";
 
 /** 诊断码 → 自然中文（内部代码不外露） */
@@ -73,6 +76,10 @@ export default async function AdminOverviewPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
+  // 页面级 fail-closed 守卫：layout 与 page 并行渲染，layout 正常 return 不阻止本页
+  // RSC payload 流式输出（官方 authentication 指南），因此取数前必须自行鉴权。
+  const guard = await checkAdmin();
+  if (!guard.ok) return <AdminGuardMessage code={guard.code} error={guard.error} />;
   const sp = await searchParams;
   const days = normalizeWindow(sp.days);
   const overview = await getAdminOverviewWithPrevious(days);

@@ -18,6 +18,9 @@ import {
 import { listCustomers, getCustomerTimeline, type TimelineEntry } from "@/lib/admin/customers";
 import { listCreemRecordsForUser } from "@/lib/creem/snapshot";
 
+import { checkAdmin } from "@/lib/admin/auth";
+import AdminGuardMessage from "@/components/admin/guard-message";
+
 export const dynamic = "force-dynamic";
 
 function kindTone(kind: string): "neutral" | "info" | "good" | "warn" {
@@ -31,6 +34,10 @@ export default async function AdminCustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // 页面级 fail-closed 守卫：layout 与 page 并行渲染，layout 正常 return 不阻止本页
+  // RSC payload 流式输出（官方 authentication 指南），因此取数前必须自行鉴权。
+  const guard = await checkAdmin();
+  if (!guard.ok) return <AdminGuardMessage code={guard.code} error={guard.error} />;
   const { id } = await params;
   const userId = decodeURIComponent(id);
 

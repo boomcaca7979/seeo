@@ -13,6 +13,9 @@ import {
 import { getDataSourceStatuses, DATA_SOURCE_STATE_LABELS, type DataSourceStatus, type DataSourceState } from "@/lib/admin/data-sources";
 import { getOwnerGscConnection, isOwnerGscOAuthConfigured } from "@/lib/admin/gsc-connection";
 
+import { checkAdmin } from "@/lib/admin/auth";
+import AdminGuardMessage from "@/components/admin/guard-message";
+
 export const dynamic = "force-dynamic";
 
 /** 五态徽章配色（如实例示，不用统一绿色冒充全部已接通） */
@@ -34,6 +37,10 @@ export default async function AdminDataSourcesPage({
 }: {
   searchParams: Promise<{ gsc?: string; reason?: string; missing?: string }>;
 }) {
+  // 页面级 fail-closed 守卫：layout 与 page 并行渲染，layout 正常 return 不阻止本页
+  // RSC payload 流式输出（官方 authentication 指南），因此取数前必须自行鉴权。
+  const guard = await checkAdmin();
+  if (!guard.ok) return <AdminGuardMessage code={guard.code} error={guard.error} />;
   const sp = await searchParams;
   const [sources, gscConnection] = await Promise.all([
     getDataSourceStatuses(),
