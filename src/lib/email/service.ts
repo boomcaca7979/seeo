@@ -3,17 +3,20 @@
 // 特性：
 //   server-side only（RESEND_API_KEY 只读 env，绝不进 client bundle）
 //   幂等：UNIQUE(user_id, automation_key) 抢占式登记，重复触发不再发送
-//   退订：营销邮件检查 email_preferences；事务性邮件不受影响
+//   同意：营销邮件(category=marketing)必须有**可核验的显式同意**（opt-in）且未退订，
+//         否则一律拦下；事务性邮件不受影响（见 consent.ts）
 //   可观测：每次发送成功/失败/跳过都落 email_log
 //   不阻塞：任何邮件失败都不抛出到业务流程
 //
 // 两类出口：
-//   sendTemplateEmail      —— 生命周期/营销邮件（幂等 + 受营销退订约束）
-//   sendTransactionalEmail —— 用户主动触发的事务邮件（不幂等、不受营销退订影响）
+//   sendTemplateEmail      —— 生命周期/营销邮件（幂等 + 受营销同意/退订约束）
+//   sendTransactionalEmail —— 用户主动触发的事务邮件（不幂等、不受营销同意/退订影响）
 
 import { getAdapter } from "@/lib/db/migrations";
 import { isEmailConfigured, sendRawEmail } from "./resend";
 import { getEmailFrom } from "./config";
+import { isMarketingSendHeld } from "./consent";
+import { getMarketingConsent } from "./preferences";
 import {
   LIFECYCLE_TEMPLATES,
   type LifecycleTemplate,
@@ -23,6 +26,10 @@ export type EmailSendStatus =
   | "sent"
   | "failed"
   | "skipped_unsubscribed"
+  /** 无营销同意记录（marketing 类别专属）——不得发送 */
+  | "skipped_no_consent"
+  /** 营销总闸生效（marketing 类别专属）——不得发送 */
+  | "skipped_marketing_hold"
   | "skipped_no_provider"
   | "skipped_render_error"
   /** 幂等命中：同一用户同一 automation_key 已登记过，本次不再发送（非失败） */
@@ -63,17 +70,6 @@ export interface TransactionalEmailInput {
 
 /** provider 是否已配置（供路由做 503 前置判断，避免业务侧直连 provider 模块） */
 export { isEmailConfigured as isEmailProviderConfigured } from "./resend";
-
-function isMarketingUnsubscribed(userId: string): Promise<boolean> {
-  return (async () => {
-    const db = await getAdapter();
-    const row = await db.get(
-      `SELECT marketing_unsubscribed_at FROM email_preferences WHERE user_id = ?`,
-      [userId]
-    ) as { marketing_unsubscribed_at: string | null } | undefined;
-    return !!row?.marketing_unsubscribed_at;
-  })();
-}
 
 /**
  * 抢占 email_log 名额。返回 logId；null = 已被抢占过（幂等命中）。
@@ -156,6 +152,17 @@ export async function sendTemplateEmail(input: TemplateEmailInput): Promise<Temp
 
   const automationKey = input.automationKey ?? input.templateKey;
 
+  // 0. 营销总闸：暂停一切自动营销发送。
+  //    在抢占幂等名额**之前**返回，避免污染 email_log 的同 (user, automation) 唯一键 ——
+  //    总闸放开后，同一封营销邮件仍应能正常发出。
+  if (template.category === "marketing" && isMarketingSendHeld()) {
+    return {
+      status: "skipped_marketing_hold",
+      claimed: false,
+      reason: "marketing send hold is active",
+    };
+  }
+
   // 1. 幂等抢占：INSERT OR IGNORE 命中唯一键说明已发送过 → 不再发送
   let logId: number | null = null;
   try {
@@ -168,12 +175,22 @@ export async function sendTemplateEmail(input: TemplateEmailInput): Promise<Temp
   }
 
   try {
-    // 2. 营销退订检查（事务性邮件不受影响）
-    if (template.category === "marketing" && (await isMarketingUnsubscribed(input.userId))) {
-      await finishLog(logId, "skipped_unsubscribed", {
-        failureReason: "user unsubscribed from marketing emails",
-      });
-      return { status: "skipped_unsubscribed", claimed: true };
+    // 2. 营销同意校验（事务性邮件不受影响）：
+    //    必须有**可核验的显式同意**且未退订 —— 「尚未退订」不等于同意。
+    if (template.category === "marketing") {
+      const consent = await getMarketingConsent(input.userId);
+      if (consent.unsubscribed) {
+        await finishLog(logId, "skipped_unsubscribed", {
+          failureReason: "user unsubscribed from marketing emails",
+        });
+        return { status: "skipped_unsubscribed", claimed: true };
+      }
+      if (!consent.optedIn) {
+        await finishLog(logId, "skipped_no_consent", {
+          failureReason: "no verifiable marketing opt-in record",
+        });
+        return { status: "skipped_no_consent", claimed: true };
+      }
     }
 
     // 3. 渲染（缺变量 → 抛错 → 记 failed，绝不发送错误内容）

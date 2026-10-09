@@ -2,6 +2,11 @@
 // 基于 B 阶段 analytics 事件判定资格，每日 sweep 一次（Vercel cron / /api/email/sweep）。
 // 幂等由 email_log 唯一键保证；退订用户全部跳过；已激活用户不再收「先去用 SeeO」提醒；
 // 已付费用户不再收升级提醒。
+//
+// ⚠️ 2026-10-09 合规整改：本模块**全部**模板都是 `category: "marketing"`。
+//    - `MARKETING_SEND_HOLD.active === true` 时，`runLifecycleEmailSweep` / `sendWelcomeEmail`
+//      直接停下（真实中止，不是隐藏 UI 或改标签）；
+//    - 即使总闸放开，`sendTemplateEmail` 仍会逐用户强制校验「可核验的显式同意」。
 
 import { getAdapter } from "@/lib/db/migrations";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -9,6 +14,7 @@ import { sendTemplateEmail } from "./service";
 import { buildCtaUrl, getAppUrl } from "./render";
 import { LIFECYCLE_TEMPLATES } from "./templates/lifecycle";
 import { ensureUnsubscribeToken } from "./preferences";
+import { isMarketingSendHeld } from "./consent";
 
 export interface EmailTarget {
   userId: string;
@@ -18,6 +24,8 @@ export interface EmailTarget {
 export interface SweepResult {
   targets: number;
   processed: number;
+  /** 是否因营销总闸被整体叫停（true = 本轮没有做任何发送） */
+  halted?: boolean;
   results: Array<{ userId: string; template: string; status: string }>;
 }
 
@@ -142,6 +150,11 @@ export function eligibleTemplates(
 
 /** 执行一轮 sweep；provider 未配置时按 dry-run 记录（status=skipped_no_provider） */
 export async function runLifecycleEmailSweep(now: Date = new Date()): Promise<SweepResult> {
+  // 营销总闸：直接停下，不枚举目标、不做任何发送（真实中止）
+  if (isMarketingSendHeld()) {
+    return { targets: 0, processed: 0, halted: true, results: [] };
+  }
+
   const targets = await getEmailTargets();
   const results: SweepResult["results"] = [];
   let processed = 0;
@@ -191,6 +204,9 @@ export async function runLifecycleEmailSweep(now: Date = new Date()): Promise<Sw
  * 幂等：同一用户重复触发不会重复发送；失败不抛出。
  */
 export async function sendWelcomeEmail(userId: string, email: string): Promise<void> {
+  // 营销总闸：welcome_v1 属 marketing 类别 → 总闸生效时直接 no-op（真实中止）
+  if (isMarketingSendHeld()) return;
+
   try {
     const token = await ensureUnsubscribeToken(userId, email);
     const prefix = email.split("@")[0].split(/[+._-]/)[0] || "there";

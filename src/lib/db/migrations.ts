@@ -76,6 +76,14 @@ async function migrate(db: DBAdapter): Promise<void> {
     // 表不存在或列已存在，忽略
   }
 
+  // 2026-10-09 合规整改：email_preferences 补**显式营销同意**时间列。
+  // 旧库只有退订列（opt-out），需 ALTER；新库由下方 CREATE TABLE 建出。NULL = 未同意。
+  try {
+    await db.run(`ALTER TABLE email_preferences ADD COLUMN marketing_opt_in_at TEXT`);
+  } catch {
+    // 表不存在或列已存在，忽略
+  }
+
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_keywords (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -638,11 +646,14 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_email_log_time
       ON email_log(created_at);
 
-    -- 用户邮件偏好：营销退订（不影响事务性邮件）
+    -- 用户邮件偏好：营销**同意（opt-in）**与**退订（opt-out）**
+    -- marketing_opt_in_at = 可核验的显式同意时间（NULL = 未同意；注册/登录/付费都不写这里）
+    -- marketing_unsubscribed_at = 退订时间（NULL = 未退订）
     CREATE TABLE IF NOT EXISTS email_preferences (
       user_id TEXT PRIMARY KEY,
       email TEXT,
       unsubscribe_token TEXT UNIQUE,
+      marketing_opt_in_at TEXT,
       marketing_unsubscribed_at TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );

@@ -23,6 +23,7 @@ function makeAdapter(): SQLiteAdapter {
     );
     CREATE TABLE email_preferences (
       user_id TEXT PRIMARY KEY, email TEXT, unsubscribe_token TEXT UNIQUE,
+      marketing_opt_in_at TEXT,
       marketing_unsubscribed_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE analytics_events (
@@ -75,9 +76,10 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
-const { runLifecycleEmailSweep } = await import("./lifecycle");
+const { runLifecycleEmailSweep, sendWelcomeEmail } = await import("./lifecycle");
 const { sendTransactionalEmail } = await import("./service");
-const { ensureUnsubscribeToken, unsubscribeByToken } = await import("./preferences");
+const { ensureUnsubscribeToken, unsubscribeByToken, grantMarketingConsent } = await import("./preferences");
+const { MARKETING_SEND_HOLD } = await import("./consent");
 
 const USER = "user-sweep-1";
 const EMAIL = "sweep@example.com";
@@ -99,15 +101,46 @@ async function logRows(): Promise<Array<Record<string, unknown>>> {
   >;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   currentAdapter = makeAdapter();
   h.sendRaw.mockClear();
   h.sendRaw.mockImplementation(async () => ({ success: true, messageId: "msg-sweep" }));
   h.configured.value = true;
   h.users.value = [{ id: USER, email: EMAIL }];
+  // 默认关闭总闸，单独验证资格/同意逻辑；总闸由专门用例验证
+  MARKETING_SEND_HOLD.active = false;
+  // 显式写入可核验的营销同意（生产只能由真实同意流程写入）
+  await grantMarketingConsent(USER, EMAIL);
 });
 
 describe("Lifecycle sweep 端到端", () => {
+  it("营销总闸生效 → sweep 整体停下（halted，零发送）（2026-10-09 合规）", async () => {
+    await seedEvent("signup_completed", 30);
+    MARKETING_SEND_HOLD.active = true;
+    const r = await runLifecycleEmailSweep();
+    expect(r.halted).toBe(true);
+    expect(r.targets).toBe(0);
+    expect(r.processed).toBe(0);
+    expect(r.results).toHaveLength(0);
+    expect(h.sendRaw).not.toHaveBeenCalled();
+    expect(await logRows()).toHaveLength(0);
+  });
+
+  it("总闸生效 → sendWelcomeEmail 为 no-op（真实中止，非隐藏 UI）", async () => {
+    MARKETING_SEND_HOLD.active = true;
+    await sendWelcomeEmail(USER, EMAIL);
+    expect(h.sendRaw).not.toHaveBeenCalled();
+    expect(await logRows()).toHaveLength(0);
+  });
+
+  it("无营销同意 → sweep 判定资格但发送被拦下（skipped_no_consent）", async () => {
+    currentAdapter = makeAdapter(); // 清掉 beforeEach 写入的同意记录
+    await seedEvent("signup_completed", 30);
+    const r = await runLifecycleEmailSweep();
+    expect(r.results.map((x) => x.status)).toEqual(["skipped_no_consent"]);
+    expect(h.sendRaw).not.toHaveBeenCalled();
+  });
+
   it("注册 30h 未激活 → 发出 audit_reminder_v1（C4）", async () => {
     await seedEvent("signup_completed", 30);
     const r = await runLifecycleEmailSweep();

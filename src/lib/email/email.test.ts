@@ -21,6 +21,7 @@ function makeAdapter(): SQLiteAdapter {
     );
     CREATE TABLE email_preferences (
       user_id TEXT PRIMARY KEY, email TEXT, unsubscribe_token TEXT UNIQUE,
+      marketing_opt_in_at TEXT,
       marketing_unsubscribed_at TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE analytics_events (
@@ -65,11 +66,17 @@ vi.mock("./resend", () => ({
 const { sendTemplateEmail } = await import("./service");
 const { LIFECYCLE_TEMPLATES } = await import("./templates/lifecycle");
 const { eligibleTemplates } = await import("./lifecycle");
-const { ensureUnsubscribeToken, unsubscribeByToken, isMarketingUnsubscribed } = await import("./preferences");
+const { ensureUnsubscribeToken, unsubscribeByToken, isMarketingUnsubscribed, grantMarketingConsent } = await import("./preferences");
+const { MARKETING_SEND_HOLD } = await import("./consent");
 const { buildCtaUrl } = await import("./render");
 
 const USER = "user-email-1";
 const EMAIL = "user@example.com";
+
+/** 测试里显式写入「可核验的营销同意」——生产只能由真实同意流程写入 */
+async function grantConsent(userId = USER, email = EMAIL): Promise<void> {
+  await grantMarketingConsent(userId, email);
+}
 
 const BASE_VARS = {
   firstName: "User",
@@ -88,10 +95,13 @@ beforeEach(() => {
   h.sendRaw.mockClear();
   h.sendRaw.mockImplementation(async () => ({ success: true, messageId: "msg-1" }));
   h.configured.value = true;
+  // 默认关闭总闸，以便单独验证「逐用户同意校验」；总闸本身由专门用例验证
+  MARKETING_SEND_HOLD.active = false;
 });
 
 describe("统一发送层", () => {
-  it("正常发送：status=sent，记录 provider_message_id（#1 部分）", async () => {
+  it("已同意用户正常发送：status=sent，记录 provider_message_id（#1 部分）", async () => {
+    await grantConsent();
     const r = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
     expect(r.status).toBe("sent");
     expect(r.claimed).toBe(true);
@@ -102,7 +112,27 @@ describe("统一发送层", () => {
     expect(h.sendRaw).toHaveBeenCalledTimes(1);
   });
 
+  it("无营销同意 → skipped_no_consent，不调用 provider（合规护栏）", async () => {
+    const r = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
+    expect(r.status).toBe("skipped_no_consent");
+    expect(h.sendRaw).not.toHaveBeenCalled();
+    const rows = await logRows();
+    expect(rows[0].status).toBe("skipped_no_consent");
+  });
+
+  it("营销总闸生效 → skipped_marketing_hold，不占幂等名额、不调用 provider", async () => {
+    await grantConsent();
+    MARKETING_SEND_HOLD.active = true;
+    const r = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
+    expect(r.status).toBe("skipped_marketing_hold");
+    expect(r.claimed).toBe(false);
+    expect(h.sendRaw).not.toHaveBeenCalled();
+    // 未落 email_log（不污染 (user, automation) 幂等键）
+    expect(await logRows()).toHaveLength(0);
+  });
+
   it("welcome 幂等：同用户同模板第二次不发送（#2 / #14）", async () => {
+    await grantConsent();
     await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
     const r2 = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
     expect(r2.claimed).toBe(false);
@@ -112,7 +142,8 @@ describe("统一发送层", () => {
     expect(await logRows()).toHaveLength(1);
   });
 
-  it("营销退订后：status=skipped_unsubscribed，不调用 provider（#7）", async () => {
+  it("已同意 + 营销退订后：status=skipped_unsubscribed，不调用 provider（#7）", async () => {
+    await grantConsent();
     const token = await ensureUnsubscribeToken(USER, EMAIL);
     await unsubscribeByToken(token);
     expect(await isMarketingUnsubscribed(USER)).toBe(true);
@@ -123,6 +154,7 @@ describe("统一发送层", () => {
   });
 
   it("provider 失败：status=failed 但不抛错，业务可继续（#11）", async () => {
+    await grantConsent();
     h.sendRaw.mockImplementation(async () => { throw new Error("provider down"); });
     const r = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
     expect(r.status).toBe("failed");
@@ -132,6 +164,7 @@ describe("统一发送层", () => {
   });
 
   it("provider 未配置：dry-run 记录 skipped_no_provider（本地验证路径）", async () => {
+    await grantConsent();
     h.configured.value = false;
     const r = await sendTemplateEmail({ userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS });
     expect(r.status).toBe("skipped_no_provider");
@@ -139,6 +172,7 @@ describe("统一发送层", () => {
   });
 
   it("缺必需变量：skipped_render_error，不发送错误内容（#10）", async () => {
+    await grantConsent();
     const r = await sendTemplateEmail({
       userId: USER,
       email: EMAIL,
@@ -265,7 +299,29 @@ describe("邮件偏好（#7 / #8）", () => {
     expect(await unsubscribeByToken(token)).toBe(false);
   });
 
+  it("默认无营销同意；grantMarketingConsent 写入可核验同意且幂等", async () => {
+    const { getMarketingConsent } = await import("./preferences");
+    expect(await getMarketingConsent(USER)).toEqual({ optedIn: false, unsubscribed: false });
+
+    await grantConsent();
+    const c = await getMarketingConsent(USER);
+    expect(c.optedIn).toBe(true);
+    expect(c.unsubscribed).toBe(false);
+
+    const before = (await currentAdapter.get(
+      `SELECT marketing_opt_in_at FROM email_preferences WHERE user_id = ?`,
+      [USER]
+    )) as { marketing_opt_in_at: string };
+    await grantConsent();
+    const after = (await currentAdapter.get(
+      `SELECT marketing_opt_in_at FROM email_preferences WHERE user_id = ?`,
+      [USER]
+    )) as { marketing_opt_in_at: string };
+    expect(after.marketing_opt_in_at).toBe(before.marketing_opt_in_at);
+  });
+
   it("退订后：营销邮件停止 + 事务邮件不受影响（#7 / #8 对比验证）", async () => {
+    await grantConsent();
     const token = await ensureUnsubscribeToken(USER, EMAIL);
     await unsubscribeByToken(token);
     expect(await isMarketingUnsubscribed(USER)).toBe(true);
