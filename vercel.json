@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/payments/notify/retry",
-      "schedule": "15 * * * *"
+      "schedule": "30 10 * * *"
     }
   ]
 }
