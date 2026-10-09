@@ -10,8 +10,9 @@ export class TursoAdapter implements DBAdapter {
 
   constructor(url: string, authToken: string) {
     this.client = createClient({ url, authToken });
-    // 启用外键约束（Turso 默认不启用，与本地 SQLite 行为对齐）
-    void this.client.execute("PRAGMA foreign_keys = ON");
+    // 启用外键约束（Turso 默认不启用，与本地 SQLite 行为对齐）。
+    // 连接级设置：失败（如只读令牌会话拒绝 PRAGMA）不影响查询，显式吞掉避免未处理拒绝。
+    this.client.execute("PRAGMA foreign_keys = ON").catch(() => {});
   }
 
   /**

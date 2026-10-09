@@ -34,6 +34,11 @@ export interface RawEmailInput {
   to: string;
   subject: string;
   html: string;
+  /**
+   * 可选幂等键（Resend Idempotency-Key）：同一键在 Resend 服务端窗口内只投递一次。
+   * 用于「邮件已发出但本地状态写回失败」时避免重试造成重复邮件。
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -46,12 +51,15 @@ export async function sendRawEmail(input: RawEmailInput): Promise<SendEmailResul
   }
 
   try {
-    const result = await resend.emails.send({
-      from: input.from,
-      to: input.to,
-      subject: input.subject,
-      html: input.html,
-    });
+    const result = await resend.emails.send(
+      {
+        from: input.from,
+        to: input.to,
+        subject: input.subject,
+        html: input.html,
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined
+    );
 
     if (result.error) {
       return { success: false, error: result.error.message };

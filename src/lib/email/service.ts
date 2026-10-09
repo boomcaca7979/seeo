@@ -56,6 +56,8 @@ export interface TransactionalEmailInput {
   html: string;
   /** 可选：显式幂等键。缺省时自动带唯一后缀 —— 事务邮件允许重复发送 */
   automationKey?: string;
+  /** 可选：Resend Idempotency-Key（服务端窗口内同一键只投递一次） */
+  idempotencyKey?: string;
   from?: string;
 }
 
@@ -118,7 +120,13 @@ async function finishLog(
 
 /** 真正投递到 provider（未配置 → dry-run 记录，绝不抛错到业务） */
 async function deliver(
-  input: { to: string; subject: string; html: string; from?: string }
+  input: {
+    to: string;
+    subject: string;
+    html: string;
+    from?: string;
+    idempotencyKey?: string;
+  }
 ): Promise<{ status: EmailSendStatus; messageId?: string; reason?: string }> {
   if (!isEmailConfigured()) {
     return { status: "skipped_no_provider", reason: "email provider not configured" };
@@ -128,6 +136,7 @@ async function deliver(
     to: input.to,
     subject: input.subject,
     html: input.html,
+    idempotencyKey: input.idempotencyKey,
   });
   if (result.success) {
     return { status: "sent", messageId: result.messageId };
@@ -229,6 +238,7 @@ export async function sendTransactionalEmail(
       subject: input.subject,
       html: input.html,
       from: input.from,
+      idempotencyKey: input.idempotencyKey,
     });
     await finishLog(logId, out.status, {
       providerMessageId: out.messageId ?? null,

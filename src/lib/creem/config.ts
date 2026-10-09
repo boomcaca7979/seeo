@@ -70,3 +70,20 @@ export function getCreemConfig(): CreemConfig | null {
 export function getCreemWebhookSecret(): string {
   return (process.env.CREEM_WEBHOOK_SECRET ?? "").trim();
 }
+
+/**
+ * 由 Creem Product ID 反查 SeeO plan key。
+ * 同时检查 live / test 两套映射（产品 ID 互不冲突），因此无需依赖当前 API 模式 ——
+ * 历史事件（如切换模式前的订单）也能正确归属。
+ */
+export function planFromProductId(
+  productId: string | null | undefined
+): CreemCheckoutPlan | null {
+  if (!productId) return null;
+  for (const map of [CREEM_PRODUCT_IDS_LIVE, CREEM_PRODUCT_IDS_TEST]) {
+    for (const [plan, id] of Object.entries(map)) {
+      if (id === productId) return plan as CreemCheckoutPlan;
+    }
+  }
+  return null;
+}

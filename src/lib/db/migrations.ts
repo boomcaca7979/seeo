@@ -646,7 +646,207 @@ async function migrate(db: DBAdapter): Promise<void> {
       marketing_unsubscribed_at TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- ===== Owner Console（/admin）本地经营快照层 =====
+    -- 设计原则：Creem / Google / AdSense 是 external source of truth，
+    -- 本层只保存**本地经营快照**，Admin 页面永不直连外部 API。
+    -- 所有 external ID 均有唯一约束，保证 webhook 重投不重复计收入。
+
+    -- Creem webhook 幂等账本：event_id 唯一，重复投递直接跳过
+    CREATE TABLE IF NOT EXISTS creem_webhook_events (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      object_id TEXT,
+      status TEXT NOT NULL DEFAULT 'received'
+        CHECK (status IN ('received', 'processed', 'ignored', 'failed')),
+      detail TEXT,
+      received_at TEXT NOT NULL DEFAULT (datetime('now')),
+      processed_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_creem_webhook_events_type
+      ON creem_webhook_events(event_type, received_at DESC);
+
+    -- Creem 客户（email ↔ SeeO user 的桥梁，用于排查支付问题）
+    CREATE TABLE IF NOT EXISTS creem_customers (
+      creem_customer_id TEXT PRIMARY KEY,
+      email TEXT,
+      user_id TEXT,
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_creem_customers_email ON creem_customers(email);
+    CREATE INDEX IF NOT EXISTS idx_creem_customers_user ON creem_customers(user_id);
+
+    -- Creem 订阅（状态快照；MRR / 活跃订阅数以此为源）
+    CREATE TABLE IF NOT EXISTS creem_subscriptions (
+      creem_subscription_id TEXT PRIMARY KEY,
+      user_id TEXT,
+      creem_customer_id TEXT,
+      product_id TEXT,
+      plan TEXT,
+      status TEXT NOT NULL,
+      current_period_start TEXT,
+      current_period_end TEXT,
+      last_transaction_id TEXT,
+      canceled_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_creem_subscriptions_user ON creem_subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_creem_subscriptions_status ON creem_subscriptions(status);
+
+    -- Creem 交易/订单快照（与 Supabase orders 对账用，非权益来源）
+    -- 方向由 type 表达：payment 行为收款、refund 行为退款（均存正数）。
+    -- 收入口径：gross = Σ payment amount；refunds = Σ refund amount；net = gross - refunds。
+    -- 主键为 Creem 侧 external id（payment=order id，refund=refund id）→ 同一事件重投天然幂等。
+    CREATE TABLE IF NOT EXISTS creem_transactions (
+      creem_transaction_id TEXT PRIMARY KEY,
+      user_id TEXT,
+      creem_customer_id TEXT,
+      creem_subscription_id TEXT,
+      out_trade_no TEXT,
+      parent_transaction_id TEXT,
+      plan TEXT,
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      currency TEXT NOT NULL DEFAULT 'USD',
+      type TEXT NOT NULL DEFAULT 'payment'
+        CHECK (type IN ('payment', 'refund')),
+      status TEXT NOT NULL,
+      paid_at TEXT,
+      occurred_at TEXT,
+      event_id TEXT,
+      raw_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_creem_transactions_order ON creem_transactions(out_trade_no);
+    CREATE INDEX IF NOT EXISTS idx_creem_transactions_user ON creem_transactions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_creem_transactions_status ON creem_transactions(status, paid_at);
+
+    -- GSC 站点级日指标（按日持久化，避免每次打开 Admin 打 Google API）
+    CREATE TABLE IF NOT EXISTS gsc_daily_metrics (
+      property_url TEXT NOT NULL,
+      date TEXT NOT NULL,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      ctr REAL NOT NULL DEFAULT 0,
+      position REAL,
+      synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (property_url, date)
+    );
+
+    -- GSC 关键词窗口快照（一次同步一行/关键词；captured_on 为抓取日）
+    CREATE TABLE IF NOT EXISTS gsc_query_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_url TEXT NOT NULL,
+      captured_on TEXT NOT NULL,
+      window_days INTEGER NOT NULL,
+      query TEXT NOT NULL,
+      country TEXT NOT NULL DEFAULT '',
+      device TEXT NOT NULL DEFAULT '',
+      clicks INTEGER NOT NULL DEFAULT 0,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      ctr REAL NOT NULL DEFAULT 0,
+      position REAL,
+      synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (property_url, captured_on, window_days, country, device, query)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_gsc_query_metrics_lookup
+      ON gsc_query_metrics(property_url, window_days, captured_on DESC);
+
+    -- GSC 页面窗口快照
+    CREATE TABLE IF NOT EXISTS gsc_page_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_url TEXT NOT NULL,
+      captured_on TEXT NOT NULL,
+      window_days INTEGER NOT NULL,
+      page TEXT NOT NULL,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      ctr REAL NOT NULL DEFAULT 0,
+      position REAL,
+      synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (property_url, captured_on, window_days, page)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_gsc_page_metrics_lookup
+      ON gsc_page_metrics(property_url, window_days, captured_on DESC);
+
+    -- 广告收入日表（provider 独立来源，与订阅收入分开统计，最后统一汇总）
+    CREATE TABLE IF NOT EXISTS ad_revenue_daily (
+      date TEXT NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'adsense',
+      currency TEXT NOT NULL DEFAULT 'USD',
+      revenue_cents INTEGER NOT NULL DEFAULT 0,
+      impressions INTEGER NOT NULL DEFAULT 0,
+      clicks INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'manual'
+        CHECK (source IN ('api', 'csv', 'manual')),
+      raw_json TEXT,
+      imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (date, provider)
+    );
+
+    -- Owner 级 GSC 连接（站点级，与用户 project 级 gsc_connections 分离；
+    -- 复用同一套 gsc-provider + AES-256-GCM secure-store，不新增第二套 OAuth 实现）
+    CREATE TABLE IF NOT EXISTS admin_gsc_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_url TEXT NOT NULL UNIQUE,
+      property_type TEXT NOT NULL DEFAULT 'url_prefix',
+      google_email TEXT,
+      encrypted_credentials TEXT NOT NULL,
+      connected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Owner Console：数据源同步/导入事件（最近成功与最近失败分开可查；五态展示依据）
+    CREATE TABLE IF NOT EXISTS admin_source_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source TEXT NOT NULL,
+      event TEXT NOT NULL CHECK (event IN ('success', 'error')),
+      message TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_admin_source_events_source
+      ON admin_source_events(source, created_at DESC);
+
+    -- 老板付款通知（支付成功 → 邮件通知 owner；持久化 + 防重复 + 重试）
+    -- dedupe_key 全局唯一：同一笔成功支付（首付 = 订单号；续费 = 订阅+交易/周期）只发一封
+    CREATE TABLE IF NOT EXISTS payment_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dedupe_key TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL CHECK (kind IN ('first_payment', 'renewal')),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      payload_json TEXT NOT NULL,
+      provider_message_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      sent_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_payment_notifications_status
+      ON payment_notifications(status, created_at DESC);
   `);
+
+  // Owner Console：analytics_events 补 content / term 列（归因完整性，附加式、旧数据不动）
+  try {
+    await db.run(`ALTER TABLE analytics_events ADD COLUMN content TEXT`);
+  } catch {
+    // 列已存在，忽略
+  }
+  try {
+    await db.run(`ALTER TABLE analytics_events ADD COLUMN term TEXT`);
+  } catch {
+    // 列已存在，忽略
+  }
 
   // projects 表升级：旧表 domain 是全局 UNIQUE，多用户下同域名冲突，重建为 (user_id, domain) 联合唯一
   try {

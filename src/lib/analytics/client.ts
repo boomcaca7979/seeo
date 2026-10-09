@@ -128,3 +128,28 @@ export function onConsentGranted(cb: () => void): () => void {
   window.addEventListener(CONSENT_EVENT, handler);
   return () => window.removeEventListener(CONSENT_EVENT, handler);
 }
+
+// ===== 经营漏斗补充事件（Owner Console）=====
+// 均为**新增**事件名，不改动既有事件；landing_view 每会话只报一次。
+
+const LANDING_REPORTED_KEY = "seeo:landing-reported";
+
+/**
+ * 会话内首次着陆上报 landing_view（每会话一次，需已同意 Cookie）。
+ * 由 AnalyticsBootstrap 在首次 page_view 时调用，因此 consent 时机由既有机制保证。
+ */
+export function trackLandingView(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  try {
+    if (window.sessionStorage.getItem(LANDING_REPORTED_KEY)) return Promise.resolve();
+    window.sessionStorage.setItem(LANDING_REPORTED_KEY, "1");
+  } catch {
+    return Promise.resolve();
+  }
+  return track("landing_view");
+}
+
+/** 高级功能被实际使用（功能维度经营指标；服务端付费功能另有同名服务端事件） */
+export function trackFeatureUsed(feature: string, props?: TrackProps): Promise<void> {
+  return track("feature_used", { feature, ...(props ?? {}) });
+}

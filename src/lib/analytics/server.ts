@@ -1,16 +1,21 @@
 // ===== Marketing Analytics：服务端事件与归因 =====
-// 单一事件模型（唯一入口 insertEvent / recordVisit）：
-//   page_view / audit_started / audit_completed / signup_started / signup_completed /
-//   login_completed / activation_completed / returning_user / pricing_viewed /
-//   upgrade_started / payment_completed / logout
+// 单一事件模型（唯一入口 insertEvent / recordVisit / recordServerEvent）：
+//   page_view / landing_view / audit_started / audit_completed / signup_started /
+//   signup_completed / login_completed / activation_completed / returning_user /
+//   pricing_viewed / upgrade_started / checkout_started / checkout_completed /
+//   subscription_active / subscription_canceled / feature_used / payment_completed / logout
 // 隐私约束：不落 token / cookie / 密码 / 支付卡信息；props 仅白名单化短字段。
+//
+// ⚠️ 事件契约为**追加式**：只允许新增事件名，不得重命名/删除既有事件
+//（L 层 doctor 第 9 项从本文件源码解析事件名，历史数据也按旧名读取）。
 
 import { getAdapter } from "@/lib/db/migrations";
 import { normalizeTouch, sanitizeShort, type TouchInput } from "./sources";
 
-/** 客户端可上报的事件（服务端事件 activation/returning/payment 由系统内部写入） */
+/** 客户端可上报的事件（服务端事件由系统内部写入） */
 export const CLIENT_EVENTS = [
   "page_view",
+  "landing_view",
   "audit_started",
   "audit_completed",
   "signup_started",
@@ -18,12 +23,17 @@ export const CLIENT_EVENTS = [
   "login_completed",
   "pricing_viewed",
   "upgrade_started",
+  "feature_used",
   "logout",
 ] as const;
 
 export const SERVER_EVENTS = [
   "activation_completed",
   "returning_user",
+  "checkout_started",
+  "checkout_completed",
+  "subscription_active",
+  "subscription_canceled",
   "payment_completed",
 ] as const;
 
@@ -75,8 +85,8 @@ export async function insertEvent(input: AnalyticsEventInput): Promise<void> {
   await db.run(
     `INSERT INTO analytics_events
        (event_name, user_id, anonymous_id, session_id, path, locale, referrer,
-        source, medium, campaign, landing_page, ref_id, props)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        source, medium, campaign, content, term, landing_page, ref_id, props)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.event,
       input.userId ?? null,
@@ -88,6 +98,8 @@ export async function insertEvent(input: AnalyticsEventInput): Promise<void> {
       touch.source,
       touch.medium,
       touch.campaign,
+      touch.content,
+      touch.term,
       sanitizeShort(input.landingPage ?? input.path),
       input.refId != null ? String(input.refId).slice(0, 120) : null,
       sanitizeProps(input.props),
@@ -120,8 +132,8 @@ export async function recordVisit(input: VisitInput): Promise<void> {
   await db.run(
     `INSERT INTO analytics_events
        (event_name, user_id, anonymous_id, session_id, path, locale, referrer,
-        source, medium, campaign, landing_page, props)
-     VALUES ('page_view', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        source, medium, campaign, content, term, landing_page, props)
+     VALUES ('page_view', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [
       userId,
       anonymousId,
@@ -132,6 +144,8 @@ export async function recordVisit(input: VisitInput): Promise<void> {
       touch.source,
       touch.medium,
       touch.campaign,
+      touch.content,
+      touch.term,
       landingPage,
     ]
   );
@@ -271,6 +285,96 @@ export async function recordPaymentCompleted(args: {
     touch: firstTouch,
     props: { plan: args.plan },
   });
+}
+
+// ---------- 经营漏斗：服务端事件（Owner Console） ----------
+// 全部为**新增**事件，不与既有事件重复；归因统一取账号 first touch。
+
+/** Checkout 已创建（服务端权威：Creem 返回 checkout_url 之后写入） */
+export async function recordCheckoutStarted(args: {
+  userId: string;
+  outTradeNo: string;
+  plan: string;
+}): Promise<void> {
+  const firstTouch = await getFirstTouchForUser(args.userId);
+  await insertEvent({
+    event: "checkout_started",
+    userId: args.userId,
+    refId: args.outTradeNo,
+    touch: firstTouch,
+    props: { plan: args.plan },
+  });
+}
+
+/** Checkout 已完成（webhook 确认该笔 checkout 支付成功，与 orders 状态迁移同步） */
+export async function recordCheckoutCompleted(args: {
+  userId: string;
+  outTradeNo: string;
+  plan: string;
+}): Promise<void> {
+  const firstTouch = await getFirstTouchForUser(args.userId);
+  await insertEvent({
+    event: "checkout_completed",
+    userId: args.userId,
+    refId: args.outTradeNo,
+    touch: firstTouch,
+    props: { plan: args.plan },
+  });
+}
+
+/** 订阅生效（首付成功或续费激活；subscriptionId 同时写 ref_id 便于排查） */
+export async function recordSubscriptionActive(args: {
+  userId: string;
+  subscriptionId: string;
+  plan?: string | null;
+}): Promise<void> {
+  const firstTouch = await getFirstTouchForUser(args.userId);
+  await insertEvent({
+    event: "subscription_active",
+    userId: args.userId,
+    refId: args.subscriptionId,
+    touch: firstTouch,
+    props: args.plan ? { plan: args.plan } : null,
+  });
+}
+
+/** 订阅取消（仅记录事实，不改变会员权益 —— 权益仍由 orders + cron 自然降级） */
+export async function recordSubscriptionCanceled(args: {
+  userId: string;
+  subscriptionId: string;
+  plan?: string | null;
+}): Promise<void> {
+  const firstTouch = await getFirstTouchForUser(args.userId);
+  await insertEvent({
+    event: "subscription_canceled",
+    userId: args.userId,
+    refId: args.subscriptionId,
+    touch: firstTouch,
+    props: args.plan ? { plan: args.plan } : null,
+  });
+}
+
+/**
+ * 付费功能被实际使用（服务端；与客户端 trackFeatureUsed 写同名事件）。
+ * 只记录「功能名」，不记录任何业务内容。失败静默 —— 埋点不得影响功能本身。
+ */
+export async function recordFeatureUsed(
+  userId: string,
+  feature: string,
+  props?: Record<string, unknown> | null
+): Promise<void> {
+  if (!userId || userId.startsWith("guest:")) return;
+  try {
+    const firstTouch = await getFirstTouchForUser(userId);
+    await insertEvent({
+      event: "feature_used",
+      userId,
+      touch: firstTouch,
+      props: { feature, ...(props ?? {}) },
+    });
+  } catch {
+    // 埋点失败不影响业务
+  }
 }
 
 /** 读取某匿名身份的归因（浏览器验证 / 调试用） */

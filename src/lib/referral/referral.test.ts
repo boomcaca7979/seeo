@@ -90,7 +90,10 @@ describe("K code 生成与校验", () => {
     const code = gen();
     expect(normalizeReferralCode(`  ${code.toLowerCase()} `)).toBe(code);
     expect(isValidReferralCode(code.toLowerCase())).toBe(true);
-    for (const bad of ["", "R", "REFERRAL", "R000000000O2", "RS7Z4C7YJKQ", gen().slice(0, -1) + "A"]) {
+    // 末位（校验位）替换成一个【必然不同】的字符：若随机码的正确校验位恰好是 A，
+    // 固定替换成 A 就不是篡改（原 flaky 根因，~1/32 概率）。篡改后的校验位必错 → 必拒。
+    const tampered = code.slice(0, -1) + (code.slice(-1) === "A" ? "B" : "A");
+    for (const bad of ["", "R", "REFERRAL", "R000000000O2", "RS7Z4C7YJKQ", tampered]) {
       expect(isValidReferralCode(bad), `${bad} 应被拒绝`).toBe(false);
     }
   });

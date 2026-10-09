@@ -33,11 +33,40 @@ const h = vi.hoisted(() => {
     syncSubscriptionPeriodMock: vi.fn(async () => true),
     handleRefundSuccessMock: vi.fn(async () => ({ ok: true })),
     recordPaymentCompletedMock: vi.fn(async () => {}),
+    // ---- Owner Console：analytics 事件 ----
+    recordCheckoutCompletedMock: vi.fn(async () => {}),
+    recordSubscriptionActiveMock: vi.fn(async () => {}),
+    recordSubscriptionCanceledMock: vi.fn(async () => {}),
+    // ---- Owner Console：Creem 本地经营快照 ----
+    // 默认 "claimed"：保持既有「重复投递仍各自处理」的测试语义不变
+    claimWebhookEventMock: vi.fn(
+      async (): Promise<"claimed" | "duplicate" | "retry"> => "claimed"
+    ),
+    finishWebhookEventMock: vi.fn(async () => {}),
+    upsertCreemCustomerMock: vi.fn(async () => {}),
+    upsertCreemSubscriptionMock: vi.fn(
+      async (): Promise<{
+        created: boolean;
+        previousStatus: string | null;
+        statusChanged: boolean;
+      }> => ({ created: true, previousStatus: null, statusChanged: true })
+    ),
+    recordCreemPaymentMock: vi.fn(async () => {}),
+    recordCreemRefundMock: vi.fn(async () => {}),
   };
 });
 
 vi.mock("@/lib/creem/config", () => ({
   getCreemWebhookSecret: vi.fn(() => "whsec_test_secret"),
+}));
+
+vi.mock("@/lib/creem/snapshot", () => ({
+  claimWebhookEvent: h.claimWebhookEventMock,
+  finishWebhookEvent: h.finishWebhookEventMock,
+  upsertCreemCustomer: h.upsertCreemCustomerMock,
+  upsertCreemSubscription: h.upsertCreemSubscriptionMock,
+  recordCreemPayment: h.recordCreemPaymentMock,
+  recordCreemRefund: h.recordCreemRefundMock,
 }));
 
 vi.mock("@/lib/orders/service", () => ({
@@ -66,6 +95,9 @@ vi.mock("@/lib/orders/service", () => ({
 
 vi.mock("@/lib/analytics/server", () => ({
   recordPaymentCompleted: h.recordPaymentCompletedMock,
+  recordCheckoutCompleted: h.recordCheckoutCompletedMock,
+  recordSubscriptionActive: h.recordSubscriptionActiveMock,
+  recordSubscriptionCanceled: h.recordSubscriptionCanceledMock,
 }));
 
 const { orderDb } = h;
@@ -555,5 +587,176 @@ describe("refund.created", () => {
     );
     expect(res.status).toBe(200);
     expect(mockRefund).not.toHaveBeenCalled();
+  });
+});
+
+// ===== Owner Console：事件账本 + 本地经营快照 =====
+// 两条硬约束：
+//   1. 账本/快照**不可用**时不得阻塞权益（否则已付费用户拿不到服务）；
+//   2. 账本**命中重复**时必须短路（否则重复计收入、重复抬高漏斗）。
+describe("Owner Console 快照与事件账本", () => {
+  it("checkout.completed → 写入 Creem 客户/订阅/收款快照（金额用最小货币单位）", async () => {
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({
+          metadata: { out_trade_no: "S20260831120000ABCDEF" },
+          subscription: {
+            id: "sub_test_1",
+            status: "active",
+            current_period_end_date: "2026-09-30T00:00:00Z",
+          },
+        })
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(h.upsertCreemCustomerMock).toHaveBeenCalledTimes(1);
+    expect(h.upsertCreemSubscriptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ subscriptionId: "sub_test_1", plan: "lite" })
+    );
+    expect(h.recordCreemPaymentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactionId: "ord_test_456",
+        amountCents: 149,
+        outTradeNo: "S20260831120000ABCDEF",
+        plan: "lite",
+      })
+    );
+    // 新订阅（created=true）→ 记一次 subscription_active，避免续费重复抬高漏斗
+    expect(h.recordSubscriptionActiveMock).toHaveBeenCalledTimes(1);
+    // 账本写 processed（detail 省略）
+    expect(h.finishWebhookEventMock.mock.calls.map((c) => c.slice(0, 2))).toContainEqual([
+      "evt_test_001",
+      "processed",
+    ]);
+  });
+
+  it("续费（subscription.paid 状态未变）→ 不重复发射 subscription_active", async () => {
+    orderDb.set(
+      "S20260831120000ABCDEF",
+      baseOrder({ payment_status: "paid", api_trade_no: "sub_test_1" })
+    );
+    h.upsertCreemSubscriptionMock.mockResolvedValueOnce({
+      created: false,
+      previousStatus: "active",
+      statusChanged: false,
+    });
+    const res = await POST(
+      makeWebhookRequest({
+        id: "evt_sub_renew",
+        eventType: "subscription.paid",
+        created_at: 1756646400,
+        object: {
+          id: "sub_test_1",
+          status: "paid",
+          current_period_end_date: "2026-10-30T00:00:00Z",
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(h.recordSubscriptionActiveMock).not.toHaveBeenCalled();
+    expect(mockSync).toHaveBeenCalledTimes(1); // 周期仍然照常同步
+  });
+
+  it("状态迁移到 canceled → 发射 subscription_canceled（且不动会员周期）", async () => {
+    // 必须能匹配到本地订单，否则 handleSubscriptionSync 会在快照之前就返回
+    orderDb.set(
+      "S20260831120000ABCDEF",
+      baseOrder({ payment_status: "paid", api_trade_no: "sub_test_1" })
+    );
+    h.upsertCreemSubscriptionMock.mockResolvedValueOnce({
+      created: false,
+      previousStatus: "active",
+      statusChanged: true,
+    });
+    const res = await POST(
+      makeWebhookRequest({
+        id: "evt_sub_cancel",
+        eventType: "subscription.canceled",
+        created_at: 1756646400,
+        object: { id: "sub_test_1", status: "canceled" },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(h.recordSubscriptionCanceledMock).toHaveBeenCalledTimes(1);
+    expect(h.recordSubscriptionActiveMock).not.toHaveBeenCalled();
+    expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  it("事件账本命中 duplicate → 直接 200 短路，不触碰订单", async () => {
+    h.claimWebhookEventMock.mockResolvedValueOnce("duplicate");
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({ metadata: { out_trade_no: "S20260831120000ABCDEF" } })
+      )
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.duplicate).toBe(true);
+    expect(mockComplete).not.toHaveBeenCalled();
+    expect(h.recordCreemPaymentMock).not.toHaveBeenCalled();
+  });
+
+  it("事件账本不可用（claim 抛错）→ 降级处理，权益照常开通", async () => {
+    h.claimWebhookEventMock.mockRejectedValueOnce(new Error("db down"));
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({ metadata: { out_trade_no: "S20260831120000ABCDEF" } })
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+    expect(h.recordCreemPaymentMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("事件账本写入失败（finish 抛错）→ 仍 200，不触发无效重投", async () => {
+    h.finishWebhookEventMock.mockRejectedValueOnce(new Error("db down"));
+    const res = await POST(
+      makeWebhookRequest(
+        checkoutCompletedEvent({ metadata: { out_trade_no: "S20260831120000ABCDEF" } })
+      )
+    );
+    expect(res.status).toBe(200);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("快照写入失败（upsertCreemSubscription 抛错）→ 不阻塞订阅周期同步", async () => {
+    orderDb.set(
+      "S20260831120000ABCDEF",
+      baseOrder({ payment_status: "paid", api_trade_no: "sub_test_1" })
+    );
+    h.upsertCreemSubscriptionMock.mockRejectedValueOnce(new Error("db down"));
+    const res = await POST(
+      makeWebhookRequest({
+        id: "evt_sub_snapfail",
+        eventType: "subscription.paid",
+        created_at: 1756646400,
+        object: {
+          id: "sub_test_1",
+          status: "paid",
+          current_period_end_date: "2026-10-30T00:00:00Z",
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    // 读不到上一状态 → 宁可不记，也不重复抬高漏斗
+    expect(h.recordSubscriptionActiveMock).not.toHaveBeenCalled();
+  });
+
+  it("未处理事件类型 → 账本记 ignored（可观测，不当作失败）", async () => {
+    const res = await POST(
+      makeWebhookRequest({
+        id: "evt_unknown_1",
+        eventType: "product.created",
+        created_at: 1756646400,
+        object: { id: "prod_1" },
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(h.finishWebhookEventMock).toHaveBeenCalledWith(
+      "evt_unknown_1",
+      "ignored",
+      "unhandled: product.created"
+    );
   });
 });

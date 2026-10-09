@@ -136,6 +136,19 @@ export async function POST(req: Request) {
 
     await recordCheckoutId(order, checkout.id);
 
+    // 经营漏斗：checkout_started（服务端权威 —— 仅在 Creem 真实返回 checkout_url 后记录）
+    // 埋点失败不得影响支付链路
+    try {
+      const { recordCheckoutStarted } = await import("@/lib/analytics/server");
+      await recordCheckoutStarted({
+        userId,
+        outTradeNo: order.out_trade_no,
+        plan: checkoutPlan,
+      });
+    } catch (analyticsErr) {
+      console.error("[CreemCreate] analytics checkout_started 记录失败:", analyticsErr);
+    }
+
     return NextResponse.json({
       data: {
         checkoutUrl: checkout.checkoutUrl,

@@ -9,7 +9,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useLocale } from "next-intl";
-import { track, hasAnalyticsConsent, onConsentGranted } from "@/lib/analytics/client";
+import { track, trackLandingView, hasAnalyticsConsent, onConsentGranted } from "@/lib/analytics/client";
 
 export default function AnalyticsBootstrap() {
   const pathname = usePathname();
@@ -24,6 +24,8 @@ export default function AnalyticsBootstrap() {
       }
       lastFired.current = { path: pathname, at: now };
       track("page_view");
+      // 经营漏斗：会话内首次着陆只报一次（内部有 sessionStorage 去重）
+      void trackLandingView();
     };
 
     if (hasAnalyticsConsent()) {

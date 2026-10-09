@@ -16,7 +16,9 @@ function makeAdapter(): SQLiteAdapter {
       user_id TEXT, anonymous_id TEXT, session_id TEXT, path TEXT, locale TEXT,
       referrer TEXT, source TEXT, medium TEXT, campaign TEXT, landing_page TEXT,
       ref_id TEXT, props TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      content TEXT,
+      term TEXT
     );
     CREATE TABLE analytics_identities (
       anonymous_id TEXT PRIMARY KEY, user_id TEXT,
