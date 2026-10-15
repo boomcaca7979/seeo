@@ -41,10 +41,17 @@ interface PageDetailEntry {
   ok: boolean;
 }
 
-/** 读取 UI locale：NEXT_LOCALE cookie → en（与 billing-error-client 优先级一致） */
+/**
+ * 读取 UI locale：NEXT_LOCALE cookie → Accept-Language（含 zh）→ en。
+ * 与 dashboard 渲染链（src/i18n/request.ts resolveUiLocale：cookie → Accept-Language → en）保持一致——
+ * 只认 cookie 会让未用过语言切换器的中文用户拿到英文的 issue 详情/建议。
+ */
 function readUiLocale(req: Request): UiLocale {
   const cookie = req.headers.get("cookie") ?? "";
-  return /(?:^|;\s*)NEXT_LOCALE=zh(?:;|$)/.test(cookie) ? "zh" : "en";
+  if (/(?:^|;\s*)NEXT_LOCALE=zh(?:;|$)/.test(cookie)) return "zh";
+  const acceptLanguage = req.headers.get("accept-language") ?? "";
+  if (/(^|,)\s*zh(-|;|$|\s)/i.test(acceptLanguage)) return "zh";
+  return "en";
 }
 
 /** checkId → 按 locale 展示名：catalog 内 → meta.name；catalog 外（如 startpage-unparsed）→ 补充映射；未知 → 原值 */

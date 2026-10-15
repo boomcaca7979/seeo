@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
 
 interface CheckItem {
@@ -139,11 +141,23 @@ function suggestionType(text: string): { key: "sugGood" | "sugAdvice" | "sugHint
   return { key: "sugHint", cls: "badge-info" };
 }
 
+// ===== 深链入口（Action Center → 内容机会）=====
+// 支持 /app/content?url=xxx&domain=yyy：预填待优化页面与站点，用户可直接点 Analyze。
+// 只预填不自动执行（避免在用户未确认时触发分析）。
 export default function ContentPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContentPageInner />
+    </Suspense>
+  );
+}
+
+function ContentPageInner() {
   const t = useTranslations("dashboard.content");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as Locale;
   const { show, Toast } = useToast();
+  const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [domain, setDomain] = useState("");
   const [targetKeywordsInput, setTargetKeywordsInput] = useState("");
@@ -152,6 +166,23 @@ export default function ContentPage() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // 深链预填（延后一拍，避免在 effect 体内同步 setState）
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const dlUrl = (searchParams.get("url") ?? "").trim();
+    const dlDomain = (searchParams.get("domain") ?? "").trim();
+    const dlKeyword = (searchParams.get("keyword") ?? "").trim();
+    if (!dlUrl && !dlDomain && !dlKeyword) return;
+    deepLinkApplied.current = true;
+    const id = window.setTimeout(() => {
+      if (dlUrl) setUrl(dlUrl);
+      if (dlDomain) setDomain(dlDomain);
+      if (dlKeyword) setTargetKeywordsInput(dlKeyword);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [searchParams]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -242,6 +273,9 @@ export default function ContentPage() {
       <p className="mt-2 font-sans text-sm text-ink-60">
         {t("subtitle")}
       </p>
+
+      {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
+      <OpportunityContextBanner />
 
       {/* URL 输入区 */}
       <form

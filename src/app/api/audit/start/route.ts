@@ -6,6 +6,7 @@
 import { NextResponse, after } from "next/server";
 import { createAudit, getLatestAudit, reapStaleRunningAudit, tryIncrementAuditDailyUsage } from "@/lib/db";
 import { runAudit, type AuditDepth } from "@/lib/audit";
+import { autoScanOpportunitiesAfterAudit } from "@/lib/seo/audit-opportunity-trigger";
 import { requireAuthAllowGuest, guestUserId } from "@/lib/auth";
 import { checkAuditRateLimit, buildRateLimitKey } from "@/lib/rate-limit";
 import { FeatureNotAllowedError, PlanLimitError, billingErrorToResponse } from "@/lib/guards";
@@ -138,11 +139,20 @@ export async function POST(req: Request) {
 
   // 异步执行审计：after() 在响应返回后继续执行，不阻塞用户
   // runAudit 内部已处理 finishAudit / addAuditIssue / 失败兜底
-  after(() =>
-    runAudit(userId, audit.id, domain, { depth }).catch((err) => {
+  after(async () => {
+    let result: Awaited<ReturnType<typeof runAudit>> | null = null;
+    try {
+      result = await runAudit(userId, audit.id, domain, { depth });
+    } catch (err) {
       console.error(`[audit ${audit.id}] async failed:`, err);
-    })
-  );
+      return;
+    }
+    // 审计成功完成 → 自动生成机会（复用现有 scanner；fire-and-forget，失败不影响审计结果）。
+    // 仅登录用户：游客审计按 IP 归属，没有可挂机会的项目。
+    if (result.status === "completed" && isAuthed) {
+      await autoScanOpportunitiesAfterAudit(userId, plan, domain);
+    }
+  });
 
   // 立即返回 auditId，前端轮询 /api/audit/latest 获取进度
   return NextResponse.json({

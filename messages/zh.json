@@ -21,16 +21,11 @@
   "accept": "同意"
 },
   "hero": {
-    "badge": "每日追踪 · SEO 审计 · 排名监控",
-    "title": "看清搜索流量的走向",
-    "subtitle": "把关键词、排名、外链、技术审计、竞品和内容优化放在同一张工作台上。SeeO 帮你从一堆搜索数据里，看出下一步该做什么。",
+    "badge": "真实站点审计 · 先修最重要的 · 修完可验证",
+    "title": "找出现在最值得处理的那个 SEO 问题，修完再验证。",
+    "subtitle": "免费审计你的真实网站：SeeO 告诉你哪个问题最值得先处理、依据是什么；你修复之后，再跑一次审计，验证问题是否真的解决。",
     "primaryCta": "免费开始",
     "secondaryCta": "看看能做什么",
-    "panel": {
-      "sample": "示例",
-      "sampleNote": "示例数据 · 演示用",
-      "caption": "引力场示意 · 数据为示例"
-    },
     "auditBox": {
       "placeholder": "输入你的网站域名，如 example.com",
       "submit": "免费开始 SEO 审计",
@@ -39,168 +34,142 @@
       "errInvalid": "域名格式无效，如 example.com",
       "errPrivate": "不支持审计本地或私有网络地址",
       "label": "网站域名"
-    },
-    "field": {
-      "center": "SEO 工具",
-      "satellites": [
-        {
-          "kw": "长尾词挖掘"
-        },
-        {
-          "kw": "竞品排名"
-        },
-        {
-          "kw": "搜索意图"
-        },
-        {
-          "kw": "SERP 特征"
-        },
-        {
-          "kw": "外链机会"
-        },
-        {
-          "kw": "内容缺口"
-        },
-        {
-          "kw": "本地 SEO"
-        }
-      ]
     }
   },
   "features": {
-    "sectionTitle": "一张工作台，看懂六个维度",
-    "sectionSubtitle": "从挖词到内容优化，SEO 工作流的每一步都在 SeeO 里打通，数据在模块之间自动流转，不用反复导入导出。",
-    "cardLink": "试用这个模块",
+    "sectionTitle": "从问题到证据",
+    "sectionSubtitle": "SeeO 围绕一个真实站点的闭环而建：找出最值得先处理的问题、看清它为什么重要，再用一次新审计验证修复效果。",
+    "cardLink": "用免费审计试一试",
     "cards": [
       {
-        "tag": "挖词",
-        "title": "关键词研究",
-        "desc": "从一个种子词挖出整片相关词，看清搜索量、难度、意图和 CPC，找到能带来流量的长尾机会。",
+        "tag": "判断",
+        "title": "找出先修什么",
+        "desc": "对真实站点的免费审计会找出技术问题，并直接判定最值得先修的那一个——而不是再甩给你一份待筛选的长清单。",
         "bullets": [
-          "相关词 / 短语匹配",
-          "KD 难度评分",
-          "搜索意图识别",
-          "搜索量 / CPC"
+          "健康分 + 20+ 项技术检查",
+          "给出优先级判断和理由",
+          "跑在你的真实页面上"
         ],
-        "metricLabel": "数据来源",
-        "metricValue": "SerpApi",
-        "href": "/features/keyword-research"
+        "metricLabel": "步骤",
+        "metricValue": "01",
+        "href": "/app/audit"
       },
       {
-        "tag": "追踪",
-        "title": "排名追踪",
-        "desc": "按关键词、地区、设备持续监控你的排名变化，波动一发生就提醒你，不用每天手动查。",
+        "tag": "依据",
+        "title": "看清它为什么重要",
+        "desc": "每个优先级都附带证据：严重程度、影响多少页面、问题在哪里被发现——先看清依据，再决定动不动手。",
         "bullets": [
-          "每日自动刷新",
-          "多地区 / 多设备",
-          "排名趋势曲线",
-          "波动预警"
+          "通俗语言说明为什么现在修",
+          "受影响页面、发现问题、样本 URL",
+          "不估算流量"
         ],
-        "metricLabel": "刷新频率",
-        "metricValue": "每日",
-        "href": "/features/rank-tracking"
+        "metricLabel": "步骤",
+        "metricValue": "02",
+        "href": "/app/audit"
       },
       {
-        "tag": "诊断",
-        "title": "技术 SEO 审计",
-        "desc": "全站爬取一遍，把 404、重定向链、重复标题、缺 Alt 这些技术问题按优先级排好给你修。",
+        "tag": "验证",
+        "title": "验证修复效果",
+        "desc": "修复之后再次审计，SeeO 会重新检查你的页面——如实告诉你问题已解决、没解决还是无法判断。",
         "bullets": [
-          "健康度评分",
-          "错误 / 警告 / 提示",
-          "页面响应分析",
-          "修复优先级"
+          "重新审计自动验证",
+          "如实给出通过 / 未通过 / 无法判断",
+          "逐个问题追踪进度"
         ],
-        "metricLabel": "检查项",
-        "metricValue": "20+",
-        "href": "/features/seo-audit"
-      },
-      {
-        "tag": "诊断",
-        "title": "外链分析",
-        "desc": "看清谁在链接你、锚文本怎么分布、引荐域名有哪些，随时运行外链分析获取完整的链接概况快照。",
-        "bullets": [
-          "外链总览 + DA",
-          "引荐域名分析",
-          "锚文本分布",
-          "跨次快照对比"
-        ],
-        "metricLabel": "数据来源",
-        "metricValue": "DataForSEO",
-        "href": "/features/backlink-analysis"
-      },
-      {
-        "tag": "洞察",
-        "title": "竞品分析",
-        "desc": "把竞品的关键词排名摆在一起对比，看到你们差在哪、机会在哪，别再凭感觉判断。",
-        "bullets": [
-          "域名概览对比",
-          "SOV 份额计算",
-          "排名差距分析",
-          "历史趋势叠加"
-        ],
-        "metricLabel": "分析维度",
-        "metricValue": "SOV 份额",
-        "href": "/features/competitor-analysis"
-      },
-      {
-        "tag": "优化",
-        "title": "内容优化",
-        "desc": "输入一个页面和目标关键词，对照 SERP 前 10 给出该写哪些主题词、字数多少、哪里还能改。",
-        "bullets": [
-          "页面 SEO 检测",
-          "内容评分",
-          "主题词建议",
-          "SEO 检查清单"
-        ],
-        "metricLabel": "对比基准",
-        "metricValue": "SERP Top10",
-        "href": "/features/content-optimization"
+        "metricLabel": "步骤",
+        "metricValue": "03",
+        "href": "/app/audit"
       }
     ]
   },
   "preview": {
-    "sectionHeading": "工作台预览",
-    "sectionSubheading": "看到每一天的变化",
-    "sectionSubtitle": "所有项目的核心指标汇总在一个仪表盘里，排名涨了还是掉了、健康度有没有回升、流量从哪来，一眼看完。",
-    "demoBadge": "示例数据 · 演示用",
-    "sample": "示例",
-    "trendIllustration": "趋势示意",
-    "rankTrend": {
-      "title": "排名趋势",
-      "subtitle": "示例项目 · 近 30 天 · 移动端",
-      "from": "30 天前",
-      "to": "今天"
+    "sectionHeading": "一次免费审计后，你会看到什么",
+    "sectionSubheading": "一个问题。一个理由。一份证据。一次修复。",
+    "sectionSubtitle": "SeeO 不先甩给你一堆图表，而是先告诉你最值得处理的那一个问题——下面就是每次审计都会给出的完整结构（示例数据，非真实客户）。",
+    "demoBadge": "示例 · 示例数据，非真实客户",
+    "exampleTag": "示例",
+    "what": {
+      "label": "先修什么",
+      "issue": "缺少 meta description",
+      "severity": "错误",
+      "desc": "审计发现该站点的页面缺少 meta description 标签。这就是 SeeO 判定为「最值得先修」的问题。"
     },
-    "health": {
-      "title": "健康度",
-      "subtitle": "技术 SEO 审计综合分",
-      "scoreNote": "评分示意",
-      "errors": "错误",
-      "warnings": "警告",
-      "notices": "提示"
+    "why": {
+      "label": "为什么先修它",
+      "reason1": "影响 100% 已抓取页面",
+      "reason2": "严重程度高",
+      "reason3": "对健康分影响大"
     },
-    "traffic": {
-      "title": "自然流量",
-      "subtitle": "月度访问量趋势 · 示例",
-      "jan": "1月",
-      "jun": "6月",
-      "dec": "12月"
+    "evidence": {
+      "label": "证据",
+      "pages": "受影响页面",
+      "findings": "发现问题",
+      "sampleUrl": "样本 URL"
     },
-    "metrics": {
-      "trackedKeywords": "追踪关键词",
-      "referringDomains": "外链域名",
-      "top3": "TOP3 关键词",
-      "top10": "TOP10 关键词"
+    "action": {
+      "label": "行动",
+      "desc": "修复这个问题"
+    },
+    "verify": {
+      "label": "验证",
+      "desc": "修复之后，再跑一次审计——SeeO 会重新抓取真实页面，如实告诉你问题是否已经解决。",
+      "cta": "运行免费审计"
+    },
+    "realDemo": {
+      "sectionSubtitle": "下面不是示例——这是 SeeO 自己的官网（www.seeo.asia）在 2026-10-15 的真实审计快照。看一个真实问题如何被发现、解释、修复与再次审计。",
+      "badge": "真实审计快照 · {time} · 非实时",
+      "snapshotTag": "真实快照 · 仅首页",
+      "summary": {
+        "healthScore": "健康分",
+        "pagesCrawled": "已抓取页面",
+        "checksPassed": "检查项通过",
+        "engine": "审计引擎"
+      },
+      "tabs": {
+        "scope": "审计范围",
+        "what": "发现的问题",
+        "why": "为什么处理",
+        "action": "修复建议",
+        "verify": "状态与再审计"
+      },
+      "scope": {
+        "domain": "目标网站",
+        "time": "审计时间",
+        "depth": "审计深度",
+        "depthValue": "快速审计（仅首页）",
+        "pages": "已抓取页面",
+        "note": "本快照仅覆盖首页，不能代表全站结论。想看自己网站的全貌，运行一次你自己的免费审计。"
+      },
+      "evidence": {
+        "visibleText": "可见文本（字符）",
+        "htmlSize": "HTML 大小（字符）",
+        "ratio": "文本/HTML 比例"
+      },
+      "why": {
+        "score": "优先级得分 {score}"
+      },
+      "action": {
+        "step1": "检查首页 HTML 与脚本体积：内联样式、冗余脚本、未压缩的标记都会抬高 HTML 基数。",
+        "step2": "补充有价值的可见文本内容：让访问者在首屏就能读到实质性内容。",
+        "step3": "改完后在 SeeO 里把该问题标记为「已修复」，再跑一次审计验证。",
+        "genericNote": "以上为该规则的通用修复建议，本演示不声称任何改善效果。"
+      },
+      "verify": {
+        "notFixedNote": "站点尚未实际完成修复，因此再次审计仍检出该问题——SeeO 如实报告，不声称改善。",
+        "userNote": "修复备注：{note}",
+        "attempts": "已尝试 {n} 次",
+        "mechanismTitle": "修复状态机的五种状态"
+      },
+      "footer": "数据来源：2026-10-15 对 www.seeo.asia 的真实审计（audit #8，引擎 V2 规则集 2.0，仅首页快速审计）· 快照静态、非实时 · 不代表任何客户数据，不含改善承诺。"
     }
   },
   "footer": {
-    "tagline": "一站式 SEO 数据分析平台，把搜索流量里的每一个机会都摆到你看得到的地方。",
-    "dataSource": "基于 SerpApi / DataForSEO 数据服务",
+    "tagline": "聚焦的 SEO 工作台：在你的真实站点上找出最值得先修的问题，然后验证修复效果。",
+    "dataSource": "基于真实站点抓取与 SERP 数据服务",
     "colProduct": "产品",
     "colProductLinks": {
       "seoAudit": "技术 SEO 审计",
       "rankTracking": "关键词排名追踪",
-      "backlinks": "外链分析",
       "allFeatures": "全部功能"
     },
     "colPlans": "方案",
@@ -209,7 +178,8 @@
     },
     "colResources": "资源",
     "colResourcesLinks": {
-      "docs": "使用文档"
+      "docs": "使用文档",
+      "changelog": "更新日志"
     },
     "colCompany": "公司",
     "colCompanyLinks": {
@@ -227,15 +197,18 @@
     "priceUnit": "/30天",
     "free": {
       "name": "免费版",
-      "tagline": "适合个人站长和初学者"
+      "tagline": "适合个人站长和初学者",
+      "outcome": "找出你的第一个优先问题。修复它。验证结果。"
     },
     "lite": {
       "name": "Lite 版",
-      "tagline": "适合个人 SEO 入门"
+      "tagline": "适合个人 SEO 入门",
+      "outcome": "站点变大后继续「判断 → 修复 → 验证」——更多项目和关键词。"
     },
     "pro": {
       "name": "专业版",
-      "tagline": "适合专业 SEO 从业者"
+      "tagline": "适合专业 SEO 从业者",
+      "outcome": "在多个站点上跑这套「修复-验证」闭环，审计更深、关键词空间更大。"
     },
     "custom": {
       "name": "定制服务",
@@ -271,7 +244,7 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "选择适合你的方案",
-    "subtitle": "从免费开始，随时升级或取消。",
+    "subtitle": "从免费审计开始——找出你的第一个优先问题，修复它，然后验证结果。需要更多空间时再升级。",
     "loading": "加载中…",
     "loadFailed": "加载套餐信息失败",
     "networkError": "网络错误，加载套餐失败",
@@ -312,11 +285,23 @@
       },
       {
         "q": "SerpApi 额度是什么？",
-        "a": "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 50 次，超出后相关功能暂停至下月刷新。升级套餐可获得更高额度。"
+        "a": "SerpApi 是第三方 SERP 数据 API，按调用次数计费。免费版每月 30 次（每天 3 次），额度用完后相关功能会明确提示受限，次月刷新。升级套餐可获得更高额度。"
+      },
+      {
+        "q": "免费审计检查哪些内容？",
+        "a": "免费版每天可发起 3 次快速审计，只抓取首页并基于页面级检查输出健康分；深度审计会抓取更多页面（当前上限约 50 页），为 Pro 套餐能力。如果网页无法访问或被反爬措施拦截，SeeO 无法得出健康结论，会如实显示失败原因，不会用 0 分冒充结果。"
+      },
+      {
+        "q": "标记「已修复」就等于解决了吗？",
+        "a": "不等于。标记只是你的声明；SeeO 会在你再次审计时重新抓取相关页面复查同一条规则：未再检出才标记为「已验证解决」，仍检出会如实显示新的发现，无法判断时不下结论——依据始终是真实检测数据。"
       },
       {
         "q": "数据存储在哪里？",
         "a": "生产环境使用 Turso 云数据库，用户鉴权由 Supabase Auth 提供。每个用户的数据相互隔离。"
+      },
+      {
+        "q": "SeeO 能保证排名提升或流量增长吗？",
+        "a": "不能。SeeO 审计你的真实站点，基于证据告诉你哪个问题最值得先修，并验证修复是否生效。排名和流量受很多因素影响，任何工具都无法保证——对这类承诺应保持警惕。"
       }
     ],
     "billingNote": "按月计费 · 随时取消",
@@ -349,8 +334,6 @@
       "competitors": "每个项目竞品数",
       "sov": "声量份额与关键词差距",
       "serpMonthly": "SERP 数据调用次数/月",
-      "dataforseo": "关键词与外链数据查询次数/月",
-      "backlinks": "外链画像分析",
       "contentChecks": "内容检查次数/月",
       "pdf": "PDF 报告导出",
       "excel": "CSV 报告导出（Excel 兼容）",
@@ -696,7 +679,7 @@
     ],
     "related": {
       "seoAudit": {
-        "title": "AI SEO 审计工具 →",
+        "title": "技术 SEO 审计 →",
         "desc": "20+ 项技术检查与健康分"
       },
       "backlinks": {
@@ -924,7 +907,7 @@
     ],
     "related": {
       "seoAudit": {
-        "title": "AI SEO 审计工具 →",
+        "title": "技术 SEO 审计 →",
         "desc": "20+ 项技术检查与健康分"
       },
       "rankTracking": {
@@ -1284,13 +1267,100 @@
     "banned": "因违反服务条款被封禁的账号，费用处理详见服务条款相关约定。",
     "lastUpdated": "最后更新：2026年8月"
   },
+  "changelogPage": {
+    "meta": {
+      "title": "SeeO 更新日志：真实的产品变化记录 | SeeO",
+      "description": "SeeO 更新日志只记录实际发生的产品变化：已上线的功能、已完成但尚未部署的改进分开列出，每条注明日期与你能感受到的影响。不写版本号，不写没有发生过的发布。"
+    },
+    "title": "更新日志",
+    "subtitle": "只记录实际发生的产品变化。已上线的、已完成但尚未部署的、正在做的，分开列出。",
+    "status": {
+      "shipped": "已发布",
+      "localOnly": "已实现 · 尚未部署",
+      "inDev": "进行中"
+    },
+    "localNote": "本页所有条目均为已进入生产发布（www.seeo.asia）的真实产品变化，日期为实际交付与发布时间。",
+    "entries": [
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "审计问题待办清单与分步修复指导",
+        "changes": [
+          "审计结果重新组织为按优先级排序的待办清单：每个问题显示 P0/P1/P2 优先级、真实检测证据和处理状态",
+          "问题详情提供分步修复指导：到哪里改、按什么步骤改、改完先自查什么，并如实说明 SeeO 无法替你确定的部分",
+          "修复后再次审计，SeeO 依据真实检测数据给出「已验证解决 / 仍然存在 / 无法判断」结论"
+        ]
+      },
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "首页真实审计演示",
+        "changes": [
+          "首页新增可交互演示，使用 SeeO 官网自己的真实审计快照（标注审计时间与范围，非实时）",
+          "完整展示「发现问题 → 为什么处理 → 如何修复 → 再次审计」的产品闭环，不使用虚构客户数据"
+        ]
+      },
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "免费审计可靠性修复",
+        "changes": [
+          "审计运行中刷新或重进页面，可自动恢复并继续显示结果，不再卡在「进行中」",
+          "网页无法抓取时如实显示失败原因与建议，不再呈现误导性的 0 分结果",
+          "修复中文用户在部分场景看到英文提示的语言判定问题"
+        ]
+      },
+      {
+        "date": "2026-10-14",
+        "status": "shipped",
+        "title": "审计闭环细节修复",
+        "changes": [
+          "修复首页输入多段域名（如 www.example.com）被误判为格式无效的问题",
+          "问题「复查失败」徽标显示真实检出数字，不再固定显示 0"
+        ]
+      },
+      {
+        "date": "2026-10-09",
+        "status": "shipped",
+        "title": "邮件同意与发送合规",
+        "changes": [
+          "营销邮件仅在用户明确同意后才会发送，同意与退订状态可随时调整"
+        ]
+      },
+      {
+        "date": "2026-09-29",
+        "status": "shipped",
+        "title": "常见 SEO 问题诊断页",
+        "changes": [
+          "新增重复标题、缺失 canonical、页面未被收录、站内死链等常见问题的诊断页，说明成因与修复思路"
+        ]
+      },
+      {
+        "date": "2026-09-28",
+        "status": "shipped",
+        "title": "注册流程与营销页完善",
+        "changes": [
+          "完善产品营销页与注册流程，修复注册链路问题"
+        ]
+      },
+      {
+        "date": "2026-09-15",
+        "status": "shipped",
+        "title": "功能页与指南更新",
+        "changes": [
+          "重建关键词排名追踪与外链分析功能页，新增配套操作指南"
+        ]
+      }
+    ],
+    "internalNote": "内部工程与运营改进不列入本页。有反馈或建议？欢迎写信到 support@seeo.asia 或访问联系页。"
+  },
   "contactPage": {
     "meta": {
       "title": "联系 SeeO 团队：获取支持、反馈与产品咨询的联系方式 | SeeO",
-      "description": "SeeO 是一个独立的 AI SEO 软件项目。本页提供联系 SeeO 团队的方式：无论是产品使用中的技术支持、对新功能的反馈，还是关于 SEO 平台的合作与疑问，都可以在这里找到对应的沟通渠道与响应预期。我们会在工作日内回复，紧急问题请优先使用站内支持渠道。"
+      "description": "SeeO 是一个独立的 SEO 数据分析项目。本页提供联系 SeeO 团队的方式：无论是产品使用中的技术支持、对新功能的反馈，还是关于 SEO 平台的合作与疑问，都可以在这里找到对应的沟通渠道与响应预期。我们会在工作日内回复，紧急问题请优先使用站内支持渠道。"
     },
     "title": "联系 SeeO",
-    "intro": "SeeO 是一个独立的 AI SEO 软件项目。",
+    "intro": "SeeO 是一个独立的 SEO 数据分析项目。",
     "sections": {
       "email": "01 邮箱",
       "response": "02 响应时间"
@@ -1301,6 +1371,222 @@
     "emailLabel": "客服支持"
   },
   "dashboard": {
+    "growth": {
+      "title": "搜索增长机会",
+      "subtitle": "来自排名历史、审计与内容实测的真实机会——发生了什么、为什么现在重要、下一步做什么。",
+      "cat": {
+        "regain": "找回丢失的排名",
+        "capture": "抓住近在咫尺的排名",
+        "improve": "改善老化内容",
+        "issue": "技术问题"
+      },
+      "whyLabel": "为什么是现在",
+      "evidenceLabel": "真实证据",
+      "defaultAction": "查看详情",
+      "technicalNote": "技术问题是基础。SeeO 只展示真实爬取检测结果——不虚构流量承诺。修复后重新审计即可验证。",
+      "unlock": {
+        "noRankData": "「找回排名」与「抓住近位机会」来自已追踪关键词的排名历史。在排名追踪中添加关键词后，SeeO 会在每次刷新后自动评估。",
+        "noGrowth": "当前窗口内没有增长机会。SeeO 会在每次审计与排名刷新后重新评估——只有有真实证据的信号才会成为机会。"
+      }
+    },
+    "opportunityContext": {
+      "label": "来自一个搜索增长机会",
+      "whyPrefix": "理由："
+    },
+    "actions": {
+      "title": "行动中心",
+      "subtitle": "把每一项真实发现收进同一条队列：技术问题与成长机会，都附证据、优先级理由，以及「如何验证是否真的解决」。",
+      "refresh": "刷新",
+      "refreshing": "刷新中…",
+      "loadFailed": "工作队列加载失败",
+      "networkError": "网络异常，请检查连接后重试",
+      "filterLabel": "筛选",
+      "filterAll": "全部",
+      "tasksCount": "{n} 项任务",
+      "noTasks": "该筛选下暂无任务",
+      "source": {
+        "audit": "技术审计",
+        "opportunity": "成长机会"
+      },
+      "status": {
+        "open": "待处理",
+        "in_progress": "处理中",
+        "fixed_claimed": "已标记修复（未验证）",
+        "verified_resolved": "已验证解决",
+        "dismissed": "已忽略",
+        "open_hint": "爬虫已检出，尚未处理。",
+        "in_progress_hint": "已开始处理，但 SeeO 尚无新的检测证据。",
+        "fixed_claimed_hint": "你已标记为修复完成——这只是声明，并不等于已验证解决。请再跑一次审计，让 SeeO 用真实检测证据确认。",
+        "verified_resolved_hint": "已由后续审计确认：该问题不再出现在抓取结果中。",
+        "dismissed_hint": "你决定不处理该问题，它会留在活跃队列之外。",
+        "managedInEngine": "状态由机会页的五步状态机管理。"
+      },
+      "sev": {
+        "error": "错误",
+        "warning": "警告",
+        "notice": "提示"
+      },
+      "priority": {
+        "title": "优先级",
+        "why": "为什么是这个优先级"
+      },
+      "reason": {
+        "severity_error": "错误级问题",
+        "severity_warning": "警告级问题",
+        "severity_notice": "提示级问题",
+        "reach_high": "影响 {value}% 的可索引页面",
+        "reach_medium": "影响 {value}% 的可索引页面",
+        "impact_high": "约拉低健康分 {value} 分",
+        "impact_medium": "约拉低健康分 {value} 分",
+        "pattern_site_wide": "模板级问题——一次修复可覆盖多页",
+        "pattern_repeated": "在多个页面重复出现",
+        "effort_low": "修复成本低",
+        "effort_medium": "修复成本中等",
+        "evidence_direct_crawl": "自研爬虫直接观测证据",
+        "opportunity_engine": "来自机会引擎（排名 / 内容 / 竞品信号）",
+        "evidence_linked": "已关联 {value} 条证据",
+        "evidence_missing": "没有关联证据——可信度已下调",
+        "confidence_high": "实测可信度高",
+        "confidence_low": "实测可信度低",
+        "stale_data": "信号距今 {value} 天",
+        "recent_data": "信号近期刷新（{value} 天）",
+        "unknown_data_age": "无法确定信号时间——可信度已降低",
+        "result_improved": "执行后实测改善——已降低催办优先级",
+        "result_worse": "执行后指标变差——建议尽快重新检查",
+        "result_unchanged": "已执行，暂未观测到改善",
+        "result_indeterminate": "已执行，暂时无法判断是否改善",
+        "verifiable_by_data": "可用现有数据验证",
+        "not_auto_verifiable": "没有自动验证通道"
+      },
+      "provenance": {
+        "title": "这条结论的性质",
+        "observed": "已观测事实",
+        "inferred": "系统推断",
+        "expected": "尚未验证的预期"
+      },
+      "channel": {
+        "channel_audit": "由再次审计验证",
+        "channel_rank": "由排名历史验证",
+        "channel_none": "无自动验证"
+      },
+      "observation": {
+        "title": "目前的结果",
+        "baseline": "你开始处理前",
+        "latest": "最近一次观测",
+        "noBaseline": "尚未记录基线——把该任务标记为「处理中」即可先记录真实数字，再去改动。",
+        "trackFirst": "尚未记录基线——只有该关键词加入排名追踪后，排名才可被观测。SeeO 不会记录它测不到的数字。",
+        "window": "观测窗口：{n} 天",
+        "measurements": "已观测 {n} 次",
+        "notVerifiable": "SeeO 对该类型任务没有自动验证通道，因此不对效果做任何声称。",
+        "verdict": {
+          "pending": "等待数据",
+          "improved": "已改善",
+          "unchanged": "暂无明显变化",
+          "worse": "变差",
+          "indeterminate": "无法判断"
+        },
+        "reason": {
+          "findings_decreased": "检出的问题数量下降",
+          "findings_increased": "检出的问题数量上升",
+          "findings_same": "检出的问题数量未变",
+          "position_up": "排名位置上升",
+          "position_down": "排名位置下降",
+          "position_same": "排名位置未变",
+          "entered_rankings": "此前未上榜，现已进入排名",
+          "lost_ranking": "已跌出排名",
+          "not_ranking_both": "两次观测均未进入排名",
+          "rule_not_executed": "最近一次审计未执行该规则，无法下结论",
+          "missing_metrics": "实测数据不足",
+          "keyword_not_tracked": "该关键词尚未加入追踪，无法观测排名",
+          "no_verification_channel": "该类型任务没有自动验证通道"
+        },
+        "next": {
+          "pending": "下一步：执行任务。开始处理时会立即记录基线，之后的审计 / 排名刷新将用于验证效果。",
+          "improved": "相对基线已实测改善。可以把该任务标记完成，继续处理下一件。",
+          "unchanged": "已执行，但当前数据尚未显示改善。等待更多观测、再次审计，或调整方案——这不算失败。",
+          "worse": "执行后指标变差。请重新检查页面上改动了什么，考虑回滚或调整方案。",
+          "indeterminate": "当前无法判断是否改善——这不等于「没有改善」。下一次审计 / 排名刷新将用于判定。"
+        }
+      },
+      "effort": {
+        "low": "低成本",
+        "medium": "中等成本",
+        "high": "高成本"
+      },
+      "evidenceTitle": "证据",
+      "recommendationTitle": "建议行动",
+      "verificationTitle": "验证",
+      "verification": {
+        "pending": "尚未验证——请再跑一次审计进行验证",
+        "pass": "已在审计 #{auditId} 通过",
+        "fail": "审计 #{auditId} 仍检出：{findings} 处问题，涉及 {pages} 个页面",
+        "inconclusive": "审计 #{auditId} 未执行该规则，因此不下结论"
+      },
+      "act": {
+        "markInProgress": "标记处理中",
+        "markFixed": "标记已修复",
+        "dismiss": "忽略",
+        "reopen": "重新打开",
+        "openAudit": "打开审计",
+        "openOpportunities": "在机会页查看",
+        "saving": "保存中…",
+        "saveFailed": "状态更新失败",
+        "nextStepTitle": "下一步",
+        "openIssue": "在审计中打开该问题",
+        "openPage": "在审计中打开受影响页面",
+        "rerunAudit": "重新执行审计",
+        "researchKeyword": "研究该关键词",
+        "trackKeyword": "加入排名追踪",
+        "optimizePage": "优化该页面",
+        "expandKeywords": "扩展关键词",
+        "reviewCompetitors": "查看竞品对比",
+        "executionUnavailable": "该类型任务暂时没有对应的执行界面——SeeO 不会放一个点了没反应的按钮。",
+        "reason_no_execution_surface": "该类型任务暂时没有可用的执行界面。"
+      },
+      "coverage": {
+        "title": "数据覆盖",
+        "auditOk": "技术审计 #{auditId} · {depth} · 已抓取 {pages} 个页面",
+        "auditMissing": "该域名尚无已完成的技术审计",
+        "health": "健康分 {score}",
+        "tracking": "已追踪 {n} 个关键词",
+        "gapsTitle": "已知数据缺口——SeeO 不会用占位数字填充",
+        "project": "项目：{name} · {domain}",
+        "noProject": "未选择项目",
+        "opportunitySources": "已加载 {n} 类机会信号",
+        "verifiable": "{n} 项任务可用数据验证",
+        "observed": "{n} 项任务已记录基线"
+      },
+      "gap": {
+        "no_completed_audit": "没有已完成的审计，因此暂时无法列出技术问题",
+        "quick_audit_only_homepage": "最近一次为快速审计（仅首页），站点级检查需要深度审计",
+        "audit_partial": "最近一次审计已达到抓取上限，结果不完整",
+        "no_dashboard_snapshot": "最近一次审计没有 dashboard 快照（由较早引擎版本生成）",
+        "no_tracked_keywords": "尚未追踪任何关键词，因此无法产生基于排名的机会",
+        "no_project_selected": "未选择项目，因此未加载成长机会",
+        "no_growth_opportunities": "尚未扫描出成长机会——请在机会页执行一次扫描，它会基于你真实的排名 / 竞品 / 内容信号生成机会",
+        "backlink_source_unavailable": "外链数据源未配置，因此不展示外链任务（SeeO 不会凭空造出来）"
+      },
+      "empty": {
+        "title": "暂无任务",
+        "body": "对该域名运行一次技术审计，即可生成有真实证据支撑的任务。",
+        "cta": "开始审计"
+      },
+      "unavailable": "不可用",
+      "panel": {
+        "title": "今日优先事项",
+        "body": "来自你的审计与追踪数据的真实发现，按「先做哪件事更值得」排序。",
+        "open": "{n} 项待处理",
+        "inProgress": "{n} 项处理中",
+        "fixedUnverified": "{n} 项已标记修复，待验证",
+        "verified": "{n} 项已验证解决",
+        "auditedDomains": "{n} 个站点已有审计",
+        "noAudit": "还没有任何已审计的站点。先跑一次免费审计，即可生成有真实证据支撑的任务。",
+        "cta": "进入行动中心",
+        "auditCta": "免费开始审计",
+        "todayTitle": "今天先做这一件事",
+        "viewAll": "查看完整队列"
+      }
+    },
     "sidebar": {
       "overview": "概览",
       "keywordOverview": "关键词概览",
@@ -1323,6 +1609,7 @@
       "demoToast": "当前为演示模式，账号系统未启用",
       "demoUser": "本地开发",
       "demoEmail": "演示账号",
+      "actions": "行动中心",
       "opportunities": "优化机会"
     },
     "topbar": {
@@ -1482,6 +1769,7 @@
     "audit": {
       "title": "技术 SEO 审计",
       "subtitle": "自建抓取检测，不消耗 SerpApi 额度。BFS 爬取同域名页面（上限 50 页），20+ 项检查并计算健康分。",
+      "subtitleQuick": "自建抓取检测，不消耗 SerpApi 额度。本次审计仅检查首页（1 页），依据页面级检查输出健康分。",
       "printHeader": "SeeO · 技术审计报告",
       "domainLabel": "审计域名",
       "viewBtn": "查看",
@@ -1539,7 +1827,7 @@
       "chartResponseSubFull": "深度审计页面明细",
       "chartResponseSubEmpty": "需深度审计后显示",
       "bucketTimeout": "超时",
-      "issuesTitle": "问题清单",
+      "issuesTitle": "SEO 待办清单（按优先级排序）",
       "issuesCount": "共 {n} 类问题",
       "filterAll": "全部",
       "thCheck": "检查项",
@@ -1633,6 +1921,8 @@
       "crawling": "爬取中",
       "navLabel": "审计分区",
       "retryBtn": "重新审计",
+      "crawlFailedTitle": "无法抓取 {domain}",
+      "crawlFailedBody": "网站起始页请求失败，本次没有执行任何检查项，因此不生成健康分、也不给出任何「通过/未通过」结论。",
       "legacyAuditNote": "本次审计由旧引擎生成，请重新运行审计以解锁完整仪表盘。",
       "legacyDetailNote": "旧引擎结果（V1）——重新审计以查看完整 V2 仪表盘。",
       "healthSub": "基于 {crawled} 个可索引页面的健康分",
@@ -1734,6 +2024,7 @@
       "sdSemanticSection": "结构化数据与语义",
       "levelSite": "站点级",
       "levelPage": "页面级",
+      "affectedScopeLine": "共影响 {pages} 个页面（占可索引页面的 {percent}%），属于{scope}问题。",
       "thFindings": "发现数",
       "backToIssues": "返回问题列表",
       "priorityHigh": "高优先级",
@@ -1751,6 +2042,12 @@
       "whatFoundSub": "首条发现及指标",
       "howToFix": "如何修复",
       "howToFixSub": "建议操作",
+      "howFixWhere": "到哪里修改",
+      "howFixSteps": "按步骤修改",
+      "howFixCheckAfter": "改完先自查",
+      "howFixVerifyNote": "SeeO 会这样验证",
+      "howFixNotKnown": "SeeO 不能替你确定的部分",
+      "howFixGeneric": "SeeO 对这类问题只有通用建议，没有把握给出更具体的操作步骤——下面是规则建议，具体改法需结合你的网站确认。",
       "affectedUrlsTitle": "受影响 URL（{n}）",
       "affectedUrlsSub": "点击 URL 展开页面详情",
       "viewCrawledPages": "查看抓取页面",
@@ -1813,9 +2110,23 @@
       "auditHistoryTableSub": "每次审计的分数、发现数与引擎版本",
       "thDate": "日期",
       "engineVersion": "引擎",
-      "guestCtaTitle": "保存这次结果 —— 创建免费账号",
-    "guestCtaBody": "审计无需登录即可运行。注册免费账号后，报告会保存到你的工作台，并可持续追踪修复效果。",
+      "guestCtaTitle": "保留这次审计——免费追踪你的修复",
+    "guestCtaBody": "注册免费账号即可保存本次报告、追踪修复进度，并在下次审计时自动验证。当前域名与审计结果会直接带入你的账号——无需重跑。",
     "guestCtaBtn": "免费注册",
+    "doFirstTitle": "先做这一件事",
+    "doFirstSub": "基于本次审计爬取中 {n} 项未通过检查的判定",
+    "whyNowTitle": "为什么先处理它",
+    "whyNowSub": "由本次审计的真实检测结果计算——影响范围、健康分影响与修复杠杆。不估算流量。",
+    "evidenceTitle": "本次爬取的实际证据",
+    "topActionOpenCta": "查看详情",
+    "tieHint": "基于本次数据有 {n} 项检查同分——这是其中之一；下方完整清单按同一逻辑排序。",
+    "verifyBodyTop": "修复后再次审计——SeeO 会重查同一条规则并验证结果。",
+    "verifyTitle": "SeeO 如何验证这个修复",
+    "verifySub": "「已验证解决」只能来自新一次审计的证据——自行标记修复不计入。",
+    "verifyBody": "修复完成后再次运行审计，SeeO 会重新爬取并复查同一条规则：通过则标记为「已验证解决」；仍失败则显示新的发现；下次审计未执行该规则则标记为「无法判断」——绝不计入已修复。",
+    "verifyStatePass": "最近一次再审计：该检查已通过。",
+    "verifyStateFail": "最近一次再审计：该检查仍失败——请查看新的发现。",
+    "verifyStateInconclusive": "最近一次再审计未执行该检查——尚无结论，不计入已修复。",
     "guestExportNote": "创建免费账号后即可将报告保存到工作台并导出 PDF。",
     "tabOverview": "概览",
       "tabIssues": "问题",
@@ -2559,7 +2870,10 @@
         "step3Title": "查看问题并开始优化",
         "step3Desc": "按严重程度排序的检查清单 + 修复建议，直接指导下一步动作。",
         "cta": "开始免费审计 →",
-        "ctaNote": "无需信用卡 · free 套餐每日 3 次审计"
+        "ctaNote": "无需信用卡 · 免费套餐每日 3 次审计",
+        "auditReadyTitle": "继续你的审计",
+        "auditReadyDesc": "保留了你最近对 {domain} 的审计记录——从上次继续即可，无需重新开始。",
+        "auditReadyCta": "查看审计结果"
       },
       "placeholder": {
         "plannedTitle": "计划交付的能力",
@@ -2573,6 +2887,7 @@
         "backToSelect": "返回选择",
         "noProjectsHint": "暂无项目，可直接输入域名开始",
         "manualOption": "手动输入…",
+        "manualOptionWithDomain": "手动输入：{domain}",
         "projectOption": "{name}（{domain}）"
       },
       "charts": {
@@ -2833,6 +3148,8 @@
     "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search 需要拥有 DataForSEO 配额的 SeeO 账号。请登录并升级后使用。",
     "OPPORTUNITY_NOT_FOUND": "未找到该机会。",
     "INVALID_TRANSITION": "该机会不允许此状态变更。",
+    "STATUS_NOT_USER_SETTABLE": "该状态不能直接设置。「已验证解决」只能由后续审计的检测证据产生。",
+    "STATUS_UPDATE_FAILED": "处理状态更新失败，请重试。",
     "GITHUB_NOT_CONNECTED": "该项目尚未连接 GitHub。请先连接仓库以执行动作。",
     "GITHUB_NOT_CONFIGURED": "GitHub 集成未配置（缺少 GitHub App 或未提供 token）。",
     "GITHUB_PERMISSION_DENIED": "GitHub 拒绝访问：凭证对该仓库没有 push 权限。",
@@ -3249,7 +3566,7 @@
         "desc": "先建好要追踪的词集"
       },
       "seoAudit": {
-        "title": "AI SEO 审计工具 →",
+        "title": "技术 SEO 审计 →",
         "desc": "查找下跌背后的技术原因"
       }
     },

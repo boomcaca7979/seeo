@@ -60,9 +60,11 @@ function buildGroups(): ComparisonGroup[] {
       titleKey: "serpData",
       rows: [
         { labelKey: "serpMonthly", getValue: (p) => fmt(p.serpapi_monthly_limit) },
-        { labelKey: "dataforseo", getValue: (p) => fmt(p.dataforseo_monthly_limit), expanded: true },
-        { labelKey: "backlinks", getValue: (p) => (p.plan === "pro" ? "✓" : ""), expanded: true },
       ],
+      // DataForSEO 额度行与 Backlink profile analysis 行已移除：
+      // Backlink/DataForSEO 当前未作为可用产品能力开放（见 src/lib/seo/public-tools.ts），
+      // 不在 Pricing 对比表中作为正常能力/额度卖点展示。
+      // 后端 entitlement（dataforseo_monthly_limit / backlinks gate）保持原样，仅此表不再展示。
     },
     {
       titleKey: "content",

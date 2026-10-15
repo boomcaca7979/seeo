@@ -57,6 +57,8 @@ import {
 } from "@/lib/seo/site-reports";
 import { compareAudits } from "@/lib/seo/audit-history";
 import { buildDashboardSnapshot } from "@/lib/seo/audit-dashboard";
+import { reverifyClaimedIssues } from "@/lib/seo/issue-verification";
+import { observeAfterAudit } from "@/lib/seo/task-observations";
 
 /** full 深度抓取上限（唯一上限入口；未来按套餐映射 100/500） */
 export const DEFAULT_CRAWL_LIMIT = 50;
@@ -533,9 +535,16 @@ export async function runAudit(
     // 达到抓取上限但队列仍有页面 → Partial audit
     const partial = queue.length > 0 && pagesCrawled >= crawlLimit;
     // 聚合 Dashboard 快照（Overview/Issues/Pages/Linking/SD/AI Search 单一数据源）
-    const dashboardJson = JSON.stringify(
-      buildDashboardSnapshot(ctx, executions, failedRules, healthScore, ENGINE_VERSION, RULE_SET_VERSION, partial)
+    const dashboardSnapshot = buildDashboardSnapshot(
+      ctx,
+      executions,
+      failedRules,
+      healthScore,
+      ENGINE_VERSION,
+      RULE_SET_VERSION,
+      partial
     );
+    const dashboardJson = JSON.stringify(dashboardSnapshot);
 
     const dbIssues = await getAuditIssues(userId, auditId);
     const allIssues = dbIssuesToAuditIssues(dbIssues);
@@ -593,6 +602,23 @@ export async function runAudit(
       errors,
       allIssues.map((i) => ({ type: i.checkId, severity: i.severity }))
     );
+
+    // 闭环验证：用本次审计的真实检测结果校验用户已声称修复的问题。
+    // 「标记完成 ≠ 已验证解决」——只有这里能把状态推进到 verified_resolved。
+    // 校验失败绝不影响审计结果本身。
+    try {
+      await reverifyClaimedIssues(userId, domain, auditId, dashboardSnapshot);
+    } catch (err) {
+      console.error(`[audit ${auditId}] issue re-verification failed:`, err);
+    }
+
+    // 结果反馈闭环：对已捕获基线的任务做一次真实观测（再审计 / 排名历史）。
+    // 同样失败不影响审计结果。
+    try {
+      await observeAfterAudit(userId, domain, dashboardSnapshot);
+    } catch (err) {
+      console.error(`[audit ${auditId}] task observation failed:`, err);
+    }
 
     return {
       auditId,

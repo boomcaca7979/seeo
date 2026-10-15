@@ -23,7 +23,6 @@ export default function Footer() {
       links: [
         { label: t("colProductLinks.seoAudit"), href: href("/features/seo-audit") },
         { label: t("colProductLinks.rankTracking"), href: href("/features/rank-tracking") },
-        { label: t("colProductLinks.backlinks"), href: href("/features/backlink-analysis") },
         { label: t("colProductLinks.allFeatures"), href: href("/features/seo-audit") },
       ],
     },
@@ -37,6 +36,7 @@ export default function Footer() {
       title: t("colResources"),
       links: [
         { label: t("colResourcesLinks.docs"), href: href("/docs") },
+        { label: t("colResourcesLinks.changelog"), href: href("/changelog") },
       ],
     },
     {

@@ -20,6 +20,7 @@ import { searchRank } from "@/lib/seo/serp-service";
 import { SeoProviderError } from "@/lib/seo/provider";
 import { QuotaExceededError } from "@/lib/seo/cache";
 import { generateRankAlert } from "@/lib/seo/alerts";
+import { observeRankForRefresh } from "@/lib/seo/task-observations";
 import type { RankResult } from "@/lib/seo/types";
 import type { PlanTier } from "@/lib/auth";
 
@@ -217,6 +218,15 @@ async function refreshSingleKeyword(
       // 4. 仅在今日首次真实调用 SerpApi 的分支生成排名预警
       if (consumed) {
         await generateRankAlert(userId, tk, rankResult.rank, today);
+
+        // 5. 结果反馈闭环：真实新排名写入后，对已有基线的排名类任务做一次观测
+        //    （与预警同原则：缓存命中不是新信息，不重复观测）。
+        //    任何失败都不得影响刷新结果。
+        try {
+          await observeRankForRefresh(userId, tk.domain, tk.keyword, rankResult.rank);
+        } catch {
+          // 观测失败静默：闭环是增强能力，不阻塞数据刷新
+        }
       }
     }
   } catch (e) {

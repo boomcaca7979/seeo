@@ -301,6 +301,73 @@ async function migrate(db: DBAdapter): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_audit_issues_user
       ON audit_issues(user_id);
 
+    -- ===== 审计问题处理状态（检测结果 ≠ 处理状态） =====
+    -- 关键设计：主键是 (user_id, domain, rule_id)，**不是 audit_id** ——
+    -- 重新审计会产生新的 audit 行，处理状态必须跨审计延续，否则「再次检测验证」
+    -- 无从比对。status 与检测结果完全分离：
+    --   open            系统检出，用户尚未处理
+    --   in_progress     用户标记为处理中
+    --   fixed_claimed   用户声称已修复（**不等于**已验证解决）
+    --   verified_resolved 由「再次审计」的检测证据确认该规则不再失败
+    --   dismissed       用户判定不适用/不处理
+    -- verify_* 只由服务端在校验时写入，绝不接受客户端直接置位。
+    CREATE TABLE IF NOT EXISTS audit_issue_resolutions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      rule_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      note TEXT,
+      claimed_at TEXT,
+      verified_at TEXT,
+      verified_audit_id INTEGER,
+      verify_status TEXT,
+      verify_detail TEXT,
+      verify_attempts INTEGER NOT NULL DEFAULT 0,
+      evidence_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, domain, rule_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_issue_resolutions_user
+      ON audit_issue_resolutions(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_audit_issue_resolutions_domain
+      ON audit_issue_resolutions(domain);
+
+    -- ===== 任务执行前后的观测记录（结果反馈闭环） =====
+    -- 用于回答"我做完之后到底有没有改善"，并明确区分：
+    --   baseline  = 用户开始处理那一刻的真实指标快照（不可事后编造）
+    --   latest    = 后续可获得的真实观测（再审计 / 排名刷新）
+    --   verdict   = improved / unchanged / worse / indeterminate（无法判断，不硬判）
+    -- 关键纪律：**"用户点了完成"不写入这里** —— 本表只记录真实数据观测。
+    CREATE TABLE IF NOT EXISTS task_observations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      task_source TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      baseline_json TEXT,
+      baseline_at TEXT,
+      latest_json TEXT,
+      latest_at TEXT,
+      observations INTEGER NOT NULL DEFAULT 0,
+      verdict TEXT,
+      window_days INTEGER,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, domain, task_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_task_observations_user
+      ON task_observations(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_task_observations_domain
+      ON task_observations(domain);
+
     CREATE TABLE IF NOT EXISTS alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL,

@@ -16,6 +16,7 @@ import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import Modal from "@/components/dashboard/Modal";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
+import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 import AuditReport from "@/components/reports/AuditReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 import DomainSelect from "@/components/dashboard/DomainSelect";
@@ -230,6 +231,40 @@ function AuditPageInner() {
     }
   }, [loadLatest, domain]);
 
+  // ---- 断线恢复：刷新/重进时若最新审计仍在运行，自动恢复轮询 ----
+  // 此前只静态显示「审计进行中」，审计在服务端完成后页面不更新，用户必须手动刷新。
+  // 每个审计 id 只恢复一次（防止轮询耗尽后无限重启）；用户主动发起的审计
+  // （handleConfirmAudit 内已有轮询）通过 auditing 守卫跳过。
+  const resumedAuditIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!audit || audit.status !== "running" || auditing) return;
+    const auditId = audit.id;
+    if (resumedAuditIdRef.current === auditId) return;
+    resumedAuditIdRef.current = auditId;
+    setAuditing(true);
+    setActiveDepth(audit.dashboard?.depth === "full" ? "full" : "quick");
+    void (async () => {
+      const POLL_INTERVAL = 3000;
+      const MAX_POLLS = 100;
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        if (lastLoadedDomain.current !== domain.trim()) break; // 用户已切走
+        try {
+          const pollRes = await fetch(`/api/audit/status?id=${auditId}`, { cache: "no-store" });
+          const pollJson = await pollRes.json();
+          const data = pollJson.data;
+          if (!data) continue;
+          if (typeof data.pagesCrawled === "number") setProgressPages(data.pagesCrawled);
+          if (data.status === "completed" || data.status === "failed") break;
+        } catch {
+          // 网络抖动：下轮重试
+        }
+      }
+      await loadLatest(domain.trim());
+      setAuditing(false);
+    })();
+  }, [audit, auditing, domain, loadLatest]);
+
   // ---- 审计执行（沿用第一阶段异步模式） ----
   const handleConfirmAudit = async () => {
     const depth = pendingDepth;
@@ -424,6 +459,13 @@ function AuditPageInner() {
   const hasResult = audit && audit.status === "completed";
   const hasFailed = audit && audit.status === "failed";
   const hasDashboard = !!audit?.dashboard;
+  // 抓取失败（起始页未能解析）：审计行虽标记 completed，但没有任何检查真正执行——
+  // 不能把「无法判断」渲染成健康分 0/100 + 检查项全部通过。按失败路径呈现真实原因与恢复动作。
+  const unusableAudit =
+    audit?.status === "completed" && audit.issues.some((i) => i.checkId === "startpage-unparsed");
+  const unusableDetail = unusableAudit
+    ? audit.issues.find((i) => i.checkId === "startpage-unparsed")
+    : null;
 
   // 访客注册跳转：带上当前域名，注册后直接回到同域名的审计页
   const signupHref = `/signup?redirect=${encodeURIComponent(domain.trim() ? `/app/audit?domain=${encodeURIComponent(domain.trim())}` : "/app/audit")}`;
@@ -467,7 +509,10 @@ function AuditPageInner() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between print:hidden">
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("title")}</h1>
-          <p className="mt-1 font-sans text-sm text-ink-60">{t("subtitle")}</p>
+          {/* 范围说明随实际可用深度切换：仅当套餐具备 full_audit 权限时才宣称多页抓取
+              （上限 50 页）；游客 / 免费用户在加载期间即按 Quick（仅首页 1 页）如实说明。
+              只切换文案，不改变抓取数量、套餐权益或审计逻辑。 */}
+          <p className="mt-1 font-sans text-sm text-ink-60">{t(canFullAudit ? "subtitle" : "subtitleQuick")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -487,7 +532,7 @@ function AuditPageInner() {
               {t("upgradeFullAudit")}
             </Link>
           )}
-          {hasResult && (
+          {hasResult && !unusableAudit && (
             <button onClick={() => setExportOpen(true)} className="btn-secondary">
               {t("exportReport")}
             </button>
@@ -495,8 +540,16 @@ function AuditPageInner() {
         </div>
       </div>
 
-      {/* ===== 访客 CTA：Free SEO Audit 漏斗的「看到结果 → 注册」衔接（不遮挡审计功能） ===== */}
-      {isGuest && (
+      {/* ===== 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） ===== */}
+      <div className="print:hidden">
+        <OpportunityContextBanner />
+      </div>
+
+      {/* ===== 访客 CTA：Free SEO Audit 漏斗的「看到结果 → 注册」衔接 =====
+          只在审计结果出来后出现（先看到价值，再理解注册用途）；
+          文案只承诺系统真实支持的能力：保存报告 / 追踪修复进度 / 下次审计自动验证；
+          域名与审计结果通过 redirect + claim 静默带入账号，无需重跑。 ===== */}
+      {isGuest && hasResult && !unusableAudit && (
         <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3 sm:flex-row sm:items-center print:hidden">
           <div className="min-w-0">
             <div className="font-sans text-sm font-medium text-ink">{t("guestCtaTitle")}</div>
@@ -566,7 +619,7 @@ function AuditPageInner() {
       )}
 
       {/* ===== Tab 导航 ===== */}
-      {!loading && hasResult && (
+      {!loading && hasResult && !unusableAudit && (
         <nav className="mt-4 flex flex-wrap gap-1 border-b border-line print:hidden" aria-label={t("navLabel")} role="tablist">
           {tabs.map((tab) => {
             const active = view === tab.key;
@@ -626,8 +679,26 @@ function AuditPageInner() {
         </div>
       )}
 
+      {/* 抓取失败（起始页未解析）：不显示健康分与检查覆盖，只讲真实原因 + 恢复动作 */}
+      {!loading && unusableAudit && (
+        <div className="card-a mt-6 border-warn/30 bg-warn/5 p-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-warn/15 font-mono text-sm text-warn">!</span>
+            <div className="min-w-0">
+              <div className="font-display text-sm font-semibold text-ink">{t("crawlFailedTitle", { domain: audit?.domain ?? domain })}</div>
+              <p className="mt-1 font-sans text-sm text-ink-60">{t("crawlFailedBody")}</p>
+              {unusableDetail?.detail ? <p className="mt-1 font-sans text-sm text-ink-60">{unusableDetail.detail}</p> : null}
+              {unusableDetail?.suggestion ? <p className="mt-1 font-sans text-sm text-ink-60">{unusableDetail.suggestion}</p> : null}
+              <div className="mt-3">
+                <button onClick={() => openConfirm("quick")} className="btn-primary">{t("retryBtn")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== 主内容区 ===== */}
-      {!loading && hasResult && audit && (
+      {!loading && hasResult && audit && !unusableAudit && (
         <div className="mt-6">
           {/* 旧引擎审计提示 */}
           {!hasDashboard && (
@@ -644,7 +715,7 @@ function AuditPageInner() {
         </div>
       )}
       {/* 无审计记录 */}
-      {!loading && !hasResult && !hasFailed && !auditing && !projectsLoading && domain.trim() && (
+      {!loading && !hasResult && !hasFailed && !unusableAudit && !auditing && !projectsLoading && domain.trim() && (
         <div className="card-a mt-6 flex flex-col items-center justify-center py-16 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-line text-ink-40">
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -730,8 +801,8 @@ function AuditPageInner() {
         </div>
       </Modal>
 
-      {/* 隐藏的 PDF 渲染容器 */}
-      {hasResult && audit && (
+      {/* 隐藏的 PDF 渲染容器（unusable 审计无结果可导出，不渲染「全部通过」的误导性覆盖列表） */}
+      {hasResult && audit && !unusableAudit && (
         <div style={{ position: "fixed", left: -9999, top: 0, pointerEvents: "none", opacity: 0 }}>
           <AuditReport
             projectName={audit.domain}
@@ -783,7 +854,7 @@ function RenderDashboard({
   const newRuleIds = new Set((audit.comparison?.newIssues ?? []).map((i) => i.checkId));
 
   if (view === "issues") {
-    return <IssuesCenter snapshot={snapshot} issue={selectedIssue} filters={issuesFilters} newRuleIds={newRuleIds} onNavigate={go} />;
+    return <IssuesCenter snapshot={snapshot} issue={selectedIssue} filters={issuesFilters} newRuleIds={newRuleIds} domain={audit.domain} onNavigate={go} />;
   }
   if (view === "pages") {
     return (

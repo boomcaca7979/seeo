@@ -212,13 +212,15 @@ describe("faqPageSchema（HTML = JSON-LD 同源）", () => {
 });
 
 describe("sitemap 公开路径（GEO V2）", () => {
-  it("包含 about 与 3 个功能页", async () => {
+  it("包含 about 与 2 个功能页；未开放的 backlink-analysis 不收录（与 /tools/backlink-checker 同一收口策略）", async () => {
     const sitemap = (await import("@/app/sitemap")).default;
     const urls = sitemap().map((e) => e.url);
     expect(urls).toContain(`${SITE_URL}/about`);
     expect(urls).toContain(`${SITE_URL}/features/seo-audit`);
     expect(urls).toContain(`${SITE_URL}/features/rank-tracking`);
-    expect(urls).toContain(`${SITE_URL}/features/backlink-analysis`);
+    // Backlink/DataForSEO 未开放期间（BACKLINK_CHECKER_ENABLED=false，默认）：
+    // feature 落地页经 DISABLED_PUBLIC_PATHS 统一排除，不作为正式能力收录
+    expect(urls).not.toContain(`${SITE_URL}/features/backlink-analysis`);
   });
 
   it("私有路径不进入 sitemap", async () => {

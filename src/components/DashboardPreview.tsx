@@ -1,121 +1,46 @@
-import { useTranslations } from "next-intl";
+"use client";
 
-// 排名趋势图（accent 面积线）
-function RankTrendChart() {
-  const points = [
-    [0, 68], [10, 62], [20, 58], [30, 64], [40, 51],
-    [50, 47], [60, 39], [70, 42], [80, 33], [90, 28], [100, 22],
-  ];
-  const path = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`)
-    .join(" ");
-  const area = `${path} L 100 100 L 0 100 Z`;
+import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 
-  return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-      <defs>
-        <linearGradient id="rankArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* 网格 */}
-      {[25, 50, 75].map((y) => (
-        <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#e5e7eb" strokeWidth="0.3" />
-      ))}
-      <path d={area} fill="url(#rankArea)" />
-      <path d={path} fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      {/* 末端节点 */}
-      <circle cx="100" cy="22" r="2.5" fill="#2563eb" />
-      <circle cx="100" cy="22" r="4" fill="none" stroke="#2563eb" strokeWidth="0.4" strokeOpacity="0.5" />
-    </svg>
-  );
-}
+import { explainTechnicalPriority } from "@/lib/seo/issue-priority";
+import {
+  DEMO_AUDIT_META,
+  DEMO_EVIDENCE,
+  DEMO_RESOLUTION,
+  DEMO_RESOLUTION_STATES,
+  DEMO_RULE_SNAPSHOT,
+  DEMO_RULE_TEXT,
+} from "@/lib/demo/audit-demo-data";
 
-// 健康度评分环（示例展示）
-function HealthRing({ scoreNote }: { scoreNote: string }) {
-  const r = 34;
-  const c = 2 * Math.PI * r;
-  const offset = c - (75 / 100) * c;
+// ===== 首页「真实审计演示」区 =====
+// 数据来自 2026-10-15 对 www.seeo.asia 的真实审计快照（仅首页快速审计），
+// 五步结构（范围 / 发现 / 依据 / 行动 / 验证）与 /app/audit 结果页一一对应。
+// 快照静态、非实时，带时间与范围标注；不冒充实时结果，不声称任何改善效果。
 
-  return (
-    <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 100 100" className="h-32 w-32 -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#e5e7eb" strokeWidth="8" />
-        <circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          stroke="#2563eb"
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="absolute text-center">
-        <div className="font-display text-3xl font-semibold text-ink">75</div>
-        <div className="font-mono text-xs text-ink-40">{scoreNote}</div>
-      </div>
-    </div>
-  );
-}
-
-// 流量柱状图
-function TrafficBars() {
-  const bars = [42, 55, 38, 67, 49, 78, 58, 72, 63, 85, 74, 92];
-  return (
-    <div className="flex h-full items-end gap-2">
-      {bars.map((h, i) => (
-        <div key={i} className="flex flex-1 flex-col justify-end">
-          <div
-            className="w-full rounded-t bg-accent/80"
-            style={{ height: `${h}%` }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MetricPill({
-  label,
-  value,
-  trend,
-}: {
-  label: string;
-  value: string;
-  trend: "up" | "down";
-}) {
-  return (
-    <div className="card-a p-3">
-      <div className="font-mono text-xs text-ink-40">{label}</div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-mono text-lg font-semibold text-ink">
-          {value}
-        </span>
-        <span
-          className={
-            trend === "up"
-              ? "font-mono text-xs text-pos"
-              : "font-mono text-xs text-neg"
-          }
-        >
-          {trend === "up" ? "▲" : "▼"} 12%
-        </span>
-      </div>
-    </div>
-  );
-}
+const TABS = ["scope", "what", "why", "action", "verify"] as const;
+type TabKey = (typeof TABS)[number];
 
 export default function DashboardPreview() {
   const t = useTranslations("preview");
+  const ta = useTranslations("dashboard.actions");
+  const locale = useLocale();
+  const ruleText = locale.toLowerCase().startsWith("zh") ? DEMO_RULE_TEXT.zh : DEMO_RULE_TEXT.en;
+  const [active, setActive] = useState<TabKey>("what");
+
+  // 优先级在渲染时由唯一来源实时计算（不预存结论）
+  const { priority, effort } = explainTechnicalPriority({
+    severity: DEMO_RULE_SNAPSHOT.severity,
+    affectedRatio: DEMO_RULE_SNAPSHOT.affectedRatio,
+    scoreImpact: DEMO_RULE_SNAPSHOT.scoreImpact,
+    pattern: DEMO_RULE_SNAPSHOT.pattern,
+    pageLevel: DEMO_RULE_SNAPSHOT.pageLevel,
+  });
 
   return (
     <section id="dashboard" className="bg-paper px-5 py-10 sm:px-8 sm:py-12">
       <div className="site-shell">
-        {/* 标题（U3：「工作台预览」升级为主 H2，副标题 L2 20-28px，正文 L3 14-16px） */}
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div className="max-w-2xl">
             <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
@@ -125,155 +50,323 @@ export default function DashboardPreview() {
               {t("sectionSubheading")}
             </p>
             <p className="mt-4 text-sm text-ink-60 sm:text-base">
-              {t("sectionSubtitle")}
+              {t("realDemo.sectionSubtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2 card-a px-3 py-2 font-mono text-xs text-ink-60">
             <span className="h-2 w-2 rounded-full bg-pos" />
-            {t("demoBadge")}
+            {t("realDemo.badge", { time: DEMO_AUDIT_META.auditedAtLabel })}
           </div>
         </div>
 
-        {/* 仪表盘矩阵 */}
-        <div className="mt-12 grid grid-cols-1 gap-5 lg:grid-cols-12">
-          {/* 排名趋势 - 大卡 */}
-          <div className="card-a p-6 lg:col-span-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-lg font-semibold text-ink">
-                  {t("rankTrend.title")}
-                </h3>
-                <p className="mt-0.5 font-mono text-xs text-ink-40">
-                  {t("rankTrend.subtitle")}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-2xl font-semibold text-ink">
-                  #22
-                </div>
-                <div className="font-mono text-xs text-pos">{t("trendIllustration")}</div>
-              </div>
+        {/* 真实快照卡 */}
+        <div className="mt-10 card-a overflow-hidden">
+          {/* 卡头：真实审计上下文 */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3 sm:px-6">
+            <div className="font-mono text-xs text-ink-60">
+              {DEMO_AUDIT_META.domain} · SEO audit
             </div>
-            <div className="mt-6 h-44">
-              <RankTrendChart />
-            </div>
-            <div className="mt-3 flex justify-between font-mono text-xs text-ink-40">
-              <span>{t("rankTrend.from")}</span>
-              <span>{t("rankTrend.to")}</span>
-            </div>
+            <span className="badge-info">{t("realDemo.snapshotTag")}</span>
           </div>
 
-          {/* 健康度环 - 小卡 */}
-          <div className="card-a p-6 lg:col-span-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold text-ink">
-                {t("health.title")}
-              </h3>
-              <span className="rounded bg-pos/10 px-2 py-0.5 font-mono text-xs text-pos">
-                {t("sample")}
-              </span>
-            </div>
-            <p className="mt-0.5 font-mono text-xs text-ink-40">
-              {t("health.subtitle")}
+          {/* 快照摘要条：健康分 / 页面 / 检查项 / 深度 */}
+          <div className="grid grid-cols-2 gap-3 border-b border-line px-5 py-4 sm:grid-cols-4 sm:px-6">
+            <SummaryStat
+              value={String(DEMO_AUDIT_META.healthScore)}
+              label={t("realDemo.summary.healthScore")}
+            />
+            <SummaryStat
+              value={String(DEMO_AUDIT_META.pagesCrawled)}
+              label={t("realDemo.summary.pagesCrawled")}
+            />
+            <SummaryStat
+              value={`${DEMO_AUDIT_META.checksPassed}/${DEMO_AUDIT_META.checksTotal}`}
+              label={t("realDemo.summary.checksPassed")}
+            />
+            <SummaryStat
+              value={DEMO_AUDIT_META.engine}
+              label={t("realDemo.summary.engine")}
+            />
+          </div>
+
+          {/* 五步交互 Tabs */}
+          <div
+            role="tablist"
+            aria-label={t("sectionHeading")}
+            className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 sm:px-4"
+          >
+            {TABS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active === key}
+                onClick={() => setActive(key)}
+                className={`whitespace-nowrap rounded-lg px-3 py-2 font-sans text-sm font-semibold transition-colors ${
+                  active === key
+                    ? "bg-ink text-white"
+                    : "text-ink-60 hover:bg-line-soft hover:text-ink"
+                }`}
+              >
+                {t(`realDemo.tabs.${key}`)}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-5 py-6 sm:px-6" role="tabpanel">
+            {active === "scope" && (
+              <ScopeTab t={t} />
+            )}
+            {active === "what" && (
+              <WhatTab t={t} ta={ta} ruleText={ruleText} />
+            )}
+            {active === "why" && (
+              <WhyTab t={t} ta={ta} priority={priority} effort={effort} />
+            )}
+            {active === "action" && (
+              <ActionTab t={t} ruleText={ruleText} />
+            )}
+            {active === "verify" && (
+              <VerifyTab t={t} ta={ta} />
+            )}
+          </div>
+
+          {/* 诚实声明脚注 */}
+          <div className="border-t border-line bg-line-soft px-5 py-3 sm:px-6">
+            <p className="font-mono text-xs leading-relaxed text-ink-40">
+              {t("realDemo.footer")}
             </p>
-            <div className="mt-4 flex flex-col items-center">
-              <HealthRing scoreNote={t("health.scoreNote")} />
-              <div className="mt-3 grid w-full grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="font-mono text-sm font-semibold text-neg">
-                    {t("sample")}
-                  </div>
-                  <div className="font-mono text-xs text-ink-40">{t("health.errors")}</div>
-                </div>
-                <div>
-                  <div className="font-mono text-sm font-semibold text-warn">
-                    {t("sample")}
-                  </div>
-                  <div className="font-mono text-xs text-ink-40">{t("health.warnings")}</div>
-                </div>
-                <div>
-                  <div className="font-mono text-sm font-semibold text-ink-60">
-                    {t("sample")}
-                  </div>
-                  <div className="font-mono text-xs text-ink-40">{t("health.notices")}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 流量柱状图 */}
-          <div className="card-a p-6 lg:col-span-7">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-lg font-semibold text-ink">
-                  {t("traffic.title")}
-                </h3>
-                <p className="mt-0.5 font-mono text-xs text-ink-40">
-                  {t("traffic.subtitle")}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="font-mono text-2xl font-semibold text-ink">
-                  {t("sample")}
-                </div>
-                <div className="font-mono text-xs text-pos">{t("trendIllustration")}</div>
-              </div>
-            </div>
-            <div className="mt-6 h-40">
-              <TrafficBars />
-            </div>
-            <div className="mt-2 flex justify-between font-mono text-xs text-ink-40">
-              <span>{t("traffic.jan")}</span>
-              <span>{t("traffic.jun")}</span>
-              <span>{t("traffic.dec")}</span>
-            </div>
-          </div>
-
-          {/* 指标卡片堆 */}
-          <div className="grid grid-cols-2 gap-4 lg:col-span-5">
-            <div className="card-a p-5">
-              <div className="font-mono text-xs text-ink-40">{t("metrics.trackedKeywords")}</div>
-              <div className="mt-2 font-mono text-2xl font-semibold text-ink">
-                {t("sample")}
-              </div>
-              <div className="mt-1 font-mono text-xs text-pos">
-                {t("trendIllustration")}
-              </div>
-              <div className="mt-4 flex gap-1">
-                {[60, 75, 45, 88, 70, 92, 80].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-sm bg-accent/70"
-                    style={{ height: `${h * 0.3}px` }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="card-a p-5">
-              <div className="font-mono text-xs text-ink-40">{t("metrics.referringDomains")}</div>
-              <div className="mt-2 font-mono text-2xl font-semibold text-ink">
-                {t("sample")}
-              </div>
-              <div className="mt-1 font-mono text-xs text-neg">
-                {t("trendIllustration")}
-              </div>
-              <div className="mt-4 flex gap-1">
-                {[70, 65, 80, 72, 68, 60, 55].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-sm bg-neg/60"
-                    style={{ height: `${h * 0.3}px` }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="col-span-2 grid grid-cols-2 gap-4">
-              <MetricPill label={t("metrics.top3")} value={t("sample")} trend="up" />
-              <MetricPill label={t("metrics.top10")} value={t("sample")} trend="up" />
-            </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function SummaryStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="card-a p-3">
+      <div className="truncate font-mono text-lg font-semibold text-ink">{value}</div>
+      <div className="mt-0.5 font-mono text-xs text-ink-40">{label}</div>
+    </div>
+  );
+}
+
+type PreviewT = ReturnType<typeof useTranslations<"preview">>;
+type ActionsT = ReturnType<typeof useTranslations<"dashboard.actions">>;
+type RuleText = (typeof DEMO_RULE_TEXT)[keyof typeof DEMO_RULE_TEXT];
+
+function ScopeTab({ t }: { t: PreviewT }) {
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ScopeRow label={t("realDemo.scope.domain")} value={DEMO_AUDIT_META.domain} mono />
+        <ScopeRow label={t("realDemo.scope.time")} value={DEMO_AUDIT_META.auditedAtLabel} mono />
+        <ScopeRow
+          label={t("realDemo.scope.depth")}
+          value={t("realDemo.scope.depthValue")}
+        />
+        <ScopeRow
+          label={t("realDemo.scope.pages")}
+          value={String(DEMO_AUDIT_META.pagesCrawled)}
+          mono
+        />
+      </div>
+      <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ink-60">
+        <span aria-hidden className="mt-0.5 text-warn">▲</span>
+        {t("realDemo.scope.note")}
+      </p>
+    </div>
+  );
+}
+
+function ScopeRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="card-a px-4 py-3">
+      <div className="font-mono text-xs text-ink-40">{label}</div>
+      <div className={`mt-1 truncate text-sm font-semibold text-ink ${mono ? "font-mono" : "font-sans"}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function WhatTab({ t, ta, ruleText }: { t: PreviewT; ta: ActionsT; ruleText: RuleText }) {
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-display text-xl font-semibold text-ink">
+          {ruleText.name}
+        </h3>
+        <span className="badge-info">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {ta("sev.notice")}
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-ink-60">
+        {ruleText.description}
+      </p>
+
+      {/* 实测证据 */}
+      <div className="mt-5 font-mono text-xs font-semibold uppercase tracking-wide text-ink-40">
+        {t("evidence.label")}
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <div className="card-a p-3">
+          <div className="font-mono text-lg font-semibold text-ink">
+            {DEMO_EVIDENCE.visibleTextSize.toLocaleString()}
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-ink-40">
+            {t("realDemo.evidence.visibleText")}
+          </div>
+        </div>
+        <div className="card-a p-3">
+          <div className="font-mono text-lg font-semibold text-ink">
+            {DEMO_EVIDENCE.htmlSize.toLocaleString()}
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-ink-40">
+            {t("realDemo.evidence.htmlSize")}
+          </div>
+        </div>
+        <div className="card-a p-3">
+          <div className="font-mono text-lg font-semibold text-ink">
+            {DEMO_EVIDENCE.ratioPercent}%
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-ink-40">
+            {t("realDemo.evidence.ratio")}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2 font-mono text-xs text-ink-60">
+        <span className="h-1 w-1 flex-none rounded-full bg-accent" />
+        <span className="truncate">{DEMO_RULE_SNAPSHOT.sampleUrl}</span>
+      </div>
+    </div>
+  );
+}
+
+function WhyTab({
+  t,
+  ta,
+  priority,
+  effort,
+}: {
+  t: PreviewT;
+  ta: ActionsT;
+  priority: ReturnType<typeof explainTechnicalPriority>["priority"];
+  effort: ReturnType<typeof explainTechnicalPriority>["effort"];
+}) {
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center rounded-lg bg-ink px-3 py-1 font-mono text-xs font-semibold text-white">
+          {priority.level}
+        </span>
+        <span className="font-mono text-xs text-ink-60">
+          {t("realDemo.why.score", { score: priority.score })}
+        </span>
+        <span className="font-mono text-xs text-ink-40">
+          {ta("effort." + effort)}
+        </span>
+      </div>
+
+      <div className="mt-5 font-mono text-xs font-semibold uppercase tracking-wide text-ink-40">
+        {ta("priority.why")}
+      </div>
+      <ul className="mt-3 space-y-2">
+        {priority.reasons.map((reason) => (
+          <li key={reason.code} className="flex items-center gap-2 font-mono text-xs text-ink-60">
+            <span className="h-1 w-1 flex-none rounded-full bg-accent" />
+            {ta(`reason.${reason.code}`, reason.value === undefined ? {} : { value: reason.value })}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ActionTab({ t, ruleText }: { t: PreviewT; ruleText: RuleText }) {
+  return (
+    <div>
+      <div className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white">
+        {ruleText.recommendation}
+        <span aria-hidden>→</span>
+      </div>
+      <ul className="mt-5 space-y-2">
+        {(["step1", "step2", "step3"] as const).map((key) => (
+          <li key={key} className="flex items-start gap-2 text-sm leading-relaxed text-ink-60">
+            <span aria-hidden className="mt-0.5 text-accent">·</span>
+            {t(`realDemo.action.${key}`)}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-4 font-mono text-xs text-ink-40">{t("realDemo.action.genericNote")}</p>
+    </div>
+  );
+}
+
+function VerifyTab({ t, ta }: { t: PreviewT; ta: ActionsT }) {
+  return (
+    <div>
+      {/* 当前真实状态：fixed_claimed + 再审计 fail */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="badge-info">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {ta("status.fixed_claimed")}
+        </span>
+        <span className="font-mono text-xs text-ink-40">
+          {ta("status.fixed_claimed_hint")}
+        </span>
+      </div>
+
+      <div className="mt-4 card-a p-4">
+        <div className="font-mono text-xs font-semibold uppercase tracking-wide text-ink-40">
+          {ta("verificationTitle")}
+        </div>
+        <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-ink-60">
+          <span aria-hidden className="mt-0.5 text-neg">✕</span>
+          {ta("verification.fail", {
+            auditId: DEMO_RESOLUTION.verifiedAuditId,
+            findings: DEMO_RESOLUTION.verifyFindings,
+            pages: DEMO_RESOLUTION.verifyPages,
+          })}
+        </p>
+        <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-ink-60">
+          <span aria-hidden className="mt-0.5 text-warn">▲</span>
+          {t("realDemo.verify.notFixedNote")}
+        </p>
+        {DEMO_RESOLUTION.note && (
+          <p className="mt-2 font-mono text-xs text-ink-40">
+            {t("realDemo.verify.userNote", { note: DEMO_RESOLUTION.note })} ·{" "}
+            {t("realDemo.verify.attempts", { n: DEMO_RESOLUTION.attempts })}
+          </p>
+        )}
+      </div>
+
+      {/* 五状态机制说明 */}
+      <div className="mt-5 font-mono text-xs font-semibold uppercase tracking-wide text-ink-40">
+        {t("realDemo.verify.mechanismTitle")}
+      </div>
+      <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {DEMO_RESOLUTION_STATES.map((state) => (
+          <li key={state} className="card-a px-3 py-2">
+            <div className="font-mono text-xs font-semibold text-ink">
+              {ta(`status.${state}`)}
+            </div>
+            <div className="mt-0.5 text-xs leading-relaxed text-ink-40">
+              {ta(`status.${state}_hint`)}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <Link
+        href={`/app/audit?domain=${DEMO_AUDIT_META.domain}`}
+        className="mt-5 inline-flex items-center gap-2 font-sans text-sm font-semibold text-accent transition-colors hover:text-ink"
+      >
+        {t("verify.cta")}
+        <span aria-hidden>→</span>
+      </Link>
+    </div>
   );
 }

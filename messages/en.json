@@ -21,16 +21,11 @@
   "accept": "Accept"
 },
   "hero": {
-    "badge": "Daily rank updates · SEO audits · Rank tracking",
-    "title": "Track rankings. Audit technical SEO. Find the keywords that matter.",
-    "subtitle": "SeeO brings keyword research, rank tracking, backlink analysis, technical audits, competitor analysis, and content optimization together on one workbench — so you always know what to do next.",
+    "badge": "Real site audit · What to fix first · Verify the fix",
+    "title": "Find the SEO problem worth fixing first. Then verify the fix.",
+    "subtitle": "Run a free audit of your real site. SeeO tells you which issue is worth fixing first and why — and re-audits after your fix to verify whether it's actually resolved.",
     "primaryCta": "Start free",
     "secondaryCta": "Explore features",
-    "panel": {
-      "sample": "Sample",
-      "sampleNote": "Sample data · for demo",
-      "caption": "Keyword gravity field · sample data"
-    },
     "auditBox": {
       "placeholder": "Enter your website domain, e.g. example.com",
       "submit": "Run free SEO audit",
@@ -39,168 +34,142 @@
       "errInvalid": "Invalid domain format, e.g. example.com",
       "errPrivate": "Local or private network addresses are not supported",
       "label": "Website domain"
-    },
-    "field": {
-      "center": "SEO workbench",
-      "satellites": [
-        {
-          "kw": "Long-tail keywords"
-        },
-        {
-          "kw": "Competitor ranks"
-        },
-        {
-          "kw": "Search intent"
-        },
-        {
-          "kw": "SERP features"
-        },
-        {
-          "kw": "Link opportunities"
-        },
-        {
-          "kw": "Content gaps"
-        },
-        {
-          "kw": "Local SEO"
-        }
-      ]
     }
   },
   "features": {
-    "sectionTitle": "One workbench, six dimensions",
-    "sectionSubtitle": "Every step of the SEO workflow — from keyword research to content optimization — lives inside SeeO. Data flows between modules automatically, with no repeated imports and exports.",
-    "cardLink": "Try this module",
+    "sectionTitle": "From problem to proof",
+    "sectionSubtitle": "SeeO is built around one loop on your real site: find the issue worth fixing first, understand why it matters, and verify the fix with a fresh audit.",
+    "cardLink": "Try it with a free audit",
     "cards": [
       {
-        "tag": "Research",
-        "title": "Keyword Research",
-        "desc": "Expand a seed keyword into a full set of related terms, with search volume, difficulty, intent, and CPC to find long-tail opportunities that can drive traffic.",
+        "tag": "Find",
+        "title": "Find what to fix first",
+        "desc": "A free audit of your real site surfaces technical issues and picks the one worth fixing first — not just another long list to triage.",
         "bullets": [
-          "Related / phrase match",
-          "KD difficulty score",
-          "Search intent",
-          "Volume / CPC"
+          "Health score + 20+ technical checks",
+          "Priority decision, with reasons",
+          "Runs on your real pages"
         ],
-        "metricLabel": "Data source",
-        "metricValue": "SerpApi",
-        "href": "/features/keyword-research"
+        "metricLabel": "Step",
+        "metricValue": "01",
+        "href": "/app/audit"
       },
       {
-        "tag": "Tracking",
-        "title": "SEO Rank Tracker",
-        "desc": "Monitor your rankings by keyword, location, and device, and get alerted the moment positions move — no more manual daily checks.",
+        "tag": "Understand",
+        "title": "Understand why it matters",
+        "desc": "Every priority comes with its evidence: severity, how many pages are affected, and where the problem was found — so you can judge before you act.",
         "bullets": [
-          "Daily auto refresh",
-          "Multiple locations / devices",
-          "Rank trend curves",
-          "Volatility alerts"
+          "Why-now reasons in plain language",
+          "Affected pages, findings, sample URLs",
+          "No traffic guessing"
         ],
-        "metricLabel": "Refresh cadence",
-        "metricValue": "Daily",
-        "href": "/features/rank-tracking"
+        "metricLabel": "Step",
+        "metricValue": "02",
+        "href": "/app/audit"
       },
       {
-        "tag": "Diagnostics",
-        "title": "AI SEO Audit Tool",
-        "desc": "Crawl your site and surface 404s, redirect chains, duplicate titles, missing Alt text, and other technical issues — prioritized so you know what to fix first.",
+        "tag": "Verify",
+        "title": "Verify the fix",
+        "desc": "Fix the issue, run the audit again, and SeeO re-checks your pages — telling you honestly whether the problem is resolved or still there.",
         "bullets": [
-          "Health score",
-          "Errors / warnings / notices",
-          "Page response analysis",
-          "Fix priority"
+          "Re-audit verification",
+          "Honest pass / fail / inconclusive",
+          "Progress tracked per issue"
         ],
-        "metricLabel": "Checks",
-        "metricValue": "20+",
-        "href": "/features/seo-audit"
-      },
-      {
-        "tag": "Diagnostics",
-        "title": "Backlink Analysis Tool",
-        "desc": "See who links to you, how anchor text is distributed, and identify referring domains — run a backlink analysis anytime to get a complete link profile snapshot.",
-        "bullets": [
-          "Backlink overview + DA",
-          "Referring domains",
-          "Anchor text distribution",
-          "Profile comparison across refreshes"
-        ],
-        "metricLabel": "Data source",
-        "metricValue": "DataForSEO",
-        "href": "/features/backlink-analysis"
-      },
-      {
-        "tag": "Insights",
-        "title": "Competitor Analysis",
-        "desc": "Compare your keyword rankings side by side with competitors to see where you lag and where the opportunities are — stop going by gut feeling.",
-        "bullets": [
-          "Domain overview comparison",
-          "Share of voice",
-          "Rank gap analysis",
-          "Historical trend overlays"
-        ],
-        "metricLabel": "Dimension",
-        "metricValue": "Share of voice",
-        "href": "/features/competitor-analysis"
-      },
-      {
-        "tag": "Optimize",
-        "title": "Content Optimization",
-        "desc": "Enter a page and a target keyword to see which topics to cover, how long to write, and what to improve — benchmarked against the SERP top 10.",
-        "bullets": [
-          "On-page SEO checks",
-          "Content score",
-          "Topic term suggestions",
-          "SEO checklist"
-        ],
-        "metricLabel": "Benchmark",
-        "metricValue": "SERP Top 10",
-        "href": "/features/content-optimization"
+        "metricLabel": "Step",
+        "metricValue": "03",
+        "href": "/app/audit"
       }
     ]
   },
   "preview": {
-    "sectionHeading": "Dashboard preview",
-    "sectionSubheading": "See what changes every day",
-    "sectionSubtitle": "Core metrics from all your projects in one dashboard — rankings up or down, site health recovering, where traffic comes from — at a glance.",
-    "demoBadge": "Sample data · for demo",
-    "sample": "Sample",
-    "trendIllustration": "Trend illustration",
-    "rankTrend": {
-      "title": "Rank trends",
-      "subtitle": "Sample project · last 30 days · mobile",
-      "from": "30 days ago",
-      "to": "Today"
+    "sectionHeading": "What you see after one free audit",
+    "sectionSubheading": "One issue. The reason. The proof. The fix.",
+    "sectionSubtitle": "SeeO doesn't start with a wall of charts. It starts with the one problem worth fixing first — here is the exact structure every audit gives you (example below uses sample data).",
+    "demoBadge": "Example · sample data, not a real customer",
+    "exampleTag": "Example",
+    "what": {
+      "label": "What to fix first",
+      "issue": "Missing meta description",
+      "severity": "Error",
+      "desc": "The audit found pages on this site missing their meta description tag. This is the issue SeeO picks as the first one worth fixing."
     },
-    "health": {
-      "title": "Site health",
-      "subtitle": "Technical SEO audit score",
-      "scoreNote": "Score illustration",
-      "errors": "Errors",
-      "warnings": "Warnings",
-      "notices": "Notices"
+    "why": {
+      "label": "Why this first",
+      "reason1": "Affects 100% of crawled pages",
+      "reason2": "High severity",
+      "reason3": "High score impact"
     },
-    "traffic": {
-      "title": "Organic traffic",
-      "subtitle": "Monthly visits trend · sample",
-      "jan": "Jan",
-      "jun": "Jun",
-      "dec": "Dec"
+    "evidence": {
+      "label": "Evidence",
+      "pages": "Pages affected",
+      "findings": "Findings",
+      "sampleUrl": "Sample URL"
     },
-    "metrics": {
-      "trackedKeywords": "Tracked keywords",
-      "referringDomains": "Referring domains",
-      "top3": "TOP3 keywords",
-      "top10": "TOP10 keywords"
+    "action": {
+      "label": "Action",
+      "desc": "Fix this issue"
+    },
+    "verify": {
+      "label": "Verify",
+      "desc": "After you fix it, run the audit again — SeeO re-checks your real pages and tells you honestly whether the issue is resolved.",
+      "cta": "Run your free audit"
+    },
+    "realDemo": {
+      "sectionSubtitle": "This is not an example — it is a real audit snapshot of SeeO's own site (www.seeo.asia) taken on 2026-10-15. See how a real issue is found, explained, fixed and re-audited.",
+      "badge": "Real audit snapshot · {time} · not live",
+      "snapshotTag": "Real snapshot · homepage only",
+      "summary": {
+        "healthScore": "Health score",
+        "pagesCrawled": "Pages crawled",
+        "checksPassed": "Checks passed",
+        "engine": "Audit engine"
+      },
+      "tabs": {
+        "scope": "Audit scope",
+        "what": "The issue",
+        "why": "Why it matters",
+        "action": "Fix advice",
+        "verify": "Status & re-audit"
+      },
+      "scope": {
+        "domain": "Target site",
+        "time": "Audited at",
+        "depth": "Audit depth",
+        "depthValue": "Quick audit (homepage only)",
+        "pages": "Pages crawled",
+        "note": "This snapshot covers the homepage only and does not represent the whole site. Run a free audit on your own site to see the full picture."
+      },
+      "evidence": {
+        "visibleText": "Visible text (chars)",
+        "htmlSize": "HTML size (chars)",
+        "ratio": "Text/HTML ratio"
+      },
+      "why": {
+        "score": "Priority score {score}"
+      },
+      "action": {
+        "step1": "Check homepage HTML and script weight: inline styles, redundant scripts and uncompressed markup all inflate the HTML size.",
+        "step2": "Add meaningful visible text content so visitors read substantial content above the fold.",
+        "step3": "After fixing, mark the issue as fixed in SeeO and run another audit to verify.",
+        "genericNote": "This is the generic fix advice for this rule. This demo claims no improvement."
+      },
+      "verify": {
+        "notFixedNote": "The site has not actually been fixed yet, so re-audits still detect the issue — SeeO reports it honestly instead of claiming improvement.",
+        "userNote": "Fix note: {note}",
+        "attempts": "{n} attempts so far",
+        "mechanismTitle": "The five states of the resolution state machine"
+      },
+      "footer": "Source: real audit of www.seeo.asia on 2026-10-15 (audit #8, engine V2 rules 2.0, homepage-only quick audit) · static snapshot, not live · no customer data, no improvement claims."
     }
   },
   "footer": {
-    "tagline": "An all-in-one SEO analytics platform that puts every opportunity in your search traffic where you can see it.",
-    "dataSource": "Powered by SerpApi / DataForSEO data services",
+    "tagline": "A focused SEO workbench: find the problem worth fixing first on your real site, then verify the fix.",
+    "dataSource": "Powered by real site crawls & SERP data services",
     "colProduct": "Product",
     "colProductLinks": {
-      "seoAudit": "AI SEO Audit Tool",
+      "seoAudit": "Technical SEO Audit",
       "rankTracking": "SEO Rank Tracker",
-      "backlinks": "Backlink Analysis Tool",
       "allFeatures": "All features"
     },
     "colPlans": "Plans",
@@ -209,7 +178,8 @@
     },
     "colResources": "Resources",
     "colResourcesLinks": {
-      "docs": "Docs"
+      "docs": "Docs",
+      "changelog": "Changelog"
     },
     "colCompany": "Company",
     "colCompanyLinks": {
@@ -227,15 +197,18 @@
     "priceUnit": "/30 days",
     "free": {
       "name": "Free",
-      "tagline": "For personal site owners and beginners"
+      "tagline": "For personal site owners and beginners",
+      "outcome": "Find your first priority issue. Fix it. Verify the result."
     },
     "lite": {
       "name": "Lite",
-      "tagline": "For getting started with SEO"
+      "tagline": "For getting started with SEO",
+      "outcome": "Keep the find → fix → verify loop running as your site grows — more projects and keywords."
     },
     "pro": {
       "name": "Pro",
-      "tagline": "For professional SEO practitioners"
+      "tagline": "For professional SEO practitioners",
+      "outcome": "Run the fix-and-verify loop across many sites, with deeper audits and room for more keywords."
     },
     "custom": {
       "name": "Custom Service",
@@ -271,7 +244,7 @@
   "pricing": {
     "eyebrow": "PRICING",
     "title": "Choose the plan that fits",
-    "subtitle": "Start free, upgrade or cancel anytime.",
+    "subtitle": "Start with the free audit — find your first priority issue, fix it, and verify the result. Upgrade only when you need more.",
     "loading": "Loading…",
     "loadFailed": "Failed to load plans",
     "networkError": "Network error, failed to load plans",
@@ -312,11 +285,23 @@
       },
       {
         "q": "What is the SerpApi quota?",
-        "a": "SerpApi is a third-party SERP data API billed per call. The Free plan includes 50 calls per month; related features pause until the next monthly refresh once exceeded. Upgrading raises your quota."
+        "a": "SerpApi is a third-party SERP data API billed per call. The Free plan includes 30 calls per month (3 per day); when the quota runs out, affected features clearly say so until the next monthly refresh. Upgrading raises your quota."
+      },
+      {
+        "q": "What does the free audit actually check?",
+        "a": "The Free plan allows 3 quick audits per day — homepage only, with a health score based on page-level checks. A deep audit crawls more pages (currently capped at about 50) and is a Pro capability. If a page is unreachable or blocked by anti-crawling measures, SeeO cannot produce a health conclusion and reports the failure honestly instead of showing a 0 score."
+      },
+      {
+        "q": "Does marking an issue \"fixed\" mean it is resolved?",
+        "a": "No. Marking is your claim. When you re-run the audit, SeeO re-crawls the affected pages and re-checks the same rule: only if it is no longer detected does the issue become \"verified resolved\"; if still detected, new findings are shown honestly; if inconclusive, no conclusion is drawn — always based on real detection data."
       },
       {
         "q": "Where is my data stored?",
         "a": "Production uses a Turso cloud database, with user authentication provided by Supabase Auth. Each user's data is isolated."
+      },
+      {
+        "q": "Will SeeO guarantee better rankings or more traffic?",
+        "a": "No. SeeO audits your real site, tells you which issue is worth fixing first based on evidence, and verifies whether the fix worked. Ranking and traffic outcomes depend on many factors no tool can control — anyone promising them should be treated with caution."
       }
     ],
     "billingNote": "Billed monthly · cancel anytime",
@@ -349,8 +334,6 @@
       "competitors": "Competitors per project",
       "sov": "Share of Voice & keyword gap",
       "serpMonthly": "SERP data calls / month",
-      "dataforseo": "Keyword & backlink data queries / month",
-      "backlinks": "Backlink profile analysis",
       "contentChecks": "Content checks / month",
       "pdf": "PDF report export",
       "excel": "CSV report export (Excel-compatible)",
@@ -412,12 +395,12 @@
   },
   "seoAudit": {
     "meta": {
-      "title": "AI SEO Audit Tool - Technical SEO Analysis & Website SEO Checker | SeeO",
-      "description": "SeeO is an AI SEO audit tool: crawl your site, run 20+ technical checks, and get a technical SEO analysis with health score and a clear SEO audit report."
+      "title": "SEO Audit Tool - Technical SEO Analysis & Website SEO Checker | SeeO",
+      "description": "SeeO audits your real site: crawl it, run 20+ technical checks, and get a technical SEO analysis with health score and a clear SEO audit report."
     },
-    "title": "AI SEO Audit Tool for Complete Website SEO Analysis",
+    "title": "SEO Audit Tool for Complete Website SEO Analysis",
     "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority, with SEO issues detection across 20+ checks",
-    "whatItDoes": "SeeO's AI SEO audit tool crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Think of it as a website SEO checker that goes far beyond a single homepage snapshot: every crawled page is inspected for on-page basics, indexability, security, performance, and link structure problems, so SEO issues detection happens in one pass instead of across five separate tools. Each technical SEO audit run is saved to history, so you can compare scores and issue counts over time and verify that your fixes actually moved the numbers. The SEO audit report groups every finding by category and severity, so triage takes minutes instead of hours — fix the high-impact errors first, then work through warnings and notices as capacity allows. Because every run is stored, the report doubles as a progress log: watch the health score climb and the issue count drop as fixes land. Nothing needs to be installed; the audit runs server-side against public pages and works the same way on static sites, framework apps, WordPress, or large e-commerce catalogs.",
+    "whatItDoes": "SeeO's SEO audit tool crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Think of it as a website SEO checker that goes far beyond a single homepage snapshot: every crawled page is inspected for on-page basics, indexability, security, performance, and link structure problems, so SEO issues detection happens in one pass instead of across five separate tools. Each technical SEO audit run is saved to history, so you can compare scores and issue counts over time and verify that your fixes actually moved the numbers. The SEO audit report groups every finding by category and severity, so triage takes minutes instead of hours — fix the high-impact errors first, then work through warnings and notices as capacity allows. Because every run is stored, the report doubles as a progress log: watch the health score climb and the issue count drop as fixes land. Nothing needs to be installed; the audit runs server-side against public pages and works the same way on static sites, framework apps, WordPress, or large e-commerce catalogs.",
     "how": {
       "input": "A website URL (one domain)",
       "process": [
@@ -703,7 +686,7 @@
     ],
     "related": {
       "seoAudit": {
-        "title": "AI SEO Audit Tool →",
+        "title": "Technical SEO Audit →",
         "desc": "20+ technical checks and a health score"
       },
       "backlinks": {
@@ -931,7 +914,7 @@
     ],
     "related": {
       "seoAudit": {
-        "title": "AI SEO Audit Tool →",
+        "title": "Technical SEO Audit →",
         "desc": "20+ technical checks and a health score"
       },
       "rankTracking": {
@@ -1291,13 +1274,100 @@
     "banned": "For accounts banned due to violations of the Terms of Service, see the terms regarding fees.",
     "lastUpdated": "Last updated: August 2026"
   },
+  "changelogPage": {
+    "meta": {
+      "title": "SeeO Changelog: Real Product Changes | SeeO",
+      "description": "SeeO changelog records only what actually changed: shipped features and completed-but-not-yet-deployed improvements are listed separately, each with a date and the impact you can feel. No invented version numbers or releases."
+    },
+    "title": "Changelog",
+    "subtitle": "Only what actually changed. Shipped, completed-but-not-deployed, and in-progress are listed separately.",
+    "status": {
+      "shipped": "Shipped",
+      "localOnly": "Built · not yet deployed",
+      "inDev": "In progress"
+    },
+    "localNote": "Every entry on this page is a real product change now live in production (www.seeo.asia); dates are the actual delivery and release times.",
+    "entries": [
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "Audit to-do list and step-by-step fix guidance",
+        "changes": [
+          "Audit results are reorganized into a priority-sorted to-do list: each issue shows a P0/P1/P2 priority, real detection evidence, and its resolution status",
+          "Issue detail now offers step-by-step fix guidance: where to look, what to change, what to check afterwards — and honestly states what SeeO cannot determine for you",
+          "After fixing, re-run the audit: SeeO judges \"verified resolved / still present / inconclusive\" from real detection data"
+        ]
+      },
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "Real audit demo on the homepage",
+        "changes": [
+          "The homepage now features an interactive demo using a real audit snapshot of SeeO's own website (labeled with audit time and scope, not live)",
+          "It shows the full loop — find the issue, why it matters, how to fix, re-audit — with no fabricated customer data"
+        ]
+      },
+      {
+        "date": "2026-10-15",
+        "status": "shipped",
+        "title": "Free audit reliability fixes",
+        "changes": [
+          "Refreshing or re-entering while an audit runs now recovers and resumes showing results instead of hanging on \"in progress\"",
+          "When a page cannot be crawled, SeeO now shows the failure honestly with reasons and suggestions instead of a misleading 0-score result",
+          "Fixed locale detection that showed English messages to Chinese users in some scenarios"
+        ]
+      },
+      {
+        "date": "2026-10-14",
+        "status": "shipped",
+        "title": "Audit loop detail fixes",
+        "changes": [
+          "Fixed the homepage rejecting multi-part domains like www.example.com as invalid",
+          "The \"re-verify failed\" badge now shows real detection numbers instead of a fixed 0"
+        ]
+      },
+      {
+        "date": "2026-10-09",
+        "status": "shipped",
+        "title": "Email consent and sending compliance",
+        "changes": [
+          "Marketing emails are only sent after explicit user consent; consent and unsubscribe states can be adjusted at any time"
+        ]
+      },
+      {
+        "date": "2026-09-29",
+        "status": "shipped",
+        "title": "Common SEO issue diagnosis pages",
+        "changes": [
+          "Added diagnosis pages for common issues such as duplicate titles, missing canonical, pages not indexed, and broken internal links — causes and fix approaches explained"
+        ]
+      },
+      {
+        "date": "2026-09-28",
+        "status": "shipped",
+        "title": "Signup flow and marketing pages",
+        "changes": [
+          "Improved product marketing pages and the signup flow"
+        ]
+      },
+      {
+        "date": "2026-09-15",
+        "status": "shipped",
+        "title": "Feature pages and guides",
+        "changes": [
+          "Rebuilt the rank-tracking and backlink-analysis feature pages with supporting guides"
+        ]
+      }
+    ],
+    "internalNote": "Internal engineering and operations work is not listed here. Feedback or suggestions? Write to support@seeo.asia or visit the contact page."
+  },
   "contactPage": {
     "meta": {
       "title": "Contact SeeO - Support, Feedback & SEO Questions | SeeO",
-      "description": "Contact SeeO, an independent AI SEO software project. Find how to reach the SeeO team for support, feedback, and questions about the SEO platform."
+      "description": "Contact SeeO, an independent SEO analytics project. Find how to reach the SeeO team for support, feedback, and questions about the SEO platform."
     },
     "title": "Contact SeeO",
-    "intro": "SeeO is an independent AI SEO software project.",
+    "intro": "SeeO is an independent SEO analytics project.",
     "sections": {
       "email": "01 Email",
       "response": "02 Response time"
@@ -1308,6 +1378,222 @@
     "emailLabel": "Customer Support"
   },
   "dashboard": {
+    "growth": {
+      "title": "Search Growth Opportunities",
+      "subtitle": "Real opportunities from your ranking history, audits and content checks — what happened, why it matters now, and what to do next.",
+      "cat": {
+        "regain": "Regain lost visibility",
+        "capture": "Capture near-miss rankings",
+        "improve": "Improve aging content",
+        "issue": "Technical issue"
+      },
+      "whyLabel": "Why now",
+      "evidenceLabel": "Evidence",
+      "defaultAction": "View details",
+      "technicalNote": "Technical issues are the foundation. SeeO only shows real crawl findings — no invented traffic promises. Fix it, then re-run the audit to verify.",
+      "unlock": {
+        "noRankData": "Ranking recovery and near-miss opportunities come from tracked keyword history. Add keywords in Position Tracking — SeeO evaluates them automatically after each refresh.",
+        "noGrowth": "No growth opportunities in the current window. SeeO re-evaluates after every audit and rank refresh — only signals with real evidence become opportunities."
+      }
+    },
+    "opportunityContext": {
+      "label": "From a growth opportunity",
+      "whyPrefix": "Reason: "
+    },
+    "actions": {
+      "title": "Action Center",
+      "subtitle": "One queue for every real finding: technical issues and growth opportunities, each with evidence, the reason for its priority, and how to verify it was actually solved.",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "loadFailed": "Could not load the work queue",
+      "networkError": "Network error — check your connection and retry",
+      "filterLabel": "Filter",
+      "filterAll": "All",
+      "tasksCount": "{n} tasks",
+      "noTasks": "No tasks in this filter",
+      "source": {
+        "audit": "Technical audit",
+        "opportunity": "Growth opportunity"
+      },
+      "status": {
+        "open": "Open",
+        "in_progress": "In progress",
+        "fixed_claimed": "Marked fixed (unverified)",
+        "verified_resolved": "Verified resolved",
+        "dismissed": "Dismissed",
+        "open_hint": "Detected by the crawler and not handled yet.",
+        "in_progress_hint": "You started working on this. SeeO has no new detection evidence yet.",
+        "fixed_claimed_hint": "You marked this as fixed. This is a claim, not a verified result — run a new audit so SeeO can confirm it with real detection evidence.",
+        "verified_resolved_hint": "Confirmed by a later audit: this no longer appears in crawl results.",
+        "dismissed_hint": "You decided not to act on this. It stays out of the active queue.",
+        "managedInEngine": "Status is managed by the opportunity state machine in the Opportunities page."
+      },
+      "sev": {
+        "error": "Error",
+        "warning": "Warning",
+        "notice": "Notice"
+      },
+      "priority": {
+        "title": "Priority",
+        "why": "Why this priority"
+      },
+      "reason": {
+        "severity_error": "Error-severity issue",
+        "severity_warning": "Warning-severity issue",
+        "severity_notice": "Notice-severity issue",
+        "reach_high": "Affects {value}% of indexable pages",
+        "reach_medium": "Affects {value}% of indexable pages",
+        "impact_high": "Removes about {value} points from the health score",
+        "impact_medium": "Removes about {value} points from the health score",
+        "pattern_site_wide": "Template-level pattern — one fix covers many pages",
+        "pattern_repeated": "Repeats across several pages",
+        "effort_low": "Low fix cost",
+        "effort_medium": "Medium fix cost",
+        "evidence_direct_crawl": "Direct crawl evidence (own crawler)",
+        "opportunity_engine": "From the opportunity engine (rank / content / competitor signals)",
+        "evidence_linked": "{value} linked evidence item(s)",
+        "evidence_missing": "No evidence linked — reliability lowered",
+        "confidence_high": "High measured confidence",
+        "confidence_low": "Low measured confidence",
+        "stale_data": "Signal is {value} days old",
+        "recent_data": "Signal refreshed recently ({value} days)",
+        "unknown_data_age": "Signal age cannot be determined — reliability lowered",
+        "result_improved": "Measured improvement after execution — deprioritized",
+        "result_worse": "Metric got worse after execution — re-check recommended",
+        "result_unchanged": "Executed, no measured improvement yet",
+        "result_indeterminate": "Executed, but improvement cannot be determined yet",
+        "verifiable_by_data": "Verifiable with existing data",
+        "not_auto_verifiable": "No automatic verification channel"
+      },
+      "provenance": {
+        "title": "What kind of claim is this",
+        "observed": "Observed fact",
+        "inferred": "System inference",
+        "expected": "Unverified expectation"
+      },
+      "channel": {
+        "channel_audit": "Verified by a new audit",
+        "channel_rank": "Verified by rank history",
+        "channel_none": "No automatic verification"
+      },
+      "observation": {
+        "title": "Result so far",
+        "baseline": "Before you started",
+        "latest": "Latest observation",
+        "noBaseline": "No baseline yet — mark this task as in progress to record the real numbers before you change anything.",
+        "trackFirst": "No baseline yet — rank can only be observed after this keyword is added to rank tracking. SeeO will not record a baseline it cannot measure.",
+        "window": "Observation window: {n} days",
+        "measurements": "{n} observation(s)",
+        "notVerifiable": "SeeO has no automatic verification channel for this task type, so no effect is claimed.",
+        "verdict": {
+          "pending": "Awaiting data",
+          "improved": "Improved",
+          "unchanged": "No change yet",
+          "worse": "Worse",
+          "indeterminate": "Cannot determine"
+        },
+        "reason": {
+          "findings_decreased": "Detected findings decreased",
+          "findings_increased": "Detected findings increased",
+          "findings_same": "Detected findings unchanged",
+          "position_up": "Ranking position improved",
+          "position_down": "Ranking position dropped",
+          "position_same": "Ranking position unchanged",
+          "entered_rankings": "Now ranking where it did not before",
+          "lost_ranking": "No longer ranking",
+          "not_ranking_both": "Not ranking in either observation",
+          "rule_not_executed": "The latest audit did not run this rule, so no conclusion is possible",
+          "missing_metrics": "Not enough measured data",
+          "keyword_not_tracked": "This keyword is not tracked yet, so rank cannot be observed",
+          "no_verification_channel": "No automatic verification channel for this task type"
+        },
+        "next": {
+          "pending": "Next: do the task. A baseline is recorded the moment you start, and the next audit / rank refresh is used to verify.",
+          "improved": "Measured improvement against your baseline. You can mark this task completed and move on to the next one.",
+          "unchanged": "Executed, but the data does not show improvement yet. Wait for more observations, run a new audit, or adjust the approach — this is not counted as a failure.",
+          "worse": "The metric got worse after execution. Re-check what changed on the page, consider rolling back, or adjust the approach.",
+          "indeterminate": "Cannot determine improvement right now — not the same as \"no improvement\". The next audit / rank refresh will be used to judge."
+        }
+      },
+      "effort": {
+        "low": "Low effort",
+        "medium": "Medium effort",
+        "high": "High effort"
+      },
+      "evidenceTitle": "Evidence",
+      "recommendationTitle": "Recommended action",
+      "verificationTitle": "Verification",
+      "verification": {
+        "pending": "Not verified yet — run a new audit to verify",
+        "pass": "Passed on audit #{auditId}",
+        "fail": "Still detected on audit #{auditId}: {findings} findings across {pages} pages",
+        "inconclusive": "Audit #{auditId} did not execute this rule — no conclusion drawn"
+      },
+      "act": {
+        "markInProgress": "Mark in progress",
+        "markFixed": "Mark fixed",
+        "dismiss": "Dismiss",
+        "reopen": "Reopen",
+        "openAudit": "Open audit",
+        "openOpportunities": "Open in Opportunities",
+        "saving": "Saving…",
+        "saveFailed": "Could not update the status",
+        "nextStepTitle": "Next step",
+        "openIssue": "Open this issue in the audit",
+        "openPage": "Open the affected page in the audit",
+        "rerunAudit": "Run a new audit",
+        "researchKeyword": "Research this keyword",
+        "trackKeyword": "Add to rank tracking",
+        "optimizePage": "Optimize this page",
+        "expandKeywords": "Expand keywords",
+        "reviewCompetitors": "Review competitors",
+        "executionUnavailable": "No execution screen exists for this task type yet — SeeO will not show a button that does nothing.",
+        "reason_no_execution_surface": "No usable execution screen for this task type yet."
+      },
+      "coverage": {
+        "title": "Data coverage",
+        "auditOk": "Technical audit #{auditId} · {depth} · {pages} pages crawled",
+        "auditMissing": "No completed technical audit for this domain yet",
+        "health": "Health score {score}",
+        "tracking": "{n} tracked keywords",
+        "gapsTitle": "Known data gaps — SeeO will not fill these with placeholder numbers",
+        "project": "Project: {name} · {domain}",
+        "noProject": "No project selected",
+        "opportunitySources": "{n} opportunity signal type(s) loaded",
+        "verifiable": "{n} task(s) can be verified with data",
+        "observed": "{n} task(s) have a captured baseline"
+      },
+      "gap": {
+        "no_completed_audit": "No completed audit, so technical findings cannot be listed yet",
+        "quick_audit_only_homepage": "Latest audit used Quick depth (homepage only); site-level checks need a deep audit",
+        "audit_partial": "Latest audit reached the crawl limit — results are partial",
+        "no_dashboard_snapshot": "Latest audit has no dashboard snapshot (created by an older engine version)",
+        "no_tracked_keywords": "No tracked keywords yet, so rank-based opportunities are unavailable",
+        "no_project_selected": "No project selected, so growth opportunities are not loaded",
+        "no_growth_opportunities": "No growth opportunities scanned yet — run a scan in Opportunities to generate them from your real rank, competitor and content signals",
+        "backlink_source_unavailable": "Backlink data provider is not configured, so no backlink tasks are shown (SeeO will not invent them)"
+      },
+      "empty": {
+        "title": "No tasks yet",
+        "body": "Run a technical audit for this domain to generate real, evidence-backed tasks.",
+        "cta": "Run an audit"
+      },
+      "unavailable": "Unavailable",
+      "panel": {
+        "title": "Today's priorities",
+        "body": "Real findings from your audits and tracking data, ordered by what is worth doing first.",
+        "open": "{n} open",
+        "inProgress": "{n} in progress",
+        "fixedUnverified": "{n} marked fixed, awaiting verification",
+        "verified": "{n} verified resolved",
+        "auditedDomains": "{n} audited site(s)",
+        "noAudit": "No audited site yet. Run a free audit to generate real, evidence-backed tasks.",
+        "cta": "Open Action Center",
+        "auditCta": "Run free audit",
+        "todayTitle": "Do this first today",
+        "viewAll": "View full queue"
+      }
+    },
     "sidebar": {
       "overview": "Overview",
       "keywordOverview": "Keyword Overview",
@@ -1330,6 +1616,7 @@
       "demoToast": "Demo mode — account system is disabled",
       "demoUser": "Alex Morgan",
       "demoEmail": "alex@acme-example.com",
+      "actions": "Action Center",
       "opportunities": "Opportunities"
     },
     "topbar": {
@@ -1489,6 +1776,7 @@
     "audit": {
       "title": "Technical SEO Audit",
       "subtitle": "In-house crawler, no SerpApi quota used. BFS-crawls same-domain pages (up to 50), runs 20+ checks and computes a health score.",
+      "subtitleQuick": "In-house crawler, no SerpApi quota used. This audit checks your homepage (1 page) and computes a health score from the page-level checks.",
       "printHeader": "SeeO · Technical Audit Report",
       "domainLabel": "Audit domain",
       "viewBtn": "View",
@@ -1546,7 +1834,7 @@
       "chartResponseSubFull": "Deep-audit page details",
       "chartResponseSubEmpty": "Available after a deep audit",
       "bucketTimeout": "Timeout",
-      "issuesTitle": "Issues",
+      "issuesTitle": "SEO to-do list (sorted by priority)",
       "issuesCount": "{n, plural, one {# issue group} other {# issue groups}}",
       "filterAll": "All",
       "thCheck": "Check",
@@ -1640,6 +1928,8 @@
       "crawling": "Crawling",
       "navLabel": "Audit sections",
       "retryBtn": "Retry audit",
+      "crawlFailedTitle": "We couldn't crawl {domain}",
+      "crawlFailedBody": "The start page request failed, so no checks were executed. No health score and no pass/fail conclusions are shown for this audit.",
       "legacyAuditNote": "This audit was created with an older engine. Run a new audit to unlock the full dashboard.",
       "legacyDetailNote": "Legacy engine result — re-run an audit for the full V2 dashboard.",
       "healthSub": "Health score across {crawled} indexable pages",
@@ -1741,6 +2031,7 @@
       "sdSemanticSection": "Structured Data & Semantic",
       "levelSite": "Site-wide",
       "levelPage": "Per-page",
+      "affectedScopeLine": "Affects {pages} pages ({percent}% of indexable pages) — a {scope} issue.",
       "thFindings": "Findings",
       "backToIssues": "Back to issues",
       "priorityHigh": "High priority",
@@ -1758,6 +2049,12 @@
       "whatFoundSub": "First detection with metrics",
       "howToFix": "How to fix",
       "howToFixSub": "Recommended action",
+      "howFixWhere": "Where to fix it",
+      "howFixSteps": "Step by step",
+      "howFixCheckAfter": "Check before re-auditing",
+      "howFixVerifyNote": "How SeeO verifies it",
+      "howFixNotKnown": "What SeeO cannot tell you",
+      "howFixGeneric": "SeeO only has a generic recommendation for this type of issue and cannot give more specific steps — see the rule advice below and adapt it to your site.",
       "affectedUrlsTitle": "Affected URLs ({n})",
       "affectedUrlsSub": "Click a URL to expand page detail",
       "viewCrawledPages": "View crawled pages",
@@ -1820,9 +2117,23 @@
       "auditHistoryTableSub": "Scores, findings and engine version per audit",
       "thDate": "Date",
       "engineVersion": "Engine",
-      "guestCtaTitle": "Save this result — create a free account",
-    "guestCtaBody": "Audits run without an account. Sign up free to keep this report in your workspace and track fixes over time.",
+      "guestCtaTitle": "Keep this audit — track your fix for free",
+    "guestCtaBody": "Sign up free to save this report, track what you fix, and let SeeO re-verify it automatically on your next audit. Your domain and this audit carry over to your account — no need to run it again.",
     "guestCtaBtn": "Sign up free",
+    "doFirstTitle": "Do this first",
+    "doFirstSub": "Judged from {n} failing checks in this audit's crawl",
+    "whyNowTitle": "Why this one first",
+    "whyNowSub": "Computed from this audit's real findings — affected scope, health-score impact and fix leverage. No traffic estimates.",
+    "evidenceTitle": "Evidence from this crawl",
+    "topActionOpenCta": "Open details",
+    "tieHint": "{n} checks tie at this priority on this audit's data — this is one of them; the full list below is ordered by the same logic.",
+    "verifyBodyTop": "Fix it, then run the audit again — SeeO re-checks this exact rule and verifies the result.",
+    "verifyTitle": "How SeeO verifies this fix",
+    "verifySub": "Verified resolved can only come from a new audit's evidence — marking it fixed yourself never counts.",
+    "verifyBody": "After you fix it, run the audit again. SeeO re-crawls and re-checks this exact rule: if it passes, the issue is marked Verified resolved; if it still fails, SeeO shows the new findings; if the rule doesn't run in the next audit, it is marked inconclusive — never counted as fixed.",
+    "verifyStatePass": "Latest re-audit: this check passed.",
+    "verifyStateFail": "Latest re-audit: this check still fails — see the new findings.",
+    "verifyStateInconclusive": "Latest re-audit did not run this check — no verdict yet, not counted as fixed.",
     "guestExportNote": "Create a free account to save reports to your workspace and export PDFs.",
     "tabOverview": "Overview",
       "tabIssues": "Issues",
@@ -2566,7 +2877,10 @@
         "step3Title": "Review issues and start optimizing",
         "step3Desc": "A severity-sorted checklist with fix suggestions to guide your next steps.",
         "cta": "Start free audit →",
-        "ctaNote": "No credit card required · 3 audits per day on the free plan"
+        "ctaNote": "No credit card required · 3 audits per day on the free plan",
+        "auditReadyTitle": "Continue with your audit",
+        "auditReadyDesc": "We kept your recent audit of {domain} — pick up where you left off; no need to start over.",
+        "auditReadyCta": "View the audit result"
       },
       "placeholder": {
         "plannedTitle": "Planned capabilities",
@@ -2580,6 +2894,7 @@
         "backToSelect": "Back to selection",
         "noProjectsHint": "No projects yet — just enter a domain to get started",
         "manualOption": "Enter manually…",
+        "manualOptionWithDomain": "Manual: {domain}",
         "projectOption": "{name} ({domain})"
       },
       "charts": {
@@ -2840,6 +3155,8 @@
     "AI_SEARCH_NOT_AVAILABLE_ON_PLAN": "AI Search requires a SeeO account with DataForSEO quota. Sign in and upgrade to use it.",
     "OPPORTUNITY_NOT_FOUND": "The opportunity was not found.",
     "INVALID_TRANSITION": "That status change is not allowed for this opportunity.",
+    "STATUS_NOT_USER_SETTABLE": "You cannot set this status directly. \"Verified resolved\" is only set by a later audit's detection evidence.",
+    "STATUS_UPDATE_FAILED": "Could not update the handling status. Please try again.",
     "GITHUB_NOT_CONNECTED": "This project is not connected to GitHub yet. Connect a repository to execute actions.",
     "GITHUB_NOT_CONFIGURED": "GitHub integration is not configured (no GitHub App and no token provided).",
     "GITHUB_PERMISSION_DENIED": "GitHub denied access: the credential lacks push permission on this repository.",
@@ -3256,7 +3573,7 @@
         "desc": "Build the keyword set you track"
       },
       "seoAudit": {
-        "title": "AI SEO Audit Tool →",
+        "title": "Technical SEO Audit →",
         "desc": "Find the technical cause behind a drop"
       }
     },

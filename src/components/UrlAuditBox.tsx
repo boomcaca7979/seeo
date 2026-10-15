@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)\.[a-z]{2,63}$/i;
+// 与 /api/audit/start 的域名正则对齐：支持多段子域（如 www.example.com）。
+// 此前只允许「单段标签.TLD」，用户输入 www.seeo.asia 会在首页被误判「域名格式无效」。
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)(?:[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$/i;
 
 export default function UrlAuditBox() {
   const t = useTranslations("hero.auditBox");

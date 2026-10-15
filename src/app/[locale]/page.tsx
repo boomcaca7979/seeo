@@ -22,14 +22,14 @@ interface LocaleHomePageProps {
 
 const homeMeta = {
   en: {
-    title: "SeeO — SEO Tool: Site Audits, Rank Tracking & Keyword Research",
+    title: "SeeO — Find the SEO Problem Worth Fixing First, Then Verify the Fix",
     description:
-      "SeeO is an all-in-one SEO tool: technical site audits, daily rank tracking, keyword research, competitor and backlink analysis, and content optimization.",
+      "Run a free technical SEO audit of your real site. SeeO tells you which issue is worth fixing first and why, and re-audits after your fix to verify whether it's actually resolved.",
   },
   zh: {
-    title: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
+    title: "SeeO · 找出最值得先处理的 SEO 问题，修完再验证",
     description:
-      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析六大核心功能。每日自动刷新 Google 排名数据，生成可视化审计报告与健康评分，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。",
+      "免费审计你的真实网站：SeeO 告诉你哪个技术问题最值得先处理、依据是什么；修复之后重新审计，验证问题是否真的解决。真实抓取、真实证据，不估算流量、不承诺排名。",
   },
 } as const;
 

@@ -9,10 +9,38 @@
 //    Metric + Why this matters / What SeeO found / How to fix + Affected URLs。
 //  - Pattern 检测：同一规则多条 finding 消息归一化后完全一致 → 站点级/模板级问题。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import type { DashboardSnapshot, RuleSnapshot, RuleSeverity, RuleCategory } from "@/lib/seo/audit-dashboard";
+import { selectTopIssue, explainTechnicalPriority, type TopIssueSelection } from "@/lib/seo/issue-priority";
+import { getFixGuidance } from "@/lib/seo/fix-guidance";
 import { SectionCard, SeverityBadge, EmptyBlock, Hint, fmtNum, SEVERITY_COLORS } from "./ui";
+
+/** 处理状态（来自 /api/audit/issues/status；与检测结果分离） */
+interface IssueResolution {
+  rule_id: string;
+  status: "open" | "in_progress" | "fixed_claimed" | "verified_resolved" | "dismissed";
+  verified_at: string | null;
+  verified_audit_id: number | null;
+  verify_status: "pass" | "fail" | "inconclusive" | null;
+  /** 服务端写入的验证明细 JSON（{auditId, depth, findings, affectedPages}），用于展示真实检出数字 */
+  verify_detail?: string | null;
+}
+
+/** 从 verify_detail JSON 解析再审计的真实检出数字；解析失败返回 null（不伪造 0） */
+function parseVerifyDetail(resolution: IssueResolution | null): { findings: number; pages: number } | null {
+  if (!resolution?.verify_detail) return null;
+  try {
+    const d = JSON.parse(resolution.verify_detail) as { findings?: unknown; affectedPages?: unknown };
+    if (typeof d.findings === "number" && typeof d.affectedPages === "number") {
+      return { findings: d.findings, pages: d.affectedPages };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 type LocalizedText = string | { en: string; zh: string };
 
@@ -39,6 +67,8 @@ interface IssuesCenterProps {
   filters: { severity?: string; category?: string; search?: string; sort?: string; group?: string; rule?: string; pageType?: string };
   /** P1-4：上次审计对比产生的新增问题规则 ID（无对比数据时不传 → 不显示 New badge） */
   newRuleIds?: Set<string>;
+  /** 审计域名：用于读取/写入该问题的处理状态（Action Center 闭环） */
+  domain?: string;
   onNavigate: (params: Record<string, string>) => void;
 }
 
@@ -47,17 +77,47 @@ const CATEGORIES: RuleCategory[] = ["crawlability", "indexability", "onpage", "c
 const SORTS = ["priority", "affected", "findings", "impact"] as const;
 const GROUPS = ["issue", "severity", "category"] as const;
 
-export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onNavigate }: IssuesCenterProps) {
+export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, domain, onNavigate }: IssuesCenterProps) {
   const t = useTranslations("dashboard.audit");
+  const ta = useTranslations("dashboard.actions");
   const locale = useLocale() as "en" | "zh";
   // P1-7：Rule / PageType / Sort / Group 收进 Advanced filters（URL 状态不受影响；
   // 已有 advanced 筛选活动时默认展开，保证用户始终看得见当前生效条件）
   const [advancedOpen, setAdvancedOpen] = useState(!!(filters.rule || filters.pageType));
 
+  // 待办清单：一次拉取该域名全部处理状态（复用现有 API），列表行直接显示状态徽标
+  const [resolutions, setResolutions] = useState<Map<string, IssueResolution>>(new Map());
+  useEffect(() => {
+    if (!domain) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/audit/issues/status?domain=${encodeURIComponent(domain)}`, { cache: "no-store" });
+        const json = await res.json();
+        if (cancelled || !res.ok) return;
+        const rows = Array.isArray(json?.data?.resolutions) ? json.data.resolutions : [];
+        const map = new Map<string, IssueResolution>();
+        for (const r of rows) {
+          if (r && typeof r.rule_id === "string") map.set(r.rule_id as string, r as IssueResolution);
+        }
+        setResolutions(map);
+      } catch {
+        // 状态读取失败不阻塞审计报告展示
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [domain]);
+
   const failedRules = useMemo(
     () => snapshot.rules.filter((r) => r.status === "fail"),
     [snapshot]
   );
+
+  // 「先做这一件事」：来自本次真实审计快照 + 既有优先级规则（唯一来源 issue-priority.ts），
+  // 完整清单仍然全部保留在下方。无失败规则 → null，不伪造。
+  const topSelection = useMemo(() => selectTopIssue(snapshot.rules), [snapshot]);
 
   const pageTypes = useMemo(() => {
     const set = new Set<string>();
@@ -73,6 +133,7 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
       <IssueDetail
         snapshot={snapshot}
         rule={selected}
+        domain={domain}
         isNew={newRuleIds?.has(selected.ruleId) ?? false}
         onBack={() => onNavigate({ view: "issues" })}
         onOpenPages={() => onNavigate({ view: "pages", issue: selected.ruleId })}
@@ -124,7 +185,18 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
 
   const groupBy = (filters.group ?? "issue") as (typeof GROUPS)[number];
 
-  const ruleRow = (r: RuleSnapshot) => (
+  const ruleRow = (r: RuleSnapshot) => {
+    // P 级：与「先做这一件事」同一优先级唯一来源（不新造第二套排序）
+    const pLevel = explainTechnicalPriority({
+      severity: r.severity,
+      affectedRatio: r.affectedRatio,
+      scoreImpact: r.scoreImpact,
+      pattern: r.pattern,
+      pageLevel: r.pageLevel,
+    }).priority.level;
+    const resStatus = resolutions.get(r.ruleId)?.status;
+    const evidence = textOf(r.sampleMessage, locale) || (r.sampleUrl ? r.sampleUrl.replace(/^https?:\/\//, "") : "");
+    return (
     <button
       key={r.ruleId}
       onClick={() => onNavigate({ view: "issues", issue: r.ruleId })}
@@ -132,12 +204,22 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
     >
       <SeverityBadge severity={r.severity} label="" />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-sans text-sm font-medium text-ink">
-          {textOf(r.name, locale)}
+        <div className="flex items-center gap-2">
+          <span className={`flex-none font-mono text-[0.625rem] font-semibold ${(LEVEL_BADGE[pLevel] ?? "badge-info")}`}>
+            {pLevel}
+          </span>
+          <span className="truncate font-sans text-sm font-medium text-ink">
+            {textOf(r.name, locale)}
+          </span>
           {/* P1-4：仅状态提示，不改变 severity / score / priority */}
-          {newRuleIds?.has(r.ruleId) ? <span className="badge-warn ml-2 align-middle font-mono text-[0.625rem]">{t("newIssueBadge")}</span> : null}
+          {newRuleIds?.has(r.ruleId) ? <span className="badge-warn flex-none font-mono text-[0.625rem]">{t("newIssueBadge")}</span> : null}
         </div>
-        <div className="mt-0.5 flex items-center gap-2 font-mono text-[0.6875rem] text-ink-40">
+        {evidence ? (
+          <div className="mt-0.5 truncate font-mono text-[0.6875rem] text-ink-40">
+            {evidence}
+          </div>
+        ) : null}
+        <div className="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-[0.6875rem] text-ink-40">
           <span>{r.category}</span>
           <span>·</span>
           <span>{r.pageLevel === "site" ? t("levelSite") : t("levelPage")}</span>
@@ -152,6 +234,18 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
               <span className="text-neg">-{r.scoreImpact.toFixed(1)} {t("pointsUnit")}</span>
             </>
           ) : null}
+          {/* 处理状态徽标：待办清单语义（检测结果 ≠ 处理状态） */}
+          <span
+            className={
+              resStatus === "verified_resolved"
+                ? "badge-pos"
+                : resStatus === "fixed_claimed" || resStatus === "in_progress" || resStatus === "dismissed"
+                  ? "badge-info"
+                  : "badge-warn"
+            }
+          >
+            {ta(`status.${resStatus ?? "open"}` as "status.open")}
+          </span>
         </div>
       </div>
       <div className="hidden w-24 text-right sm:block">
@@ -164,7 +258,8 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
       </div>
       <span className="w-14 text-right font-mono text-xs text-ink-40">→</span>
     </button>
-  );
+    );
+  };
 
   const groups: Array<{ key: string; label: string; rules: RuleSnapshot[]; findings: number; pages: number }> = [];
   const groupCounts = (rs: RuleSnapshot[]) => {
@@ -190,6 +285,14 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
 
   return (
     <div className="space-y-4">
+      {/* ===== 先做这一件事（来自本次真实审计 + 既有优先级规则；完整清单在下方保留） ===== */}
+      {topSelection && !issue && (
+        <TopActionCard
+          selection={topSelection}
+          onOpen={() => onNavigate({ view: "issues", issue: topSelection.rule.ruleId })}
+        />
+      )}
+
       <SectionCard
         title={t("issuesTitle")}
         subtitle={
@@ -349,27 +452,226 @@ export default function IssuesCenter({ snapshot, issue, filters, newRuleIds, onN
   );
 }
 
+// ===== TopActionCard：「先做这一件事」 =====
+// WHAT（发现了什么）/ WHY（为什么优先）/ EVIDENCE（真实爬取证据）/ ACTION（现在做什么）/ VERIFY（如何验证）。
+// 只使用本次审计快照的真实数据与既有优先级规则；数据不足以区分时如实说明并列，不伪造。
+
+const LEVEL_BADGE: Record<string, string> = {
+  P0: "badge-err",
+  P1: "badge-warn",
+  P2: "badge-info",
+};
+
+function TopActionCard({
+  selection,
+  onOpen,
+}: {
+  selection: TopIssueSelection;
+  onOpen: () => void;
+}) {
+  const t = useTranslations("dashboard.audit");
+  const ta = useTranslations("dashboard.actions");
+  const locale = useLocale() as "en" | "zh";
+  const { rule, priority, tieCount, totalFailing } = selection;
+
+  const whatLine =
+    (rule.sampleMessage ? textOf(rule.sampleMessage, locale) : "") ||
+    textOf(rule.description, locale);
+
+  return (
+    <section
+      className="rounded-xl border border-line bg-card p-4 sm:p-5"
+      aria-label={t("doFirstTitle")}
+      data-testid="audit-top-action"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="badge-err">{t("doFirstTitle")}</span>
+        <span className={LEVEL_BADGE[priority.level] ?? "badge-info"}>{priority.level}</span>
+        <span className="font-mono text-[0.6875rem] text-ink-40">
+          {t("doFirstSub", { n: totalFailing })}
+        </span>
+      </div>
+
+      {/* WHAT：具体发现了什么（规则名 + 本次爬取的真实发现） */}
+      <div className="mt-2 font-display text-base font-semibold text-ink">
+        {textOf(rule.name, locale)}
+      </div>
+      {whatLine && (
+        <p className="mt-1 font-sans text-sm leading-relaxed text-ink-60">{whatLine}</p>
+      )}
+
+      {/* WHY：可解释的优先级理由（与 Action Center 同一套词表，来自真实检测数据） */}
+      <div className="mt-3 font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+        {t("whyNowTitle")}
+      </div>
+      <ul className="mt-1 list-disc pl-4">
+        {priority.reasons.map((r, i) => (
+          <li key={`${r.code}-${i}`} className="font-sans text-xs text-ink-60">
+            {r.value !== undefined
+              ? ta(`reason.${r.code}` as "reason.effort_low", { value: r.value })
+              : ta(`reason.${r.code}` as "reason.effort_low")}
+          </li>
+        ))}
+      </ul>
+      {/* 数据不足以唯一区分时如实说明（不冒充精确答案） */}
+      {tieCount > 1 && (
+        <p className="mt-1.5 font-sans text-xs text-ink-40">{t("tieHint", { n: tieCount })}</p>
+      )}
+
+      {/* EVIDENCE：本次爬取的真实证据（数量/范围/位置），缺失侧如实显示 — */}
+      <div className="mt-3 font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+        {t("evidenceTitle")}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-ink-60">
+        <span>
+          {fmtNum(rule.findings)} {t("findingsTitle")}
+        </span>
+        <span>·</span>
+        <span>
+          {fmtNum(rule.affectedPages)} {t("affectedPagesLabel")} ({Math.round(rule.affectedRatio * 100)}%)
+        </span>
+        {rule.scoreImpact > 0 ? (
+          <>
+            <span>·</span>
+            <span className="text-neg">
+              -{rule.scoreImpact.toFixed(1)} {t("pointsUnit")}
+            </span>
+          </>
+        ) : null}
+        {rule.pattern === "site-wide" ? <span className="badge-warn">{t("patternSiteWide")}</span> : null}
+        {rule.pattern === "repeated" ? <span className="badge-info">{t("patternRepeated")}</span> : null}
+        {rule.sampleUrl ? (
+          <>
+            <span>·</span>
+            <a
+              href={rule.sampleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate text-brand hover:underline"
+            >
+              {rule.sampleUrl.replace(/^https?:\/\//, "")}
+            </a>
+          </>
+        ) : null}
+      </div>
+
+      {/* ACTION + VERIFY：现在能做什么，以及修完后 SeeO 如何用再审计验证 */}
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <button onClick={onOpen} className="btn-primary px-3 py-1.5 text-xs">
+          {t("topActionOpenCta")} →
+        </button>
+        <p className="min-w-0 font-sans text-xs text-ink-40 sm:max-w-[60%] sm:text-right">
+          {t("verifyBodyTop")}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 // ===== Issue Detail =====
+
+/** 行动结构编号标题：①发现 ②为什么 ③如何修复 ④如何验证 */
+function StepTitle({ n, label }: { n: number; label: string }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-ink font-mono text-[0.6875rem] font-semibold text-white">
+        {n}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
+}
 
 function IssueDetail({
   snapshot,
   rule,
+  domain,
   isNew,
   onBack,
   onOpenPages,
 }: {
   snapshot: DashboardSnapshot;
   rule: RuleSnapshot;
+  domain?: string;
   isNew: boolean;
   onBack: () => void;
   onOpenPages: () => void;
 }) {
   const t = useTranslations("dashboard.audit");
+  const ta = useTranslations("dashboard.actions");
   const locale = useLocale() as "en" | "zh";
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
 
+  // ---- 处理状态：检测结果 ≠ 处理状态；标记修复 ≠ 已验证解决 ----
+  const [resolution, setResolution] = useState<IssueResolution | null>(null);
+  const [resBusy, setResBusy] = useState(false);
+  const [resError, setResError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 无域名（如未传入 domain）时保持初始 null —— 不在 effect 体内同步 setState
+    if (!domain) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/audit/issues/status?domain=${encodeURIComponent(domain)}`, { cache: "no-store" });
+        const json = await res.json();
+        if (cancelled || !res.ok) return;
+        const rows = Array.isArray(json?.data?.resolutions) ? json.data.resolutions : [];
+        const found = rows.find((r: { rule_id?: string }) => r.rule_id === rule.ruleId) ?? null;
+        setResolution(found as IssueResolution | null);
+      } catch {
+        // 状态读取失败不阻塞审计报告展示
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [domain, rule.ruleId]);
+
+  async function setResolutionStatus(to: IssueResolution["status"]) {
+    if (!domain) return;
+    setResBusy(true);
+    setResError(null);
+    try {
+      const res = await fetch("/api/audit/issues/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain, rule_id: rule.ruleId, status: to }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setResError(typeof json?.error === "string" ? json.error : ta("act.saveFailed"));
+        return;
+      }
+      setResolution((prev) => ({
+        rule_id: rule.ruleId,
+        status: to,
+        verified_at: prev?.verified_at ?? null,
+        verified_audit_id: prev?.verified_audit_id ?? null,
+        verify_status: prev?.verify_status ?? null,
+        verify_detail: prev?.verify_detail ?? null,
+      }));
+    } catch {
+      setResError(ta("act.saveFailed"));
+    } finally {
+      setResBusy(false);
+    }
+  }
+
   const affected = useMemo(() => snapshot.findings.filter((f) => f.ruleId === rule.ruleId), [snapshot, rule]);
   const priority = priorityOf(rule);
+  // WHY：与「先做这一件事」/ Action Center 同一份优先级算法的可解释理由（不新造第二套）
+  const whyNow = useMemo(
+    () =>
+      explainTechnicalPriority({
+        severity: rule.severity,
+        affectedRatio: rule.affectedRatio,
+        scoreImpact: rule.scoreImpact,
+        pattern: rule.pattern,
+        pageLevel: rule.pageLevel,
+      }).priority,
+    [rule]
+  );
 
   // Pattern：由后端多信号判定（site-wide / repeated / null=scattered）
   const isSiteWide = rule.pattern === "site-wide";
@@ -380,6 +682,9 @@ function IssueDetail({
     : isRepeated
       ? t("patternRepeatedHint", { n: rule.findings })
       : t("patternScatteredHint");
+
+  // 规则级修复指导：仅对有把握的规则提供分步步骤；无指导时回退规则建议并如实说明
+  const guidance = useMemo(() => getFixGuidance(rule.ruleId), [rule.ruleId]);
 
   // URL → 页面快照（Affected URLs 展示 status/type/depth/response）
   const pageByUrl = useMemo(() => {
@@ -443,12 +748,106 @@ function IssueDetail({
         </div>
       </SectionCard>
 
-      {/* Why / What / How */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <SectionCard title={t("whyMatters")} subtitle={t("whyMattersSub")}>
-          <p className="font-sans text-sm leading-relaxed text-ink-60">{textOf(rule.description, locale)}</p>
+      {/* 处理状态（检测结果 ≠ 处理状态；verified_resolved 只能由再审计产出） */}
+      {domain && (
+        <SectionCard
+          title={ta("title")}
+          subtitle={ta(`status.${resolution?.status ?? "open"}_hint` as "status.open_hint")}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={
+                resolution?.status === "verified_resolved"
+                  ? "badge-pos"
+                  : resolution?.status === "fixed_claimed"
+                    ? "badge-info"
+                    : resolution?.status === "in_progress"
+                      ? "badge-info"
+                      : resolution?.status === "dismissed"
+                        ? "badge-info"
+                        : "badge-warn"
+              }
+            >
+              {ta(`status.${resolution?.status ?? "open"}` as "status.open")}
+            </span>
+            {resolution?.verify_status === "pass" && resolution.verified_audit_id !== null && (
+              <span className="badge-pos">{ta("verification.pass", { auditId: resolution.verified_audit_id })}</span>
+            )}
+            {resolution?.verify_status === "fail" && resolution.verified_audit_id !== null && (() => {
+              const v = parseVerifyDetail(resolution);
+              return (
+                <span className="badge-err">{ta("verification.fail", { auditId: resolution.verified_audit_id, findings: v?.findings ?? 0, pages: v?.pages ?? 0 })}</span>
+              );
+            })()}
+            {resolution?.verify_status === "inconclusive" && resolution.verified_audit_id !== null && (
+              <span className="badge-info">{ta("verification.inconclusive", { auditId: resolution.verified_audit_id })}</span>
+            )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              disabled={resBusy || (resolution?.status ?? "open") === "in_progress"}
+              onClick={() => void setResolutionStatus("in_progress")}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {ta("act.markInProgress")}
+            </button>
+            <button
+              disabled={resBusy || (resolution?.status ?? "open") === "fixed_claimed"}
+              onClick={() => void setResolutionStatus("fixed_claimed")}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {ta("act.markFixed")}
+            </button>
+            <button
+              disabled={resBusy || (resolution?.status ?? "open") === "dismissed"}
+              onClick={() => void setResolutionStatus("dismissed")}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {ta("act.dismiss")}
+            </button>
+            {(resolution?.status ?? "open") !== "open" && (
+              <button
+                disabled={resBusy}
+                onClick={() => void setResolutionStatus("open")}
+                className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+              >
+                {ta("act.reopen")}
+              </button>
+            )}
+          </div>
+
+          {(resolution?.status === "fixed_claimed" || !resolution) && (
+            <p className="mt-2 font-sans text-xs text-ink-40">{ta("verification.pending")}</p>
+          )}
+          <div className="mt-2">
+            <Link href="/app/actions" className="font-mono text-xs text-brand hover:underline">
+              {ta("panel.cta")} →
+            </Link>
+          </div>
+          {resError && <p className="mt-2 font-sans text-xs text-neg">{resError}</p>}
         </SectionCard>
-        <SectionCard title={t("whatFound")} subtitle={t("whatFoundSub")}>
+      )}
+
+      {/* WHY（优先级理由）：来自本次真实检测数据（范围/分数影响/修复杠杆），不含虚构流量损失 */}
+      <SectionCard title={t("whyNowTitle")} subtitle={t("whyNowSub")}>
+        <ul className="list-disc pl-4">
+          {whyNow.reasons.map((r, i) => (
+            <li key={`${r.code}-${i}`} className="font-sans text-sm text-ink-60">
+              {r.value !== undefined
+                ? ta(`reason.${r.code}` as "reason.effort_low", { value: r.value })
+                : ta(`reason.${r.code}` as "reason.effort_low")}
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+
+      {/* 行动结构 ①发现 ②为什么 ③如何修复 ④如何验证：新手按序执行 */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <SectionCard
+          title={<StepTitle n={1} label={t("whatFound")} />}
+          subtitle={t("whatFoundSub")}
+        >
           <p className="font-sans text-sm leading-relaxed text-ink-60">
             {affected.length > 0 ? textOf(affected[0].message, locale) : "—"}
           </p>
@@ -461,11 +860,131 @@ function IssueDetail({
               ))}
             </div>
           ) : null}
+          {rule.sampleUrl ? (
+            <a
+              href={rule.sampleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block truncate font-mono text-xs text-brand hover:underline"
+            >
+              {rule.sampleUrl.replace(/^https?:\/\//, "")}
+            </a>
+          ) : null}
         </SectionCard>
-        <SectionCard title={t("howToFix")} subtitle={t("howToFixSub")}>
-          <p className="font-sans text-sm leading-relaxed text-ink-60">{textOf(rule.recommendation, locale)}</p>
+        <SectionCard
+          title={<StepTitle n={2} label={t("whyMatters")} />}
+          subtitle={t("whyMattersSub")}
+        >
+          <p className="font-sans text-sm leading-relaxed text-ink-60">{textOf(rule.description, locale)}</p>
+          {/* 影响范围：多少页 / 全站还是特定页，来自真实检测数据 */}
+          <p className="mt-3 font-sans text-sm leading-relaxed text-ink-60">
+            {t("affectedScopeLine", {
+              pages: fmtNum(rule.affectedPages),
+              percent: Math.round(rule.affectedRatio * 100),
+              scope: rule.pageLevel === "site" ? t("levelSite") : t("levelPage"),
+            })}
+          </p>
         </SectionCard>
       </div>
+
+      {/* ③ 如何修复：规则建议（唯一来源）+ 规则级分步指导（有把握才给）+ 诚实边界 */}
+      <SectionCard
+        title={<StepTitle n={3} label={t("howToFix")} />}
+        subtitle={t("howToFixSub")}
+      >
+        <p className="font-sans text-sm font-medium leading-relaxed text-ink">
+          {textOf(rule.recommendation, locale)}
+        </p>
+
+        {guidance ? (
+          <>
+            <div className="mt-4">
+              <div className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+                {t("howFixWhere")}
+              </div>
+              <p className="mt-1 font-sans text-sm leading-relaxed text-ink-60">
+                {textOf(guidance.where, locale)}
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <div className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+                {t("howFixSteps")}
+              </div>
+              <ol className="mt-2 space-y-3">
+                {guidance.steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-ink font-mono text-[0.6875rem] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-sans text-sm font-medium text-ink">
+                        {textOf(step.title, locale)}
+                      </div>
+                      <div className="mt-0.5 font-sans text-sm leading-relaxed text-ink-60">
+                        {textOf(step.detail, locale)}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="mt-4">
+              <div className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+                {t("howFixCheckAfter")}
+              </div>
+              <p className="mt-1 flex items-start gap-2 font-sans text-sm leading-relaxed text-ink-60">
+                <span aria-hidden className="mt-0.5 text-pos">✓</span>
+                {textOf(guidance.checkAfter, locale)}
+              </p>
+            </div>
+
+            {guidance.notKnown ? (
+              <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/30 px-3 py-2">
+                <div className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+                  {t("howFixNotKnown")}
+                </div>
+                <p className="mt-1 font-sans text-sm leading-relaxed text-ink-40">
+                  {textOf(guidance.notKnown, locale)}
+                </p>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="mt-3 font-sans text-sm leading-relaxed text-ink-40">
+            {t("howFixGeneric")}
+          </p>
+        )}
+      </SectionCard>
+
+      {/* ④ 如何验证：现有再审计机制的真实语义；有规则级说明时追加（SeeO 检查什么、依据什么判定） */}
+      <SectionCard
+        title={<StepTitle n={4} label={t("verifyTitle")} />}
+        subtitle={t("verifySub")}
+      >
+        <p className="font-sans text-sm leading-relaxed text-ink-60">{t("verifyBody")}</p>
+        {guidance ? (
+          <p className="mt-2 flex items-start gap-2 font-sans text-sm leading-relaxed text-ink-60">
+            <span aria-hidden className="mt-0.5 text-brand">◉</span>
+            <span>
+              <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-wide text-ink-40">
+                {t("howFixVerifyNote")}：
+              </span>
+              {textOf(guidance.verifyNote, locale)}
+            </span>
+          </p>
+        ) : null}
+        {resolution?.verify_status === "pass" && (
+          <p className="mt-2 font-sans text-xs text-pos">{t("verifyStatePass")}</p>
+        )}
+        {resolution?.verify_status === "fail" && (
+          <p className="mt-2 font-sans text-xs text-neg">{t("verifyStateFail")}</p>
+        )}
+        {resolution?.verify_status === "inconclusive" && (
+          <p className="mt-2 font-sans text-xs text-ink-60">{t("verifyStateInconclusive")}</p>
+        )}
+      </SectionCard>
 
       {/* Affected URLs */}
       <SectionCard

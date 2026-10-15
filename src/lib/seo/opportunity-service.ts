@@ -24,6 +24,9 @@ import { getRankWindow, type RankWindowRow } from "@/lib/db/rankings";
 import { getProjectById } from "@/lib/db";
 import { getLatestAudit, getAuditIssues } from "@/lib/db/audits";
 import { listAiSearchRuns } from "@/lib/db/ai-search";
+import { listContentChecks } from "@/lib/db/content";
+import { pickText } from "./audit-checks";
+import type { DashboardSnapshot } from "./audit-dashboard";
 import { searchRank } from "./serp-service";
 import { searchAnalytics } from "./gsc-service";
 import type { PlanTier } from "@/lib/auth";
@@ -39,6 +42,13 @@ interface KeywordSignal {
   previousRank: number | null;
   currentUrl: string | null;
   previousUrl: string | null;
+  /** 窗口内出现过的最好名次（null/undefined = 窗口内从未进入前 100） */
+  bestRankInWindow?: number | null;
+  /** 窗口内最后一次真正进榜的日期 */
+  lastRankedDate?: string | null;
+  /** 窗口内总观测行数 / 其中有名次的行数（用于识别稀疏数据） */
+  windowRows?: number;
+  rankedRows?: number;
 }
 
 /** rank_history 窗口 → 每个关键词的 current/previous 快照（一次查询，避免 N+1） */
@@ -52,17 +62,25 @@ export async function collectRankSignals(userId: string, domain: string, days = 
   }
   const signals: KeywordSignal[] = [];
   for (const rows of byKeyword.values()) {
-    const current = rows[rows.length - 1];
-    const previous = rows.length > 1 ? rows[rows.length - 2] : null;
+    const latest = rows[rows.length - 1];
+    // 稀疏数据处理（真实数据里 position 常为 null = 未进前 100）：
+    // "上一次排名"取最近一次**真正有名次**的较早观测，而不是机械地取上一行。
+    const earlierRanked = rows.slice(0, -1).filter((r) => r.position !== null);
+    const prevRanked = earlierRanked.length > 0 ? earlierRanked[earlierRanked.length - 1] : null;
+    const ranked = rows.filter((r) => r.position !== null);
     signals.push({
-      keywordId: current.keyword_id,
-      keyword: current.keyword,
-      location: current.location,
-      device: current.device,
-      currentRank: current.position,
-      previousRank: previous?.position ?? null,
-      currentUrl: current.url,
-      previousUrl: previous?.url ?? null,
+      keywordId: latest.keyword_id,
+      keyword: latest.keyword,
+      location: latest.location,
+      device: latest.device,
+      currentRank: latest.position,
+      previousRank: prevRanked?.position ?? null,
+      currentUrl: latest.url,
+      previousUrl: prevRanked?.url ?? null,
+      bestRankInWindow: ranked.length > 0 ? Math.min(...ranked.map((r) => r.position as number)) : null,
+      lastRankedDate: ranked.length > 0 ? String(ranked[ranked.length - 1].date) : null,
+      windowRows: rows.length,
+      rankedRows: ranked.length,
     });
   }
   return signals;
@@ -125,10 +143,37 @@ export interface OpportunityCandidate {
   evidence: OpportunityEvidence[];
   signals: Record<string, unknown>;
   recommendation: string;
+  /** 双语推荐语（UI 按 locale 渲染，避免英文界面出现中文推荐） */
+  recommendationI18n?: { en: string; zh: string };
 }
 
 function evidence(source: string, ref: string, summary: string): OpportunityEvidence {
   return { source, ref, summary, capturedAt: new Date().toISOString() };
+}
+
+/**
+ * 解析数据库时间戳。兼容以下真实数据形态：
+ *   - ISO：`2026-10-14T06:15:53Z` / `2026-10-14T06:15:53+08:00`
+ *   - SQLite `datetime('now')`：`2026-10-14 06:15:53`（UTC，无时区标记；手工拼 "Z" 是非 ISO
+ *     输入，严格解析器下为 NaN → 曾导致"时效"判断静默失效）
+ *   - 带毫秒：`2026-10-14 06:15:53.123`
+ *   - date-only：`2026-10-14`（rank_history.date 等日期字段，按 UTC 零点）
+ * @returns 毫秒时间戳；无法解析时返回 null（调用方必须按"未知"处理，不得当作新鲜）
+ */
+export function parseDbTimestamp(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  const m = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/.exec(s);
+  const iso = m ? `${m[1]}T${m[2] ?? "00:00:00"}${m[3] ?? ""}${m[4] ?? "Z"}` : s;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** 距今天数（null = 无法解析，调用方按"未知"处理） */
+export function ageInDays(raw: string | null | undefined): number | null {
+  const t = parseDbTimestamp(raw);
+  if (t === null) return null;
+  return Math.max(0, Math.round((Date.now() - t) / 86_400_000));
 }
 
 // ---------- 规则评估（输入为已收集信号，纯函数、可测试） ----------
@@ -163,12 +208,26 @@ export function evaluateRankImprovement(
       rankingUrl: signal.currentUrl,
     },
     recommendation: `改进「${signal.keyword}」的现有页面内容与内链，向 Top5 逼近（当前 #${signal.currentRank}，竞品 #${bestCompetitor.competitorRank}）`,
+    recommendationI18n: {
+      en: `Improve the existing page's content and internal links for "${signal.keyword}" to close in on the Top 5 (now #${signal.currentRank}, competitor #${bestCompetitor.competitorRank})`,
+      zh: `改进「${signal.keyword}」的现有页面内容与内链，向 Top5 逼近（当前 #${signal.currentRank}，竞品 #${bestCompetitor.competitorRank}）`,
+    },
   };
 }
 
-/** Lost Ranking Recovery：上次有排名、本次无（跌出前 100） */
+/**
+ * Lost Ranking Recovery：曾进入排名、现在未进入。
+ * 两种证据形态：
+ *   1) 相邻两行：上次有排名、本次无
+ *   2) **窗口内曾进榜但最近未进**（真实稀疏数据的常见形态；只看相邻两行会漏掉）
+ */
 export function evaluateLostRecovery(signal: KeywordSignal): OpportunityCandidate | null {
-  if (signal.currentRank !== null || signal.previousRank === null) return null;
+  if (signal.currentRank !== null) return null;
+  const bestInWindow = signal.bestRankInWindow ?? null;
+  const adjacentLost = signal.previousRank !== null;
+  const windowLost = bestInWindow !== null;
+  if (!adjacentLost && !windowLost) return null;
+  const wasRank = signal.previousRank ?? bestInWindow!;
   return {
     type: "lost_recovery",
     targetType: "keyword",
@@ -177,11 +236,31 @@ export function evaluateLostRecovery(signal: KeywordSignal): OpportunityCandidat
     impact: "high",
     confidence: "high",
     evidence: [
-      evidence("rank_history", `keyword:${signal.keywordId}`, `${signal.keyword} 从 #${signal.previousRank} 跌出前 100`),
-      ...(signal.previousUrl ? [evidence("rank_history", `keyword:${signal.keywordId}:url`, `上次排名 URL：${signal.previousUrl}`)] : []),
+      evidence(
+        "rank_history",
+        `keyword:${signal.keywordId}`,
+        adjacentLost
+          ? `${signal.keyword} 从 #${wasRank} 跌出前 100`
+          : `${signal.keyword} 在窗口内曾达 #${signal.bestRankInWindow}（最近进榜 ${signal.lastRankedDate ?? "未知"}），当前已不在前 100`
+      ),
+      ...(adjacentLost && signal.previousUrl
+        ? [evidence("rank_history", `keyword:${signal.keywordId}:url`, `上次排名 URL：${signal.previousUrl}`)]
+        : []),
     ],
-    signals: { previousRank: signal.previousRank, previousUrl: signal.previousUrl, currentUrl: signal.currentUrl },
+    signals: {
+      previousRank: signal.previousRank,
+      bestRankInWindow: signal.bestRankInWindow,
+      lastRankedDate: signal.lastRankedDate,
+      previousUrl: signal.previousUrl,
+      currentUrl: signal.currentUrl,
+      windowRows: signal.windowRows,
+      rankedRows: signal.rankedRows,
+    },
     recommendation: `恢复「${signal.keyword}」排名：先确认页面仍可访问/未被 noindex，再对照 SERP 现状评估内容差距`,
+    recommendationI18n: {
+      en: `Recover rankings for "${signal.keyword}": first verify the page is still reachable and not noindexed, then assess the content gap against the current SERP`,
+      zh: `恢复「${signal.keyword}」排名：先确认页面仍可访问/未被 noindex，再对照 SERP 现状评估内容差距`,
+    },
   };
 }
 
@@ -205,6 +284,10 @@ export function evaluateContentRefresh(signal: KeywordSignal): OpportunityCandid
     ],
     signals: { previousRank: signal.previousRank, currentRank: signal.currentRank, decline, rankingUrl: signal.currentUrl },
     recommendation: `刷新 ${signal.currentUrl}：对照当前 SERP 前列结果补齐内容差距（排名 ${decline} 位下滑而 URL 未变）`,
+    recommendationI18n: {
+      en: `Refresh ${signal.currentUrl}: close the content gap against the current top SERP results (rank dropped ${decline} places while the URL stayed the same)`,
+      zh: `刷新 ${signal.currentUrl}：对照当前 SERP 前列结果补齐内容差距（排名 ${decline} 位下滑而 URL 未变）`,
+    },
   };
 }
 
@@ -228,6 +311,10 @@ export function evaluateCompetitorGap(signal: KeywordSignal, competitors: Compet
     ],
     signals: { competitorDomain: bestCompetitor.competitorDomain, competitorRank: bestCompetitor.competitorRank },
     recommendation: `创建/扩展「${signal.keyword}」内容：竞品 ${bestCompetitor.competitorDomain} 已凭该词进入 Top${bestCompetitor.competitorRank}`,
+    recommendationI18n: {
+      en: `Create or expand content for "${signal.keyword}": competitor ${bestCompetitor.competitorDomain} already ranks Top${bestCompetitor.competitorRank} for it`,
+      zh: `创建/扩展「${signal.keyword}」内容：竞品 ${bestCompetitor.competitorDomain} 已凭该词进入 Top${bestCompetitor.competitorRank}`,
+    },
   };
 }
 
@@ -261,6 +348,10 @@ export function evaluateCtrOpportunity(row: GscQueryRow): OpportunityCandidate |
     ],
     signals: { impressions: row.impressions, position: row.position, ctr: row.ctr, expectedBaselineCtr: baseline },
     recommendation: `优化「${query}」的 title/meta：曝光充足、位置尚可但 CTR 显著低于同位置基线`,
+    recommendationI18n: {
+      en: `Improve the title/meta for "${query}": impressions are healthy and the position is decent, but CTR is well below the same-position baseline`,
+      zh: `优化「${query}」的 title/meta：曝光充足、位置尚可但 CTR 显著低于同位置基线`,
+    },
   };
 }
 
@@ -285,6 +376,10 @@ export function evaluateAiVisibilityGap(run: AiRunSummary | null): OpportunityCa
       evidence: [evidence("ai_search_runs", "latest_brand_lookup", "最近一次 AI Search 扫描 mentions 为 0（ChatGPT/Google AI Overview 均未提及）")],
       signals: { mentionsTotal: 0 },
       recommendation: "提升 AI 引用覆盖：产出可被 AI 引用的权威内容（对比/数据/定义型页面），并在高需求词上建立 Google 侧排名（AI Overview 引用与 SERP 强相关）",
+      recommendationI18n: {
+        en: "Increase AI citation coverage: publish authoritative, citable content (comparison / data / definition pages) and build Google-side rankings for high-demand terms (AI Overview citations correlate strongly with SERP rankings)",
+        zh: "提升 AI 引用覆盖：产出可被 AI 引用的权威内容（对比/数据/定义型页面），并在高需求词上建立 Google 侧排名（AI Overview 引用与 SERP 强相关）",
+      },
     };
   }
   if (run.aiShareOfVoice) {
@@ -305,19 +400,118 @@ export function evaluateAiVisibilityGap(run: AiRunSummary | null): OpportunityCa
         ],
         signals: { targetMentions: target.mentions, competitorLabel: best.label, competitorMentions: best.mentions },
         recommendation: `缩小 AI 提及差距：${best.label} 的提及量约为我方 ${(best.mentions ?? 0) / Math.max(1, target.mentions ?? 1)} 倍，优先补充被高频引用的内容形态`,
+        recommendationI18n: {
+          en: `Close the AI mention gap: ${best.label} is mentioned roughly ${((best.mentions ?? 0) / Math.max(1, target.mentions ?? 1)).toFixed(1)}× more often than you — prioritise the content formats that get cited most`,
+          zh: `缩小 AI 提及差距：${best.label} 的提及量约为我方 ${(best.mentions ?? 0) / Math.max(1, target.mentions ?? 1)} 倍，优先补充被高频引用的内容形态`,
+        },
       };
     }
   }
   return null;
 }
 
-// ---------- Technical（audit_issues 真实数据） ----------
+// ---------- Technical（审计快照的真实检测结果） ----------
 
-const MAX_TECHNICAL_OPPORTUNITIES = 5;
+const MAX_TECHNICAL_OPPORTUNITIES = 10;
+/** 审计结果超过该天数视为"可能已过期"，用于证据时效标注（不隐藏，只降级提示） */
+const AUDIT_STALE_DAYS = 30;
 
+/** 技术风险的确定性优先级：严重度 + 受影响页面占比 + 问题模式（模板级=一次修复覆盖多页） */
+export function technicalRiskLevel(rule: {
+  severity: string;
+  affectedRatio: number;
+  pattern: string | null;
+}): { priority: "P0" | "P1" | "P2"; impact: "high" | "medium" | "low"; score: number } {
+  let score = rule.severity === "error" ? 3 : rule.severity === "warning" ? 2 : 1;
+  if (rule.affectedRatio >= 0.5) score += 2;
+  else if (rule.affectedRatio >= 0.2) score += 1;
+  if (rule.pattern === "site-wide") score += 2;
+  else if (rule.pattern === "repeated") score += 1;
+  return {
+    priority: score >= 6 ? "P0" : score >= 4 ? "P1" : "P2",
+    impact: rule.affectedRatio >= 0.5 ? "high" : rule.affectedRatio >= 0.2 ? "medium" : "low",
+    score,
+  };
+}
+
+/**
+ * 技术机会：**规则级**（而非按 URL 聚合），直接来自最近一次已完成审计的快照。
+ * 这样每条机会都能回答"哪个规则、影响多少页、证据在哪、为什么这个优先级"。
+ * 旧引擎审计（无 dashboard_json）退回 audit_issues 的 error 级聚合，保持可用。
+ */
 export async function collectTechnicalCandidates(userId: string, domain: string): Promise<OpportunityCandidate[]> {
   const audit = await getLatestAudit(userId, domain);
   if (!audit) return []; // 无审计数据 → DATA GAP（不伪造）
+
+  const auditedAt = audit.finished_at ?? audit.started_at;
+  const ageDays = ageInDays(auditedAt);
+  const stale = ageDays !== null && ageDays > AUDIT_STALE_DAYS;
+
+  // ---- 偏好路径：V2 快照（规则级，含 severity / affectedPages / pattern / 双语修复建议）----
+  if (audit.dashboard_json) {
+    let snapshot: DashboardSnapshot | null = null;
+    try {
+      snapshot = JSON.parse(audit.dashboard_json) as DashboardSnapshot;
+    } catch {
+      snapshot = null;
+    }
+    if (snapshot) {
+      const counts = new Map<string, number>();
+      for (const f of snapshot.findings) counts.set(f.ruleId, (counts.get(f.ruleId) ?? 0) + 1);
+      return snapshot.rules
+        .filter((rule) => rule.status === "fail")
+        .map((rule) => {
+          const { priority, impact } = technicalRiskLevel(rule);
+          const findings = counts.get(rule.ruleId) ?? rule.findings;
+          const sampleMessage = rule.sampleMessage ? pickText(rule.sampleMessage, "en") : "";
+          const target = rule.sampleUrl ?? domain;
+          const ev: OpportunityEvidence[] = [
+            evidence(
+              "audit",
+              `audit:${audit.id}:${rule.ruleId}`,
+              `${findings} finding(s) across ${rule.affectedPages} page(s) · severity=${rule.severity} · pattern=${rule.pattern ?? "scattered"}${stale ? ` · audited ${ageDays} days ago` : ""}`
+            ),
+          ];
+          if (rule.sampleUrl && sampleMessage) {
+            ev.push(evidence("audit_issues", rule.sampleUrl, sampleMessage));
+          }
+          const recI18n = {
+            en: pickText(rule.recommendation, "en"),
+            zh: pickText(rule.recommendation, "zh"),
+          };
+          return {
+            type: "technical" as const,
+            targetType: "url" as const,
+            targetValue: target,
+            priority,
+            impact,
+            confidence: "high" as const, // 自研爬虫直接观测
+            evidence: ev,
+            signals: {
+              auditId: audit.id,
+              ruleId: rule.ruleId,
+              severity: rule.severity,
+              findings,
+              affectedPages: rule.affectedPages,
+              affectedRatio: rule.affectedRatio,
+              pattern: rule.pattern,
+              auditedAt,
+              ageDays,
+              stale,
+            },
+            recommendation: recI18n.zh,
+            recommendationI18n: recI18n,
+          };
+        })
+        .sort((a, b) => {
+          const order = { P0: 0, P1: 1, P2: 2 } as const;
+          return order[a.priority] - order[b.priority];
+        })
+        .slice(0, MAX_TECHNICAL_OPPORTUNITIES);
+    }
+  }
+
+  // ---- 兼容路径：旧引擎审计只有 audit_issues（按 URL 聚合 error 级）----
   const issues = await getAuditIssues(userId, audit.id);
   const errors = issues.filter((issue) => issue.severity === "error");
   const byUrl = new Map<string, number>();
@@ -333,14 +527,83 @@ export async function collectTechnicalCandidates(userId: string, domain: string)
       targetType: "url",
       targetValue: url,
       priority: "P1" as const,
-      impact: "high",
-      confidence: "high",
+      impact: "high" as const,
+      confidence: "high" as const,
       evidence: [
-        evidence("audit_issues", `audit:${audit.id}:${url}`, `该页面存在 ${count} 个 error 级审计问题（audit #${audit.id}）`),
+        evidence("audit_issues", `audit:${audit.id}:${url}`, `${count} error-level issue(s) on this page (audit #${audit.id})`),
       ],
-      signals: { auditId: audit.id, errorCount: count },
-      recommendation: `修复 ${url} 上的 ${count} 个 error 级技术问题（详见 SeeO 审计报告 #${audit.id}）`,
+      signals: { auditId: audit.id, errorCount: count, auditedAt, ageDays, stale, legacyEngine: true },
+      recommendation: `Fix ${count} error-level issue(s) on ${url} (see audit #${audit.id})`,
+      recommendationI18n: {
+        en: `Fix ${count} error-level issue(s) on ${url} (see audit #${audit.id})`,
+        zh: `修复 ${url} 上的 ${count} 个 error 级技术问题（详见审计报告 #${audit.id}）`,
+      },
     }));
+}
+
+// ---------- Content（content_checks 的真实检查结果） ----------
+
+const CONTENT_MAX_OPPORTUNITIES = 5;
+const CONTENT_LOW_SCORE = 70;
+/** 内容检查结果的时效窗口：超过则该结果不作为机会依据（避免用过时结果建议改动） */
+const CONTENT_FRESH_DAYS = 30;
+
+/** 内容检查得分 → 机会（纯函数，便于验证边界） */
+export function evaluateContentCheck(row: {
+  url: string;
+  keyword: string;
+  score: number;
+  createdAt: string;
+}): OpportunityCandidate | null {
+  if (!row.url || row.score >= CONTENT_LOW_SCORE) return null;
+  const ageDays = ageInDays(row.createdAt);
+  if (ageDays === null) return null; // 时间不可解析 → 不作为机会依据
+  if (ageDays > CONTENT_FRESH_DAYS) return null; // 过期结果不作为机会依据
+  const gap = CONTENT_LOW_SCORE - row.score;
+  const { priority, impact } = {
+    priority: gap >= 30 ? ("P0" as const) : gap >= 15 ? ("P1" as const) : ("P2" as const),
+    impact: gap >= 30 ? ("high" as const) : gap >= 15 ? ("medium" as const) : ("low" as const),
+  };
+  return {
+    type: "content_refresh",
+    targetType: "url",
+    targetValue: row.url,
+    priority,
+    impact,
+    confidence: "high", // 页面实测（词频/字数/结构）直接证据
+    evidence: [
+      evidence("content_checks", row.url, `Content score ${row.score}/100 for "${row.keyword}" (${ageDays} days ago)`),
+    ],
+    signals: {
+      contentScore: row.score,
+      keyword: row.keyword,
+      ageDays,
+      threshold: CONTENT_LOW_SCORE,
+      source: "content_checks",
+    },
+    recommendation: `改进 ${row.url} 的内容以匹配「${row.keyword}」（当前内容得分 ${row.score}/100）`,
+    recommendationI18n: {
+      en: `Improve the content of ${row.url} so it matches "${row.keyword}" (current content score ${row.score}/100)`,
+      zh: `改进 ${row.url} 的内容以匹配「${row.keyword}」（当前内容得分 ${row.score}/100）`,
+    },
+  };
+}
+
+/** 内容机会：只消费**最新且未过时**的内容检查记录，最多 5 条 */
+export async function collectContentCandidates(userId: string): Promise<OpportunityCandidate[]> {
+  const rows = await listContentChecks(userId, 20).catch(() => []);
+  const out: OpportunityCandidate[] = [];
+  for (const row of rows) {
+    const candidate = evaluateContentCheck({
+      url: row.url,
+      keyword: row.keyword,
+      score: row.score,
+      createdAt: row.created_at,
+    });
+    if (candidate) out.push(candidate);
+    if (out.length >= CONTENT_MAX_OPPORTUNITIES) break;
+  }
+  return out;
 }
 
 // ---------- Action Planner（确定性模板；executionMode 诚实为 manual） ----------
@@ -423,7 +686,16 @@ export interface OpportunityScanResult {
   refreshed: number;
   suppressed: number;
   dataGaps: string[];
+  /** 每个数据源的实际覆盖情况（行数 + 是否可用），用于解释"这个类别为什么没有机会" */
+  sourceCoverage: OpportunitySourceCoverage[];
   candidates: Array<{ type: OpportunityType; target: string; priority: "P0" | "P1" | "P2"; isNew: boolean }>;
+}
+
+export interface OpportunitySourceCoverage {
+  source: "audit" | "content_checks" | "rank_history" | "competitor_ranks" | "gsc" | "ai_search";
+  rows: number;
+  available: boolean;
+  note: string;
 }
 
 const MAX_OPPORTUNITIES_PER_SCAN = 20;
@@ -439,12 +711,29 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
 
   // 1. Rank 侧信号（DB-only）
   const rankSignals = await collectRankSignals(userId, domain, 30);
-  const candidateKeywords = rankSignals.filter((signal) => signal.currentRank !== null || signal.previousRank !== null);
+  // 参与评估的关键词：当前有排名 / 上次有排名 / **窗口内曾进榜**（真实稀疏数据也能纳入）
+  const candidateKeywords = rankSignals.filter(
+    (signal) =>
+      signal.currentRank !== null ||
+      signal.previousRank !== null ||
+      (signal.bestRankInWindow ?? null) !== null
+  );
+  if (candidateKeywords.length === 0) {
+    dataGaps.push(
+      rankSignals.length === 0
+        ? "rank: 该域名在 30 天窗口内没有排名记录（先在 Position Tracking 添加并刷新关键词）"
+        : `rank: 窗口内有 ${rankSignals.length} 个关键词的观测记录，但没有任何进榜名次（全部为「未进前 100」），因此不产生基于排名的机会`
+    );
+  }
   // 竞品证据 bounded：仅对可能成型的候选查竞品排名
   const pool = candidateKeywords
     .filter((signal) => (signal.currentRank !== null && signal.currentRank >= 8 && signal.currentRank <= 30) || signal.currentRank === null)
     .slice(0, 20);
   const competitorMap = await collectCompetitorSignals(userId, pool.map((signal) => signal.keywordId));
+  const competitorRowCount = [...competitorMap.values()].reduce((n, rows) => n + rows.length, 0);
+  if (competitorRowCount === 0) {
+    dataGaps.push("competitor_gap: 没有竞品排名数据（先在 Competitors 添加竞品并刷新），该类别本次不产生机会");
+  }
 
   for (const signal of candidateKeywords) {
     const competitors = competitorMap.get(signal.keywordId) ?? [];
@@ -459,17 +748,28 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
     }
   }
 
-  // 2. Technical 信号（audit_issues，DB-only；无审计 → DATA GAP）
+  // 2. Technical 信号（审计快照 / audit_issues，DB-only；无审计 → DATA GAP）
   const technical = await collectTechnicalCandidates(userId, domain);
-  if (technical.length === 0) dataGaps.push("technical: 无可用审计数据（DATA GAP，不伪造）");
+  if (technical.length === 0) dataGaps.push("technical: 没有已完成的审计结果（先运行一次技术审计），该类别本次不产生机会");
   candidates.push(...technical);
 
+  // 2b. Content 信号（content_checks 的真实检查结果；只消费未过时的低分记录）
+  const contentCandidates = await collectContentCandidates(userId);
+  if (contentCandidates.length === 0) {
+    dataGaps.push("content_refresh: 没有 30 天内得分低于 70 的内容检查记录（先在 Content Optimization 运行检查）");
+  }
+  candidates.push(...contentCandidates);
+
   // 3. CTR 信号（GSC，缓存优先、单次调用、bounded 100 行）
+  let gscRows = 0;
+  let gscAvailable = false;
   if (options?.includeCtr !== false) {
     try {
       const gsc = await searchAnalytics({
         userId, projectId, dimensions: ["query"], rowLimit: 100, dateRange: "last_28_days",
       });
+      gscAvailable = true;
+      gscRows = gsc.rows.length;
       let ctrCount = 0;
       for (const row of gsc.rows) {
         const candidate = evaluateCtrOpportunity({ keys: row.keys, clicks: row.clicks, impressions: row.impressions, ctr: row.ctr, position: row.position });
@@ -485,9 +785,11 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
   }
 
   // 4. AI Visibility（仅读最近 run，不触发 provider）
+  let aiRunFound = false;
   try {
     const runs = await listAiSearchRuns(userId, { projectId, runType: "brand_lookup", limit: 1 });
     const latest = runs[0] ?? null;
+    aiRunFound = Boolean(latest);
     const candidate = evaluateAiVisibilityGap(
       latest
         ? {
@@ -504,6 +806,46 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
   } catch (e) {
     dataGaps.push(`ai_visibility: ${(e as Error).message}`);
   }
+
+  // 4b. 数据来源覆盖：让用户看到"这个类别为什么没有机会"，而不是只看到一个空列表
+  const sourceCoverage: OpportunitySourceCoverage[] = [
+    {
+      source: "rank_history",
+      rows: candidateKeywords.length,
+      available: candidateKeywords.length > 0,
+      note: "Tracked keywords with a rank position in the 30-day window",
+    },
+    {
+      source: "competitor_ranks",
+      rows: competitorRowCount,
+      available: competitorRowCount > 0,
+      note: "Competitor rank evidence for the candidate keywords",
+    },
+    {
+      source: "audit",
+      rows: technical.length,
+      available: technical.length > 0,
+      note: "Failing rules from the latest completed technical audit",
+    },
+    {
+      source: "content_checks",
+      rows: contentCandidates.length,
+      available: contentCandidates.length > 0,
+      note: "Content checks under 70 within the last 30 days",
+    },
+    {
+      source: "gsc",
+      rows: gscRows,
+      available: gscAvailable,
+      note: "Query-level impressions/clicks from Google Search Console (requires a bound property)",
+    },
+    {
+      source: "ai_search",
+      rows: aiRunFound ? 1 : 0,
+      available: aiRunFound,
+      note: "Most recent AI brand-visibility run",
+    },
+  ];
 
   // 5. dedupe（fingerprint）+ 按优先级排序 + 上限
   const seen = new Set<string>();
@@ -540,7 +882,11 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
       impact: candidate.impact,
       confidence: candidate.confidence,
       evidence: candidate.evidence,
-      signals: { ...candidate.signals, recommendation: candidate.recommendation },
+      signals: {
+        ...candidate.signals,
+        recommendation: candidate.recommendation,
+        ...(candidate.recommendationI18n ? { recommendation_i18n: candidate.recommendationI18n } : {}),
+      },
       actionPlan: buildActionPlan(candidate),
     });
     if (result.suppressed) suppressed += 1;
@@ -549,7 +895,7 @@ export async function scanOpportunities(userId: string, plan: PlanTier, projectI
     persisted.push({ type: candidate.type, target: candidate.targetValue, priority: candidate.priority, isNew: result.isNew });
   }
 
-  return { projectId, domain, generated, refreshed, suppressed, dataGaps, candidates: persisted };
+  return { projectId, domain, generated, refreshed, suppressed, dataGaps, sourceCoverage, candidates: persisted };
 }
 
 // ---------- Verification（分层：rank 即时复检；GSC/AI PENDING） ----------

@@ -36,6 +36,15 @@ describe("BUG-001：audit 页 hydration 安全与快速审计按钮反馈", () =
     expect(ZH.dashboard.audit.auditInProgress.length).toBeGreaterThan(0);
     expect(EN.dashboard.audit.auditInProgress.length).toBeGreaterThan(0);
   });
+
+  it("访客注册 CTA 只在审计结果完成后出现（先看到价值，再理解注册用途；不阻断游客流程）", () => {
+    // 价值优先：CTA 条件必须是 isGuest && hasResult，不允许回到常驻横幅
+    // （抓取失败/unusable 审计没有可保存的结果，追加 !unusableAudit 排除）
+    expect(PAGE_SRC).toMatch(/\{isGuest && hasResult && !unusableAudit && \(/);
+    // 注册回传必须保留：signupHref 带当前域名回到同一审计页
+    expect(PAGE_SRC).toContain('/signup?redirect=');
+    expect(PAGE_SRC).toContain("/app/audit?domain=");
+  });
 });
 
 describe("「保存到报告」快照：coverage 一并写入（防 0/0 回归）", () => {

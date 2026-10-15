@@ -26,13 +26,16 @@
 /** 公开外链检查器的路由路径（EN 无前缀；ZH 前缀由 i18n 体系追加） */
 export const BACKLINK_CHECKER_PATH = "/tools/backlink-checker";
 
+/** 外链分析 feature 落地页（依赖同一 DataForSEO 数据源，随检查器一并收口） */
+export const FEATURE_BACKLINK_ANALYSIS_PATH = "/features/backlink-analysis";
+
 /** 是否启用公开外链检查器。默认 false（停用）；仅在显式设为 "true" 时启用。 */
 export const BACKLINK_CHECKER_ENABLED = process.env.BACKLINK_CHECKER_ENABLED === "true";
 
 /** 当前处于「暂缓上线」状态的公开路径（不收录、noindex、不对外导流） */
 export const DISABLED_PUBLIC_PATHS: readonly string[] = BACKLINK_CHECKER_ENABLED
   ? []
-  : [BACKLINK_CHECKER_PATH];
+  : [BACKLINK_CHECKER_PATH, FEATURE_BACKLINK_ANALYSIS_PATH];
 
 /** 某条公开路径当前是否应作为正式 SEO 落地页对外收录 */
 export function isPublicPathEnabled(path: string): boolean {

@@ -73,11 +73,16 @@ const FEATURE_EN: Record<string, string> = {
   email_report: "email reports",
 };
 
-/** 读取当前 UI locale：NEXT_LOCALE cookie → en（与 i18n request.ts 优先级一致） */
+/**
+ * 读取当前 UI locale：NEXT_LOCALE cookie → <html lang> → en。
+ * cookie 只在用户用过语言切换器后才存在；直接访问 /zh 的用户没有 cookie，
+ * 此时以 SSR 输出的 <html lang>（反映该请求真实渲染语言）为准，避免中文页面弹英文错误。
+ */
 export function readUiLocale(): ApiErrorLocale {
   if (typeof document !== "undefined") {
     const m = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=(zh)(?:;|$)/);
     if (m) return "zh";
+    if (/^zh/i.test(document.documentElement?.lang ?? "")) return "zh";
   }
   return "en";
 }

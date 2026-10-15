@@ -144,7 +144,13 @@ export default function DomainSelect({ value, onChange, placeholder, className }
             {t("projectOption", { name: p.name, domain: p.domain })}
           </option>
         ))}
-        <option value={MANUAL_KEY}>{t("manualOption")}</option>
+        {/* 非项目域名（URL 深链/手动输入）必须显示实际域名，不能只显示「手动输入…」——
+            否则审计失败/结果页上用户无法分辨当前看的是哪个站点 */}
+        <option value={MANUAL_KEY}>
+          {selectedValue === MANUAL_KEY && value
+            ? t("manualOptionWithDomain", { domain: value })
+            : t("manualOption")}
+        </option>
       </select>
     </div>
   );

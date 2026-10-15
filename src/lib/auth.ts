@@ -115,10 +115,14 @@ export function guestUserId(req: Request): string {
  * 其余非审计 API 不得使用此函数。
  */
 export async function requireAuthAllowGuest(): Promise<AuthResult> {
-  // 演示模式：与 requireAuth 一致，直接放行
+  // 演示模式：与 requireAuthOrDemo 的路由级约定（`auth.user?.id ?? "demo-user"`）保持**同一身份**。
+  // 此前返回 user:null 会让 /api/audit/* 回退到 guest:{ip}——同一个人在 Action Center
+  // 认领问题（demo-user）但再审计落在 guest 名下，`reverifyClaimedIssues` /
+  // `observeAfterAudit` 永远找不到对应记录，执行→验证闭环断裂。
+  // 真实访客语义不受影响：仅当 auth 启用且未登录时才使用 guest:{ip}。
   if (!isAuthEnabled) {
     return {
-      user: null,
+      user: { id: "demo-user" },
       plan: "free",
       subscriptionStatus: "inactive",
       limits: await getPlanLimits("free"),

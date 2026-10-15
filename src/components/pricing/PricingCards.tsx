@@ -68,6 +68,8 @@ function MemberCard({
   onCheckout: (plan?: "lite" | "pro" | "custom") => void;
 }) {
   const t = useTranslations("pricing");
+  // 套餐结果承诺（"用户得到什么"）：与额度清单分开，按 plan key 读取
+  const tPlans = useTranslations("plans");
   const { display, features, state } = card;
 
   return (
@@ -82,6 +84,11 @@ function MemberCard({
       {/* Persona: Semrush 14px/19.88px */}
       <p className="mt-0.5 font-sans text-sm leading-5 text-ink-40">
         {display.tagline}
+      </p>
+
+      {/* 结果行：这个套餐让你"得到什么"（先于额度清单；文案以现有真实能力为依据） */}
+      <p className="mt-3 rounded-md bg-paper px-3 py-2 font-sans text-sm font-medium leading-5 text-ink">
+        {tPlans(`${display.plan}.outcome` as "free.outcome")}
       </p>
 
       {/* Price：Semrush 风格 —— $ 小 + 主数字大 + /mo 小 */}

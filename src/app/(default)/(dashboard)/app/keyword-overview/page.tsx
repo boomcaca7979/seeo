@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import RelatedKeywordBars from "@/components/dashboard/charts/RelatedKeywordBars";
+import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 import { formatNumber } from "@/lib/ui-locale";
 
 interface UsageBadge {
@@ -51,10 +53,24 @@ function intentText(t: ReturnType<typeof useTranslations>, value: string): strin
   return t("intentNavigational");
 }
 
+// ===== 深链入口（Action Center → 关键词机会）=====
+// 支持 /app/keyword-overview?keyword=xxx：直接预填并执行该关键词的研究，
+// 使"任务 → 真实执行功能"是一条可用路径，而不是空按钮。
+// 使用 useSearchParams 需要 Suspense 边界（Next CSR bailout）。
 export default function KeywordOverviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <KeywordOverviewInner />
+    </Suspense>
+  );
+}
+
+function KeywordOverviewInner() {
   const t = useTranslations("dashboard.keywords.overview");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
+  const searchParams = useSearchParams();
+  const deepLinkKeyword = (searchParams.get("keyword") ?? "").trim();
   const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const [searchValue, setSearchValue] = useState("");
   const [location, setLocation] = useState("中国");
@@ -63,37 +79,55 @@ export default function KeywordOverviewPage() {
   const [usage, setUsage] = useState<UsageBadge | null>(null);
   const { show, Toast } = useToast();
 
-  const handleAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const kw = searchValue.trim();
-    if (!kw) {
-      show(t("errKeyword"), "error");
-      return;
-    }
-    setSerp({ loading: true, data: null, error: null, keyword: kw });
-    try {
-      const res = await fetch(
-        `/api/seo/serp?keyword=${encodeURIComponent(kw)}&location=${encodeURIComponent(location)}&device=${encodeURIComponent(device)}`
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        const { message } = handleBillingError(json, t("queryFailed"));
-        setSerp({ loading: false, data: null, error: message, keyword: kw });
-        show(message, "error");
+  const runAnalyze = useCallback(
+    async (kw: string) => {
+      if (!kw) {
+        show(t("errKeyword"), "error");
         return;
       }
-      setSerp({ loading: false, data: json.data, error: null, keyword: kw });
-      if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
-      if (json.data?.fromCache) {
-        show(t("cacheHit", { keyword: kw }), "info");
-      } else {
-        show(t("loaded", { keyword: kw }), "success");
+      setSerp({ loading: true, data: null, error: null, keyword: kw });
+      try {
+        const res = await fetch(
+          `/api/seo/serp?keyword=${encodeURIComponent(kw)}&location=${encodeURIComponent(location)}&device=${encodeURIComponent(device)}`
+        );
+        const json = await res.json();
+        if (!res.ok) {
+          const { message } = handleBillingError(json, t("queryFailed"));
+          setSerp({ loading: false, data: null, error: message, keyword: kw });
+          show(message, "error");
+          return;
+        }
+        setSerp({ loading: false, data: json.data, error: null, keyword: kw });
+        if (json.usage) setUsage({ used: json.usage.used, limit: json.usage.limit });
+        if (json.data?.fromCache) {
+          show(t("cacheHit", { keyword: kw }), "info");
+        } else {
+          show(t("loaded", { keyword: kw }), "success");
+        }
+      } catch (err) {
+        const msg = `${tc("networkError")} ${(err as Error).message}`;
+        setSerp({ loading: false, data: null, error: msg, keyword: kw });
+        show(msg, "error");
       }
-    } catch (err) {
-      const msg = `${tc("networkError")} ${(err as Error).message}`;
-      setSerp({ loading: false, data: null, error: msg, keyword: kw });
-      show(msg, "error");
-    }
+    },
+    [location, device, show, t, tc]
+  );
+
+  // 深链只自动执行一次；延后一拍避免在 effect 体内同步 setState
+  const deepLinkRan = useRef(false);
+  useEffect(() => {
+    if (deepLinkRan.current || !deepLinkKeyword) return;
+    deepLinkRan.current = true;
+    const id = window.setTimeout(() => {
+      setSearchValue(deepLinkKeyword);
+      void runAnalyze(deepLinkKeyword);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [deepLinkKeyword, runAnalyze]);
+
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runAnalyze(searchValue.trim());
   };
 
   const hasResult = !!serp.data && serp.data.organic.length > 0;
@@ -120,6 +154,11 @@ export default function KeywordOverviewPage() {
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
+
+      {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
+      <div className="mt-4">
+        <OpportunityContextBanner />
+      </div>
 
       {/* 搜索框 */}
       <form onSubmit={handleAnalyze} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">

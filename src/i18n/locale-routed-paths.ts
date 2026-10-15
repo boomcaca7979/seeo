@@ -35,6 +35,8 @@ export const LOCALE_ROUTED_PATHS = new Set([
   "/terms",
   "/refund",
   "/contact",
+  // 公开运营材料（第五阶段）：公开更新日志（Owner 决定不设独立路线图/数据来源页）
+  "/changelog",
 ]);
 
 /** 剥离 /zh locale 前缀，返回逻辑路径（en 即原样） */

@@ -49,6 +49,8 @@ const bilingualPaths = [
   "/terms",
   "/refund",
   "/contact",
+  // 公开更新日志（第五阶段；Owner 决定不设独立路线图/数据来源页）
+  "/changelog",
 ];
 
 /** 实际收录进 sitemap 的路径：排除当前暂缓上线的公开工具页 */

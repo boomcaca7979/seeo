@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import {
   CartesianGrid,
@@ -21,6 +22,7 @@ import { formatNumber } from "@/lib/ui-locale";
 import { formatRelativeTime } from "@/lib/relative-time";
 import Modal from "@/components/dashboard/Modal";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 
 import {
   COMMON_GRID_PROPS,
@@ -82,10 +84,22 @@ interface TrackedKeyword {
 interface UsageInfo { used: number; limit: number; month: string; }
 interface RankHistoryPoint { date: string; position: number | null; url: string | null; }
 
+// ===== 深链入口（Action Center → 关键词机会：加入排名追踪）=====
+// 支持 /app/position-tracking?keyword=xxx&domain=yyy：预填并打开"添加关键词"弹窗。
+// 不会自动提交（提交会消耗 SerpApi 额度），由用户确认后再添加。
 export default function PositionTrackingPage() {
+  return (
+    <Suspense fallback={null}>
+      <PositionTrackingInner />
+    </Suspense>
+  );
+}
+
+function PositionTrackingInner() {
   const t = useTranslations("dashboard.positionTracking");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
+  const searchParams = useSearchParams();
   const { plan: currentPlan } = useEntitlements();
   const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const deviceLabel = (d: Device) => (d === "PC" ? "PC" : t("deviceMobile"));
@@ -104,6 +118,22 @@ export default function PositionTrackingPage() {
   const [addDomain, setAddDomain] = useState("");
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // 深链预填并打开添加弹窗（延后一拍，避免 effect 体内同步 setState）
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const dlKeyword = (searchParams.get("keyword") ?? "").trim();
+    const dlDomain = (searchParams.get("domain") ?? "").trim();
+    if (!dlKeyword && !dlDomain) return;
+    deepLinkApplied.current = true;
+    const id = window.setTimeout(() => {
+      if (dlKeyword) setAddKeyword(dlKeyword);
+      if (dlDomain) setAddDomain(dlDomain);
+      setAddModalOpen(true);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [searchParams]);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [groups, setGroups] = useState<KeywordGroup[]>([]);
   const [groupFilter, setGroupFilter] = useState<string>("all");
@@ -413,6 +443,9 @@ export default function PositionTrackingPage() {
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
+
+      {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
+      <OpportunityContextBanner />
 
       {/* 工具栏 */}
       <div className="mt-5 flex flex-wrap items-center gap-2">

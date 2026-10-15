@@ -227,8 +227,11 @@ function PricingContent({ initialPlans }: { initialPlans: PlanInfo[] | null }) {
             ? tp("cta.upgradePro")
             : tp("cta.start"),
       checkoutPlan: p.display.checkoutPlan as "lite" | "pro" | undefined,
-      // 未登录时 Free 卡「Start free」直达注册（/app 会被弹去登录，对新用户是断点）
-      ctaHref: planKey === "free" && currentPlan === null ? "/signup" : p.display.ctaHref,
+      // Free 卡「Start free」直达免费审计：/app 对未登录访客会被弹去登录（对新用户是断点），
+      // 而 /app/audit 支持游客直接使用（阶段 1C）。
+      // 只覆盖公开定价页这一张卡；billing.ts 中被 /api/plans 等多处共享的全局
+      // ctaHref 配置保持不动。
+      ctaHref: planKey === "free" ? "/app/audit" : p.display.ctaHref,
       highlighted: p.display.highlighted,
     };
     const state = getPlanCardState(

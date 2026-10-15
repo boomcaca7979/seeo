@@ -57,6 +57,7 @@ vi.mock("./gsc-service", () => ({
 }));
 
 import {
+  ageInDays,
   evaluateAiVisibilityGap,
   evaluateCompetitorGap,
   evaluateContentRefresh,
@@ -64,6 +65,7 @@ import {
   evaluateLostRecovery,
   evaluateRankImprovement,
   expectedCtrForPosition,
+  parseDbTimestamp,
   scanOpportunities,
   verifyOpportunity,
   type GscQueryRow,
@@ -262,5 +264,41 @@ describe("verifyOpportunity（分层验证）", () => {
       projectId: 2, type: "technical", targetType: "url", targetValue: "https://me.site/a", signals: {},
     });
     expect(checks[0]).toMatchObject({ check: "technical", status: "pass" });
+  });
+});
+
+describe("parseDbTimestamp / ageInDays（真实数据时间戳回归）", () => {
+  // 背景：SQLite `datetime('now')` 产出 "2026-10-14 06:15:53"（无时区标记）。
+  // 旧逻辑手工拼 "Z" 得到非 ISO 输入，严格解析下为 NaN → 过期数据被静默当作最新。
+
+  it("ISO + Z / 带时区偏移 均可解析", () => {
+    expect(parseDbTimestamp("2026-10-14T06:15:53Z")).toBe(Date.parse("2026-10-14T06:15:53Z"));
+    expect(parseDbTimestamp("2026-10-14T06:15:53+08:00")).toBe(Date.parse("2026-10-14T06:15:53+08:00"));
+  });
+
+  it("SQLite 空格格式按 UTC 解析（真实 bug 形态，不得返回 null）", () => {
+    expect(parseDbTimestamp("2026-10-14 06:15:53")).toBe(Date.parse("2026-10-14T06:15:53Z"));
+    expect(parseDbTimestamp("2026-10-14 06:15:53.123")).toBe(Date.parse("2026-10-14T06:15:53.123Z"));
+  });
+
+  it("date-only（rank_history.date 形态）按 UTC 零点解析", () => {
+    expect(parseDbTimestamp("2026-10-14")).toBe(Date.parse("2026-10-14T00:00:00Z"));
+  });
+
+  it("空值 / 非法输入 / 语义非法日期 → null（不静默当新鲜）", () => {
+    expect(parseDbTimestamp(null)).toBeNull();
+    expect(parseDbTimestamp(undefined)).toBeNull();
+    expect(parseDbTimestamp("")).toBeNull();
+    expect(parseDbTimestamp("   ")).toBeNull();
+    expect(parseDbTimestamp("not-a-date")).toBeNull();
+    expect(parseDbTimestamp("2026-13-45 99:99:99")).toBeNull();
+  });
+
+  it("ageInDays：过去/未来/未知三态", () => {
+    expect(ageInDays(new Date(Date.now() - 3 * 86_400_000).toISOString())).toBe(3);
+    // 未来时间（时钟偏差）钳制为 0 天，不产生负数
+    expect(ageInDays(new Date(Date.now() + 3 * 86_400_000).toISOString())).toBe(0);
+    // 无法解析 → 明确 unknown
+    expect(ageInDays("garbage")).toBeNull();
   });
 });
