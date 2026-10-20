@@ -6,6 +6,7 @@ import {
   createAlert,
   hasAlertToday,
 } from "@/lib/db";
+import { alertLText } from "@/lib/alert-text";
 
 interface RankAlertContext {
   id: number;
@@ -30,16 +31,23 @@ export async function generateRankAlert(
   if (!prev) return; // 没有历史记录，不生成预警
 
   const oldPos = prev.position;
+  const positions = (n: number) => `${n} ${n === 1 ? "position" : "positions"}`;
 
   // 上榜掉出：之前有排名，现在 null
   if (oldPos !== null && newPos === null) {
-    const title = `关键词「${tk.keyword}」从排名 ${oldPos} 掉出前 100`;
+    const title = alertLText(
+      `关键词「${tk.keyword}」从排名 ${oldPos} 掉出前 100`,
+      `Keyword "${tk.keyword}" fell from #${oldPos} out of the top 100`
+    );
     if (await hasAlertToday(userId, tk.domain, title)) return;
     await createAlert(userId, {
       type: "rank_drop",
       level: "error",
       title,
-      detail: `域名 ${tk.domain} · 上次排名 ${oldPos}（${prev.date}）`,
+      detail: alertLText(
+        `域名 ${tk.domain} · 上次排名 ${oldPos}（${prev.date}）`,
+        `Domain ${tk.domain} · previous rank ${oldPos} (${prev.date})`
+      ),
       domain: tk.domain,
     });
     return;
@@ -54,33 +62,51 @@ export async function generateRankAlert(
     const up = oldPos - newPos;   // 正 = 上升（数字变小）
 
     if (drop >= 20) {
-      const title = `关键词「${tk.keyword}」排名下降 ${drop} 位`;
+      const title = alertLText(
+        `关键词「${tk.keyword}」排名下降 ${drop} 位`,
+        `Keyword "${tk.keyword}" dropped ${positions(drop)}`
+      );
       if (await hasAlertToday(userId, tk.domain, title)) return;
       await createAlert(userId, {
         type: "rank_drop",
         level: "error",
         title,
-        detail: `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+        detail: alertLText(
+          `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+          `Domain ${tk.domain} · ${oldPos} → ${newPos}`
+        ),
         domain: tk.domain,
       });
     } else if (drop >= 5) {
-      const title = `关键词「${tk.keyword}」排名下降 ${drop} 位`;
+      const title = alertLText(
+        `关键词「${tk.keyword}」排名下降 ${drop} 位`,
+        `Keyword "${tk.keyword}" dropped ${positions(drop)}`
+      );
       if (await hasAlertToday(userId, tk.domain, title)) return;
       await createAlert(userId, {
         type: "rank_drop",
         level: "warning",
         title,
-        detail: `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+        detail: alertLText(
+          `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+          `Domain ${tk.domain} · ${oldPos} → ${newPos}`
+        ),
         domain: tk.domain,
       });
     } else if (up >= 10) {
-      const title = `关键词「${tk.keyword}」排名上升 ${up} 位`;
+      const title = alertLText(
+        `关键词「${tk.keyword}」排名上升 ${up} 位`,
+        `Keyword "${tk.keyword}" climbed ${positions(up)}`
+      );
       if (await hasAlertToday(userId, tk.domain, title)) return;
       await createAlert(userId, {
         type: "rank_up",
         level: "info",
         title,
-        detail: `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+        detail: alertLText(
+          `域名 ${tk.domain} · ${oldPos} → ${newPos}`,
+          `Domain ${tk.domain} · ${oldPos} → ${newPos}`
+        ),
         domain: tk.domain,
       });
     }

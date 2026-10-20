@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "支付 · SeeO",
-  description: "SeeO 支付结果页：Creem 安全支付，订阅与定制服务订单状态查询。",
-  robots: { index: false, follow: false },
-};
+// /payment 树无 [locale] 段：UI locale 由 NEXT_LOCALE cookie → Accept-Language → en
+// 解析（见 src/i18n/request.ts），metadata 与页面正文必须同源，否则英文界面会拿到
+// 中文标题（旧版在此硬编码「支付 · SeeO」）。
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("paymentResult");
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default function PaymentLayout({
   children,

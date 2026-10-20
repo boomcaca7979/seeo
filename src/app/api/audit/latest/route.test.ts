@@ -187,3 +187,32 @@ describe("latest 路由：边界行为", () => {
     expect(body.data.coverage.every((c) => c.passed)).toBe(true);
   });
 });
+
+// BUG-46：旧引擎报告的页面级筛选读的是 issue.urls。
+// 只有 sampleUrl 时，「影响该页面的检查」会漏掉样本 URL 是别的页面的那些
+// （实测 acme-example.com 的 /blog/2024-launch-notes：真实命中 7 项，按 sampleUrl 只能筛出 3 项）。
+describe("latest 路由 issues 分组：urls 必须覆盖该检查命中的全部页面", () => {
+  it("同一 checkId 的多条命中合并为一组，urls 按行序收全，affectedPages === urls.length", async () => {
+    state.audit = makeAudit({ depth: "full" });
+    state.issues = [
+      makeIssue("title-length", "warning", "https://example.com/a"),
+      makeIssue("title-length", "warning", "https://example.com/blog/launch"),
+      makeIssue("missing-title", "error", "https://example.com/blog/launch"),
+    ];
+
+    const res = await GET(request());
+    const body = (await res.json()) as {
+      data: { issues: Array<{ checkId: string; sampleUrl: string; affectedPages: number; urls: string[] }> };
+    };
+    const grouped = body.data.issues.find((i) => i.checkId === "title-length");
+    expect(grouped?.sampleUrl).toBe("https://example.com/a");
+    expect(grouped?.urls).toEqual(["https://example.com/a", "https://example.com/blog/launch"]);
+    expect(grouped?.affectedPages).toBe(grouped?.urls.length);
+
+    // 样本 URL 不是目标页、但确实命中目标页的检查，必须能被 urls 筛出来
+    const hit = body.data.issues.filter((i) =>
+      i.urls.some((u) => u.includes("/blog/launch"))
+    );
+    expect(hit.map((i) => i.checkId).sort()).toEqual(["missing-title", "title-length"]);
+  });
+});

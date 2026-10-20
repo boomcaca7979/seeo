@@ -3,6 +3,7 @@ import { Montserrat, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
+import { ToastProvider } from "@/components/dashboard/Toast";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import JsonLd from "@/components/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
@@ -74,10 +75,14 @@ export default async function RootLayout({
         <JsonLd schema={organizationSchema()} />
         <JsonLd schema={websiteSchema()} />
         <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
-          {/* CookieBanner 在 Provider 内：文案随 NEXT_LOCALE 输出 en/zh */}
-          <CookieBanner />
-          <AnalyticsBootstrap />
+          {/* 提示条全站唯一实例：一个页面上挂两对 live region 会重复播报，
+              两个气泡还会在同一个 fixed 定位上重叠（工作台 = 页面 + 新建项目 Provider）。 */}
+          <ToastProvider>
+            {children}
+            {/* CookieBanner 在 Provider 内：文案随 NEXT_LOCALE 输出 en/zh */}
+            <CookieBanner />
+            <AnalyticsBootstrap />
+          </ToastProvider>
         </NextIntlClientProvider>
       </body>
     </html>

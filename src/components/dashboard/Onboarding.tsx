@@ -75,7 +75,7 @@ export default function Onboarding({ displayName, mode = "demo" }: OnboardingPro
       {/* Onboarding 区块 */}
       <section className="mt-10">
         <div className="flex items-center gap-3">
-          <h2 className="font-display text-base font-semibold text-ink">{t("sectionTitle")}</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">{t("sectionTitle")}</h2>
           <div className="hairline flex-1" />
         </div>
 

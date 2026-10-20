@@ -1,40 +1,48 @@
 import { Suspense } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 import type { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
+import { localeToOgLocale, type Locale } from "@/i18n/config";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/seo/schema";
 
-export const metadata: Metadata = {
-  title: "Log In to SeeO — SEO Audits & Rank Tracking",
-  description:
-    "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
-  alternates: { canonical: "/login" },
-  openGraph: {
-    type: "website",
-    url: "https://www.seeo.asia/login",
-    siteName: "SeeO",
-    locale: "en_US",
-    title: "Log In to SeeO — SEO Audits & Rank Tracking",
-    description:
-      "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
-    images: [
-      {
-        url: "/og.jpg",
-        width: 1200,
-        height: 630,
-        alt: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Log In to SeeO — SEO Audits & Rank Tracking",
-    description:
-      "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
-    images: ["/og.jpg"],
-  },
-  // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
-};
+// /login 不做双 URL：同一 URL 按 NEXT_LOCALE cookie → Accept-Language → en 输出界面，
+// 因此 metadata 必须在服务端按同一 locale 解析（旧版是静态英文 metadata，
+// 中文界面拿到英文标题）。canonical 保持无前缀：/login 只有一个规范地址。
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = (await getLocale()) as Locale;
+  const t = await getTranslations("authPage");
+  const title = t("loginTitle");
+  const description = t("loginDescription");
+  return {
+    title,
+    description,
+    alternates: { canonical: "/login" },
+    openGraph: {
+      type: "website",
+      url: "https://www.seeo.asia/login",
+      siteName: "SeeO",
+      locale: localeToOgLocale[locale],
+      title,
+      description,
+      images: [
+        {
+          url: "/og.jpg",
+          width: 1200,
+          height: 630,
+          alt: t("ogAlt"),
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/og.jpg"],
+    },
+    // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
+  };
+}
 
 export default function LoginPage() {
   return (

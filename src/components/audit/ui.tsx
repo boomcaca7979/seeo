@@ -32,6 +32,18 @@ export const GRADE_COLORS: Record<ScoreGrade, string> = {
   critical: "#EF4444",
 };
 
+/**
+ * HTTP 状态段配色（**与审计概览的 HTTP 分布完全同色**，不再各处硬编码）。
+ * 2xx 通过 / 3xx 重定向 / 4xx 客户端错误 / 5xx 服务端错误 / other 未知。
+ */
+export const HTTP_STATUS_COLORS = {
+  "2xx": "#22C55E",
+  "3xx": "#8B5CF6",
+  "4xx": "#F59E0B",
+  "5xx": "#EF4444",
+  other: "#9CA3AF",
+} as const;
+
 /** 文字颜色 class（语义化，不依赖色值） */
 export const SEVERITY_TEXT_CLASS: Record<RuleSeverity, string> = {
   error: "text-neg",
@@ -97,7 +109,7 @@ export function HealthBadge({
           ? "badge-warn"
           : "badge-info";
   return (
-    <span className={cls}>
+    <span className={`${cls} whitespace-nowrap`}>
       <span
         className="h-1.5 w-1.5 rounded-full"
         style={{ backgroundColor: HEALTH_COLORS[health] }}
@@ -147,8 +159,8 @@ export function HealthGauge({
         />
       </svg>
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center">
-        <div className="font-display text-4xl font-semibold tracking-tight text-ink">{score}</div>
-        <div className="font-mono text-[0.6875rem] text-ink-40">{t("healthScoreLabel")} / 100</div>
+        <div className="font-display text-3xl font-semibold tracking-tight text-ink">{score}</div>
+        <div className="font-mono text-xs text-ink-40">{t("healthScoreLabel")} / 100</div>
         <div className="mt-0.5 font-sans text-sm font-semibold" style={{ color }}>
           {gradeLabel}
         </div>
@@ -185,7 +197,7 @@ export function StatTile({
       className={`card-a p-4 text-left ${onClick ? "cursor-pointer transition-colors hover:border-ink-25" : ""} ${className}`}
       aria-label={onClick ? label : undefined}
     >
-      <div className="flex items-center font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">
+      <div className="flex items-center font-mono text-xs uppercase tracking-wide text-ink-40">
         {label}
         {hint ? <Hint text={hint} /> : null}
       </div>
@@ -269,7 +281,7 @@ export function SectionCard({
     <section className={`card-a p-5 ${className}`}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-sans text-[0.9375rem] font-semibold text-ink">{title}</h3>
+          <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
           {subtitle ? <p className="mt-0.5 font-sans text-xs text-ink-40">{subtitle}</p> : null}
         </div>
         {right ? <div className="flex-shrink-0">{right}</div> : null}
@@ -284,7 +296,7 @@ export function SectionCard({
 export function PctBar({ pct, color, label }: { pct: number; color: string; label?: string }) {
   return (
     <div className="flex items-center gap-2">
-      {label ? <span className="w-16 shrink-0 font-mono text-[0.6875rem] text-ink-40">{label}</span> : null}
+      {label ? <span className="w-16 shrink-0 font-mono text-xs text-ink-40">{label}</span> : null}
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line-soft">
         <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, backgroundColor: color }} />
       </div>

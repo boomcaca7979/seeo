@@ -146,6 +146,16 @@ describe("Hero 信息层级（搜索入口为第一互动 CTA）", () => {
     // 漏斗 A2：审计入口不得把访客先重定向到登录页
     expect(URL_AUDIT_BOX).not.toContain("/login");
   });
+
+  // BUG-48（390/1440 实测）：首页访客审计框的校验错误此前只是一个裸 <p>，
+  // 与同仓库 AuthForm（BUG-10）/ BacklinkChecker 的播报语义不一致：
+  // 屏幕阅读器用户按下「免费开始 SEO 审计」后只听到按钮朗读，听不到「请输入网站域名」。
+  it("UrlAuditBox：校验错误对辅助技术可播报（role=alert + aria-invalid/describedby）", () => {
+    const errNode = URL_AUDIT_BOX.slice(URL_AUDIT_BOX.indexOf('id="audit-url-error"'));
+    expect(errNode).toContain('role="alert"');
+    expect(URL_AUDIT_BOX).toContain('aria-describedby={error ? "audit-url-error" : undefined}');
+    expect(URL_AUDIT_BOX).toContain("aria-invalid={error ? true : undefined}");
+  });
 });
 
 describe("hint 文案删除（中英同步）", () => {

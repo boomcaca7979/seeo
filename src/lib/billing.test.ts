@@ -119,3 +119,17 @@ describe("canPurchasePlan 套餐购买规则（CASE 1-7）", () => {
     });
   });
 });
+
+describe("PLAN_DISPLAY_INFO 对外展示价格必须同一货币", () => {
+  // 支付通道是 Creem（USD）。免费版曾写成 "¥0"，与同屏的 $1.49 / $4.49 混排，
+  // zh/en 两种语言下都会让用户把美元价读成人民币价。
+  it("四个档位的 price 币种符号一致，且不出现 ¥", async () => {
+    const { PLAN_DISPLAY_INFO } = await import("@/lib/billing");
+    const prices = Object.values(PLAN_DISPLAY_INFO).map((p) => p.price);
+    expect(prices.length).toBe(4);
+    expect(prices.some((p) => p.includes("¥"))).toBe(false);
+    const symbols = new Set(prices.map((p) => p.match(/^[^\d.]+/)?.[0] ?? ""));
+    expect(symbols.size).toBe(1);
+    expect([...symbols][0]).toBe("$");
+  });
+});

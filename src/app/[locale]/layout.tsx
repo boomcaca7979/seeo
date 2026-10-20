@@ -55,6 +55,13 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+// 无效 locale 段（/de/pricing、/app/<未注册> …）在**路由层**就不匹配本树，
+// 直接由 global-not-found 输出 404 文档。旧实现放无效段进树、再由页面 notFound()
+// 冒泡，Next 对动态渲染的 notFound() 输出 __next_error__ 错误壳：无 <html lang>、
+// <body> 为空、robots 标签与框架注入的 noindex 并存。dynamicParams=false 才是
+// 「正确的路由 fallback」：错误语言根本进不了 locale 路由树，本布局也无需读 cookie。
+export const dynamicParams = false;
+
 export async function generateMetadata({
   params,
 }: LocaleLayoutProps): Promise<Metadata> {
@@ -83,9 +90,10 @@ export async function generateMetadata({
 
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params;
-  // 无效 locale 的 404 由各页面 notFound() 触发（[locale]/not-found.tsx 承接），
-  // layout 不再 notFound()：那会冒泡到全局 /_not-found（(default) layout 读取
-  // cookies，多 root layouts 下运行时 500）。
+  // dynamicParams=false 已让无效 locale 段在路由层 404，本布局只收到 en/zh。
+  // 这里的收窄只是类型层面的兜底：layout 不调用 notFound()（那会冒泡到全局
+  // /_not-found，而 (default) layout 读取 cookies，多 root layouts 下运行时 500），
+  // 也不读 cookie 决定 lang（本布局必须保持静态渲染，读 cookie 会整批营销页动态化）。
 
   // schema inLanguage 需要 Locale 类型：与 generateMetadata 相同的收窄
   const loc: Locale = hasLocale(routing.locales, locale) ? locale : defaultLocale;

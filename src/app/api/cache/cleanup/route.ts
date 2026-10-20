@@ -25,8 +25,15 @@ export async function POST() {
   }
   // 全局缓存清理属于运维操作，限制为 Pro 套餐用户
   if (auth.plan !== "pro") {
+    // 带上真实当前套餐：前端 UpgradeModal 据此显示「你现在是 X」，而不是替用户猜一个 free；
+    // requiredPlan 让弹窗推荐真正能解锁该动作的套餐（推荐 Lite 却解不开 Pro 功能是误导）。
     return NextResponse.json(
-      { error: "需要 Pro 套餐权限才能执行缓存清理", code: "PLAN_REQUIRED" },
+      {
+        error: "需要 Pro 套餐权限才能执行缓存清理",
+        code: "PLAN_REQUIRED",
+        plan: auth.plan,
+        requiredPlan: "pro",
+      },
       { status: 403 }
     );
   }

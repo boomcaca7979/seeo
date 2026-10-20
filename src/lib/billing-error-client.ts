@@ -15,6 +15,8 @@ import ZH_MESSAGES from "../../messages/zh.json";
 export const BILLING_ERROR_CODES = {
   QUOTA_EXCEEDED: "QUOTA_EXCEEDED",
   FEATURE_NOT_AVAILABLE: "FEATURE_NOT_AVAILABLE",
+  /** 后端按套餐拒绝的运维/高级动作（如 Pro 专属缓存清理）：与 FEATURE_NOT_AVAILABLE 同类，必须给升级出口 */
+  PLAN_REQUIRED: "PLAN_REQUIRED",
   PLAN_LIMIT_REACHED: "PLAN_LIMIT_REACHED",
   PROJECT_LIMIT_REACHED: "PROJECT_LIMIT_REACHED",
   KEYWORD_LIMIT_REACHED: "KEYWORD_LIMIT_REACHED",
@@ -41,7 +43,16 @@ export interface BillingErrorBody {
   feature?: string;
   limit?: number;
   used?: number;
+  /** QUOTA_EXCEEDED 的超限维度：daily（每日限额，次日重置）/ monthly（月度配额，下月 1 日重置） */
+  scope?: "daily" | "monthly";
+  /** 解锁该动作真正需要的套餐；缺省时弹窗按「升一级」推荐 */
+  requiredPlan?: string;
   error?: string; // 兼容非 billing 错误的 error 字段
+  /**
+   * BUG-44：语言中立的补充信息（如 "HTTP 503"），只允许由服务端算好的技术 token。
+   * `{detail}` 模板优先取它，取不到才退回 error/message——避免把中文原文插进英文文案。
+   */
+  detail?: string;
 }
 
 /**
@@ -52,6 +63,7 @@ export function isBillingError(body: BillingErrorBody): boolean {
   return (
     body.code === BILLING_ERROR_CODES.QUOTA_EXCEEDED ||
     body.code === BILLING_ERROR_CODES.FEATURE_NOT_AVAILABLE ||
+    body.code === BILLING_ERROR_CODES.PLAN_REQUIRED ||
     ALL_LIMIT_CODES.has(body.code)
   );
 }
@@ -106,13 +118,28 @@ export function resolveApiErrorMessage(
 ): string {
   const code = body?.code;
   const catalog = API_ERRORS[locale] ?? API_ERRORS.en;
-  if (code && catalog[code]) {
-    return interpolate(catalog[code], {
-      plan: body.plan,
-      limit: body.limit,
-      used: body.used,
-      feature: body.feature ? (locale === "en" ? FEATURE_EN[body.feature] ?? body.feature : body.feature) : undefined,
-    });
+  if (code) {
+    // 每日限额与月度配额重置周期不同，文案必须分开：
+    // scope=daily → QUOTA_EXCEEDED_DAILY（今日…明日重置）；缺省沿用月度模板。
+    // daily 模板缺失时回退月度模板（不因 catalog 缺项渲染空文案）。
+    const catalogKey =
+      code === "QUOTA_EXCEEDED" && body.scope === "daily" ? "QUOTA_EXCEEDED_DAILY" : code;
+    const template = catalog[catalogKey] ?? catalog[code];
+    if (template) {
+      // {detail} 占位符（TIMEOUT / INVALID_URL / HTTP_ERROR / UNKNOWN 等模板）：
+      // 优先取服务端算好的语言中立 token（body.detail），其次才是 error/message 原文；
+      // 两者皆缺失时给双语兜底，避免出现「抓取超时：」这类空冒号。
+      const detail =
+        body.detail ?? body.error ?? body.message ?? (locale === "zh" ? "暂时无法获取详细信息" : "no further details available");
+      return interpolate(template, {
+        plan: body.plan,
+        // used/limit 缺省时显示占位「–」，避免渲染成空括号「（/）」
+        limit: body.limit ?? "–",
+        used: body.used ?? "–",
+        feature: body.feature ? (locale === "en" ? FEATURE_EN[body.feature] ?? body.feature : body.feature) : undefined,
+        detail: detail || (locale === "zh" ? "暂时无法获取详细信息" : "no further details available"),
+      });
+    }
   }
   return body?.error ?? body?.message ?? fallbackMessage;
 }
@@ -139,13 +166,24 @@ export function handleBillingError(
   const locale = readUiLocale();
   const message = resolveApiErrorMessage(body, locale, fallbackMessage) || fallbackMessage;
 
+  // 关键词数量上限（KEYWORD_LIMIT_REACHED）的 used/limit 语义就是「账号关键词总数 / 套餐关键词上限」，
+  // 与 QUOTA_EXCEEDED 的 SerpApi 每日/每月用量口径完全不同：这里改成按语义分列，
+  // 其余 code（项目数、竞品数、分组数、SerpApi 日/月额度）保持原有 used/limit 单行口径。
+  // 响应缺少 used 时不进关键词分支——宁可不分列，也不替用户编一个数字。
+  const keywordQuota =
+    body.code === BILLING_ERROR_CODES.KEYWORD_LIMIT_REACHED &&
+    typeof body.used === "number" &&
+    typeof body.limit === "number"
+      ? { total: body.used, limit: body.limit }
+      : null;
+
   // 触发全局 UpgradeModal
   triggerUpgradeModal({
     currentPlan,
     reason: message,
     feature: body.feature,
-    limit: body.limit,
-    used: body.used,
+    ...(body.requiredPlan ? { requiredPlan: body.requiredPlan } : {}),
+    ...(keywordQuota ? { keywordQuota } : { limit: body.limit, used: body.used }),
   });
 
   return { isBillingError: true, message };

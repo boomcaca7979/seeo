@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
 import { useUpgradeModalProvider } from "@/components/billing/UpgradeModal";
@@ -33,6 +33,17 @@ function DashboardShellInner({ displayName, email, isGuest, children }: Dashboar
   // 移动端（<lg）侧边抽屉；桌面端 sidebar 常驻，此状态无效
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  // BUG-18：抽屉只能靠点击遮罩关闭，键盘用户打开后关不掉（实测 390px：
+  // Escape 后 drawer 仍在 left:0）。与营销站 Navbar 保持一致，用 Escape 收起。
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileNavOpen]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-paper text-ink">
       {mobileNavOpen && (
@@ -43,9 +54,6 @@ function DashboardShellInner({ displayName, email, isGuest, children }: Dashboar
         />
       )}
       <Sidebar
-        displayName={displayName}
-        email={email}
-        isGuest={isGuest}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
       />
@@ -55,6 +63,7 @@ function DashboardShellInner({ displayName, email, isGuest, children }: Dashboar
           email={email}
           isGuest={isGuest}
           onMobileMenuClick={() => setMobileNavOpen(true)}
+          mobileMenuOpen={mobileNavOpen}
         />
         <main className="flex-1 overflow-y-auto bg-paper text-ink">{children}</main>
       </div>

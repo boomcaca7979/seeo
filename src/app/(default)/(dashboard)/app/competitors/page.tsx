@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useId, useState, useCallback, useRef } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,8 +12,9 @@ import {
   YAxis,
 } from "recharts";
 import { useTranslations, useLocale } from "next-intl";
+import Link from "next/link";
 import { useToast } from "@/components/dashboard/Toast";
-import { handleBillingError } from "@/lib/billing-error-client";
+import { handleBillingError, resolveApiErrorMessage, readUiLocale } from "@/lib/billing-error-client";
 import {
   COMMON_GRID_PROPS,
   COMMON_XAXIS_PROPS,
@@ -24,8 +25,12 @@ import {
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import SOVGroupBars from "@/components/dashboard/charts/SOVGroupBars";
 import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/charts/CompetitorRankBars";
+import PageHeader from "@/components/viz/PageHeader";
+import MetricCard from "@/components/viz/MetricCard";
+import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
 import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT } from "@/lib/project-selector";
 import { formatNumber, intlLocale } from "@/lib/ui-locale";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 interface Competitor {
   id: number;
@@ -59,6 +64,18 @@ interface RanksData {
   domain: string;
   results: RankResult[];
   fromCache: boolean;
+  /** 数据已超过 24h：仍可展示，但必须与最新数据区分 */
+  stale?: boolean;
+  /** 库里没有可比数据（或已过期），需要用户显式点击刷新才会请求上游 */
+  needsRefresh?: boolean;
+  /** 本批结果里最新的抓取时间（SQLite datetime 或 ISO 字符串） */
+  checkedAt?: string | null;
+}
+
+/** 排名区提示：区分「读取失败」与「刷新失败」，两者的可执行动作不同 */
+interface RanksNotice {
+  kind: "read" | "refresh";
+  message: string;
 }
 
 interface UsageInfo {
@@ -95,6 +112,19 @@ function rankColor(rank: number | null): string {
 function rankText(rank: number | null): string {
   if (rank === null) return "—";
   return `#${rank}`;
+}
+
+/**
+ * 数据时间：SQLite datetime 或 ISO 字符串 → 本地可读时间；解析失败时不显示（不编造时间）。
+ * 无时区后缀按 UTC 解释，与 ranks 路由 24h 新鲜度判断（toEpochMs）用同一套约定，
+ * 否则界面显示的时间与"是否过期"的判断会互相矛盾。
+ */
+function formatCheckedAt(raw: string | null | undefined, locale: "en" | "zh"): string | null {
+  if (!raw) return null;
+  const iso = /Z|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : `${raw.replace(" ", "T")}Z`;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(intlLocale(locale), { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 // SOV 百分比颜色：≥50% 绿 / 30-49% 琥珀 / <30% 红
@@ -139,6 +169,9 @@ export default function CompetitorsPage() {
   const [addName, setAddName] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  // BUG-24：删除二次确认是自绘遮层（未走共享 Modal），补齐 dialog 语义与焦点管理
+  const deleteTitleId = useId();
+  const deletePanelRef = useDialogA11y(deleteId !== null, () => setDeleteId(null));
 
   // 关键词列表（项目下）
   const [keywords, setKeywords] = useState<TrackedKeyword[]>([]);
@@ -147,6 +180,7 @@ export default function CompetitorsPage() {
   // 排名数据
   const [ranks, setRanks] = useState<RanksData | null>(null);
   const [ranksLoading, setRanksLoading] = useState(false);
+  const [ranksNotice, setRanksNotice] = useState<RanksNotice | null>(null);
 
   // SOV
   const [sov, setSov] = useState<SOVData | null>(null);
@@ -220,8 +254,11 @@ export default function CompetitorsPage() {
           ? all.filter((k) => k.domain === projectDomain)
           : all;
         setKeywords(filtered);
-        if (filtered.length > 0 && selectedKeywordId === null) {
-          setSelectedKeywordId(filtered[0].id);
+        // BUG-21：selectedKeywordId 不能进 useCallback 依赖 —— 这个回调自己会写它，
+        // 于是「拉词 → 选中第一个 → 回调换引用 → projectDomain effect 重跑」，
+        // 同一次进页面打两次 GET /api/tracking。改用函数式 setState 只补空位。
+        if (filtered.length > 0) {
+          setSelectedKeywordId((cur) => cur ?? filtered[0].id);
         }
         if (json.usage) setUsage(json.usage);
       } else {
@@ -230,7 +267,7 @@ export default function CompetitorsPage() {
     } catch {
       show(tc("networkError"), "error");
     }
-  }, [projectDomain, selectedKeywordId, show, tc]);
+  }, [projectDomain, show, tc]);
 
   // 拉取 SOV（pid 为前端项目 id string）
   const loadSov = useCallback(async (pid: string) => {
@@ -261,6 +298,7 @@ export default function CompetitorsPage() {
       setKeywords([]);
       setSelectedKeywordId(null);
       setRanks(null);
+      setRanksNotice(null);
       setSov(null);
       void loadCompetitors(projectId);
       void loadSov(projectId);
@@ -361,7 +399,8 @@ export default function CompetitorsPage() {
     }
   };
 
-  // 刷新排名
+  // 刷新排名（用户显式动作：唯一会请求上游 SerpApi 的入口）
+  const ranksRefreshRef = useRef(false);
   const handleRefreshRanks = async () => {
     if (selectedKeywordId === null) {
       show(t("errNoKeyword"), "info");
@@ -371,6 +410,9 @@ export default function CompetitorsPage() {
       show(t("errNoCompetitors"), "info");
       return;
     }
+    // 刷新进行中不重复发起：disabled 要等 React 提交后才生效，同一 tick 内的连点只能靠 ref 挡住
+    if (ranksLoading || ranksRefreshRef.current) return;
+    ranksRefreshRef.current = true;
     setRanksLoading(true);
     try {
       const res = await fetch("/api/competitors/ranks", {
@@ -380,12 +422,16 @@ export default function CompetitorsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
+        // billing code（日/月度额度）→ 本地化文案 + 升级引导；
+        // 上游额度（UPSTREAM_QUOTA）等非 billing code 只给准确原因，不弹升级窗。
         const { message } = handleBillingError(json, t("refreshFailed"));
         show(message, "error");
-        setRanks({ ...ranks, results: [] } as RanksData | null);
+        // 失败原因常驻显示，且不销毁已展示的旧数据（旧数据仍带它自己的时间标记）
+        setRanksNotice({ kind: "refresh", message });
         return;
       }
       setRanks(json.data);
+      setRanksNotice(null);
       if (json.usage) setUsage(json.usage);
       if (json.data?.fromCache) {
         show(t("cacheHit"), "info");
@@ -395,45 +441,85 @@ export default function CompetitorsPage() {
       // 刷新 SOV
       if (projectId) await loadSov(projectId);
     } catch (err) {
-      show(`${tc("networkError")} ${(err as Error).message}`, "error");
+      const message = `${tc("networkError")} ${(err as Error).message}`;
+      show(message, "error");
+      setRanksNotice({ kind: "refresh", message });
     } finally {
+      ranksRefreshRef.current = false;
       setRanksLoading(false);
     }
   };
 
-  // 选择关键词时自动加载排名
+  // 读取已入库的对比结果：GET 是纯读操作（不请求上游、不消耗额度），
+  // 每次新读取都会取消上一个在途请求，避免旧关键词/旧项目的结果覆盖新状态。
+  const ranksAbortRef = useRef<AbortController | null>(null);
+  const loadRanks = useCallback(async (keywordId: number) => {
+    ranksAbortRef.current?.abort();
+    const controller = new AbortController();
+    ranksAbortRef.current = controller;
+    setRanksLoading(true);
+    setRanksNotice(null);
+    try {
+      const res = await fetch(`/api/competitors/ranks?keyword_id=${keywordId}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const json = await res.json();
+      if (controller.signal.aborted) return;
+      if (res.ok) {
+        setRanks(json.data);
+        if (json.usage) setUsage(json.usage);
+      } else {
+        // 读取失败按真实 code 显示本地化原因；
+        // 读操作不消耗额度，因此不走 handleBillingError（不弹升级窗，避免误导付费）
+        setRanks(null);
+        setRanksNotice({ kind: "read", message: resolveApiErrorMessage(json, readUiLocale(), t("ranksLoadFailed")) });
+      }
+    } catch {
+      if (controller.signal.aborted) return;
+      setRanks(null);
+      setRanksNotice({ kind: "read", message: tc("networkError") });
+    } finally {
+      if (!controller.signal.aborted) setRanksLoading(false);
+    }
+  }, [t, tc]);
+
   const ranksFetchRef = useRef<number | null>(null);
   useEffect(() => {
     if (selectedKeywordId === null) {
-      const tid = window.setTimeout(() => setRanks(null), 0);
+      // 切换项目 / 清空关键词：取消在途读取并重置展示状态
+      ranksFetchRef.current = null;
+      ranksAbortRef.current?.abort();
+      const tid = window.setTimeout(() => {
+        setRanks(null);
+        setRanksNotice(null);
+      }, 0);
       return () => window.clearTimeout(tid);
     }
+    // 同一关键词只读一次：effect 因回调身份变化重跑、StrictMode 双挂载都不会重复请求
     if (ranksFetchRef.current === selectedKeywordId) return;
     ranksFetchRef.current = selectedKeywordId;
     const tid = window.setTimeout(() => {
-      (async () => {
-        setRanksLoading(true);
-        try {
-          const res = await fetch(`/api/competitors/ranks?keyword_id=${selectedKeywordId}`, { cache: "no-store" });
-          const json = await res.json();
-          if (res.ok) {
-            setRanks(json.data);
-            if (json.usage) setUsage(json.usage);
-          } else {
-            setRanks(null);
-          }
-        } catch {
-          setRanks(null);
-        } finally {
-          setRanksLoading(false);
-        }
-      })();
+      void loadRanks(selectedKeywordId);
     }, 0);
-    return () => window.clearTimeout(tid);
-  }, [selectedKeywordId]);
+    return () => {
+      window.clearTimeout(tid);
+      // 让真正重新挂载（StrictMode）时仍能发起一次读取
+      if (ranksFetchRef.current === selectedKeywordId) ranksFetchRef.current = null;
+    };
+  }, [selectedKeywordId, loadRanks]);
+
+  // 读取失败后的重试：重发只读请求（同样不产生上游调用）
+  const retryRanks = () => {
+    if (selectedKeywordId === null) return;
+    void loadRanks(selectedKeywordId);
+  };
 
   const usagePercent = usage ? (usage.used / usage.limit) * 100 : 0;
   const quotaExceeded = usage ? usage.used >= usage.limit : false;
+
+  // 排名数据时间（GET 只读返回的 checkedAt 与 POST 刷新结果都用同一字段展示）
+  const rankCheckedAt = ranks ? formatCheckedAt(ranks.checkedAt, locale) : null;
 
   // SOV 趋势图数据（基于当前 sov 结果，单点占位；历史数据需多次刷新积累）
   const sovTrendData = sov && sov.sov.length > 0
@@ -465,17 +551,17 @@ export default function CompetitorsPage() {
     : [];
 
   return (
-    <div className="dash-container p-6 lg:p-8">
-      {/* 页头：编号 + 标题 + 发丝线 */}
-      <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("title")}
-        </h1>
-        <div className="hairline flex-1" />
-      </div>
-      <p className="mt-2 font-sans text-sm text-ink-60">
-        {t("subtitle")}
-      </p>
+    <div className="dash-container p-4 lg:p-8">
+      {/* 页头：统一 PageHeader（标题 + 副标题 + 元信息条） */}
+      <PageHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        meta={
+          projectId !== null && projectDomain ? (
+            <span>{projectDomain}</span>
+          ) : null
+        }
+      />
 
       {/* 项目未选择提示 */}
       {projectId === null && (
@@ -516,10 +602,10 @@ export default function CompetitorsPage() {
             </div>
           )}
 
-          {/* 竞品域名管理区 */}
+          {/* ===== 区域 A：管理竞品网站（只负责添加/查看/删除，不产生分析数据） ===== */}
           <div className="card-a mt-6 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-base font-semibold text-ink">
+              <h2 className="font-display text-lg font-semibold text-ink">
                 {t("manageTitle")}
               </h2>
               <span className="font-mono text-xs text-ink-40">
@@ -527,76 +613,144 @@ export default function CompetitorsPage() {
               </span>
             </div>
 
-            <form onSubmit={handleAddCompetitor} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <input
-                type="text"
-                value={addDomain}
-                onChange={(e) => setAddDomain(e.target.value)}
-                placeholder={t("domainPlaceholder")}
-                className="flex-1 rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-              />
-              <input
-                type="text"
-                value={addName}
-                onChange={(e) => setAddName(e.target.value)}
-                placeholder={t("namePlaceholder")}
-                className="sm:w-40 rounded-md border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={adding || quotaExceeded}
-                className="btn-primary disabled:opacity-60"
-              >
-                {adding ? t("adding") : t("addBtn")}
-              </button>
+            {/* 添加表单：标签明确置于输入框上方，与列表在视觉上分离 */}
+            <form onSubmit={handleAddCompetitor} className="mt-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto] sm:items-end">
+                <div className="min-w-0">
+                  <label htmlFor="competitor-domain-input" className="font-sans text-xs text-ink-40">
+                    {t("domainLabel")}
+                  </label>
+                  <input
+                    id="competitor-domain-input"
+                    type="text"
+                    value={addDomain}
+                    onChange={(e) => setAddDomain(e.target.value)}
+                    placeholder={t("domainPlaceholder")}
+                    className="mt-1.5 w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <label htmlFor="competitor-name-input" className="font-sans text-xs text-ink-40">
+                    {t("namePlaceholder")}
+                  </label>
+                  <input
+                    id="competitor-name-input"
+                    type="text"
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    className="mt-1.5 w-full rounded-md border border-line bg-card px-3 py-2 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={adding || quotaExceeded}
+                  className="btn-primary h-10 disabled:opacity-60"
+                >
+                  {adding ? t("adding") : t("addBtn")}
+                </button>
+              </div>
             </form>
 
-            {/* 已添加竞品列表 */}
-            <div className="mt-4">
-              {compLoading ? (
-                <div className="flex flex-wrap gap-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-8 w-32 rounded-full bg-line-soft" />
-                  ))}
-                </div>
-              ) : competitors.length === 0 ? (
-                <div className="py-6 text-center font-mono text-xs text-ink-40">
-                  {t("noCompetitors")}
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {competitors.map((c) => (
-                    <span
-                      key={c.id}
-                      className="inline-flex items-center gap-2 rounded-full border border-line bg-line-soft px-3 py-1 font-mono text-xs text-ink-60"
-                    >
-                      {c.domain}
-                      {c.name && (
-                        <span className="text-ink-40">· {c.name}</span>
-                      )}
-                      <button
-                        onClick={() => setDeleteId(c.id)}
-                        className="ml-0.5 text-ink-40 transition-colors hover:text-neg"
-                        aria-label={t("deleteAria", { domain: c.domain })}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* 已添加竞品列表：独立子区块，与表单以分隔线 + 小标题明确分层 */}
+            <div className="mt-5 border-t border-line-soft pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-ink">{t("addedListTitle")}</h3>
+                <span className="font-mono text-xs text-ink-40">
+                  {t("competitorCount", { n: formatNumber(competitors.length, locale) })}
+                </span>
+              </div>
+              <div className="mt-2">
+                {compLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-10 rounded-md bg-line-soft" />
+                    ))}
+                  </div>
+                ) : competitors.length === 0 ? (
+                  <div className="py-5 text-center font-mono text-xs text-ink-40">
+                    {t("noCompetitors")}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-line-soft">
+                    {competitors.map((c) => {
+                      // 真实状态：SOV 由已比较关键词的排名数据计算——
+                      // 域名出现在 SOV 结果中 = 该竞品已参与过对比
+                      const compared = !!sov?.sov.some((s) => s.domain === c.domain);
+                      return (
+                        <li key={c.id} className="flex items-center gap-3 py-3">
+                          <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink" title={c.domain}>
+                            {c.domain}
+                          </span>
+                          {c.name && (
+                            <span className="hidden shrink-0 font-sans text-xs text-ink-40 sm:inline">
+                              {c.name}
+                            </span>
+                          )}
+                          <span
+                            className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-xs ${
+                              compared ? "bg-pos/10 text-pos" : "bg-line-soft text-ink-40"
+                            }`}
+                          >
+                            {compared ? t("compStatusCompared") : t("compStatusPending")}
+                          </span>
+                          <button
+                            onClick={() => setDeleteId(c.id)}
+                            className="shrink-0 rounded px-1.5 py-1 font-sans text-xs text-ink-40 transition-colors hover:bg-neg/10 hover:text-neg"
+                            aria-label={t("deleteAria", { domain: c.domain })}
+                          >
+                            {locale === "zh" ? "删除" : "Delete"} ×
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
+
+            {/* 下一步引导（真实状态，不伪装分析）：添加竞品只保存域名，
+                对比需要用户选择关键词并刷新排名；无关键词时引导去位置追踪 */}
+            {!compLoading && (
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 font-sans text-xs text-ink-60">
+                <span className="font-mono uppercase tracking-wide text-ink-40">
+                  {locale === "zh" ? "下一步" : "Next"}
+                </span>
+                {competitors.length === 0 ? (
+                  <span>{t("nextStepNoCompetitor")}</span>
+                ) : keywords.length === 0 ? (
+                  <>
+                    <span>{t("nextStepNoKeyword")}</span>
+                    <Link
+                      href={`/app/position-tracking?domain=${encodeURIComponent(projectDomain)}`}
+                      className="font-mono text-xs text-brand hover:underline"
+                    >
+                      → {t("nextStepNoKeywordLink")}
+                    </Link>
+                  </>
+                ) : (
+                  <span>{t("nextStepReady")}</span>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 关键词对比区 */}
+          {/* ===== 区域 B：竞品对比分析（核心功能：选关键词 → 刷新排名并对比 → 看结果） ===== */}
           <div className="card-a mt-6 p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-xs text-ink-40">{t("keywordLabel")}</label>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("compareSectionTitle")}
+            </h2>
+            <p className="mt-1.5 max-w-3xl font-sans text-xs leading-relaxed text-ink-60">
+              {t("compareIntro")}
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-2">
+                <label htmlFor="competitor-keyword-select" className="font-mono text-xs text-ink-40">{t("keywordLabel")}</label>
                 <select
+                  id="competitor-keyword-select"
                   value={selectedKeywordId ?? ""}
                   onChange={(e) => setSelectedKeywordId(Number(e.target.value))}
-                  className="rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                  className="min-w-0 max-w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
                 >
                   {keywords.length === 0 ? (
                     <option value="">{t("noKeywords")}</option>
@@ -618,6 +772,25 @@ export default function CompetitorsPage() {
               </button>
             </div>
 
+            {/* 数据状态提示：读取失败 / 刷新失败的真实原因常驻显示，
+                并按失败来源给出对应动作（重读 vs 重新刷新） */}
+            {!ranksLoading && ranksNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neg/25 bg-neg/5 px-3 py-2"
+              >
+                <span className="font-mono text-xs text-neg">{ranksNotice.message}</span>
+                <button
+                  type="button"
+                  onClick={ranksNotice.kind === "read" ? retryRanks : handleRefreshRanks}
+                  className="btn-secondary"
+                >
+                  {ranksNotice.kind === "read" ? t("retryBtn") : t("refreshBtn")}
+                </button>
+              </div>
+            )}
+
             {/* SERP 交叉对比表格 */}
             <div className="mt-4 overflow-hidden rounded-lg border border-line-soft">
               {ranksLoading ? (
@@ -631,95 +804,110 @@ export default function CompetitorsPage() {
                   ))}
                 </div>
               ) : ranks && ranks.results.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-line-soft bg-line-soft/40">
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDomain")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thRank")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thUrl")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thStatus")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ranks.results.map((r) => {
-                        const selfRank = ranks.results.find((x) => x.is_self)?.rank ?? null;
-                        const isCompBetter = r.is_self
-                          ? false
-                          : (r.rank !== null && (selfRank === null || r.rank < selfRank));
-                        const isSelfBetter = r.is_self
-                          ? false
-                          : (selfRank !== null && (r.rank === null || selfRank < r.rank));
-                        return (
-                          <tr
-                            key={`${r.competitor_id}-${r.domain}`}
-                            className={`border-b border-line-soft/60 transition-colors hover:bg-[#FBFAF4] ${
-                              r.is_self ? "bg-brand/5" : ""
-                            }`}
-                          >
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <span className={`font-mono text-sm ${r.is_self ? "font-semibold text-brand" : "text-ink"}`}>
-                                  {r.domain}
-                                </span>
-                                {r.is_self && (
-                                  <span className="badge-warn">{t("selfBadge")}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className={`px-4 py-3 ${isCompBetter ? "bg-warn/5" : ""} ${isSelfBetter ? "bg-pos/5" : ""}`}>
-                              <span className={`font-mono text-base font-semibold ${rankColor(r.rank)}`}>
-                                {rankText(r.rank)}
+                <DataTable minWidthRem={44}>
+                  <THead>
+                    <Th width="14rem">{t("thDomain")}</Th>
+                    <Th width="6rem">{t("thRank")}</Th>
+                    <Th>{t("thUrl")}</Th>
+                    <Th width="8rem">{t("thStatus")}</Th>
+                  </THead>
+                  <TBody>
+                    {ranks.results.map((r) => {
+                      const selfRank = ranks.results.find((x) => x.is_self)?.rank ?? null;
+                      const isCompBetter = r.is_self
+                        ? false
+                        : (r.rank !== null && (selfRank === null || r.rank < selfRank));
+                      const isSelfBetter = r.is_self
+                        ? false
+                        : (selfRank !== null && (r.rank === null || selfRank < r.rank));
+                      return (
+                        <TR
+                          key={`${r.competitor_id}-${r.domain}`}
+                          className={`transition-colors hover:bg-line-soft/50 ${
+                            r.is_self ? "bg-brand/5" : ""
+                          }`}
+                        >
+                          <TD>
+                            <div className="flex items-center gap-2">
+                              <span className={`truncate font-mono text-sm ${r.is_self ? "font-semibold text-brand" : "text-ink"}`}>
+                                {r.domain}
                               </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              {r.target_url ? (
-                                <a
-                                  href={r.target_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block max-w-xs truncate font-mono text-xs text-brand hover:text-brand-deep hover:underline"
-                                  title={r.target_url}
-                                >
-                                  {r.target_url}
-                                </a>
-                              ) : (
-                                <span className="font-mono text-xs text-ink-40">—</span>
+                              {r.is_self && (
+                                <span className="badge-warn whitespace-nowrap">{t("selfBadge")}</span>
                               )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {r.is_self ? (
-                                <span className="font-mono text-xs text-ink-40">{t("statusBaseline")}</span>
-                              ) : isCompBetter ? (
-                                <span className="font-mono text-xs text-neg">{t("statusAhead")}</span>
-                              ) : isSelfBetter ? (
-                                <span className="font-mono text-xs text-pos">{t("statusBehind")}</span>
-                              ) : (
-                                <span className="font-mono text-xs text-ink-40">{t("statusTied")}</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </TD>
+                          <TD
+                            numeric
+                            className={isCompBetter ? "bg-warn/5" : isSelfBetter ? "bg-pos/5" : ""}
+                          >
+                            <span className={`text-base font-semibold ${rankColor(r.rank)}`}>
+                              {rankText(r.rank)}
+                            </span>
+                          </TD>
+                          <TD>
+                            {r.target_url ? (
+                              <a
+                                href={r.target_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block max-w-xs truncate font-mono text-xs text-brand hover:text-brand-deep hover:underline"
+                                title={r.target_url}
+                              >
+                                {r.target_url}
+                              </a>
+                            ) : (
+                              <span className="font-mono text-xs text-ink-40">—</span>
+                            )}
+                          </TD>
+                          <TD>
+                            {r.is_self ? (
+                              <span className="font-mono text-xs text-ink-40 whitespace-nowrap">{t("statusBaseline")}</span>
+                            ) : isCompBetter ? (
+                              <span className="font-mono text-xs text-neg whitespace-nowrap">{t("statusAhead")}</span>
+                            ) : isSelfBetter ? (
+                              <span className="font-mono text-xs text-pos whitespace-nowrap">{t("statusBehind")}</span>
+                            ) : (
+                              <span className="font-mono text-xs text-ink-40 whitespace-nowrap">{t("statusTied")}</span>
+                            )}
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                  </TBody>
+                </DataTable>
               ) : (
                 <div className="px-4 py-10 text-center">
-                  <div className="font-mono text-xs text-ink-40">
-                    {competitors.length === 0
-                      ? t("emptyAddFirst")
-                      : t("emptyRefreshHint")}
-                  </div>
+                  {competitors.length === 0 ? (
+                    <div className="font-mono text-xs text-ink-40">{t("emptyAddFirst")}</div>
+                  ) : keywords.length === 0 ? (
+                    // 无追踪关键词：明显 CTA 按钮引导去位置追踪，保留项目上下文
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="font-mono text-xs text-ink-40">{t("emptyNoKeywords")}</div>
+                      <Link href={`/app/position-tracking?domain=${encodeURIComponent(projectDomain)}`} className="btn-primary">
+                        {t("addKeywordsCta")}
+                      </Link>
+                      <span className="font-mono text-xs text-ink-40">
+                        → {t("nextStepNoKeywordLink")}
+                      </span>
+                    </div>
+                  ) : ranks?.needsRefresh ? (
+                    // 只读 GET 返回"无缓存"：明确说明还没查过，不冒充加载失败也不谎报额度消耗
+                    <div className="font-mono text-xs text-ink-40">{t("noCacheHint")}</div>
+                  ) : (
+                    <div className="font-mono text-xs text-ink-40">{t("emptyRefreshHint")}</div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* 表格底部统计 */}
-            {ranks && (
-              <div className="mt-3 flex items-center justify-between font-mono text-xs text-ink-40">
+            {/* 表格底部统计：仅在真有排名行时展示数据状态（无缓存时不得谎称"实时数据"） */}
+            {ranks && ranks.results.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-ink-40">
                 <span>
-                  {t("tableKeyword", { keyword: ranks.keyword })} · {ranks.fromCache ? t("cachedHint") : t("liveHint")}
+                  {t("tableKeyword", { keyword: ranks.keyword })} ·{" "}
+                  {ranks.stale ? t("staleHint") : ranks.fromCache ? t("cachedHint") : t("liveHint")}
+                  {rankCheckedAt && ` · ${t("checkedAtHint", { time: rankCheckedAt })}`}
                 </span>
                 <span>
                   {t("domainsCompared", { n: formatNumber(ranks.results.length, locale) })}
@@ -728,11 +916,11 @@ export default function CompetitorsPage() {
             )}
           </div>
 
-          {/* SOV 概览卡 */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* SOV 概览卡（统一 MetricCard） */}
+          <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {sovLoading ? (
               [1, 2, 3, 4].map((i) => (
-                <div key={i} className="card-a p-5">
+                <div key={i} className="card-a p-4">
                   <div className="h-3 w-20 rounded bg-line-soft" />
                   <div className="mt-2 h-8 w-24 rounded bg-line-soft" />
                 </div>
@@ -742,60 +930,49 @@ export default function CompetitorsPage() {
                 {/* 我的 SOV */}
                 {(() => {
                   const mySov = sov.sov.find((s) => s.domain === sov.projectDomain) ?? sov.sov[0];
+                  const pct = mySov.percentage;
                   return (
-                    <div className="card-a p-5">
-                      <div className="font-mono text-xs text-ink-40">{t("mySov")}</div>
-                      <div className={`mt-1 font-mono text-2xl font-semibold ${sovColor(mySov.percentage)}`}>
-                        {mySov.percentage}%
-                      </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line-soft">
-                        <div
-                          className={`h-full rounded-full transition-all ${sovBarColor(mySov.percentage)}`}
-                          style={{ width: `${Math.min(100, mySov.percentage)}%` }}
-                        />
-                      </div>
-                      <div className="mt-2 font-mono text-xs text-ink-40">
-                        {t("mySovDetail", { score: formatNumber(mySov.score, locale), keywords: formatNumber(mySov.keywordCount, locale) })}
-                      </div>
-                    </div>
+                    <MetricCard
+                      hintStyle="plain"
+                      label={t("mySov")}
+                      value={`${pct}%`}
+                      tone={pct >= 50 ? "pos" : pct >= 30 ? "warn" : "neg"}
+                      caption={t("mySovDetail", { score: formatNumber(mySov.score, locale), keywords: formatNumber(mySov.keywordCount, locale) })}
+                    />
                   );
                 })()}
-                {/* Top 1 关键词数 */}
-                <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">{t("top3Keywords")}</div>
-                  <div className="mt-1 font-mono text-2xl font-semibold text-pos">
-                    {(() => {
-                      const my = sov.sov.find((s) => s.domain === sov.projectDomain);
-                      return my?.top10Count ?? 0;
-                    })()}
-                  </div>
-                  <div className="mt-2 font-mono text-xs text-ink-40">
-                    {t("top10Hint")}
-                  </div>
-                </div>
-                {/* 平均排名 */}
-                <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">{t("myAvgRank")}</div>
-                  <div className="mt-1 font-mono text-2xl font-semibold text-ink">
-                    {(() => {
-                      const my = sov.sov.find((s) => s.domain === sov.projectDomain);
-                      return my?.avgRank !== null && my?.avgRank !== undefined ? `#${my.avgRank}` : "—";
-                    })()}
-                  </div>
-                  <div className="mt-2 font-mono text-xs text-ink-40">
-                    {t("avgRankHint")}
-                  </div>
-                </div>
+                {/* Top 10 关键词数（label 键沿用 top3Keywords，文案已修正为 Top 10 与数值一致；0 为中性不用正向色） */}
+                <MetricCard
+                  hintStyle="plain"
+                  label={t("top3Keywords")}
+                  value={(() => {
+                    const my = sov.sov.find((s) => s.domain === sov.projectDomain);
+                    return my?.top10Count ?? 0;
+                  })()}
+                  tone={(() => {
+                    const my = sov.sov.find((s) => s.domain === sov.projectDomain);
+                    return (my?.top10Count ?? 0) > 0 ? "pos" : undefined;
+                  })()}
+                  hint={t("top10Hint")}
+                />
+                {/* 平均排名（无排名时诚实降级，不用 0 冒充） */}
+                <MetricCard
+                  hintStyle="plain"
+                  label={t("myAvgRank")}
+                  value={(() => {
+                    const my = sov.sov.find((s) => s.domain === sov.projectDomain);
+                    return my?.avgRank !== null && my?.avgRank !== undefined ? `#${my.avgRank}` : null;
+                  })()}
+                  unavailableLabel="—"
+                  hint={t("avgRankHint")}
+                />
                 {/* 竞品数量 */}
-                <div className="card-a p-5">
-                  <div className="font-mono text-xs text-ink-40">{t("competitorCountLabel")}</div>
-                  <div className="mt-1 font-mono text-2xl font-semibold text-ink">
-                    {sov.competitorCount}
-                  </div>
-                  <div className="mt-2 font-mono text-xs text-ink-40">
-                    {t("analyzedKeywords", { analyzed: formatNumber(sov.analyzedKeywords, locale), total: formatNumber(sov.totalKeywords, locale) })}
-                  </div>
-                </div>
+                <MetricCard
+                  hintStyle="plain"
+                  label={t("competitorCountLabel")}
+                  value={sov.competitorCount}
+                  caption={t("analyzedKeywords", { analyzed: formatNumber(sov.analyzedKeywords, locale), total: formatNumber(sov.totalKeywords, locale) })}
+                />
               </>
             ) : (
               <div className="card-a col-span-full p-6 text-center">
@@ -832,67 +1009,63 @@ export default function CompetitorsPage() {
           {sov && sov.sov.length > 0 && (
             <div className="card-a mt-6 overflow-hidden">
               <div className="border-b border-line-soft px-5 py-3">
-                <h2 className="font-display text-sm font-semibold text-ink">
+                <h2 className="font-display text-lg font-semibold text-ink">
                   {t("sovDetailTitle")}
                 </h2>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-line-soft bg-line-soft/40">
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDomain")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thSov")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thScore")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thAvgRank")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thTop10")}</th>
-                      <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKeywords")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sov.sov.map((s) => {
-                      const isSelf = s.domain === sov.projectDomain;
-                      return (
-                        <tr
-                          key={s.domain}
-                          className={`border-b border-line-soft/60 transition-colors hover:bg-[#FBFAF4] ${
-                            isSelf ? "bg-brand/5" : ""
-                          }`}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-mono text-sm ${isSelf ? "font-semibold text-brand" : "text-ink"}`}>
-                                {s.domain}
-                              </span>
-                              {isSelf && <span className="badge-warn">{t("selfBadge")}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-mono text-sm font-semibold ${sovColor(s.percentage)}`}>
-                                {s.percentage}%
-                              </span>
-                              <div className="h-1 w-16 overflow-hidden rounded-full bg-line-soft">
-                                <div
-                                  className={`h-full rounded-full ${sovBarColor(s.percentage)}`}
-                                  style={{ width: `${Math.min(100, s.percentage)}%` }}
-                                />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-sm text-ink-60">{s.score}</td>
-                          <td className="px-4 py-3">
-                            <span className={`font-mono text-sm font-semibold ${rankColor(s.avgRank)}`}>
-                              {s.avgRank !== null ? `#${s.avgRank}` : "—"}
+              <DataTable minWidthRem={46}>
+                <THead>
+                  <Th width="14rem">{t("thDomain")}</Th>
+                  <Th width="10rem">{t("thSov")}</Th>
+                  <Th width="7rem">{t("thScore")}</Th>
+                  <Th width="7rem">{t("thAvgRank")}</Th>
+                  <Th width="7rem">{t("thTop10")}</Th>
+                  <Th width="7rem">{t("thKeywords")}</Th>
+                </THead>
+                <TBody>
+                  {sov.sov.map((s) => {
+                    const isSelf = s.domain === sov.projectDomain;
+                    return (
+                      <TR
+                        key={s.domain}
+                        className={`transition-colors hover:bg-line-soft/50 ${
+                          isSelf ? "bg-brand/5" : ""
+                        }`}
+                      >
+                        <TD>
+                          <div className="flex items-center gap-2">
+                            <span className={`truncate font-mono text-sm ${isSelf ? "font-semibold text-brand" : "text-ink"}`}>
+                              {s.domain}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-sm text-ink-60">{s.top10Count}</td>
-                          <td className="px-4 py-3 font-mono text-sm text-ink-60">{s.keywordCount}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            {isSelf && <span className="badge-warn whitespace-nowrap">{t("selfBadge")}</span>}
+                          </div>
+                        </TD>
+                        <TD>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-mono text-sm font-semibold ${sovColor(s.percentage)}`}>
+                              {s.percentage}%
+                            </span>
+                            <div className="h-1 w-16 overflow-hidden rounded-full bg-line-soft">
+                              <div
+                                className={`h-full rounded-full ${sovBarColor(s.percentage)}`}
+                                style={{ width: `${Math.min(100, s.percentage)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </TD>
+                        <TD numeric className="text-ink-60">{s.score}</TD>
+                        <TD numeric>
+                          <span className={`font-mono text-sm font-semibold ${rankColor(s.avgRank)}`}>
+                            {s.avgRank !== null ? `#${s.avgRank}` : "—"}
+                          </span>
+                        </TD>
+                        <TD numeric className="text-ink-60">{s.top10Count}</TD>
+                        <TD numeric className="text-ink-60">{s.keywordCount}</TD>
+                      </TR>
+                    );
+                  })}
+                </TBody>
+              </DataTable>
             </div>
           )}
 
@@ -901,7 +1074,7 @@ export default function CompetitorsPage() {
             <div className="card-a mt-6 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-display text-base font-semibold text-ink">
+                  <h2 className="font-display text-lg font-semibold text-ink">
                     {t("sovTrendTitle")}
                   </h2>
                   <p className="mt-0.5 font-mono text-xs text-ink-40">
@@ -960,9 +1133,16 @@ export default function CompetitorsPage() {
       {deleteId !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteId(null)} aria-hidden />
-          <div className="relative w-full max-w-sm rounded-lg border border-line bg-card">
+          <div
+            ref={deletePanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={deleteTitleId}
+            tabIndex={-1}
+            className="relative w-full max-w-sm rounded-lg border border-line bg-card"
+          >
             <div className="border-b border-line-soft px-5 py-4">
-              <h3 className="font-display text-base font-semibold text-ink">{t("deleteConfirmTitle")}</h3>
+              <h3 id={deleteTitleId} className="font-display text-base font-semibold text-ink">{t("deleteConfirmTitle")}</h3>
             </div>
             <div className="px-5 py-4">
               <p className="font-sans text-sm text-ink-60">

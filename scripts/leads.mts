@@ -212,6 +212,13 @@ function cmdUpdate(positional: string[], flags: Args): void {
     ["activation", "activation"],
     ["paid", "paid"],
     ["email", "email"],
+    // 研究/归因字段的修正（不改状态、不改触达日期）。
+    // 让 prospecting 流水线能修正写错来源的行，而不必绕开 CLI 直接改 CSV。
+    ["source", "source"],
+    ["campaign", "campaign"],
+    ["company", "company"],
+    ["industry", "industry"],
+    ["company-size", "company_size"],
   ] as Array<[string, keyof Lead]>) {
     const v = flags[flag];
     if (typeof v === "string") (patch as Record<string, string>)[field] = v;
@@ -433,7 +440,7 @@ function main(): void {
   due   [--today=YYYY-MM-DD] 列出今天该跟进的 Lead
   list  [--status=...] [关键词]
   show  <lead_id>
-  update <lead_id> --status=... [--next-followup=... --notes=...]
+  update <lead_id> --status=... [--next-followup=... --notes=... --source=...]
   suppress <lead_id> --reason="..."   标记永不联系
   suppress-complaint <lead_id>        投诉压制（追加 [complaint] 记录 + Suppressed）
   backfill-contacted [--apply]        历史 Contacted 对账（默认 dry-run）

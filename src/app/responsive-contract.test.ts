@@ -107,7 +107,10 @@ describe("移动端抽屉导航契约", () => {
     expect(src).toContain("fixed inset-y-0 left-0 z-50");
     expect(src).toContain("-translate-x-full");
     expect(src).toContain("lg:static lg:translate-x-0");
-    expect(src).toContain("transition-transform duration-150"); // 动效 ≤150ms
+    // 关闭态用 invisible 把抽屉移出焦点/无障碍树，所以过渡必须同时覆盖 transform 与 visibility（动效 ≤150ms）
+    expect(src).toContain("transition-[transform,visibility] duration-150");
+    expect(src).toContain("lg:visible");
+    expect(src).toContain('"-translate-x-full invisible"');
   });
 
   it("Topbar：有 <lg 汉堡按钮（lg:hidden）并通过 onMobileMenuClick 打开抽屉", () => {
@@ -153,7 +156,38 @@ describe("表格横向滚动契约", () => {
   it("关键数据页表格均包裹 overflow-x-auto（小屏滚动而非撑破容器）", () => {
     for (const p of tablePages) {
       const src = read(p);
-      expect(src.includes("overflow-x-auto"), `${p} 缺少 overflow-x-auto 表格容器`).toBe(true);
+      // DataTable 组件自带 overflow-x-auto 包裹，页面源码出现 <DataTable 同样满足契约
+      expect(
+        src.includes("overflow-x-auto") || src.includes("<DataTable"),
+        `${p} 缺少 overflow-x-auto 表格容器（或封装它的 DataTable）`
+      ).toBe(true);
     }
+  });
+});
+
+// BUG-32：首页「实测证据」三卡在 360/390 实测被裁切（数值溢出 17px、标签溢出 6px）。
+// BUG-33：同页快照摘要条的引擎值「V2 · 规则集 2.0」用 truncate 裁成「V2 · 规则…」——规则集版本属于演示可信度信息，不得丢字。
+// 两处都不动栅格列数，改为小屏降字号 + 允许换行 + min-w-0，保证内容完整可读。
+describe("首页 demo 卡片窄屏可读性", () => {
+  const src = read("src/components/DashboardPreview.tsx");
+
+  it("证据数值在小屏用 text-base，≥sm 才回到 text-lg", () => {
+    expect(src.match(/font-mono text-base font-semibold break-words text-ink sm:text-lg/g)).toHaveLength(3);
+  });
+
+  it("SummaryStat 数值小屏降为 text-sm 并允许换行（≥sm 回到 text-lg）", () => {
+    expect(src).toContain("font-mono text-sm leading-snug break-words font-semibold text-ink sm:text-lg");
+  });
+
+  it("卡片允许收缩、长标签允许换行", () => {
+    // 3 张证据卡 + SummaryStat
+    expect(src.match(/card-a min-w-0 p-3/g)).toHaveLength(4);
+    expect(src.match(/text-xs leading-snug break-words text-ink-40/g)).toHaveLength(4);
+    expect(src).not.toMatch(/className="card-a p-3"/);
+  });
+
+  it("演示数值不再保留会溢出小屏的裸 text-lg / truncate", () => {
+    expect(src).not.toMatch(/className="font-mono text-lg font-semibold text-ink"/);
+    expect(src).not.toMatch(/truncate font-mono/);
   });
 });

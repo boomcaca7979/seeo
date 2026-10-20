@@ -1,30 +1,23 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Link as LocaleLink, useRouter } from "@/i18n/routing";
+import { Link as LocaleLink } from "@/i18n/routing";
 import { isLocaleRoutedPath, stripLocalePrefix } from "@/i18n/locale-routed-paths";
-import { localePath } from "@/i18n/seo";
+import { localeSwitchCookie, localeSwitchHref } from "@/i18n/locale-switch";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
-
-// 浏览器可见路径（"/pricing" 或 "/zh/pricing"）。SSG prerender 时
-// usePathname 不可靠（client page 内返回 null / 内部 /en 路径），
-// 用 useSyncExternalStore 读取 window.location.pathname（hydration-safe）
-const subscribeNoop = () => () => {};
 
 export default function Navbar() {
   const t = useTranslations("nav");
   const locale = useLocale();
-  const pathname = usePathname();
-  const browserPath = useSyncExternalStore(
-    subscribeNoop,
-    () => window.location.pathname,
-    () => null
-  );
-  const effectivePath = browserPath ?? pathname;
+  // 逻辑路径：预渲染的内部路径（/en、/en/pricing）与浏览器 canonical 路径
+  // （/、/pricing）归一到同一个值，服务端首屏与客户端首轮渲染才能完全一致。
+  // （读 window.location 的 useSyncExternalStore 写法正是 #418 的来源：服务端
+  // 快照为 null，首轮渲染必然改用浏览器路径，两份 markup 不可能相同。）
+  const appPath = stripLocalePrefix(usePathname());
 
   // 演示模式：开始分析直接进 /app；启用模式：进 /signup
   const primaryHref = isAuthEnabled ? "/signup" : "/app";
@@ -33,7 +26,7 @@ export default function Navbar() {
   // 导航项：label 走 messages；href 为逻辑路径，
   // locale-routed 页（pricing/docs）按 locale 加 /zh 前缀
   // 锚点链接：首页用本地锚点，非首页用完整路径（含 locale 前缀）
-  const isHome = stripLocalePrefix(effectivePath ?? "/") === "/";
+  const isHome = appPath === "/";
   const homePrefix = locale === "zh" ? "/zh" : "/";
   const navItems = [
     { label: t("features"), href: isHome ? "#features" : `${homePrefix}#features` },
@@ -43,24 +36,19 @@ export default function Navbar() {
   ];
 
   // 语言切换：仅在 locale-routed 路径显示（/ ↔ /zh、/pricing ↔ /zh/pricing）
-  // 切换 URL 用 localePath 自算：en 侧永远无前缀（不会出现 /en）
-  const showLangSwitch = effectivePath
-    ? isLocaleRoutedPath(effectivePath)
-    : false;
+  // 目标 URL 由 localeSwitchHref（内部即 localePath）自算：en 侧永远无前缀（不会出现 /en）
+  const showLangSwitch = isLocaleRoutedPath(appPath);
   const otherLocale = locale === "zh" ? "en" : "zh";
-  const switchHref = localePath(
-    otherLocale,
-    stripLocalePrefix(effectivePath ?? "/")
-  );
+  const switchHref = localeSwitchHref(otherLocale, appPath);
 
-  // 语言切换必须经 next-intl 的 client router：它会在导航前写 NEXT_LOCALE cookie
-  // （syncLocaleCookie），否则 next-intl middleware 会按 Accept-Language 把
-  // 无前缀英文 URL（/、/pricing）307 回 /zh —— 表现为「点了没反应」。
-  // href 仍保留（右键新标签 / JS 未接管时的兜底），preventDefault 后由 router 接管。
-  const router = useRouter();
+  // 见 @/i18n/locale-switch：客户端 router 切换 locale 会让 head 出现两份互相冲突的
+  // description / canonical / og:locale（服务端那份未被替换，新语言的一份被追加），
+  // 所以先写 cookie（否则 next-intl 会把无前缀 URL 307 回旧语言），再整份文档导航。
+  // href 仍保留：右键新标签与 JS 未接管时走的就是同一个服务端渲染地址。
   const switchLocale = (e: React.MouseEvent) => {
     e.preventDefault();
-    router.replace(stripLocalePrefix(effectivePath ?? "/"), { locale: otherLocale });
+    document.cookie = localeSwitchCookie(otherLocale);
+    window.location.assign(switchHref);
   };
 
   // Session 感知：loading 时不渲染「登录」，避免已登录用户看到误导性登录入口
@@ -123,9 +111,7 @@ export default function Navbar() {
         {/* 桌面端导航 */}
         <ul className="hidden items-center gap-8 md:flex">
           {navItems.map((item) => {
-            const isActive = item.routed && effectivePath
-              ? stripLocalePrefix(effectivePath) === item.href
-              : false;
+            const isActive = item.routed && appPath === item.href;
             return (
             <li key={item.href}>
               {item.routed ? (
@@ -230,9 +216,7 @@ export default function Navbar() {
         >
           <ul className="site-shell flex flex-col px-5 py-3 sm:px-8">
             {navItems.map((item) => {
-              const isActive = item.routed && effectivePath
-                ? stripLocalePrefix(effectivePath) === item.href
-                : false;
+              const isActive = item.routed && appPath === item.href;
               const linkClass = `block py-3 text-sm font-medium transition-colors hover:text-ink ${isActive ? "text-ink" : "text-ink-60"}`;
               return (
               <li key={item.href}>

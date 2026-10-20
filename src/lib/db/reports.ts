@@ -1,6 +1,8 @@
 // ===== 报告领域：reports + 报告导出查询 + alerts =====
 
 import { getAdapter } from "./migrations";
+import { parseAlertText, serializeAlertText } from "@/lib/alert-text";
+import type { LocalizedText } from "@/lib/seo/audit-ltext";
 
 // ---------- 报告导出查询 ----------
 
@@ -131,8 +133,9 @@ export interface AlertRow {
   id: number;
   type: AlertType;
   level: AlertLevel;
-  title: string;
-  detail: string | null;
+  /** 新数据为 LText（双语），历史行为纯文本；渲染端一律走 alertText() 取值 */
+  title: LocalizedText;
+  detail: LocalizedText | null;
   domain: string | null;
   created_at: string;
   read: 0 | 1;
@@ -143,8 +146,8 @@ function rowToAlert(row: Record<string, unknown>): AlertRow {
     id: Number(row.id),
     type: String(row.type) as AlertType,
     level: String(row.level) as AlertLevel,
-    title: String(row.title),
-    detail: row.detail ? String(row.detail) : null,
+    title: parseAlertText(String(row.title)) ?? "",
+    detail: parseAlertText(row.detail ? String(row.detail) : null),
     domain: row.domain ? String(row.domain) : null,
     created_at: String(row.created_at),
     read: Number(row.read) as 0 | 1,
@@ -154,8 +157,8 @@ function rowToAlert(row: Record<string, unknown>): AlertRow {
 export async function createAlert(userId: string, params: {
   type: AlertType;
   level: AlertLevel;
-  title: string;
-  detail?: string | null;
+  title: LocalizedText;
+  detail?: LocalizedText | null;
   domain?: string | null;
 }): Promise<AlertRow> {
   const db = await getAdapter();
@@ -165,8 +168,8 @@ export async function createAlert(userId: string, params: {
   `, [{
     type: params.type,
     level: params.level,
-    title: params.title,
-    detail: params.detail ?? null,
+    title: serializeAlertText(params.title),
+    detail: params.detail === null || params.detail === undefined ? null : serializeAlertText(params.detail),
     domain: params.domain ?? null,
     user_id: userId,
   }]);
@@ -207,12 +210,12 @@ export async function countUnreadAlertsByDomain(userId: string, domain: string):
 }
 
 /** 兜底去重：同 domain + 同 title + 同日期（localtime）是否已存在预警 */
-export async function hasAlertToday(userId: string, domain: string, title: string): Promise<boolean> {
+export async function hasAlertToday(userId: string, domain: string, title: LocalizedText): Promise<boolean> {
   const db = await getAdapter();
   const row = await db.get(`
     SELECT 1 FROM alerts
     WHERE domain = ? AND title = ? AND date(created_at) = date('now', 'localtime') AND user_id = ?
     LIMIT 1
-  `, [domain, title, userId]) as { 1: number } | undefined;
+  `, [domain, serializeAlertText(title), userId]) as { 1: number } | undefined;
   return !!row;
 }

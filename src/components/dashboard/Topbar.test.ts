@@ -117,3 +117,67 @@ describe("F1：额度分支（未达额度→Modal，达额度→升级提示）
     expect(SRC).toMatch(/useEffect\(\(\) => \{\s*void \(async \(\) => \{ await loadProjects\(\); \}\)\(\);\s*\}, \[loadProjects\]\);/);
   });
 });
+
+// ===== BUG-45 回归测试：360 屏项目切换器不得压到铃铛/套餐徽标上 =====
+// 实测：360×800 下切换器容器已被压到 128px，但按钮仍是 220px 宽（域名 span 的
+// flex 默认 min-width:auto 不允许收缩），于是域名文字画到铃铛按钮（216..252）之上，
+// 未读小红点正好压在域名上，读起来像「acme-example.co●」的乱码。
+
+describe("BUG-45：项目切换器必须 shrink-safe", () => {
+  it("外层容器、按钮、域名 span 三层都允许收缩", () => {
+    const start = SRC.indexOf('<div className="relative min-w-0" ref={projectRef}>');
+    expect(start, "切换器容器保持 relative min-w-0").toBeGreaterThan(-1);
+    const region = SRC.slice(start, SRC.indexOf("</button>", start));
+    expect(region).toContain("flex min-w-0 max-w-full items-center");
+    expect(region).toMatch(/max-w-\[140px\] min-w-0 truncate/);
+  });
+
+  it("铃铛未读点定位在铃铛按钮内，不靠绝对坐标压盖其他控件", () => {
+    const start = SRC.indexOf('<div className="relative" ref={bellRef}>');
+    expect(start, "铃铛容器保持 relative").toBeGreaterThan(-1);
+    const bell = SRC.slice(start, SRC.indexOf("</button>", start));
+    expect(bell).toContain("relative flex h-9 w-9");
+    expect(bell).toMatch(/\{unread > 0 && \(\s*<span className="absolute right-1\.5 top-2 h-1\.5 w-1\.5/);
+  });
+});
+
+// ===== BUG-16 回归测试：项目列表加载失败不得伪装成「尚无项目」 =====
+// 根因：loadProjects 里 !res.ok 与 catch 都落到 (data.data ?? [])，
+// 菜单只判断 projects.length === 0 → 服务端 500 / 断网时用户看到「尚无项目」，
+// 以为自己的项目被删了（在鉴权实例 /api/projects 500 的真实复现中确认）。
+
+describe("BUG-16：加载失败与空列表是两种状态", () => {
+  it("存在独立的 projectsFailed 状态，失败分支不读取 data.data", () => {
+    expect(SRC).toContain("const [projectsFailed, setProjectsFailed] = useState(false);");
+    const load = SRC.slice(SRC.indexOf("const loadProjects = useCallback"), SRC.indexOf("// 拉取预警"));
+    expect(load).toContain("if (!res.ok) {");
+    expect(load).toContain("setProjectsFailed(true);");
+    expect(load).toContain("setProjectsFailed(false);");
+    // 失败时提前 return，绝不把空数组当成功结果继续走选中项恢复逻辑
+    const failBranch = load.slice(load.indexOf("if (!res.ok) {"));
+    expect(failBranch.slice(0, 260)).toContain("return;");
+    expect(load).toMatch(/catch \{[\s\S]{0,200}setProjectsFailed\(true\)/);
+  });
+
+  it("菜单渲染：projectsFailed 优先于「尚无项目」，并提供重试", () => {
+    const menu = SRC.slice(SRC.indexOf('{t("switchProject")}'), SRC.indexOf("{projects.map("));
+    expect(menu).toContain("projectsFailed ? (");
+    expect(menu).toContain('{t("loadFailed")}');
+    expect(menu).toContain("onClick={() => void loadProjects()}");
+    expect(menu).toContain('{t("retry")}');
+    // 「尚无项目」只能在非失败状态下渲染
+    expect(menu.indexOf("projectsFailed ?")).toBeLessThan(menu.indexOf('{t("noProjects")}'));
+  });
+
+  it("en / zh 都补齐 loadFailed 与 retry 文案", () => {
+    for (const lang of ["en", "zh"]) {
+      const msg = JSON.parse(
+        readFileSync(fileURLToPath(new URL(`../../../messages/${lang}.json`, import.meta.url)), "utf-8")
+      );
+      const tb = msg.dashboard.topbar;
+      expect(typeof tb.loadFailed).toBe("string");
+      expect(typeof tb.retry).toBe("string");
+      expect(tb.retry).not.toBe(tb.noProjects);
+    }
+  });
+});

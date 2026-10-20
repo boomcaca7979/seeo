@@ -10,10 +10,15 @@ import { fileURLToPath } from "node:url";
 const EN = JSON.parse(readFileSync(fileURLToPath(new URL("../../messages/en.json", import.meta.url)), "utf-8"));
 const ZH = JSON.parse(readFileSync(fileURLToPath(new URL("../../messages/zh.json", import.meta.url)), "utf-8"));
 const MW = readFileSync(fileURLToPath(new URL("../lib/supabase/middleware.ts", import.meta.url)), "utf-8");
+const REDIRECT_SRC = readFileSync(
+  fileURLToPath(new URL("../lib/auth-redirect.ts", import.meta.url)),
+  "utf-8"
+);
 const AUTH_FORM_SRC = readFileSync(
   fileURLToPath(new URL("../components/auth/AuthForm.tsx", import.meta.url)),
   "utf-8"
 );
+import { safeRedirectTarget } from "@/lib/auth-redirect";
 
 // ---------- 1. locale message loading ----------
 describe("1. locale message loading（en/zh catalog 完整性）", () => {
@@ -42,6 +47,20 @@ describe("1. locale message loading（en/zh catalog 完整性）", () => {
       expect(EN.dashboard[ns], `en.dashboard.${ns}`).toBeTruthy();
       expect(ZH.dashboard[ns], `zh.dashboard.${ns}`).toBeTruthy();
     }
+  });
+
+  // 工作台 head 的 description 由 dashboard layout 的 generateMetadata 本地化输出，
+  // 缺键会让中文页面继承 (default)/layout 的英文兜底描述。
+  it("dashboard.metaDescription 双语齐备且各自语言正确", () => {
+    const en = EN.dashboard.metaDescription;
+    const zh = ZH.dashboard.metaDescription;
+    expect(typeof en).toBe("string");
+    expect(typeof zh).toBe("string");
+    expect(en.length).toBeGreaterThan(40);
+    expect(zh.length).toBeGreaterThan(20);
+    expect(zh).toMatch(/[一-鿿]/);
+    expect(en).not.toMatch(/[一-鿿]/);
+    expect(en).not.toBe(zh);
   });
 });
 
@@ -222,21 +241,40 @@ describe("6. Dashboard 不进入 /zh/app（locale 路由白名单）", () => {
 });
 
 // ---------- 7. login redirect 保持原路径 ----------
-describe("7. login redirect 保持原路径（safeRedirect 只放行 /app 前缀）", () => {
+describe("7. login redirect 保持原路径（白名单只在 /app 与 /payment/result 之内）", () => {
   it("middleware：未登录访问 /app → /login?redirect=<原路径+query>（深链保留）", () => {
     expect(MW).toContain('url.searchParams.set("redirect", redirectTarget)');
     expect(MW).toContain("pathname + request.nextUrl.search");
     expect(MW).toContain('url.pathname = "/login"');
   });
 
-  it("middleware + AuthForm：redirect 参数必须以 /app 开头才放行（防 open redirect）", () => {
-    const guard = 'startsWith("/app")';
-    expect(MW).toContain(guard);
-    expect(AUTH_FORM_SRC).toContain(guard);
+  // 阶段 19 遗留 A 修复后，`/app` 前缀判定不再是就地字面量，而是收敛到
+  // src/lib/auth-redirect.ts 的白名单。这里改断言「等价契约」而非放宽：
+  // 两个消费点都必须经过 safeRedirectTarget，且 /app 前缀规则仍在唯一实现里。
+  it("middleware + AuthForm：redirect 必须经白名单放行，白名单仍含 /app 前缀规则", () => {
+    expect(AUTH_FORM_SRC).toContain("safeRedirectTarget(redirectTarget)");
+    expect(MW).toContain("safeRedirectTarget(");
+    expect(REDIRECT_SRC).toContain('SAFE_REDIRECT_PREFIXES = ["/app", "/payment/result"]');
+    expect(REDIRECT_SRC).toContain("target.startsWith(`${prefix}/`)");
+    // 白名单以外的地址一律回落，绝不原样使用用户输入
+    expect(REDIRECT_SRC).toContain("AUTH_FALLBACK_TARGET = \"/app\"");
+    // 受保护页面判定仍要求 /app 前缀
+    expect(MW).toContain('startsWith("/app")');
   });
 
   it("AuthForm：登录/注册成功统一 router.push(safeRedirect)", () => {
     expect(AUTH_FORM_SRC).toContain("router.push(safeRedirect)");
+  });
+
+  it("白名单行为：工作台与支付结果页放行，站外与非白名单路径回落 /app", () => {
+    const deepLink = "/app/position-tracking?domain=acme-example.com";
+    expect(safeRedirectTarget(deepLink)).toBe(deepLink);
+    const paymentResult = "/payment/result?order=SO202610170001";
+    expect(safeRedirectTarget(paymentResult)).toBe(paymentResult);
+    for (const hostile of ["//evil.com", "https://evil.com/app", "/\\evil.com", "/application", "/payment/checkout"]) {
+      expect(safeRedirectTarget(hostile), hostile).toBe("/app");
+    }
+    expect(safeRedirectTarget(null)).toBe("/app");
   });
 });
 

@@ -21,9 +21,10 @@ function acceptsChinese(acceptLanguage: string): boolean {
 
 /** 无 [locale] 段路由（dashboard/auth）的 locale：cookie → Accept-Language → en */
 export async function resolveUiLocale(): Promise<Locale> {
-  // BUG-004：未知根路径（如 /this-page-not-exist）命中全局 /_not-found 静态壳时，
-  // requestLocale 为空并走到此处。静态渲染上下文调用 cookies()/headers() 会抛
-  // DYNAMIC_SERVER_USAGE（生产 500）。静态壳无用户请求上下文，直接回退默认语言。
+  // BUG-004：无 [locale] 段的未匹配路径（如 /this-page-not-exist）由 global-not-found
+  // 渲染，requestLocale 为空并走到此处。若渲染上下文是静态的（构建期/无请求上下文），
+  // cookies()/headers() 会抛 DYNAMIC_SERVER_USAGE（生产 500）——静态上下文没有用户请求，
+  // 直接回退默认语言。global-not-found 自身声明 force-dynamic，运行时有请求上下文。
   try {
     const store = await cookies();
     const cookieLocale = store.get("NEXT_LOCALE")?.value;
@@ -40,11 +41,11 @@ export async function resolveUiLocale(): Promise<Locale> {
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
-  // BUG-004：单段未知路径（如 /this-page-not-exist）会被 [locale] 段捕获，
-  // requested 为无效 locale。此时页面必然 notFound()，但 SSG 路由的动态
-  // fallback 渲染一旦触碰 cookies()（即使被 catch）也会污染静态渲染 store
-  // （staticBailoutInfo）→ E132 → 500。因此 requested 存在但无效时直接用
-  // defaultLocale，不解析用户 locale；requested 为空（无 [locale] 段的
+  // BUG-004：requested 存在但无效（首段被当成 [locale] 值）时直接用 defaultLocale，
+  // 不解析用户 locale —— SSG 路由的动态 fallback 渲染一旦触碰 cookies()（即使被 catch）
+  // 也会污染静态渲染 store（staticBailoutInfo）→ E132 → 500。
+  // 现在 [locale] 布局已声明 dynamicParams=false，无效 locale 段在路由层就交给
+  // global-not-found，本分支只剩防御作用；requested 为空（无 [locale] 段的
   // dashboard/auth 路由）才走 cookie 解析（这些路由本就是动态渲染）。
   const locale = hasLocale(routing.locales, requested)
     ? requested

@@ -5,6 +5,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SQLiteAdapter } from "../db/adapter";
+// 仅取类型（编译期擦除，不参与 vi.mock 的求值顺序）：
+// provider 替身默认返回 success 形状，若不标注契约类型，
+// mockImplementation 注入失败分支会被推断成缺 messageId 的错误类型。
+import type { SendEmailResult } from "./resend";
 
 function makeAdapter(): SQLiteAdapter {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -55,7 +59,7 @@ vi.mock("../db/migrations", () => ({
 
 // provider mock：可注入成功/失败
 const h = vi.hoisted(() => ({
-  sendRaw: vi.fn(async () => ({ success: true, messageId: "msg-1" })),
+  sendRaw: vi.fn((): Promise<SendEmailResult> => Promise.resolve({ success: true, messageId: "msg-1" })),
   configured: { value: true },
 }));
 vi.mock("./resend", () => ({
@@ -69,6 +73,20 @@ const { eligibleTemplates } = await import("./lifecycle");
 const { ensureUnsubscribeToken, unsubscribeByToken, isMarketingUnsubscribed, grantMarketingConsent } = await import("./preferences");
 const { MARKETING_SEND_HOLD } = await import("./consent");
 const { buildCtaUrl } = await import("./render");
+const { getEmailFrom } = await import("./config");
+
+/** provider 替身实际收到的消息体（sendRawEmail 的唯一入参） */
+type ProviderMessage = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  idempotencyKey?: string;
+};
+function providerMessages(): ProviderMessage[] {
+  const calls = (h.sendRaw as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+  return calls.map((c) => c[0] as ProviderMessage);
+}
 
 const USER = "user-email-1";
 const EMAIL = "user@example.com";
@@ -347,6 +365,60 @@ describe("邮件偏好（#7 / #8）", () => {
     expect(tx.messageId).toBe("msg-1");
     // provider 只被调用一次 —— 即事务邮件那一次
     expect(h.sendRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("发送层 → provider 的消息构建与幂等键（§六E）", () => {
+  it("模板邮件：provider 收到渲染后的主题/正文与默认发件人，模板通道不携带幂等键", async () => {
+    await grantConsent();
+    const r = await sendTemplateEmail({
+      userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS,
+    });
+    expect(r.status).toBe("sent");
+    const msgs = providerMessages();
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].from).toBe(getEmailFrom());
+    expect(msgs[0].to).toBe(EMAIL);
+    expect(msgs[0].subject.trim().length).toBeGreaterThan(0);
+    // 营销邮件的退订链接必须随正文一起送达 provider，否则合规护栏只是纸面成立
+    expect(msgs[0].html).toContain(BASE_VARS.unsubscribeUrl);
+    expect(msgs[0].idempotencyKey).toBeUndefined();
+  });
+
+  it("事务邮件：显式幂等键原样送达 provider；缺省不伪造，from 覆盖生效", async () => {
+    const { sendTransactionalEmail } = await import("./service");
+    await sendTransactionalEmail({
+      userId: USER, email: EMAIL, templateKey: "report_email_v1",
+      subject: "Your SeeO report", html: "<p>ok</p>", idempotencyKey: "report:9:run-1",
+    });
+    expect(providerMessages()[0]).toMatchObject({
+      from: getEmailFrom(), to: EMAIL, subject: "Your SeeO report",
+      html: "<p>ok</p>", idempotencyKey: "report:9:run-1",
+    });
+
+    h.sendRaw.mockClear();
+    await sendTransactionalEmail({
+      userId: USER, email: EMAIL, templateKey: "report_email_v1",
+      subject: "S2", html: "<p>H2</p>", from: "SeeO Reports <reports@seeo.asia>",
+    });
+    expect(providerMessages()[0].from).toBe("SeeO Reports <reports@seeo.asia>");
+    expect(providerMessages()[0].idempotencyKey).toBeUndefined();
+  });
+
+  it("provider 失败：原因写入 email_log，provider_message_id 与 sent_at 不被伪造", async () => {
+    h.sendRaw.mockImplementation(async () => ({ success: false, error: "provider down" }));
+    await grantConsent();
+    const r = await sendTemplateEmail({
+      userId: USER, email: EMAIL, templateKey: "welcome_v1", variables: BASE_VARS,
+    });
+    expect(r.status).toBe("failed");
+    expect(r.reason).toBe("provider down");
+    const rows = await logRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("failed");
+    expect(rows[0].failure_reason).toBe("provider down");
+    expect(rows[0].provider_message_id).toBeNull();
+    expect(rows[0].sent_at).toBeNull();
   });
 });
 

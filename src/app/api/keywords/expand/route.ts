@@ -4,10 +4,9 @@
 // 缓存与用量：serpapi 沿用 serp 命名空间；dataforseo 沿用 kw-metrics 命名空间 + dataforseo 配额
 
 import { NextResponse } from "next/server";
-import { SeoProviderError } from "@/lib/seo/provider";
 import { getSerpUsage } from "@/lib/seo/serp-service";
 import { researchKeywords } from "@/lib/seo/keyword-research-service";
-import { QuotaExceededError } from "@/lib/seo/cache";
+import { serpApiErrorResponse } from "@/lib/seo/serp-route-errors";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -43,33 +42,6 @@ interface ExpandResponse {
 
 function badParams(msg: string) {
   return NextResponse.json<SeoApiError>({ error: msg, code: "BAD_REQUEST" }, { status: 400 });
-}
-
-function mapError(e: unknown) {
-  if (e instanceof SeoProviderError) {
-    const status =
-      e.code === "INVALID_KEY" ? 401 :
-      e.code === "QUOTA_EXCEEDED" ? 429 :
-      e.code === "TIMEOUT" ? 504 :
-      e.code === "BAD_REQUEST" ? 400 : 502;
-    return NextResponse.json<SeoApiError>({ error: e.message, code: e.code }, { status });
-  }
-  if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-    return NextResponse.json<SeoApiError>(
-      { error: "本月额度已用尽，下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
-      { status: 429 }
-    );
-  }
-  if (e instanceof QuotaExceededError) {
-    return NextResponse.json<SeoApiError>(
-      { error: e.message, code: "QUOTA_EXCEEDED" },
-      { status: 429 }
-    );
-  }
-  return NextResponse.json<SeoApiError>(
-    { error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" },
-    { status: 500 }
-  );
 }
 
 export async function POST(req: Request) {
@@ -115,6 +87,6 @@ export async function POST(req: Request) {
     };
     return NextResponse.json({ data: resp, usage: await getSerpUsage(userId, plan) });
   } catch (e) {
-    return mapError(e);
+    return serpApiErrorResponse(e);
   }
 }

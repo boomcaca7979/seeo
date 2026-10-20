@@ -1,9 +1,14 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import { AddressInfo } from "node:net";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as nodePath from "node:path";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { normalizeMcpError, McpNormalizedError } from "./errors";
+import { useTempSqliteDb, type TempSqliteDb } from "@/lib/db/test-db";
+import { closeDb, getAdapter } from "@/lib/db/migrations";
 import { backlinkOutputSchema, gscCompareOutputSchema, gscInspectOutputSchema, gscPerformanceOutputSchema, keywordOutputSchema, rankHistoryOutputSchema, serpOutputSchema } from "./output-schemas";
 import { gscInputSchema } from "./schemas";
 import { keywordInputSchema, serpInputSchema } from "./schemas";
@@ -58,12 +63,18 @@ let httpServer: ReturnType<typeof createHttpServer>;
 let POST: typeof import("@/app/api/mcp/route").POST;
 let GET: typeof import("@/app/api/mcp/route").GET;
 let DELETE: typeof import("@/app/api/mcp/route").DELETE;
+let tempDb: TempSqliteDb;
 
 beforeAll(async () => {
+  // 隔离：本文件通过真实的 /api/mcp 处理器读写数据库，所以必须跑在自己的临时库上。
+  // 上一轮 data/seeo.db 的归属疑问正是这类「用默认 demo 库的集成测试」造成的。
+  // useTempSqliteDb 会断言路径落在临时目录，且不在仓库 data/ 内。
+  tempDb = useTempSqliteDb("mcp");
   // auth-config is intentionally evaluated once. Keep this integration test
   // deterministic and exercise the MCP demo boundary without changing
   // production authentication behavior.
   process.env.NEXT_PUBLIC_ENABLE_AUTH = "false";
+  await getAdapter();
   ({ POST, GET, DELETE } = await import("@/app/api/mcp/route"));
   httpServer = createHttpServer(async (req, res) => {
     try {
@@ -88,6 +99,9 @@ beforeAll(async () => {
 afterAll(async () => {
   httpServer.close();
   await once(httpServer, "close");
+  closeDb();
+  tempDb.restore();
+  fs.rmSync(tempDb.dir, { recursive: true, force: true });
 });
 
 async function httpRequest(body: unknown, headers: Record<string, string> = clientHeaders, method = "POST") {
@@ -133,6 +147,12 @@ async function officialClient() {
 }
 
 describe("SeeO MCP standard Streamable HTTP compatibility", () => {
+  it("serves this suite from a temp SQLite file, never the repository demo db", () => {
+    expect(process.env.SEO_SQLITE_DB_PATH).toBe(tempDb.file);
+    expect(tempDb.file.startsWith(fs.realpathSync(os.tmpdir()))).toBe(true);
+    expect(tempDb.file.startsWith(nodePath.join(process.cwd(), "data"))).toBe(false);
+  });
+
   it("connects with the official MCP client and lists exactly thirteen tools", async () => {
     const { client } = await officialClient();
     const listed = await client.listTools();

@@ -102,7 +102,7 @@ export default async function GrowthOpportunityPanel({ summary }: GrowthOpportun
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="font-display text-base font-semibold text-ink">{tg("title")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{tg("title")}</h2>
             {hasAudit && (
               <span className="badge-info">{tp("auditedDomains", { n: summary.auditedDomains })}</span>
             )}

@@ -4,7 +4,10 @@
 //   - 多页 title/description 曾共用同一文案（重复）
 // 本测试对齐审计引擎阈值（TITLE 30-60 / DESC 120-160，按 String.length 计），
 // 覆盖全部营销页（首页 / pricing / docs / about / features×3 / privacy / terms /
-// refund / login / signup），并保证同 locale 下 title 与 description 全站唯一。
+// refund），保证同 locale 下 title 与 description 全站唯一；
+// /login、/signup 是 noindex 的同 URL 双语言页，单独按「本地化 + 上限 + 不重复」校验。
+// 认证页取的是 messages 里服务端 generateMetadata 真正读取的 key（旧版解析 page.tsx
+// 源码字面量，页面改成服务端按 locale 解析后字面量已不存在，解析不到就变成空串）。
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -63,12 +66,10 @@ function parseLocaleMetaBlock(src: string): Record<"en" | "zh", MetaEntry> {
   return out;
 }
 
-/** 从 TSX 源码解析单语言 metadata（title/description 直接字面量） */
-function parsePlainMetadata(src: string): MetaEntry {
-  return {
-    title: src.match(/title:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? "",
-    description: src.match(/description:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? "",
-  };
+/** 从 messages 目录取认证页 metadata（服务端 generateMetadata 真正使用的就是这两个 key） */
+function authMeta(locale: "en" | "zh", which: "login" | "signup"): MetaEntry {
+  const ns = (locale === "en" ? enMessages : zhMessages).authPage as Record<string, string>;
+  return { title: ns[`${which}Title`], description: ns[`${which}Description`] };
 }
 
 // ---- 汇总全站 metadata（页面路径 → 条目）----
@@ -99,8 +100,7 @@ const PAGES: Record<"en" | "zh", Record<string, MetaEntry>> = {
     "/privacy": enMeta.privacyPage,
     "/terms": enMeta.termsPage,
     "/refund": enMeta.refundPage,
-    "/login": parsePlainMetadata(read("../app/(default)/login/page.tsx")),
-    "/signup": parsePlainMetadata(read("../app/(default)/signup/page.tsx")),
+    // /login、/signup 为同一 URL 的双语言界面（不做 /zh/login 双地址），单独在下面校验
   },
   zh: {
     "/zh": homeMeta.zh,
@@ -122,9 +122,21 @@ const PAGES: Record<"en" | "zh", Record<string, MetaEntry>> = {
     "/zh/privacy": zhMeta.privacyPage,
     "/zh/terms": zhMeta.termsPage,
     "/zh/refund": zhMeta.refundPage,
-    // login / signup 为 EN 专属页（不参与 locale 路由）
   },
 };
+
+/**
+ * 认证页：同一 URL（/login、/signup）按界面语言输出，两个 locale 都可能有访客，
+ * 因此都必须有本地化 metadata。它们继承 (default) layout 的 noindex，
+ * 不进 sitemap —— 长度按「不被 SERP 截断 + 足够描述」而非营销页 120-160 区间约束。
+ */
+const AUTH_PAGES: Record<"en" | "zh", Record<string, MetaEntry>> = {
+  en: { "/login": authMeta("en", "login"), "/signup": authMeta("en", "signup") },
+  zh: { "/login": authMeta("zh", "login"), "/signup": authMeta("zh", "signup") },
+};
+
+const AUTH_TITLE_MIN = { en: TITLE_MIN, zh: 15 } as const;
+const AUTH_DESC_MIN = { en: DESC_MIN, zh: 40 } as const;
 
 for (const locale of ["en", "zh"] as const) {
   describe(`[${locale}] 全站 metadata 完整性`, () => {
@@ -167,15 +179,62 @@ for (const locale of ["en", "zh"] as const) {
   });
 }
 
+describe("认证页 metadata：/login、/signup 同一 URL 的双语言界面", () => {
+  for (const locale of ["en", "zh"] as const) {
+    for (const [path, meta] of Object.entries(AUTH_PAGES[locale])) {
+      it(`[${locale}] ${path} title/description 非空且长度合规（title ${AUTH_TITLE_MIN[locale]}-${TITLE_MAX}，description ≥${AUTH_DESC_MIN[locale]}、≤${DESC_MAX}）`, () => {
+        expect(meta.title.length, `${locale} ${path} title 为空`).toBeGreaterThan(0);
+        expect(meta.description.length, `${locale} ${path} description 为空`).toBeGreaterThan(0);
+        expect(meta.title.length).toBeGreaterThanOrEqual(AUTH_TITLE_MIN[locale]);
+        expect(meta.title.length).toBeLessThanOrEqual(TITLE_MAX);
+        expect(meta.description.length).toBeGreaterThanOrEqual(AUTH_DESC_MIN[locale]);
+        expect(meta.description.length).toBeLessThanOrEqual(DESC_MAX);
+      });
+    }
+  }
+
+  it("中文界面不再拿英文标题（历史缺陷：zh 环境的 /login metadata 硬编码英文）", () => {
+    for (const path of ["/login", "/signup"]) {
+      expect(AUTH_PAGES.zh[path].title).not.toBe(AUTH_PAGES.en[path].title);
+      expect(AUTH_PAGES.zh[path].description).not.toBe(AUTH_PAGES.en[path].description);
+      // 中文页必须是中文文案（含 CJK 字符），不是 key 回显或占位符
+      expect(AUTH_PAGES.zh[path].title).toMatch(/[\u4e00-\u9fff]/);
+      expect(AUTH_PAGES.zh[path].description).toMatch(/[\u4e00-\u9fff]/);
+    }
+  });
+
+  it("认证页 title/description 彼此不同，且不与任何营销页重复", () => {
+    for (const locale of ["en", "zh"] as const) {
+      const marketing = [
+        ...Object.values(PAGES[locale]),
+        // 营销页的另一语言集合也一并比对：认证页文案不得抄自首页/定价页
+        ...Object.values(PAGES[locale === "en" ? "zh" : "en"]),
+      ];
+      const entries = Object.entries(AUTH_PAGES[locale]);
+      expect(new Set(entries.map(([, m]) => m.title)).size).toBe(entries.length);
+      expect(new Set(entries.map(([, m]) => m.description)).size).toBe(entries.length);
+      for (const [path, meta] of entries) {
+        for (const m of marketing) {
+          expect(meta.title, `${locale} ${path} 与营销页 title 重复`).not.toBe(m.title);
+          expect(meta.description, `${locale} ${path} 与营销页 description 重复`).not.toBe(
+            m.description
+          );
+        }
+      }
+    }
+  });
+});
+
 describe("EN / ZH 对应关系", () => {
   it("messages JSON 的 meta 键在 EN 与 ZH 完全对应", () => {
     expect(Object.keys(enMeta).sort()).toEqual(Object.keys(zhMeta).sort());
   });
 
-  it("EN 与 ZH 页面集合一致（login/signup 除外，为 EN 专属）", () => {
-    const enPaths = Object.keys(PAGES.en).filter((p) => p !== "/login" && p !== "/signup");
+  it("EN 与 ZH 营销页集合一致（认证页不参与 locale 双地址）", () => {
+    const enPaths = Object.keys(PAGES.en);
     const zhPaths = Object.keys(PAGES.zh);
     expect(zhPaths.map((p) => (p === "/zh" ? "/" : p.replace(/^\/zh/, ""))).sort()).toEqual(enPaths.sort());
+    expect(Object.keys(AUTH_PAGES.en).sort()).toEqual(Object.keys(AUTH_PAGES.zh).sort());
   });
 });
 
@@ -206,9 +265,12 @@ describe("回归防护：本轮修复的历史问题不得再现", () => {
     expect(defaultLayout).toMatch(/index:\s*false/);
     const siteTitle = defaultLayout.match(/title:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? "";
     expect(siteTitle.length).toBeGreaterThan(0);
-    // (default) 根布局的兜底 title 不得与任何 locale 页面 title 重复
+    // (default) 根布局的兜底 title 不得与任何 locale 页面（含认证页）title 重复
     for (const locale of ["en", "zh"] as const) {
       for (const [path, meta] of Object.entries(PAGES[locale])) {
+        expect(meta.title, `(default) layout 与 ${locale} ${path} title 重复`).not.toBe(siteTitle);
+      }
+      for (const [path, meta] of Object.entries(AUTH_PAGES[locale])) {
         expect(meta.title, `(default) layout 与 ${locale} ${path} title 重复`).not.toBe(siteTitle);
       }
     }

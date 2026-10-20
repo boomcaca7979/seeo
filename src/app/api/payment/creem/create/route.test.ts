@@ -80,7 +80,13 @@ vi.mock("@/lib/orders/service", () => ({
       },
     };
   }),
-  markOrderFailed: vi.fn(async () => {}),
+  markOrderFailed: vi.fn(
+    async (): Promise<{ ok: boolean; order: unknown; opened: boolean }> => ({
+      ok: true,
+      order: null,
+      opened: false,
+    })
+  ),
   parseOrderParam: vi.fn(() => ({})),
 }));
 

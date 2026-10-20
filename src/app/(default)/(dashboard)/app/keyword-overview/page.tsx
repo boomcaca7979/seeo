@@ -1,15 +1,55 @@
 "use client";
 
+// ===== Keyword Overview（关键词概览 · 单关键词 SERP 研究）=====
+//
+// 与第一批 /app、/app/audit 共用同一套可视化规则：
+//   ① 头部 + 工具栏：市场 / 设备 / 关键词输入（既有操作一个不少）
+//   ② 指标卡：本次 SERP 快照里**真实存在**的量（结果数 / 相关搜索 / 相关问题 / 意图估算）
+//   ③ 图表：结果域名分布（横条，标注"出现次数"）+ 相关搜索
+//   ④ 数据表：SERP Top N（位置 / 标题 / 域名 / 摘要），移动端转紧凑卡片
+//
+// 诚实边界：
+//   - 本页没有搜索量 / 难度 / CPC 数据 → 不展示、不估算、不用替代值；
+//     意图是**基于关键词文本的规则估算**，UI 明确标注「估算」。
+//   - 未查询、无结果、数据源不可用分别有各自的空状态，绝不画假图表。
+
 import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import type { SerpResult } from "@/lib/seo/types";
-import ChartCard from "@/components/dashboard/charts/ChartCard";
-import RelatedKeywordBars from "@/components/dashboard/charts/RelatedKeywordBars";
+import {
+  RK,
+  RK_GRID_PROPS,
+  RK_LINK_CLASS,
+  RK_TICK_STYLE,
+  RK_TOOLTIP_ITEM_STYLE,
+  RK_TOOLTIP_LABEL_STYLE,
+  RK_TOOLTIP_STYLE,
+  RK_YAXIS_PROPS,
+  categoryColorMap,
+  intTicks,
+} from "@/components/viz/rank-theme";
 import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 import { formatNumber } from "@/lib/ui-locale";
+
+import PageHeader from "@/components/viz/PageHeader";
+import MetricCard from "@/components/viz/MetricCard";
+import ChartFrame from "@/components/viz/ChartFrame";
+import { StatusBadge } from "@/components/viz/StatusBadge";
+import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
 
 interface UsageBadge {
   used: number;
@@ -68,6 +108,7 @@ export default function KeywordOverviewPage() {
 function KeywordOverviewInner() {
   const t = useTranslations("dashboard.keywords.overview");
   const tc = useTranslations("dashboard.common");
+  const tv = useTranslations("dashboard.viz");
   const locale = useLocale() as "en" | "zh";
   const searchParams = useSearchParams();
   const deepLinkKeyword = (searchParams.get("keyword") ?? "").trim();
@@ -132,7 +173,7 @@ function KeywordOverviewInner() {
 
   const hasResult = !!serp.data && serp.data.organic.length > 0;
 
-  // SERP 域名分布：统计前 10 结果中各域名出现次数（作为量级对比的替代）
+  // SERP 域名分布：统计结果中各域名出现次数（真实计数，不是搜索量）
   const organic = serp.data?.organic;
   const domainDistribution = useMemo(() => {
     if (!organic) return [];
@@ -141,32 +182,75 @@ function KeywordOverviewInner() {
       counts.set(r.domain, (counts.get(r.domain) ?? 0) + 1);
     });
     return Array.from(counts.entries())
-      .map(([domain, count]) => ({ keyword: domain, volume: count }))
-      .sort((a, b) => b.volume - a.volume);
+      .map(([domain, count]) => ({ domain, count }))
+      .sort((a, b) => b.count - a.count || a.domain.localeCompare(b.domain));
   }, [organic]);
+
+  const intentValue = serp.keyword ? detectIntent(serp.keyword) : null;
+
+  /**
+   * 域名标签：过长则截短（**不旋转、不拼接**），完整域名仍可在 tooltip 中查看。
+   * YAxis 宽度按截短后的最大长度给定，保证标签与数值轴互不挤压。
+   */
+  const DOMAIN_LABEL_MAX = 20;
+  const truncateDomain = (d: string) =>
+    d.length > DOMAIN_LABEL_MAX ? `${d.slice(0, DOMAIN_LABEL_MAX - 1)}…` : d;
+  /** 稳定分类配色：同一域名在同一数据集内颜色恒定（排序/筛选变化不会改色） */
+  const domainColors = useMemo(
+    () => categoryColorMap(domainDistribution.map((d) => d.domain)),
+    [domainDistribution]
+  );
+  /** 出现次数轴的整数刻度（0 起，不含小数；量级变化时布局仍稳定） */
+  const countAxis = useMemo(
+    () => intTicks(domainDistribution.reduce((m, d) => Math.max(m, d.count), 0)),
+    [domainDistribution]
+  );
 
   return (
     <div className="dash-container p-6 lg:p-8">
-      {/* 页头 */}
-      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">
-        {t("title")}
-      </h1>
-      <p className="mt-1 text-sm text-ink-60">
-        {t("subtitle")}
-      </p>
+      <PageHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        meta={
+          <>
+            <span>
+              {display(location)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}
+            </span>
+            {serp.keyword && (
+              <>
+                <span>·</span>
+                <span>{serp.keyword}</span>
+              </>
+            )}
+            {serp.data && (
+              <>
+                <span>·</span>
+                <span>{serp.data.fromCache ? `${t("serpSource")} · ${t("cachedTag")}` : t("serpSource")}</span>
+              </>
+            )}
+            {usage && (
+              <>
+                <span>·</span>
+                <span>
+                  {t("usage", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
+                </span>
+              </>
+            )}
+          </>
+        }
+      />
 
       {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
-      <div className="mt-4">
-        <OpportunityContextBanner />
-      </div>
+      <OpportunityContextBanner />
 
-      {/* 搜索框 */}
-      <form onSubmit={handleAnalyze} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      {/* 工具栏：市场 / 设备 / 关键词 / 分析（既有操作保持不变） */}
+      <form onSubmit={handleAnalyze} className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex items-center gap-2">
           <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            aria-label={t("marketLabel")}
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             {KEYWORD_LOCATIONS.map((c) => (
               <option key={c} value={c}>{display(c)}</option>
@@ -175,14 +259,15 @@ function KeywordOverviewInner() {
           <select
             value={device}
             onChange={(e) => setDevice(e.target.value as Device)}
-            className="rounded-md border border-line bg-card h-10 px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
+            aria-label={t("deviceLabel")}
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm text-ink focus:border-ink-25 focus:outline-none"
           >
             <option value="PC">PC</option>
             <option value="移动端">{locale === "zh" ? "移动端" : "Mobile"}</option>
           </select>
         </div>
         <div className="relative flex-1">
-          <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-40">
+          <svg viewBox="0 0 24 24" fill="none" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-40">
             <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
             <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
@@ -191,168 +276,272 @@ function KeywordOverviewInner() {
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             placeholder={t("searchPlaceholder")}
-            className="w-full rounded-md border border-line bg-card py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
+            aria-label={t("searchPlaceholder")}
+            className="h-10 w-full rounded-md border border-line bg-card py-2 pl-11 pr-4 text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
-        <button type="submit" disabled={serp.loading} className="btn-primary px-6 py-3">
+        <button type="submit" disabled={serp.loading} className="btn-primary px-6 disabled:opacity-60">
           {serp.loading ? t("analyzing") : t("analyze")}
         </button>
       </form>
 
-      {usage && (
-        <div className="mt-4 text-xs text-ink-40">
-          {t("usage", { used: formatNumber(usage.used, locale), limit: formatNumber(usage.limit, locale) })}
-        </div>
-      )}
-
-      {/* 概览区：未分析时纯空态 */}
+      {/* 未分析：诚实空态 + 可直接开始的操作（无图表、无装饰性圆形） */}
       {!hasResult && !serp.loading && !serp.error && (
-        <div className="mt-8 card-a flex flex-col items-center justify-center py-20 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-line text-ink-40">
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-              <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="mt-3 text-sm font-medium text-ink">{t("emptyTitle")}</div>
-          <p className="mt-1 text-xs text-ink-40">{t("emptyHint")}</p>
+        <div className="mt-6 flex flex-col items-center justify-center rounded-lg border border-dashed border-line py-14 text-center">
+          <div className="font-mono text-xs uppercase tracking-wide text-ink-40">{t("title")}</div>
+          <div className="mt-2 font-sans text-sm font-medium text-ink">{t("emptyTitle")}</div>
+          <p className="mt-1 max-w-md font-sans text-xs text-ink-40">{t("emptyHint")}</p>
         </div>
       )}
 
-      {/* 错误态 */}
+      {/* 错误态（含数据源不可用 / 额度）：如实显示，不给替代数据 */}
       {serp.error && !serp.loading && (
-        <div className="mt-8 card-a p-6 text-center text-sm text-neg">{serp.error}</div>
+        <div className="mt-6 card-a p-5">
+          <div className="flex items-start gap-2">
+            <StatusBadge label={t("queryFailed")} tone="neg" dot={false} />
+            <span className="font-sans text-sm text-neg">{serp.error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 查询成功但没有自然结果：独立空态（不是"没查询"，也不是假图表） */}
+      {serp.data && !serp.loading && !serp.error && serp.data.organic.length === 0 && (
+        <ChartFrame
+          className="mt-6"
+          title={t("serpTableTitle")}
+          subtitle={serp.keyword ?? undefined}
+          isEmpty
+          emptyTitle={t("noResults")}
+          emptyHint={t("emptyHint")}
+        />
       )}
 
       {/* 分析结果 */}
       {hasResult && serp.keyword && (
         <>
-          {/* 四张概览卡（真实派生指标） */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <OverviewCard label={t("cardKeyword")} value={serp.keyword} sub={t("subIntent", { intent: intentText(t, detectIntent(serp.keyword)) })} />
-            <OverviewCard label={t("cardResults")} value={formatNumber(serp.data!.organic.length, locale)} sub={t("subTop100")} />
-            <OverviewCard label={t("cardRelated")} value={formatNumber(serp.data!.relatedSearches.length, locale)} sub={t("subExpandable")} />
-            <OverviewCard label={t("cardPaa")} value={formatNumber(serp.data!.relatedQuestions.length, locale)} sub={t("subQuestions")} />
+          {/* 指标卡：本次 SERP 快照里真实存在的量 */}
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MetricCard
+              label={t("metricIntent")}
+              value={intentValue ? intentText(t, intentValue) : null}
+              caption={serp.keyword}
+              hint={t("intentNote")}
+              hintStyle="plain"
+            />
+            <MetricCard
+              label={t("cardResults")}
+              value={formatNumber(serp.data!.organic.length, locale)}
+              caption={t("subTop100")}
+              hint={t("metricResultsHint")}
+              hintStyle="plain"
+            />
+            <MetricCard
+              label={t("cardRelated")}
+              value={formatNumber(serp.data!.relatedSearches.length, locale)}
+              caption={t("subExpandable")}
+              hint={t("metricRelatedHint")}
+              hintStyle="plain"
+            />
+            <MetricCard
+              label={t("cardPaa")}
+              value={formatNumber(serp.data!.relatedQuestions.length, locale)}
+              caption={t("subQuestions")}
+              hint={t("metricPaaHint")}
+              hintStyle="plain"
+            />
           </div>
 
-          {/* SERP Top 10 */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[1.0625rem] font-semibold text-ink">SERP Top 10</h2>
-              <span className="text-xs text-ink-40">
-                {t("serpSource")}{serp.data?.fromCache && ` · ${t("cachedTag")}`}
-              </span>
-            </div>
-            <div className="card-a mt-3 overflow-hidden">
-              {serp.loading ? (
-                <SerpSkeleton />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-line-soft bg-line-soft/50">
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colRank")}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colTitle")}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colDomain")}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-ink-40">{t("colSnippet")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {serp.data!.organic.map((r) => (
-                        <tr key={r.position} className="border-b border-line-soft/60 transition-colors hover:bg-line-soft/40">
-                          <td className="px-4 py-3">
-                            <span className="text-sm font-semibold text-ink">#{r.position}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <a
-                              href={r.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium text-accent hover:underline"
-                            >
-                              {r.title}
-                            </a>
-                            {r.date && <span className="ml-2 text-xs text-ink-40">{r.date}</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="rounded bg-line-soft px-2 py-0.5 font-mono text-xs text-ink-60">{r.domain}</span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-ink-60 line-clamp-2 max-w-md">{r.snippet || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 图表区：SERP 域名分布 + 相关搜索 */}
-          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-12">
-            {/* SERP 域名分布横向条形图 */}
-            <ChartCard
+          {/* 图表：域名分布 + 相关搜索 */}
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <ChartFrame
+              className="lg:col-span-7"
               title={t("chartDomainTitle")}
               subtitle={t("chartDomainSubtitle")}
-              height={Math.max(240, domainDistribution.length * 28 + 80)}
-              className="lg:col-span-7"
+              legend={[
+                { label: t("domainValueLabel"), tone: "neutral", color: RK.accent },
+                { label: t("colDomain"), tone: "neutral", value: domainDistribution.length, color: RK.neutral },
+              ]}
+              isEmpty={domainDistribution.length === 0}
+              emptyTitle={t("noResults")}
+              emptyHint={t("domainValueHint")}
+              showEmptyIcon={false}
+              chartHeight={domainDistribution.length === 0 ? undefined : Math.max(200, domainDistribution.length * 28 + 56)}
+              chart={
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={domainDistribution}
+                    layout="vertical"
+                    margin={{ top: 4, right: 30, bottom: 4, left: 0 }}
+                    barCategoryGap="22%"
+                  >
+                    <CartesianGrid {...RK_GRID_PROPS} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      domain={countAxis.domain}
+                      ticks={countAxis.ticks}
+                      allowDecimals={false}
+                      {...RK_YAXIS_PROPS}
+                      tickMargin={6}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="domain"
+                      width={138}
+                      interval={0}
+                      tickFormatter={truncateDomain}
+                      tick={RK_TICK_STYLE}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={6}
+                    />
+                    <Tooltip
+                      contentStyle={RK_TOOLTIP_STYLE}
+                      labelStyle={RK_TOOLTIP_LABEL_STYLE}
+                      itemStyle={RK_TOOLTIP_ITEM_STYLE}
+                      cursor={{ fill: RK.cursor }}
+                      formatter={(v) => [`${formatNumber(Number(v), locale)}`, t("domainValueLabel")]}
+                    />
+                    <Bar dataKey="count" radius={[0, 3, 3, 0]} maxBarSize={16} isAnimationActive={false}>
+                      {domainDistribution.map((d) => (
+                        <Cell key={d.domain} fill={domainColors.get(d.domain) ?? RK.neutral} />
+                      ))}
+                      <LabelList
+                        dataKey="count"
+                        position="right"
+                        offset={6}
+                        formatter={(v) => `${v}`}
+                        style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", fill: RK.ink60 }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              }
             >
-              <RelatedKeywordBars data={domainDistribution} topN={15} />
-            </ChartCard>
+              <p className="mt-3 border-t border-line-soft pt-3 font-sans text-xs text-ink-40">{t("domainValueHint")}</p>
+            </ChartFrame>
 
-            {/* 相关搜索词 */}
-            <ChartCard
+            <ChartFrame
+              className="lg:col-span-5 self-start"
               title={t("chartRelatedTitle")}
-              subtitle={t("relatedCount", { count: formatNumber(serp.data?.relatedSearches.length ?? 0, locale) })}
-              height={320}
-              className="lg:col-span-5"
+              subtitle={t("relatedCount", { count: formatNumber(serp.data!.relatedSearches.length, locale) })}
+              isEmpty={serp.data!.relatedSearches.length === 0}
+              emptyTitle={t("noRelated")}
+              emptyHint={t("metricRelatedHint")}
+              showEmptyIcon={false}
             >
-              {serp.data && serp.data.relatedSearches.length > 0 ? (
-                <div className="flex h-full flex-wrap content-start gap-2 overflow-y-auto">
-                  {serp.data.relatedSearches.map((r, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center rounded-full border border-line bg-card px-3 py-1 text-xs text-ink-60 transition-colors hover:border-ink-25 hover:text-ink"
-                    >
-                      {r.query}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs text-ink-40">
-                  {t("noRelated")}
-                </div>
-              )}
-            </ChartCard>
+              <div className="flex max-h-[19rem] flex-wrap content-start gap-2 overflow-y-auto">
+                {serp.data!.relatedSearches.map((r, i) => (
+                  <span
+                    key={`${r.query}-${i}`}
+                    className="inline-flex items-center rounded-sm border border-line bg-card px-2 py-1 font-sans text-xs text-ink-60"
+                  >
+                    {r.query}
+                  </span>
+                ))}
+              </div>
+            </ChartFrame>
           </div>
+
+          {/* SERP 结果表 */}
+          <section className="card-a mt-4 p-5">
+            <header className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-display text-lg font-semibold text-ink">{t("serpTableTitle")}</h3>
+                <p className="mt-0.5 font-sans text-xs text-ink-40">{t("topNNote")}</p>
+              </div>
+              <StatusBadge
+                label={serp.data!.fromCache ? `${t("serpSource")} · ${t("cachedTag")}` : t("serpSource")}
+                tone={serp.data!.fromCache ? "info" : "pos"}
+                dot={false}
+              />
+            </header>
+
+            <div className="mt-4">
+              {/* 桌面端：真表格（外层 overflow-x-auto 兜底，小屏横向滚动而非撑破页面） */}
+              <div className="hidden overflow-x-auto md:block">
+                <DataTable minWidthRem={50} ariaLabel={t("serpTableTitle")}>
+                  <THead>
+                    <Th align="right" width="5rem">{t("colRank")}</Th>
+                    <Th>{t("colTitle")}</Th>
+                    <Th width="10rem">{t("colDomain")}</Th>
+                    <Th width="28%">{t("colSnippet")}</Th>
+                  </THead>
+                  <TBody>
+                    {serp.data!.organic.map((r) => (
+                      <TR key={`${r.position}-${r.link}`}>
+                        <TD align="right" numeric>
+                          <span
+                            className="font-mono text-base font-semibold"
+                            style={{ color: r.position <= 3 ? RK.up : r.position <= 10 ? RK.warn : RK.ink60 }}
+                          >
+                            #{r.position}
+                          </span>
+                        </TD>
+                        <TD>
+                          <a
+                            href={r.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`font-sans text-sm font-medium ${RK_LINK_CLASS}`}
+                          >
+                            {r.title || r.link}
+                          </a>
+                          {r.date && <span className="ml-2 font-mono text-xs text-ink-40">{r.date}</span>}
+                        </TD>
+                        <TD>
+                          <span className="font-mono text-xs text-ink-60">{r.domain}</span>
+                        </TD>
+                        <TD>
+                          {r.snippet ? (
+                            <span className="line-clamp-2 font-sans text-xs text-ink-60">{r.snippet}</span>
+                          ) : (
+                            <span className="font-sans text-xs text-ink-40">{tv("notApplicable")}</span>
+                          )}
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </DataTable>
+              </div>
+
+              {/* 移动端：紧凑卡片 */}
+              <div className="md:hidden">
+                {serp.data!.organic.map((r) => (
+                  <div key={`${r.position}-${r.link}`} className="border-b border-line-soft py-3 last:border-b-0">
+                    <div className="flex items-start gap-2">
+                      <span
+                        className="font-mono text-sm font-semibold"
+                        style={{ color: r.position <= 3 ? RK.up : r.position <= 10 ? RK.warn : RK.ink60 }}
+                      >
+                        #{r.position}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={r.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`font-sans text-sm font-medium ${RK_LINK_CLASS}`}
+                        >
+                          {r.title || r.link}
+                        </a>
+                        <div className="mt-0.5 truncate font-mono text-xs text-ink-40">{r.domain}</div>
+                        {r.snippet && (
+                          <p className="mt-1 line-clamp-2 font-sans text-xs text-ink-60">{r.snippet}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 意图为文本规则估算，必须标注清楚 */}
+            <p className="mt-3 border-t border-line-soft pt-3 font-sans text-xs text-ink-40">{t("intentNote")}</p>
+          </section>
         </>
       )}
 
       <Toast />
-    </div>
-  );
-}
-
-function OverviewCard({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="card-a p-5">
-      <div className="text-xs text-ink-40">{label}</div>
-      <div className="mt-1 text-xl font-semibold text-ink break-all">{value}</div>
-      <div className="mt-1 text-xs text-ink-40">{sub}</div>
-    </div>
-  );
-}
-
-function SerpSkeleton({ rows = 6 }: { rows?: number }) {
-  return (
-    <div className="space-y-2 p-3">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg border border-line-soft bg-card px-4 py-3">
-          <div className="h-3.5 w-8 rounded bg-line-soft" />
-          <div className="h-3.5 w-1/3 rounded bg-line-soft" />
-          <div className="h-3.5 w-20 rounded bg-line-soft" />
-          <div className="h-3.5 flex-1 rounded bg-line-soft" />
-        </div>
-      ))}
     </div>
   );
 }

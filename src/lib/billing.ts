@@ -120,7 +120,9 @@ export const PLAN_DISPLAY_INFO: Record<PlanTier | "custom", PlanDisplayInfo> = {
   free: {
     name: "免费版",
     tagline: "适合个人站长和初学者",
-    price: "¥0",
+    // 全部套餐按 USD 计费（Creem），免费版也必须写 $0：
+    // 写成 ¥0 会和同屏的 $1.49 / $4.49 混用货币，zh/en 都会让人误读成人民币定价。
+    price: "$0",
     priceUnit: "",
     ctaLabel: "开始使用",
     ctaHref: "/app",
@@ -260,15 +262,19 @@ function isCacheValid(entry: { expiresAt: number } | null): boolean {
 /**
  * 判断用户当前订阅是否仍然有效
  * 规则：subscription_status=active/trialing 且 current_period_end 未过期
+ *
+ * `now` 可注入：classifyCustomer 已接受 now，若这里继续读挂钟，
+ * 同一个「现在」会在一次调用里被解释成两个时间，测试结果随日历漂移。
  */
 export function isSubscriptionActive(
   status: SubscriptionStatus,
-  currentPeriodEnd: string | null
+  currentPeriodEnd: string | null,
+  now: number = Date.now()
 ): boolean {
   if (status !== "active" && status !== "trialing") return false;
   if (!currentPeriodEnd) return true; // 无到期时间视为有效（兼容老数据）
   try {
-    return new Date(currentPeriodEnd).getTime() > Date.now();
+    return new Date(currentPeriodEnd).getTime() > now;
   } catch {
     return false;
   }

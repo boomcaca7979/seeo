@@ -28,6 +28,7 @@ import {
   createAlert,
   hasAlertToday,
 } from "@/lib/db";
+import { alertLText } from "@/lib/alert-text";
 import {
   runAuditRules,
   executionToIssues,
@@ -239,38 +240,47 @@ async function generateAuditAlerts(
 
   const has404 = issues.some((i) => i.type === "broken-links" || i.type.includes("404"));
   if (has404) {
-    const title = `${domain} 检测到 404 死链`;
+    const title = alertLText(`${domain} 检测到 404 死链`, `404 broken links detected on ${domain}`);
     if (await hasAlertToday(userId, domain, title)) return;
     await createAlert(userId, {
       type: "new_error",
       level: "error",
       title,
-      detail: `审计 #${auditId} 发现 404 错误页面，建议添加 301 重定向`,
+      detail: alertLText(
+        `审计 #${auditId} 发现 404 错误页面，建议添加 301 重定向`,
+        `Audit #${auditId} found 404 pages; add 301 redirects`
+      ),
       domain,
     });
     return;
   }
 
   if (prev && errorCount > prev.errors) {
-    const title = `${domain} 审计错误数增加`;
+    const title = alertLText(`${domain} 审计错误数增加`, `More audit errors on ${domain}`);
     if (await hasAlertToday(userId, domain, title)) return;
     await createAlert(userId, {
       type: "new_error",
       level: "warning",
       title,
-      detail: `本次 ${errorCount} 个错误，上次 ${prev.errors} 个`,
+      detail: alertLText(
+        `本次 ${errorCount} 个错误，上次 ${prev.errors} 个`,
+        `${errorCount} ${errorCount === 1 ? "error" : "errors"} this run vs ${prev.errors} last run`
+      ),
       domain,
     });
     return;
   }
 
-  const title = `${domain} 审计完成`;
+  const title = alertLText(`${domain} 审计完成`, `Audit finished for ${domain}`);
   if (await hasAlertToday(userId, domain, title)) return;
   await createAlert(userId, {
     type: "audit_done",
     level: "info",
     title,
-    detail: `健康分 ${errorCount === 0 ? "良好" : `${errorCount} 个错误`} · ${issues.length} 个问题`,
+    detail: alertLText(
+      `健康分 ${errorCount === 0 ? "良好" : `${errorCount} 个错误`} · ${issues.length} 个问题`,
+      `Health: ${errorCount === 0 ? "good" : `${errorCount} ${errorCount === 1 ? "error" : "errors"}`} · ${issues.length} ${issues.length === 1 ? "issue" : "issues"}`
+    ),
     domain,
   });
 }

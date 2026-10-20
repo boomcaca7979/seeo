@@ -6,7 +6,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { isLocale } from "@/i18n/config";
+import { defaultLocale, isLocale } from "@/i18n/config";
+import { notFoundPageMetadata } from "@/lib/not-found-meta";
 import { seoMetadata } from "@/i18n/seo";
 import HreflangAlternates from "@/components/HreflangAlternates";
 import { BACKLINK_CHECKER_ENABLED, BACKLINK_CHECKER_PATH } from "@/lib/seo/public-tools";
@@ -20,6 +21,9 @@ export async function generateMetadata({
   params,
 }: LocaleBacklinkCheckerToolPageProps): Promise<Metadata> {
   const { locale } = await params;
+  // 无效 locale 段 → 组件里 notFound()。metadata 必须与 not-found 边界同源，否则 hydration 后
+  // 404 会顶着本页营销标题（客户端 metadata 只认 layout + page，不看 not-found 边界）。
+  if (!isLocale(locale)) return notFoundPageMetadata(defaultLocale);
   const loc = isLocale(locale) ? locale : "en";
   // 启用 → 常规营销 metadata；停用 → 如实的「暂未开放」metadata（避免宣称可查真实外链）
   const t = BACKLINK_CHECKER_ENABLED

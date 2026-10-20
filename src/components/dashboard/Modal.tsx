@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useId } from "react";
 import { useTranslations } from "next-intl";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 interface ModalProps {
   open: boolean;
@@ -13,14 +14,8 @@ interface ModalProps {
 
 export default function Modal({ open, onClose, title, children, footer }: ModalProps) {
   const t = useTranslations("dashboard.shared.modal");
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const titleId = useId();
+  const panelRef = useDialogA11y(open, onClose);
 
   if (!open) return null;
 
@@ -33,9 +28,16 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
         aria-hidden
       />
       {/* 模态框：浅色卡片 */}
-      <div className="relative w-full max-w-md rounded-lg border border-line bg-card">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative w-full max-w-md rounded-lg border border-line bg-card"
+      >
         <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
-          <h3 className="font-display text-base font-semibold text-ink">
+          <h3 id={titleId} className="font-display text-lg font-semibold text-ink">
             {title}
           </h3>
           <button

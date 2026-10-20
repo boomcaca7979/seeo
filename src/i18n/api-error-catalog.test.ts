@@ -114,9 +114,54 @@ describe("4. route 实际使用的 code 都在 catalog 内", () => {
 
   it("content/check 既有 CRAWL code（TIMEOUT 等）保持原值", () => {
     const src = readFileSync(join(API_DIR, "content/check/route.ts"), "utf8");
-    expect(src).toContain('code: e.code');
-    expect(EN.TIMEOUT).toBeTruthy();
-    expect(ZH.TIMEOUT).toBeTruthy();
+    for (const code of ["TIMEOUT", "HTTP_ERROR", "UNKNOWN", "NETWORK"]) {
+      expect(EN[code]).toBeTruthy();
+      expect(ZH[code]).toBeTruthy();
+    }
+    // CrawlError.code 原值仍是这些 code，只是不再直接当用户文案来源
+    expect(src).toContain('"INVALID_URL"');
+  });
+
+  it("BUG-44：content/check 不再把服务端中文原文拼进响应，按 reason 细分 code", () => {
+    const src = readFileSync(join(API_DIR, "content/check/route.ts"), "utf8");
+    const start = src.indexOf("function crawlErrorResponse");
+    expect(start, "CrawlError 必须有单一映射点").toBeGreaterThan(-1);
+    const mapper = src.slice(start, src.indexOf("export async function POST"));
+    // 映射区里不允许出现中文字面量（原文改走 console.error 日志）
+    expect(mapper.replace("console.error", "").match(/["'`][^"'`\n]*[一-鿿][^"'`\n]*["'`]/g)).toBeNull();
+    expect(mapper).toContain("console.error");
+    for (const code of ["PRIVATE_HOST", "INVALID_URL_SCHEME", "INVALID_URL_FORMAT"]) {
+      expect(mapper).toContain(`"${code}"`);
+      expect(EN[code]).toBeTruthy();
+      expect(ZH[code]).toBeTruthy();
+    }
+    // detail 只允许来自语言中立的 HTTP 状态，且必须进响应体
+    expect(mapper).toContain('e.code === "HTTP_ERROR"');
+    expect(mapper).toContain("detail");
+    // 两个 catch 站点（额度前的本地校验 / 抓取失败）共用同一映射点，禁止各自再拼文案
+    expect((src.match(/return crawlErrorResponse\(e\)/g) ?? []).length).toBe(2);
+  });
+
+  it("BUG-44b：本地就能判出的地址错误不得消耗月度额度", () => {
+    const src = readFileSync(join(API_DIR, "content/check/route.ts"), "utf8");
+    const scheme = src.indexOf("assertSupportedUserScheme(rawUrl)");
+    const safety = src.indexOf("validateUrlSafety(url)");
+    const quota = src.indexOf('requireQuota(userId, "content_check")');
+    expect(scheme, "协议必须对原文判断（normalizeUrl 会把 ftp:// 拼成 https://ftp://）").toBeGreaterThan(-1);
+    expect(safety).toBeGreaterThan(-1);
+    expect(quota).toBeGreaterThan(-1);
+    expect(scheme).toBeLessThan(quota);
+    expect(safety).toBeLessThan(quota);
+  });
+
+  it("BUG-44：SSRF 拦截必须带机器可辨 reason，供路由选 code", () => {
+    const src = readFileSync(join(process.cwd(), "src/lib/crawl/index.ts"), "utf8");
+    expect(src).toContain('export type CrawlErrorReason = "malformed" | "scheme" | "private_host"');
+    expect((src.match(/"private_host"\)/g) ?? []).length).toBe(3);
+    expect(src).toContain('"malformed")');
+    // scheme 有两个抛点：SSRF 白名单 + 手输地址的协议预检
+    expect((src.match(/"scheme"\)/g) ?? []).length).toBe(2);
+    expect(src).toContain("export function assertSupportedUserScheme");
   });
 });
 
@@ -139,11 +184,17 @@ describe("5. API response contract 兼容", () => {
     expect(bad).toEqual([]);
   });
 
-  it("既有 QUOTA_EXCEEDED / UPSTREAM_ERROR code 未被移除（seo 系 route）", () => {
-    for (const f of ["seo/rank/route.ts", "seo/serp/route.ts", "keywords/expand/route.ts", "competitors/ranks/route.ts"]) {
+  it("既有 QUOTA_EXCEEDED / UPSTREAM_ERROR code 未被移除（seo 系 route 统一走 serpApiErrorResponse）", () => {
+    // 第十阶段起 seo 系路由的错误码单点在 serp-route-errors.ts：
+    // 契约（QUOTA_EXCEEDED/UPSTREAM_ERROR/UPSTREAM_QUOTA/TIMEOUT）必须在 helper 中完整保留，
+    // 且各路由 catch 统一委托 helper，禁止回退到各自复制的 mapError。
+    const helper = readFileSync(join(process.cwd(), "src/lib/seo/serp-route-errors.ts"), "utf8");
+    for (const code of ['"QUOTA_EXCEEDED"', '"UPSTREAM_ERROR"', '"UPSTREAM_QUOTA"', '"TIMEOUT"']) {
+      expect(helper).toContain(code);
+    }
+    for (const f of ["seo/rank/route.ts", "seo/serp/route.ts", "keywords/expand/route.ts", "competitors/ranks/route.ts", "competitors/gap/route.ts", "competitors/discover/route.ts", "opportunities/verify/route.ts"]) {
       const src = readFileSync(join(API_DIR, f), "utf8");
-      expect(src).toContain('"QUOTA_EXCEEDED"');
-      expect(src).toContain('"UPSTREAM_ERROR"');
+      expect(src).toContain("serpApiErrorResponse");
     }
   });
 });
@@ -153,5 +204,46 @@ describe("6. billing-error-client locale 解析", () => {
     for (const code of Object.values(SERVER_BILLING_CODES)) {
       expect(Object.values(BILLING_ERROR_CODES)).toContain(code);
     }
+  });
+});
+
+describe("7. BUG-40：SeoProviderError 透传 code 必须本地化，禁止回显上游原文", () => {
+  // 从 provider.ts 提取 code 联合类型（单一来源）；新增上游 code 而未补文案时本测试即失败。
+  const providerSrc = readFileSync(join(process.cwd(), "src/lib/seo/provider.ts"), "utf8");
+  const unionLine = providerSrc
+    .split("\n")
+    .find((line) => /^\s*code:\s*"[A-Z_]+".*;$/.test(line));
+  const providerCodes = [...(unionLine?.matchAll(/"([A-Z_]+)"/g) ?? [])].map((m) => m[1]);
+
+  it(" SeoProviderError code 联合类型可解析且覆盖 5 个上游 code", () => {
+    expect(providerCodes.length).toBeGreaterThanOrEqual(5);
+    for (const code of ["QUOTA_EXCEEDED", "INVALID_KEY", "UPSTREAM_ERROR", "TIMEOUT", "BAD_REQUEST"]) {
+      expect(providerCodes).toContain(code);
+    }
+  });
+
+  it("每个上游 code（含透传形态 UPSTREAM_QUOTA）在 EN/ZH catalog 中均有文案", () => {
+    for (const code of [...providerCodes, "UPSTREAM_QUOTA"]) {
+      expect(EN[code], `EN missing ${code}`).toBeTruthy();
+      expect(ZH[code], `ZH missing ${code}`).toBeTruthy();
+    }
+  });
+
+  it("INVALID_KEY 文案面向最终用户：不含上游报错原文、不引导用户去配置密钥", () => {
+    for (const [locale, text] of [["EN", EN.INVALID_KEY], ["ZH", ZH.INVALID_KEY]] as const) {
+      expect(text, locale).toBeTruthy();
+      expect(text).not.toMatch(/https?:\/\//);
+      expect(text).not.toMatch(/manage-api-key|API key should be here|Invalid API key/i);
+      expect(text).not.toMatch(/密钥无效：|here:/);
+    }
+  });
+
+  it("serp helper 保持 INVALID_KEY → 401 映射，且 error 字段仍透传（供日志排查）", () => {
+    const helper = readFileSync(join(process.cwd(), "src/lib/seo/serp-route-errors.ts"), "utf8");
+    expect(helper).toContain('e.code === "INVALID_KEY" ? 401');
+  });
+
+  it("INVALID_KEY 已纳入 API_ERROR_CODES 常量目录", () => {
+    expect(ALL_API_ERROR_CODES).toContain("INVALID_KEY");
   });
 });

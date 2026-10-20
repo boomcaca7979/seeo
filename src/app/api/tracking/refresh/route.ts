@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { listTrackedKeywords } from "@/lib/db";
 import { peekUsage } from "@/lib/seo/cache";
+import { listTrackedKeywordsForProject } from "@/lib/seo/rank-tracking-service";
 import {
   refreshRanksBatch,
   MAX_KEYWORDS_PER_REQUEST,
@@ -28,7 +29,13 @@ export async function POST(request: Request) {
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
-  const list = await listTrackedKeywords(userId);
+  // 项目范围内刷新：带 domain 时只处理该项目（domain + user_id）的关键词；
+  // offset 分批与额度口径不变（还是同一批词、同一份日缓存）
+  const search = new URL(request.url).searchParams;
+  const domain = search.get("domain")?.trim() || null;
+  const list = domain
+    ? await listTrackedKeywordsForProject(userId, domain)
+    : await listTrackedKeywords(userId);
 
   if (list.length === 0) {
     const usage = await peekUsage(userId, "serpapi", plan);
@@ -39,8 +46,7 @@ export async function POST(request: Request) {
   }
 
   // P0：支持 offset 参数，前端续批时传 offset 跳过已处理词
-  const url = new URL(request.url);
-  const offsetRaw = Number(url.searchParams.get("offset") ?? "0");
+  const offsetRaw = Number(search.get("offset") ?? "0");
   const offset = Number.isFinite(offsetRaw) && offsetRaw > 0
     ? Math.min(Math.floor(offsetRaw), list.length)
     : 0;

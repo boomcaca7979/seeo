@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 // ===== /unsubscribe —— 营销邮件退订确认页 =====
 // 从邮件底部 Unsubscribe 链接 302 而来（token 在 /api/email/unsubscribe 处理）。
 // noindex：工具页，不进搜索引擎。
+// 文案走 messages（unsubscribePage），locale 与 /app、/login 共用 (default) 布局的
+// NEXT_LOCALE cookie → Accept-Language → en 解析，不另建语言判断。
 
-export const metadata: Metadata = {
-  title: "Unsubscribed — SeeO",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("unsubscribePage");
+  return {
+    title: t("metaTitle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function UnsubscribePage({
   searchParams,
@@ -16,24 +22,17 @@ export default async function UnsubscribePage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status } = await searchParams;
+  const t = await getTranslations("unsubscribePage");
 
-  const title =
+  // 未知 status 与无参数一样落到入口态，退订语义与原有分支保持一致
+  const { title, body } =
     status === "done"
-      ? "You're unsubscribed"
+      ? { title: t("doneTitle"), body: t("doneBody") }
       : status === "already"
-        ? "You were already unsubscribed"
+        ? { title: t("alreadyTitle"), body: t("alreadyBody") }
         : status === "invalid"
-          ? "This unsubscribe link is not valid"
-          : "Unsubscribe";
-
-  const body =
-    status === "done"
-      ? "You will no longer receive marketing and lifecycle emails from SeeO. Account and security emails (like sign-in) are not affected."
-      : status === "already"
-        ? "Marketing emails were already turned off for this address."
-        : status === "invalid"
-          ? "The link seems broken or incomplete. If you keep receiving marketing emails, contact support@seeo.asia."
-          : "";
+          ? { title: t("invalidTitle"), body: t("invalidBody") }
+          : { title: t("entryTitle"), body: "" };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-5 py-12">
@@ -46,7 +45,7 @@ export default async function UnsubscribePage({
           <h1 className="mt-6 font-display text-xl font-semibold text-ink">{title}</h1>
           {body && <p className="mt-3 font-sans text-sm leading-relaxed text-ink-60">{body}</p>}
           <Link href="/" className="btn-secondary mt-6 inline-block px-6 py-2 text-sm">
-            Back to SeeO
+            {t("back")}
           </Link>
         </div>
       </div>

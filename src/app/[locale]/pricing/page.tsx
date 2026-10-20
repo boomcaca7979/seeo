@@ -5,7 +5,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import { isLocale } from "@/i18n/config";
+import { defaultLocale, isLocale } from "@/i18n/config";
+import { notFoundPageMetadata } from "@/lib/not-found-meta";
 import { localePath, seoMetadata } from "@/i18n/seo";
 import { getDefaultPlanInfo } from "@/lib/billing";
 import JsonLd from "@/components/JsonLd";
@@ -36,6 +37,9 @@ export async function generateMetadata({
   params,
 }: LocalePricingPageProps): Promise<Metadata> {
   const { locale } = await params;
+  // 无效 locale 段 → 组件里 notFound()。metadata 必须与 not-found 边界同源，否则 hydration 后
+  // 404 会顶着本页营销标题（客户端 metadata 只认 layout + page，不看 not-found 边界）。
+  if (!isLocale(locale)) return notFoundPageMetadata(defaultLocale);
   const loc = isLocale(locale) ? locale : "en";
   const text = pricingMeta[loc];
   return seoMetadata(loc, "/pricing", text.title, text.description);

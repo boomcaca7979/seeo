@@ -2,7 +2,7 @@
 // 真实抓取页面 + 解析 + 内容分析，不消耗 SerpApi 额度
 
 import { NextResponse } from "next/server";
-import { fetchPage, parsePage, detectIssues, keywordAnalysis, normalizeUrl, CrawlError } from "@/lib/crawl";
+import { fetchPage, parsePage, detectIssues, keywordAnalysis, normalizeUrl, validateUrlSafety, assertSupportedUserScheme, CrawlError } from "@/lib/crawl";
 import {
   addContentCheck,
   listContentChecksFull,
@@ -103,6 +103,28 @@ function parsePrevAnalysis(prev: ContentCheckFull): ContentAnalysisResult | null
   }
 }
 
+/**
+ * BUG-44：CrawlError → 语言中立 code 的唯一映射点。
+ * 这里原先把中文技术原文拼进 error，客户端 {detail} 模板原样插值，
+ * 英文界面就会渲染出「Invalid URL: URL 无效：禁止访问私有/保留 IP：127」。
+ * 现在：原文只进服务端日志；响应体给出可按语言查表的 code + 语言中立 detail，
+ * 用户可见文案一律来自 apiErrors[code]。
+ */
+function crawlErrorResponse(e: CrawlError) {
+  console.error("[content/check] crawl failed", e.code, e.reason ?? "", e.message);
+  const code =
+    e.code !== "INVALID_URL"
+      ? e.code
+      : e.reason === "private_host"
+        ? "PRIVATE_HOST"
+        : e.reason === "scheme"
+          ? "INVALID_URL_SCHEME"
+          : "INVALID_URL_FORMAT";
+  // HTTP 状态码是唯一语言中立、且对用户有信息量的细节（形如 HTTP 503）
+  const detail = e.code === "HTTP_ERROR" ? e.message : undefined;
+  return NextResponse.json({ error: code, code, ...(detail ? { detail } : {}) }, { status: 502 });
+}
+
 export async function POST(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
@@ -119,6 +141,8 @@ export async function POST(req: Request) {
   const rawUrl = String(body.url ?? "").trim();
   const keyword = String(body.keyword ?? "").trim();
   const targetKeywords = parseKeywords(body.targetKeywords ?? (keyword ? [keyword] : []));
+  // 分析产物（可读性等级 / 标题建议）按请求 locale 生成；缺省 zh 保持旧行为
+  const locale = body.locale === "en" ? "en" : "zh";
 
   if (!rawUrl) {
     return NextResponse.json({ error: "URL 不能为空", code: "URL_REQUIRED" }, { status: 400 });
@@ -128,6 +152,19 @@ export async function POST(req: Request) {
   }
 
   const url = normalizeUrl(rawUrl);
+
+  // BUG-44b：本地就能判出来的错（协议写错 / 内网地址 / URL 残缺）必须在扣额度之前拦。
+  // 原先顺序是「先 requireQuota 再抓取」，而抓取里的 SSRF/格式校验必然失败，
+  // 于是用户输错 10 次地址就把当月内容检查额度烧光（free 档 10/月），
+  // 且看到的还是「额度已用尽」而不是「地址不对」。
+  // fetchPage 内部会再校验一次（纯函数，无额外请求），这里只是把判定提前。
+  try {
+    assertSupportedUserScheme(rawUrl);
+    validateUrlSafety(url);
+  } catch (e) {
+    if (e instanceof CrawlError) return crawlErrorResponse(e);
+    throw e;
+  }
 
   // P3：内容检查配额校验（content_check_monthly_limit）
   // free: 10/月, lite: 50/月, pro: 300/月（详见 billing.ts DEFAULT_PLAN_LIMITS）
@@ -152,7 +189,7 @@ export async function POST(req: Request) {
     const score = Math.round((passedCount / checks.length) * 100);
 
     // 深度内容分析
-    const analysis = analyzeContent(result.html, result.url, targetKeywords);
+    const analysis = analyzeContent(result.html, result.url, targetKeywords, locale);
 
     // 写入数据库
     let savedId: number | null = null;
@@ -210,18 +247,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ data: response });
   } catch (e) {
-    if (e instanceof CrawlError) {
-      const msg =
-        e.code === "TIMEOUT"
-          ? `抓取超时：${e.message}`
-          : e.code === "INVALID_URL"
-          ? `URL 无效：${e.message}`
-          : e.code === "HTTP_ERROR"
-          ? `页面返回错误：${e.message}`
-          : `抓取失败：${e.message}`;
-      return NextResponse.json({ error: msg, code: e.code }, { status: 502 });
-    }
-    return NextResponse.json({ error: `服务器错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" }, { status: 500 });
+    if (e instanceof CrawlError) return crawlErrorResponse(e);
+    console.error("[content/check] unexpected failure", (e as Error).message);
+    return NextResponse.json({ error: "UPSTREAM_ERROR", code: "UPSTREAM_ERROR" }, { status: 500 });
   }
 }
 

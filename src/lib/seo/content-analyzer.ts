@@ -101,29 +101,49 @@ function extractTopKeywords(text: string, limit: number): TopKeywordItem[] {
     .map(([word, count]) => ({ word, count }));
 }
 
-function generateTitleSuggestions(currentTitle: string, targetKeywords: string[]): string[] {
+export type AnalyzerLocale = "zh" | "en";
+
+const READABILITY_LEVELS: Record<AnalyzerLocale, { easy: string; medium: string; hard: string }> = {
+  zh: { easy: "易读", medium: "中等", hard: "较难" },
+  en: { easy: "Easy to read", medium: "Fairly readable", hard: "Difficult to read" },
+};
+
+function generateTitleSuggestions(
+  currentTitle: string,
+  targetKeywords: string[],
+  locale: AnalyzerLocale = "zh"
+): string[] {
   const suggestions: string[] = [];
   const titleLen = currentTitle.length;
+  const zh = locale === "zh";
 
   if (titleLen > 0 && titleLen < 30) {
-    suggestions.push("标题过短，建议扩展至 30-60 字符");
+    suggestions.push(zh ? "标题过短，建议扩展至 30-60 字符" : "Title is too short; extend it to 30-60 characters");
   }
   if (titleLen > 60) {
-    suggestions.push("标题过长，建议精简至 60 字符以内");
+    suggestions.push(zh ? "标题过长，建议精简至 60 字符以内" : "Title is too long; trim it to 60 characters or fewer");
   }
   if (titleLen === 0) {
-    suggestions.push("页面缺少 title 标签，建议添加 30-60 字符的标题");
+    suggestions.push(
+      zh
+        ? "页面缺少 title 标签，建议添加 30-60 字符的标题"
+        : "Page is missing a <title> tag; add one that is 30-60 characters"
+    );
   }
 
   for (const kw of targetKeywords) {
     if (!kw.trim()) continue;
     if (!currentTitle.toLowerCase().includes(kw.toLowerCase())) {
-      suggestions.push(`标题未包含目标关键词「${kw}」，建议加入`);
+      suggestions.push(
+        zh
+          ? `标题未包含目标关键词「${kw}」，建议加入`
+          : `Title does not include the target keyword "${kw}"; consider adding it`
+      );
     }
   }
 
   if (suggestions.length === 0) {
-    suggestions.push("标题长度和关键词覆盖良好");
+    suggestions.push(zh ? "标题长度和关键词覆盖良好" : "Title length and keyword coverage look good");
   }
   return suggestions;
 }
@@ -175,7 +195,12 @@ function calculateContentScore(metrics: {
   return Math.round(Math.min(100, score));
 }
 
-export function analyzeContent(html: string, url: string, targetKeywords: string[]): ContentAnalysisResult {
+export function analyzeContent(
+  html: string,
+  url: string,
+  targetKeywords: string[],
+  locale: AnalyzerLocale = "zh"
+): ContentAnalysisResult {
   const $ = cheerio.load(html);
 
   // 移除无关标签后取正文
@@ -185,7 +210,9 @@ export function analyzeContent(html: string, url: string, targetKeywords: string
 
   // 可读性
   const readabilityScore = calculateReadability(bodyText);
-  const readabilityLevel = readabilityScore >= 80 ? "易读" : readabilityScore >= 60 ? "中等" : "较难";
+  const levels = READABILITY_LEVELS[locale];
+  const readabilityLevel =
+    readabilityScore >= 80 ? levels.easy : readabilityScore >= 60 ? levels.medium : levels.hard;
 
   // 关键词密度
   const keywordDensity: KeywordDensityItem[] = targetKeywords
@@ -252,7 +279,7 @@ export function analyzeContent(html: string, url: string, targetKeywords: string
 
   // 标题建议
   const currentTitle = $("title").first().text().trim();
-  const titleSuggestions = generateTitleSuggestions(currentTitle, targetKeywords);
+  const titleSuggestions = generateTitleSuggestions(currentTitle, targetKeywords, locale);
 
   // 内容评分
   const contentScore = calculateContentScore({

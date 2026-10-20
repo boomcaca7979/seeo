@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import DomainSelect from "@/components/dashboard/DomainSelect";
-import type { RankResult } from "@/lib/seo/types";
+import type { RankResult, ApiUsage } from "@/lib/seo/types";
 
 const REGION_CITIES: Record<string, string[]> = {
   "中国": ["北京", "上海", "广州", "深圳"],
@@ -30,6 +30,12 @@ const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
   },
 };
 
+// 数据年龄只由响应真实字段 fetchedAt 与当前时刻相减得到；结果卡片在服务端恒为 result=null，
+// 因此这段渲染期取时不参与 SSR/hydration 比对（BUG-001 教训）。
+function minutesSince(iso: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+}
+
 export default function RankCheckPage() {
   const t = useTranslations("dashboard.rankCheck");
   const tc = useTranslations("dashboard.common");
@@ -45,6 +51,8 @@ export default function RankCheckPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasQueried, setHasQueried] = useState(false);
+  // 本月 SerpApi 用量（API 成功响应的 usage 字段；系统确实提供后才展示）
+  const [usage, setUsage] = useState<ApiUsage | null>(null);
 
   const handleRegionChange = (region: string) => {
     setCountry(region);
@@ -78,6 +86,7 @@ export default function RankCheckPage() {
         return;
       }
       setResult(json.data);
+      if (json.usage) setUsage(json.usage);
       if (json.data?.fromCache) {
         show(t("cacheHit"), "info");
       } else {
@@ -92,9 +101,11 @@ export default function RankCheckPage() {
     }
   };
 
+  const cachedMinutes = result?.fromCache ? minutesSince(result.fetchedAt) : null;
+
   return (
     <div className="mx-auto max-w-5xl p-6 lg:p-8">
-      <h1 className="text-[1.75rem] font-semibold leading-tight text-ink">{t("title")}</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("title")}</h1>
       <p className="mt-1 text-sm text-ink-60">
         {t("subtitle")}
       </p>
@@ -103,9 +114,10 @@ export default function RankCheckPage() {
       <form onSubmit={handleCheck} className="card-a mt-6 p-5">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <label className="text-xs text-ink-40">{t("keyword")}</label>
+            <label htmlFor="rc-keyword" className="text-xs text-ink-40">{t("keyword")}</label>
             <input
               type="text"
+              id="rc-keyword"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder={t("keywordPlaceholder")}
@@ -125,8 +137,9 @@ export default function RankCheckPage() {
 
         <div className="mt-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-ink-40">{t("region")}</label>
+            <label htmlFor="rc-region" className="text-xs text-ink-40">{t("region")}</label>
             <select
+              id="rc-region"
               value={country}
               onChange={(e) => handleRegionChange(e.target.value)}
               className="rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus:border-ink-25 focus:outline-none"
@@ -138,12 +151,13 @@ export default function RankCheckPage() {
 
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-ink-40">{t("device")}</label>
-            <div className="flex gap-2">
+            <span className="text-xs text-ink-40">{t("device")}</span>
+            <div className="flex gap-2" role="group" aria-label={t("device")}>
               {(["PC", "移动端"] as Device[]).map((d) => (
                 <button
                   key={d}
                   type="button"
+                  aria-pressed={device === d}
                   onClick={() => setDevice(d)}
                   className={device === d ? "btn-primary" : "btn-secondary"}
                 >
@@ -161,8 +175,13 @@ export default function RankCheckPage() {
           </button>
         </div>
 
-        <div className="mt-4 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-xs text-ink-60">
-          {t("quotaHint")}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 text-xs text-ink-60">
+          <span>{t("quotaHint")}</span>
+          {usage && (
+            <span className="font-mono tabular-nums">
+              {t("usageThisMonth", { used: usage.used, limit: usage.limit })}
+            </span>
+          )}
         </div>
       </form>
 
@@ -201,12 +220,7 @@ export default function RankCheckPage() {
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-xs text-ink-40">{t("currentRank")}</span>
-                      {result.fromCache && (
-                        <span className="badge-warn">{t("cachedData")}</span>
-                      )}
-                    </div>
+                    <div className="text-xs text-ink-40">{t("currentRank")}</div>
                     <div className="mt-2 text-5xl font-semibold text-ink">#{result.rank}</div>
                     {result.matchedUrl && (
                       <a
@@ -223,9 +237,28 @@ export default function RankCheckPage() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-center justify-between text-xs text-ink-40">
-                <span>{t("regionLabel")}：{display(country)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
-                <span>{t("queryTime")}：{new Date(result.fetchedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</span>
+              {/* 数据来源 + 数据时间：两个结果分支（有排名 / 未进前 100）共用此处，
+                  缓存标识必须常驻结果卡片——3 秒后消失的 Toast 不能是唯一线索。 */}
+              <div className="mt-4 flex flex-wrap items-start justify-between gap-2 text-xs text-ink-40">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={result.fromCache ? "badge-warn" : "badge-good"}>
+                    {result.fromCache ? t("cachedData") : t("liveData")}
+                  </span>
+                  <span>{t("regionLabel")}：{display(country)} · {device === "PC" ? "PC" : locale === "zh" ? "移动端" : "Mobile"}</span>
+                </div>
+                <div className="text-right">
+                  <div>
+                    {result.fromCache ? t("cachedAtLabel") : t("queryTime")}：
+                    {new Date(result.fetchedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}
+                  </div>
+                  {cachedMinutes !== null && (
+                    <div className="mt-0.5">
+                      {cachedMinutes < 60
+                        ? t("cachedAgoMinutes", { minutes: cachedMinutes })
+                        : t("cachedAgoHours", { hours: Math.floor(cachedMinutes / 60) })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : null}

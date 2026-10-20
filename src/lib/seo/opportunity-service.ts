@@ -151,6 +151,11 @@ function evidence(source: string, ref: string, summary: string): OpportunityEvid
   return { source, ref, summary, capturedAt: new Date().toISOString() };
 }
 
+/** 证据摘要恒为英文（见 pickText(..., "en")），所以天数也要遵守英文单复数 */
+export function daysAgoLabel(n: number): string {
+  return `${n} ${n === 1 ? "day" : "days"} ago`;
+}
+
 /**
  * 解析数据库时间戳。兼容以下真实数据形态：
  *   - ISO：`2026-10-14T06:15:53Z` / `2026-10-14T06:15:53+08:00`
@@ -469,7 +474,7 @@ export async function collectTechnicalCandidates(userId: string, domain: string)
             evidence(
               "audit",
               `audit:${audit.id}:${rule.ruleId}`,
-              `${findings} finding(s) across ${rule.affectedPages} page(s) · severity=${rule.severity} · pattern=${rule.pattern ?? "scattered"}${stale ? ` · audited ${ageDays} days ago` : ""}`
+              `${findings} finding(s) across ${rule.affectedPages} page(s) · severity=${rule.severity} · pattern=${rule.pattern ?? "scattered"}${stale && ageDays !== null ? ` · audited ${daysAgoLabel(ageDays)}` : ""}`
             ),
           ];
           if (rule.sampleUrl && sampleMessage) {
@@ -572,7 +577,7 @@ export function evaluateContentCheck(row: {
     impact,
     confidence: "high", // 页面实测（词频/字数/结构）直接证据
     evidence: [
-      evidence("content_checks", row.url, `Content score ${row.score}/100 for "${row.keyword}" (${ageDays} days ago)`),
+      evidence("content_checks", row.url, `Content score ${row.score}/100 for "${row.keyword}" (${daysAgoLabel(ageDays)})`),
     ],
     signals: {
       contentScore: row.score,

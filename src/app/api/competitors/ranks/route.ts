@@ -1,20 +1,24 @@
 // ===== /api/competitors/ranks =====
-// GET：返回某关键词下所有竞品的最新排名
+// GET：只读已入库的竞品排名，**不请求上游 SerpApi、不消耗额度**
 //   - query: keyword_id
-//   - 如果数据库中无记录或记录超过 24h，自动触发 SerpApi 查询并缓存
-//   - POST：手动触发刷新（body: { keyword_id }）
+//   - 有记录且在 24h 内 → 返回数据库结果（fromCache: true）
+//   - 有记录但已超过 24h → 仍返回数据库结果，并标记 stale: true / needsRefresh: true
+//   - 无记录 → 返回空结果 + needsRefresh: true（这是正常状态，不是 API 故障）
+//     实时排名由用户显式点击「刷新排名并对比」（POST）触发
+// POST：手动刷新（body: { keyword_id }），会调用 SerpApi 并按套餐日/月额度计费
 
 import { NextResponse } from "next/server";
 import {
   getTrackedKeywordById,
   getLatestCompetitorRanks,
+  getRankHistory,
   addCompetitorRank,
   listCompetitors,
   getProjectByDomain,
 } from "@/lib/db";
 import { checkCompetitorRanks } from "@/lib/seo/competitor";
-import { SeoProviderError } from "@/lib/seo/provider";
-import { peekUsage, QuotaExceededError } from "@/lib/seo/cache";
+import { peekUsage } from "@/lib/seo/cache";
+import { serpApiErrorResponse } from "@/lib/seo/serp-route-errors";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo, type PlanTier } from "@/lib/auth";
 
@@ -23,32 +27,35 @@ export const dynamic = "force-dynamic";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
-function mapError(e: unknown) {
-  if (e instanceof SeoProviderError) {
-    const status =
-      e.code === "INVALID_KEY" ? 401 :
-      e.code === "QUOTA_EXCEEDED" ? 429 :
-      e.code === "TIMEOUT" ? 504 :
-      e.code === "BAD_REQUEST" ? 400 : 502;
-    return NextResponse.json<SeoApiError>({ error: e.message, code: e.code }, { status });
-  }
-  if (e instanceof QuotaExceededError) {
-    return NextResponse.json<SeoApiError>(
-      { error: e.message, code: "QUOTA_EXCEEDED" },
-      { status: 429 }
-    );
-  }
-  if (e instanceof Error && e.message === "QUOTA_EXCEEDED") {
-    return NextResponse.json<SeoApiError>(
-      { error: "本月额度已用尽，下月 1 日自动重置", code: "QUOTA_EXCEEDED" },
-      { status: 429 }
-    );
-  }
-  return NextResponse.json<SeoApiError>(
-    { error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" },
-    { status: 500 }
-  );
+/** SQLite datetime 字符串（"YYYY-MM-DD HH:MM:SS"）→ epoch ms，用于 24h 判断 */
+function toEpochMs(checkedAt: string): number {
+  return new Date(checkedAt.endsWith("Z") ? checkedAt : checkedAt.replace(" ", "T") + "Z").getTime();
 }
+
+/**
+ * 「本站」基准行：只读该关键词已入库的 rank_history 最新一条。
+ * 没有历史快照时返回 null——宁可少一行，不编造排名，也不为此请求上游。
+ */
+async function buildSelfRow(userId: string, keywordId: number, domain: string) {
+  try {
+    const history = await getRankHistory(userId, keywordId);
+    const newest = history[history.length - 1];
+    if (!newest) return null;
+    return {
+      competitor_id: 0,
+      domain,
+      rank: newest.position,
+      target_url: newest.url,
+      checked_at: newest.date,
+      is_self: true,
+    };
+  } catch {
+    // 补「本站」基准失败不影响竞品结果本身
+    return null;
+  }
+}
+
+
 
 /**
  * 执行一次竞品排名查询并写入数据库
@@ -110,6 +117,12 @@ async function refreshRanks(userId: string, keywordId: number, plan: PlanTier = 
       ...latestFromDb.map((r) => ({ ...r, is_self: false })),
     ];
 
+    // 与 GET 共用同一份响应形状：checkedAt 取本次结果里最新的时间，前端据此显示数据时间
+    const checkedAt = merged.reduce<string | null>(
+      (max, r) => (max === null || r.checked_at > max ? r.checked_at : max),
+      null
+    );
+
     return NextResponse.json({
       data: {
         keyword: kw.keyword,
@@ -117,11 +130,14 @@ async function refreshRanks(userId: string, keywordId: number, plan: PlanTier = 
         domain: kw.domain,
         results: merged,
         fromCache,
+        stale: false,
+        needsRefresh: false,
+        checkedAt,
       },
       usage,
     });
   } catch (e) {
-    return mapError(e);
+    return serpApiErrorResponse(e);
   }
 }
 
@@ -142,67 +158,52 @@ export async function GET(req: Request) {
     );
   }
 
-  const kw = await getTrackedKeywordById(userId, keywordId);
-  if (!kw) {
-    return NextResponse.json({ error: "未找到该关键词", code: "KEYWORD_NOT_FOUND" }, { status: 404 });
-  }
-
-  // 读已有最新记录
-  const latest = await getLatestCompetitorRanks(userId, keywordId);
-  const usage = await peekUsage(userId, "serpapi", plan);
-
-  // 如果有记录且未过期 24h，直接返回
-  if (latest.length > 0) {
-    const newestCheckedAt = latest.reduce((max, r) => {
-      return r.checked_at > max ? r.checked_at : max;
-    }, latest[0].checked_at);
-    const ageMs = Date.now() - new Date(newestCheckedAt.endsWith("Z") ? newestCheckedAt : newestCheckedAt.replace(" ", "T") + "Z").getTime();
-    if (ageMs < CACHE_TTL_MS) {
-      // 仍然触发一次 SerpApi 查询以补上「我自己」的排名（不消耗额度，命中缓存）
-      try {
-        const project = await getProjectByDomain(userId, kw.domain);
-        const competitors = project
-          ? (await listCompetitors(userId, project.id)).map((c) => ({ id: c.id, domain: c.domain }))
-          : [];
-        const allCompetitors = [{ id: 0, domain: kw.domain }, ...competitors];
-        const { results } = await checkCompetitorRanks({
-          keyword: kw.keyword,
-          location: kw.location,
-          device: kw.device,
-          competitors: allCompetitors,
-          userId,
-          plan,
-        });
-        const selfRank = results.find((r) => r.competitorId === 0) ?? null;
-        const merged = [
-          {
-            competitor_id: 0,
-            domain: kw.domain,
-            rank: selfRank?.rank ?? null,
-            target_url: selfRank?.targetUrl ?? null,
-            checked_at: newestCheckedAt,
-            is_self: true,
-          },
-          ...latest.map((r) => ({ ...r, is_self: false })),
-        ];
-        return NextResponse.json({
-          data: {
-            keyword: kw.keyword,
-            keyword_id: keywordId,
-            domain: kw.domain,
-            results: merged,
-            fromCache: true,
-          },
-          usage,
-        });
-      } catch {
-        // 缓存查询失败，回退到仅返回数据库结果
-      }
+  // 只读分支：数据库故障（500）与「库里没有数据」（200 + needsRefresh）必须区分
+  try {
+    const kw = await getTrackedKeywordById(userId, keywordId);
+    if (!kw) {
+      return NextResponse.json({ error: "未找到该关键词", code: "KEYWORD_NOT_FOUND" }, { status: 404 });
     }
-  }
 
-  // 无记录或已过期：触发刷新
-  return refreshRanks(userId, keywordId, plan);
+    const latest = await getLatestCompetitorRanks(userId, keywordId);
+    const usage = await peekUsage(userId, "serpapi", plan);
+
+    if (latest.length === 0) {
+      return NextResponse.json({
+        data: {
+          keyword: kw.keyword,
+          keyword_id: keywordId,
+          domain: kw.domain,
+          results: [],
+          fromCache: false,
+          stale: false,
+          needsRefresh: true,
+          checkedAt: null,
+        },
+        usage,
+      });
+    }
+
+    const newestCheckedAt = latest.reduce((max, r) => (r.checked_at > max ? r.checked_at : max), latest[0].checked_at);
+    const stale = Date.now() - toEpochMs(newestCheckedAt) >= CACHE_TTL_MS;
+    const selfRow = await buildSelfRow(userId, keywordId, kw.domain);
+
+    return NextResponse.json({
+      data: {
+        keyword: kw.keyword,
+        keyword_id: keywordId,
+        domain: kw.domain,
+        results: [...(selfRow ? [selfRow] : []), ...latest.map((r) => ({ ...r, is_self: false }))],
+        fromCache: true,
+        stale,
+        needsRefresh: stale,
+        checkedAt: newestCheckedAt,
+      },
+      usage,
+    });
+  } catch (e) {
+    return serpApiErrorResponse(e);
+  }
 }
 
 export async function POST(req: Request) {

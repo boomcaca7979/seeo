@@ -67,7 +67,9 @@ describe("detectIntent（关键词 → 意图分类）", () => {
 
 describe("相关关键词表格 intent 来源（防回归）", () => {
   it("intent 使用 detectIntent(关键词)，不再使用 i % 3 位置硬编码", () => {
-    expect(SOURCE).toContain("intent: detectIntent(r.query)");
+    // 第十一阶段：表格数据源从 serp.data.relatedSearches 切到 expand.data.related，
+    // 行构造为 (q) => ({ keyword: q, intent: detectIntent(q), ... })——行为契约不变。
+    expect(SOURCE).toContain("intent: detectIntent(q)");
     expect(SOURCE).not.toContain("i % 3");
     expect(SOURCE).not.toContain("商业调查型"); // 旧假数据特有的类别名
     expect(SOURCE).not.toContain("交易型");

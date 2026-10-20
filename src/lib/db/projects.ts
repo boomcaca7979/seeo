@@ -29,7 +29,7 @@ export interface ProjectWithMetrics extends Omit<ProjectRow, "id"> {
 }
 
 /** 指标构建入参：id 为 string（SQLite 整数或 Supabase UUID） */
-type ProjectWithMetricsInput = Omit<ProjectRow, "id"> & { id: string };
+export type ProjectWithMetricsInput = Omit<ProjectRow, "id"> & { id: string };
 
 function rowToProject(row: Record<string, unknown>): ProjectRow {
   return {
@@ -286,6 +286,19 @@ export async function listProjectsWithMetricsForUser(
   supabaseProjects: Array<{ id: string; name: string; domain: string; created_at: string }>
 ): Promise<ProjectWithMetrics[]> {
   return buildProjectsWithMetricsBase(userId, supabaseProjects);
+}
+
+/**
+ * 单个项目 + 指标（项目详情页用）。
+ * 与列表共用同一次批量构建，口径完全一致（不会出现"列表 78、详情 80"）。
+ * id 传前端使用的项目 id（鉴权模式 Supabase UUID / 演示模式整数字符串）。
+ */
+export async function getProjectWithMetrics(
+  userId: string,
+  project: ProjectWithMetricsInput
+): Promise<ProjectWithMetrics> {
+  const rows = await buildProjectsWithMetricsBase(userId, [project]);
+  return rows[0];
 }
 
 // ---------- competitors ----------

@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { getOpportunityById, saveOpportunityVerification, type OpportunityStatus } from "@/lib/db/opportunities";
 import { verifyOpportunity } from "@/lib/seo/opportunity-service";
-import { QuotaExceededError } from "@/lib/seo/cache";
+import { serpApiErrorResponse } from "@/lib/seo/serp-route-errors";
 import { requireAuthOrDemo } from "@/lib/auth";
 import type { SeoApiError } from "@/lib/seo/types";
 
@@ -57,9 +57,8 @@ export async function POST(req: Request) {
     await saveOpportunityVerification(userId, id, checks);
     return NextResponse.json({ data: { id, verification: checks } });
   } catch (e) {
-    if (e instanceof QuotaExceededError) {
-      return NextResponse.json({ error: e.message, code: "QUOTA_EXCEEDED" }, { status: 429 });
-    }
-    return NextResponse.json<SeoApiError>({ error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" }, { status: 500 });
+    // rank 复检经 searchRank → 用户套餐配额（QUOTA_EXCEEDED + used/limit/scope）、
+    // 上游 SerpApi 额度（UPSTREAM_QUOTA）、超时等统一按 SerpApi 契约映射
+    return serpApiErrorResponse(e);
   }
 }

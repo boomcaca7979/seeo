@@ -29,14 +29,35 @@ export async function GET(req: Request) {
     );
   }
 
-  // 带 user_id 校验：只能查询自己的订单
-  const order = await getOrderByOutTradeNoForUser(orderNo, auth.user.id);
-  if (!order) {
+  // 带 user_id 校验：只能查询自己的订单。
+  // 三态必须分开处理：服务故障绝不能伪装成「订单不存在」（404），
+  // 否则支付结果页会在数据库抖动时告诉用户「未找到订单，请重新购买」。
+  const lookup = await getOrderByOutTradeNoForUser(orderNo, auth.user.id);
+  if (lookup.kind === "failure") {
+    console.error("[PaymentStatus] 订单查询失败:", lookup.reason);
+    return NextResponse.json(
+      { error: "暂时无法确认订单状态", code: "ORDER_QUERY_FAILED" },
+      { status: 503 }
+    );
+  }
+  if (lookup.kind === "foreign") {
+    // 订单存在但不属于当前账号：403（不返回任何订单内容，仅说明无权查看）。
+    // 与 404 分开是为了让支付结果页能区分「订单号有误」与「这不是你的订单」，
+    // 两者都不会泄露订单金额、套餐、状态。
+    console.warn("[PaymentStatus] 订单不属于当前用户，拒绝查看:", orderNo);
+    return NextResponse.json(
+      { error: "无权查看该订单", code: "ORDER_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+  if (lookup.kind === "absent") {
     return NextResponse.json(
       { error: "订单不存在", code: "ORDER_NOT_FOUND" },
       { status: 404 }
     );
   }
+
+  const order = lookup.order;
 
   return NextResponse.json({
     data: {

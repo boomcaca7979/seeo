@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
-import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
+import {
+  SELECTED_PROJECT_KEY,
+  PROJECT_CHANGED_EVENT,
+  projectChangedDetail,
+  validStoredProjectId,
+} from "@/lib/project-selector";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { planLabel } from "@/lib/plan-labels";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { useCreateProject } from "@/components/dashboard/CreateProjectContext";
 import { triggerUpgradeModal } from "@/components/billing/UpgradeModal";
 import { resolveApiErrorMessage } from "@/lib/billing-error-client";
+import { alertText } from "@/lib/alert-text";
+import type { LocalizedText } from "@/lib/seo/audit-ltext";
 import { track } from "@/lib/analytics/client";
 
 interface TopbarProps {
@@ -21,6 +28,8 @@ interface TopbarProps {
   isGuest?: boolean;
   /** 移动端（<lg）打开侧边抽屉 */
   onMobileMenuClick?: () => void;
+  /** 抽屉当前是否展开，仅用于 aria-expanded（BUG-18） */
+  mobileMenuOpen?: boolean;
 }
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
@@ -32,7 +41,8 @@ const PLAN_BADGE_STYLES: Record<string, string> = {
 interface AlertItem {
   id: number;
   level: "error" | "warning" | "info";
-  title: string;
+  /** 新数据双语、历史数据纯文本，统一用 alertText() 取当前 locale 的可读串 */
+  title: LocalizedText;
   domain: string | null;
   created_at: string;
 }
@@ -54,12 +64,15 @@ const alertDotColor: Record<string, string> = {
 // SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
 
 
-export default function Topbar({ displayName, email, isGuest, onMobileMenuClick }: TopbarProps) {
+export default function Topbar({ displayName, email, isGuest, onMobileMenuClick, mobileMenuOpen }: TopbarProps) {
   const t = useTranslations("dashboard.topbar");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
   const [projectOpen, setProjectOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
+  // BUG-16：加载失败 ≠ 没有项目。之前 500 / 网络异常都落到 (data.data ?? [])，
+  // 菜单直接说「尚无项目」，用户会以为自己项目被删了。
+  const [projectsFailed, setProjectsFailed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -73,6 +86,11 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
   const bellRef = useRef<HTMLDivElement>(null);
   const projectRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  // BUG-25：三个下拉此前只能"点外面"关闭 —— 键盘用户按 Esc 关不掉，读屏也听不到
+  // 面板开合。触发按钮补 aria-expanded/haspopup/controls，面板补 id + role=group。
+  const bellPanelId = useId();
+  const projectPanelId = useId();
+  const userMenuPanelId = useId();
 
 
   // 拉取真实项目列表 + 从 localStorage 恢复选中项
@@ -80,6 +98,12 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
   const loadProjects = useCallback(async () => {
     try {
       const res = await fetch("/api/projects", { cache: "no-store" });
+      if (!res.ok) {
+        setProjectsFailed(true);
+        setProjects([]);
+        setSelectedId(null);
+        return;
+      }
       const data = await res.json();
       const list: ProjectItem[] = (data.data ?? []).map((p: ProjectItem) => ({
         id: p.id,
@@ -87,6 +111,7 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
         domain: p.domain,
         healthScore: p.healthScore,
       }));
+      setProjectsFailed(false);
       setProjects(list);
 
       // 恢复 localStorage 选中项（string id；旧版本遗留数字 id / 已删项目会校验失败 → fallback 第一个）
@@ -106,16 +131,32 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
       }
       // 通知同 tab 的页面（如 competitors）初始项目已就绪
       if (initialId !== null) {
-        window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId } }));
+        window.dispatchEvent(
+          new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId, source: "init" as const } }),
+        );
       }
     } catch {
-      // ignore
+      // 网络层失败同样如实标记：菜单显示「加载失败 + 重试」，而不是「尚无项目」
+      setProjectsFailed(true);
+      setProjects([]);
+      setSelectedId(null);
     }
   }, []);
 
   useEffect(() => {
     void (async () => { await loadProjects(); })();
   }, [loadProjects]);
+
+  // 外部同步：项目详情页 / 带范围参数的页面会把该项目设为活跃项目（setActiveProject）。
+  // 这里只更新选中态、不再派发事件，避免与 setActiveProject 形成回环。
+  useEffect(() => {
+    const onProjectChanged = (e: Event) => {
+      const detail = projectChangedDetail(e);
+      if (detail) setSelectedId(detail.id);
+    };
+    window.addEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+    return () => window.removeEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+  }, []);
 
   // 拉取预警
   useEffect(() => {
@@ -151,6 +192,19 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
     return () => document.removeEventListener("mousedown", onClick);
   }, [bellOpen, projectOpen, userMenuOpen]);
 
+  // BUG-25：Esc 收起任一打开的下拉（抽屉/弹层已有各自处理，这里只补顶栏下拉）
+  useEffect(() => {
+    if (!bellOpen && !projectOpen && !userMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setBellOpen(false);
+      setProjectOpen(false);
+      setUserMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [bellOpen, projectOpen, userMenuOpen]);
+
   const handleMarkAllRead = async () => {
     try {
       const res = await fetch("/api/alerts/read", {
@@ -169,7 +223,7 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
     setSelectedId(id);
     window.localStorage.setItem(SELECTED_PROJECT_KEY, id);
     // 通知同 tab 页面项目已切换
-    window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id } }));
+    window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id, source: "user" as const } }));
     setProjectOpen(false);
   };
 
@@ -219,6 +273,9 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
           onClick={onMobileMenuClick}
           className="flex h-9 w-9 flex-none items-center justify-center rounded-md text-ink-60 hover:bg-line-soft hover:text-ink lg:hidden"
           aria-label={t("menu")}
+          // BUG-18：抽屉是 fixed 覆盖层，展开时它遮挡整页。不加 aria-expanded，
+          // 读屏用户无法知道菜单是否已打开，也不知道焦点落在被遮住的导航里。
+          aria-expanded={mobileMenuOpen ?? false}
         >
           <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
             <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -234,12 +291,17 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
             if (!projectOpen) void loadProjects();
             setProjectOpen((o) => !o);
           }}
-          className="flex items-center gap-2 rounded-md border border-line bg-card px-3 py-2 hover:border-ink-25"
+          aria-haspopup="true"
+          aria-expanded={projectOpen}
+          aria-controls={projectOpen ? projectPanelId : undefined}
+          className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-line bg-card px-3 py-2 hover:border-ink-25"
         >
           <span className="flex h-6 w-6 flex-none items-center justify-center rounded bg-ink text-xs font-semibold text-card">
             {currentProject ? currentProject.name.charAt(0).toUpperCase() : "—"}
           </span>
-          <span className="max-w-[140px] truncate font-sans text-sm font-medium text-ink sm:max-w-[220px] lg:max-w-none">
+          {/* min-w-0 是必需的：flex 子项默认 min-width:auto，长域名不会收缩，
+              按钮会顶穿 360 屏上 128px 的容器，把域名画到铃铛/套餐徽标上面（BUG-45）。 */}
+          <span className="max-w-[140px] min-w-0 truncate font-sans text-sm font-medium text-ink sm:max-w-[220px] lg:max-w-none">
             {currentProject ? currentProject.domain : t("noProject")}
           </span>
           <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-ink-40">
@@ -248,11 +310,26 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
         </button>
 
         {projectOpen && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-2">
+          <div
+            id={projectPanelId}
+            role="group"
+            aria-label={t("switchProject")}
+            className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-card p-2"
+          >
             <div className="px-2 py-1 font-sans text-xs uppercase tracking-wider text-ink-40">
               {t("switchProject")}
             </div>
-            {projects.length === 0 ? (
+            {projectsFailed ? (
+              <div className="px-2 py-3">
+                <div className="font-sans text-xs text-neg">{t("loadFailed")}</div>
+                <button
+                  onClick={() => void loadProjects()}
+                  className="btn-secondary mt-2 px-2 py-1 text-xs"
+                >
+                  {t("retry")}
+                </button>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="px-2 py-3 font-sans text-xs text-ink-40">
                 {t("noProjects")}
               </div>
@@ -303,6 +380,9 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
             onClick={() => setBellOpen((o) => !o)}
             className="relative flex h-9 w-9 items-center justify-center rounded-md text-ink-60 hover:bg-card hover:text-ink"
             aria-label={t("notifications")}
+            aria-haspopup="true"
+            aria-expanded={bellOpen}
+            aria-controls={bellOpen ? bellPanelId : undefined}
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
               <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -314,7 +394,12 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
           </button>
 
           {bellOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden">
+            <div
+              id={bellPanelId}
+              role="group"
+              aria-label={t("notifications")}
+              className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-line bg-card overflow-hidden"
+            >
               {/* 头部 */}
               <div className="flex items-center justify-between border-b border-line-soft px-4 py-2">
                 <span className="text-sm font-semibold text-ink">{t("notifications")}</span>
@@ -339,7 +424,7 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
                     >
                       <span className={`mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-sans text-xs text-ink leading-snug">{a.title}</div>
+                        <div className="font-sans text-xs text-ink leading-snug">{alertText(a.title, locale)}</div>
                         <div className="mt-0.5 font-sans text-xs text-ink-40">
                           {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                         </div>
@@ -377,7 +462,11 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen((o) => !o)}
+            aria-label={displayName}
             className="flex items-center gap-2 rounded p-1 hover:bg-line-soft"
+            aria-haspopup="true"
+            aria-expanded={userMenuOpen}
+            aria-controls={userMenuOpen ? userMenuPanelId : undefined}
           >
             <span className={`rounded px-2 py-0.5 font-mono text-xs font-medium ${entitlementsLoading ? "bg-line-soft text-ink-40" : (PLAN_BADGE_STYLES[currentPlan] ?? PLAN_BADGE_STYLES.free)}`}>
               {entitlementsLoading ? "…" : planLabel(currentPlan, locale)}
@@ -388,7 +477,12 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
           </button>
 
           {userMenuOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-line bg-card overflow-hidden">
+            <div
+              id={userMenuPanelId}
+              role="group"
+              aria-label={t("menu")}
+              className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-line bg-card overflow-hidden"
+            >
               <div className="border-b border-line-soft px-4 py-2">
                 <p className="font-sans text-sm font-medium text-ink truncate">
                   {displayName}
@@ -406,6 +500,13 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick 
                 </div>
               </div>
               <div className="border-b border-line-soft py-1">
+                <Link
+                  href="/app/settings"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="block px-4 py-2 font-sans text-sm text-ink-60 transition-colors duration-150 hover:bg-line-soft hover:text-ink"
+                >
+                  {t("settings")}
+                </Link>
                 <Link
                   href="/pricing"
                   onClick={() => setUserMenuOpen(false)}

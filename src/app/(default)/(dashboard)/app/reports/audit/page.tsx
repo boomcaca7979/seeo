@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import ScoreRing from "@/components/dashboard/ScoreRing";
@@ -63,6 +64,13 @@ export default function AuditReportPrintPage() {
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
+    // 数据来源优先级：URL ?domain=&audit= > localStorage（旧入口兼容）。
+    // URL 参数让「指定某次审计」的打印报告可刷新、可分享，不依赖浏览器状态；
+    // 无 URL 参数时回退到审计页写入的最近域名（行为与历史版本一致）。
+    const params = new URLSearchParams(window.location.search);
+    const urlDomain = (params.get("domain") ?? "").trim();
+    const auditParamRaw = (params.get("audit") ?? "").trim();
+    const auditId = /^\d+$/.test(auditParamRaw) ? Number(auditParamRaw) : null;
     const saved = (() => {
       try {
         return localStorage.getItem(STORAGE_KEY) ?? "";
@@ -70,37 +78,42 @@ export default function AuditReportPrintPage() {
         return "";
       }
     })();
-    if (!saved) {
-      // 推迟到下一帧避免 effect 同步路径 setState
-      const id = window.setTimeout(() => {
+    const effectiveDomain = urlDomain || saved;
+    // 状态写入放进微任务，而不是 effect 同步路径、也不是 setTimeout + cleanup clearTimeout：
+    //   - 同步 setState 命中 react-hooks/set-state-in-effect（级联渲染）；
+    //   - 定时器版本会被开发模式 StrictMode 的「挂载→卸载→重挂载」取消，第二次又被上面的
+    //     initRef 短路，domain 永不写入：URL 带 domain 也永久停在骨架屏，
+    //     空状态还错报「尚未选择审计域名」。微任务不受 cleanup 取消，每次挂载只发起一次取数。
+    queueMicrotask(() => {
+      if (!effectiveDomain) {
         setNotFound(true);
         setLoading(false);
-      }, 0);
-      return () => window.clearTimeout(id);
-    }
-    const id = window.setTimeout(() => setDomain(saved), 0);
-    void (async () => {
-      try {
-        const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(saved)}`, { cache: "no-store" });
-        const json = await res.json();
-        if (res.ok) {
-          if (!json.data) {
-            setNotFound(true);
-          } else if (json.data.status !== "completed") {
-            setNotFound(true);
-          } else {
-            setAudit(json.data as AuditData);
-          }
-        } else {
-          setNotFound(true);
-        }
-      } catch {
-        setNotFound(true);
-      } finally {
-        setLoading(false);
+        return;
       }
-    })();
-    return () => window.clearTimeout(id);
+      setDomain(effectiveDomain);
+      void (async () => {
+        try {
+          const auditQuery = auditId !== null ? `&audit=${auditId}` : "";
+          const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(effectiveDomain)}${auditQuery}`, { cache: "no-store" });
+          const json = await res.json();
+          if (res.ok) {
+            if (!json.data) {
+              setNotFound(true);
+            } else if (json.data.status !== "completed") {
+              setNotFound(true);
+            } else {
+              setAudit(json.data as AuditData);
+            }
+          } else {
+            setNotFound(true);
+          }
+        } catch {
+          setNotFound(true);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    });
   }, []);
 
   const handlePrint = () => {
@@ -126,9 +139,11 @@ export default function AuditReportPrintPage() {
     return (
       <div className="mx-auto max-w-3xl p-6 lg:p-8 print:hidden">
         <div className="card-a border border-dashed border-line p-12 text-center">
-          <div className="font-display text-lg font-semibold text-ink">
+          {/* 空状态也要有页面级 <h1>：已加载分支的报告头是 h1，
+              否则直接进来看不到报告的读者（含读屏）没有任何标题可定位。 */}
+          <h1 className="font-display text-lg font-semibold text-ink">
             {t("emptyTitle")}
-          </div>
+          </h1>
           <p className="mt-3 font-sans text-sm text-ink-60">
             {domain
               ? t("emptyWithDomain", { domain })
@@ -143,6 +158,11 @@ export default function AuditReportPrintPage() {
           >
             {t("emptyAction")}
           </button>
+          <div className="mt-3">
+            <Link href="/app/reports" className="btn-secondary">
+              {t("gotoReports")}
+            </Link>
+          </div>
         </div>
       </div>
     );

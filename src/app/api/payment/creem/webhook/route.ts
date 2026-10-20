@@ -18,6 +18,12 @@
 //   - syncSubscriptionPeriod：RPC 内部 greatest(current_period_end, p_period_end)
 //   - handleRefundSuccess：条件 UPDATE(payment_status='paid')，重复退款事件幂等
 //   - 本地经营快照：creem_transactions 主键为 Creem 侧 external id，重投不重复计收入
+//
+// 重试契约（与真实支付平台一致）：
+//   200 = 「这个事件我已安全处理，或永久无法处理（已记 ignored 并留原因）」；
+//   5xx = 「暂时没能安全处理，请重投」。
+//   因此订单查询/写入的**依赖故障必须抛错换 500**，绝不能塌成「订单不存在」后 200 确认收货：
+//   Creem 收到 200 就停止重投，已付款用户的开通会永久丢失。
 
 import { NextResponse } from "next/server";
 import {
@@ -106,6 +112,36 @@ async function tryFinishWebhookEvent(
   }
 }
 
+/**
+ * 事件处理结论：
+ * - processed：已安全处理（或按设计无需处理），账本记 processed；
+ * - ignored：确认收到但永久无法处理（订单不属于本渠道、校验不通过等），
+ *   账本记 ignored 并留下原因 —— 不抛错、不让 Creem 做无效重投；
+ * - 依赖故障走 throw → 500，由 Creem 重投（见文件头「重试契约」）。
+ */
+interface HandleOutcome {
+  status: "processed" | "ignored";
+  reason?: string;
+}
+
+const PROCESSED: HandleOutcome = { status: "processed" };
+
+function ignored(reason: string): HandleOutcome {
+  console.warn("[CreemWebhook] 事件确认收到但不处理:", reason);
+  return { status: "ignored", reason };
+}
+
+/** 订单查询三态 → 订单；failure 一律抛错换 500（不能当成「不存在」确认收货） */
+function unwrapLookup(
+  lookup: Awaited<ReturnType<typeof getOrderByOutTradeNo>>,
+  label: string
+): { order: OrderRecord | null } {
+  if (lookup.kind === "failure") {
+    throw new Error(`${label}查询失败：${lookup.reason}`);
+  }
+  return { order: lookup.kind === "found" ? lookup.order : null };
+}
+
 export async function POST(req: Request) {
   // 1. Webhook secret 必须配置
   const secret = getCreemWebhookSecret();
@@ -147,23 +183,25 @@ export async function POST(req: Request) {
     }
   }
 
-  // 5. 分发处理（异常返回 500 让 Creem 重试，并登记 failed 允许重放开）
+  // 5. 分发处理（可重试故障抛错 → 500 让 Creem 重投，并登记 failed 允许重放开）
+  let outcome: HandleOutcome;
   try {
     switch (event.eventType) {
       case "checkout.completed":
-        await handleCheckoutCompleted(event.object as CreemCheckoutCompletedObject);
+        outcome = await handleCheckoutCompleted(event.object as CreemCheckoutCompletedObject);
         break;
       case "refund.created":
-        await handleRefundCreated(event.object as CreemRefundObject, event.id);
+        outcome = await handleRefundCreated(event.object as CreemRefundObject, event.id);
         break;
       case "dispute.created":
         console.warn("[CreemWebhook] 收到争议事件，需人工处理:", {
           eventId: event.id,
         });
+        outcome = PROCESSED;
         break;
       default:
         if (SUBSCRIPTION_STATUS_EVENTS.has(event.eventType)) {
-          await handleSubscriptionSync(
+          outcome = await handleSubscriptionSync(
             event.object as CreemSubscriptionEventObject,
             event.eventType,
             event.id
@@ -188,7 +226,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "processing error" }, { status: 500 });
   }
 
-  await tryFinishWebhookEvent(event.id, "processed");
+  await tryFinishWebhookEvent(event.id, outcome.status, outcome.reason ?? null);
   return NextResponse.json({ received: true });
 }
 
@@ -198,67 +236,57 @@ function isCreemChannel(order: OrderRecord | null): boolean {
 }
 
 /** checkout.completed：一次性支付 / 订阅首付成功 */
-async function handleCheckoutCompleted(obj: CreemCheckoutCompletedObject) {
+async function handleCheckoutCompleted(
+  obj: CreemCheckoutCompletedObject
+): Promise<HandleOutcome> {
   const outTradeNo = extractOutTradeNo(obj.metadata, obj.request_id);
   if (!outTradeNo) {
-    console.warn("[CreemWebhook] checkout.completed 缺少订单标识，无法匹配", {
-      checkoutId: obj.id,
-    });
-    return;
+    return ignored(`checkout.completed 缺少订单标识（checkoutId=${obj.id}）`);
   }
 
-  const order = await getOrderByOutTradeNo(outTradeNo);
+  const { order } = unwrapLookup(await getOrderByOutTradeNo(outTradeNo), "订单");
   if (!order) {
-    console.warn("[CreemWebhook] 订单不存在:", outTradeNo);
-    return;
+    // 真实查库确认「没有这个订单号」：本地订单在调 Creem 之前同步写入，重投也不会出现，
+    // 因此确认收到（账本记 ignored），不让渠道做无效重投。
+    return ignored(`未匹配到订单：${outTradeNo}`);
   }
   if (!isCreemChannel(order)) {
-    console.error(
-      "[CreemWebhook] 非 Creem 渠道订单拒绝处理:",
-      outTradeNo,
-      order.payment_channel
+    return ignored(
+      `非 Creem 渠道订单拒绝处理：${outTradeNo}（channel=${order.payment_channel}）`
     );
-    return;
   }
 
   const creemOrder = obj.order;
   // 支付失败态：不 completeOrder，标记 failed（Creem order.status: paid/refunded/failed 等）
   if (creemOrder?.status && creemOrder.status !== "paid") {
     if (creemOrder.status === "failed") {
-      await markOrderFailed(outTradeNo);
+      const marked = await markOrderFailed(outTradeNo);
+      if (!marked.ok) {
+        // 未落库：留在 pending 的失败订单会让支付结果页永远「确认中」，必须重投纠正
+        throw new Error(marked.error ?? "markOrderFailed failed");
+      }
       console.warn("[CreemWebhook] 支付失败，订单标记 failed:", outTradeNo);
-    } else {
-      console.warn(
-        "[CreemWebhook] 订单状态非 paid，跳过开通:",
-        outTradeNo,
-        creemOrder.status
-      );
+      return PROCESSED;
     }
-    return;
+    return ignored(`渠道订单状态非 paid，跳过开通：${outTradeNo}（status=${creemOrder.status}）`);
   }
 
   // 金额校验（Creem amount 为最小货币单位，换算为元后比对）
   const paidAmount =
     typeof creemOrder?.amount === "number" ? creemOrder.amount / 100 : order.amount;
   if (!amountsMatch(order.amount, paidAmount)) {
-    console.error("[CreemWebhook] 金额不匹配，拒绝开通:", {
-      outTradeNo,
-      expected: order.amount,
-      actual: paidAmount,
-    });
-    return;
+    return ignored(
+      `金额不匹配，拒绝开通：${outTradeNo}（期望 ${order.amount}，实付 ${paidAmount} ${order.currency}）`
+    );
   }
   // 币种校验
   if (
     creemOrder?.currency &&
     creemOrder.currency.toUpperCase() !== order.currency.toUpperCase()
   ) {
-    console.error("[CreemWebhook] 币种不匹配，拒绝开通:", {
-      outTradeNo,
-      expected: order.currency,
-      actual: creemOrder.currency,
-    });
-    return;
+    return ignored(
+      `币种不匹配，拒绝开通：${outTradeNo}（期望 ${order.currency}，实付 ${creemOrder.currency}）`
+    );
   }
 
   // 订阅产品：周期以 Creem 返回的 current_period_end_date 为准（不自行换算 Monthly→N 天）
@@ -287,8 +315,14 @@ async function handleCheckoutCompleted(obj: CreemCheckoutCompletedObject) {
     console.error("[CreemWebhook] completeOrder 失败:", {
       outTradeNo,
       error: result.error,
+      code: result.code,
+      retryable: result.retryable,
     });
-    throw new Error(result.error ?? "completeOrder failed"); // 返回 500 让 Creem 重试
+    if (result.retryable) {
+      // 未安全落库 → 500 让 Creem 重投（completeOrder 幂等，重投不会重复开通）
+      throw new Error(result.error ?? "completeOrder failed");
+    }
+    return ignored(`拒绝开通：${outTradeNo}（${result.error ?? "unknown"}）`);
   }
 
   // ===== 本地经营快照（Owner Console）=====
@@ -396,6 +430,7 @@ async function handleCheckoutCompleted(obj: CreemCheckoutCompletedObject) {
     plan: order.plan,
     opened: result.opened,
   });
+  return PROCESSED;
 }
 
 /**
@@ -406,26 +441,24 @@ async function handleSubscriptionSync(
   obj: CreemSubscriptionEventObject,
   eventType: string,
   eventId?: string
-) {
+): Promise<HandleOutcome> {
   const outTradeNo = extractOutTradeNo(obj.metadata);
-  let order = outTradeNo ? await getOrderByOutTradeNo(outTradeNo) : null;
+  let order: OrderRecord | null = outTradeNo
+    ? unwrapLookup(await getOrderByOutTradeNo(outTradeNo), "订阅事件的订单").order
+    : null;
   if (!order && obj.id) {
-    order = await findOrderByCreemSubscriptionId(obj.id);
+    order = unwrapLookup(await findOrderByCreemSubscriptionId(obj.id), "订阅事件的订单").order;
   }
   if (!order) {
-    console.warn("[CreemWebhook] 订阅事件未匹配到订单:", obj.id, eventType);
-    return;
+    return ignored(`订阅事件未匹配到订单：${obj.id ?? "(无订阅 id)"}（${eventType}）`);
   }
   if (!isCreemChannel(order)) {
-    console.error(
-      "[CreemWebhook] 非 Creem 渠道订单拒绝订阅同步:",
-      order.out_trade_no,
-      order.payment_channel
+    return ignored(
+      `非 Creem 渠道订单拒绝订阅同步：${order.out_trade_no}（channel=${order.payment_channel}）`
     );
-    return;
   }
   // 定制服务无订阅周期
-  if (order.plan === CUSTOM_SERVICE_PLAN) return;
+  if (order.plan === CUSTOM_SERVICE_PLAN) return PROCESSED;
 
   // ===== 快照（含所有订阅状态事件，含未支付态的 unpaid / incomplete）=====
   const status = obj.status ?? statusFromEventType(eventType);
@@ -479,14 +512,12 @@ async function handleSubscriptionSync(
     }
   }
 
-  // 首付订单尚未由 checkout.completed 处理时，等待其投递（Creem 按顺序重试）
+  // 首付订单尚未由 checkout.completed 处理：checkout.completed 自带 Creem 订阅周期并落库，
+  // 权益不会因此丢失，因此这里确认收到并记账（不重投，避免无效重试风暴）。
   if (order.payment_status !== "paid") {
-    console.warn(
-      "[CreemWebhook] 订单未支付，跳过订阅周期同步:",
-      order.out_trade_no,
-      order.payment_status
+    return ignored(
+      `订单尚未支付，跳过订阅周期同步：${order.out_trade_no}（status=${order.payment_status}）`
     );
-    return;
   }
 
   // 只有 active/paid 事件携带新周期时才推动会员周期（canceled/unpaid 等不改权益）
@@ -496,13 +527,12 @@ async function handleSubscriptionSync(
       status,
       eventId,
     });
-    return;
+    return PROCESSED;
   }
 
   const periodEnd = obj.current_period_end_date;
   if (!periodEnd || Number.isNaN(Date.parse(periodEnd))) {
-    console.warn("[CreemWebhook] 订阅事件缺少有效周期结束时间:", obj.id);
-    return;
+    return ignored(`订阅事件缺少有效周期结束时间：${obj.id ?? "(无订阅 id)"}`);
   }
 
   const ok = await syncSubscriptionPeriod({
@@ -558,6 +588,7 @@ async function handleSubscriptionSync(
       console.error("[CreemWebhook] 续费通知入队/发送失败（不影响支付）:", notifyErr);
     }
   }
+  return PROCESSED;
 }
 
 /** 事件名 → 订阅状态（payload 未带 status 时的兜底映射） */
@@ -568,26 +599,31 @@ function statusFromEventType(eventType: string): string {
 }
 
 /** refund.created：退款成功处理 */
-async function handleRefundCreated(obj: CreemRefundObject, eventId?: string) {
+async function handleRefundCreated(
+  obj: CreemRefundObject,
+  eventId?: string
+): Promise<HandleOutcome> {
   // 匹配订单：metadata.out_trade_no → refund.order.metadata → Creem order id（trade_no 列）
   const outTradeNo =
     extractOutTradeNo(obj.metadata) ??
     extractOutTradeNo(obj.order?.metadata ?? null) ??
     null;
-  let order = outTradeNo ? await getOrderByOutTradeNo(outTradeNo) : null;
-  if (!order && obj.order?.id) order = await findOrderByCreemOrderId(obj.order.id);
-  if (!order && obj.order_id) order = await findOrderByCreemOrderId(obj.order_id);
+  let order: OrderRecord | null = outTradeNo
+    ? unwrapLookup(await getOrderByOutTradeNo(outTradeNo), "退款事件的订单").order
+    : null;
+  if (!order && obj.order?.id) {
+    order = unwrapLookup(await findOrderByCreemOrderId(obj.order.id), "退款事件的订单").order;
+  }
+  if (!order && obj.order_id) {
+    order = unwrapLookup(await findOrderByCreemOrderId(obj.order_id), "退款事件的订单").order;
+  }
   if (!order) {
-    console.warn("[CreemWebhook] 退款事件未匹配到订单:", obj.id);
-    return;
+    return ignored(`退款事件未匹配到订单：${obj.id ?? "(无退款 id)"}`);
   }
   if (!isCreemChannel(order)) {
-    console.error(
-      "[CreemWebhook] 非 Creem 渠道订单拒绝退款处理:",
-      order.out_trade_no,
-      order.payment_channel
+    return ignored(
+      `非 Creem 渠道订单拒绝退款处理：${order.out_trade_no}（channel=${order.payment_channel}）`
     );
-    return;
   }
 
   const refundAmount =
@@ -621,11 +657,21 @@ async function handleRefundCreated(obj: CreemRefundObject, eventId?: string) {
     outRefundNo: obj.id,
   });
   if (!result.ok) {
-    console.error("[CreemWebhook] 退款处理失败:", order.out_trade_no, result.error);
-    throw new Error(result.error ?? "refund handling failed");
+    console.error("[CreemWebhook] 退款处理失败:", {
+      outTradeNo: order.out_trade_no,
+      error: result.error,
+      code: result.code,
+      retryable: result.retryable,
+    });
+    if (result.retryable) {
+      // 退款状态未安全落库 → 500 让 Creem 重投（handleRefundSuccess 幂等）
+      throw new Error(result.error ?? "refund handling failed");
+    }
+    return ignored(`退款不予处理：${order.out_trade_no}（${result.error ?? "unknown"}）`);
   }
   console.log("[CreemWebhook] 退款处理完成:", {
     outTradeNo: order.out_trade_no,
     refundAmount,
   });
+  return PROCESSED;
 }

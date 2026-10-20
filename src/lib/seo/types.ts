@@ -80,7 +80,9 @@ export interface ApiUsage {
 /** 统一错误返回 */
 export interface SeoApiError {
   error: string;
-  code: "QUOTA_EXCEEDED" | "INVALID_KEY" | "UPSTREAM_ERROR" | "TIMEOUT" | "BAD_REQUEST";
+  code: "QUOTA_EXCEEDED" | "INVALID_KEY" | "UPSTREAM_ERROR" | "TIMEOUT" | "BAD_REQUEST"
+    // 上游 SERP 服务（如 SerpApi 账户）自身额度耗尽——非用户套餐配额，升级不可解除
+    | "UPSTREAM_QUOTA";
 }
 
 /** 统一成功响应外壳（带用量字段） */

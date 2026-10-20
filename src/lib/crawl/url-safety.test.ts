@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { validateUrlSafety, CrawlError } from "@/lib/crawl";
+import { validateUrlSafety, assertSupportedUserScheme, normalizeUrl, CrawlError } from "@/lib/crawl";
+
+/** 取 CrawlError 的 code/reason，非 CrawlError 直接失败 */
+function catchCrawlError(fn: () => unknown): CrawlError {
+  try {
+    fn();
+  } catch (e) {
+    expect(e).toBeInstanceOf(CrawlError);
+    return e as CrawlError;
+  }
+  throw new Error("expected CrawlError");
+}
 
 describe("validateUrlSafety SSRF 防护", () => {
   it("合法 https URL 通过", () => {
@@ -79,5 +90,37 @@ describe("validateUrlSafety SSRF 防护", () => {
   it("无效 URL 格式被拒绝", () => {
     expect(() => validateUrlSafety("not-a-url")).toThrow(CrawlError);
     expect(() => validateUrlSafety("")).toThrow(CrawlError);
+  });
+});
+
+describe("BUG-44b assertSupportedUserScheme：协议必须在补全 https:// 之前判断", () => {
+  it.each(["example.com", "https://example.com", "HTTP://example.com/x", "  https://example.com  "])(
+    "放行 %s",
+    (input) => {
+      expect(() => assertSupportedUserScheme(input)).not.toThrow();
+    }
+  );
+
+  it.each(["ftp://example.com/page", "ws://example.com", "file:///etc/passwd"])(
+    "拒绝 %s，并带 scheme reason",
+    (input) => {
+      const e = catchCrawlError(() => assertSupportedUserScheme(input));
+      expect(e.code).toBe("INVALID_URL");
+      expect(e.reason).toBe("scheme");
+    }
+  );
+
+  it("根因复现：normalizeUrl 会把 ftp:// 伪装成可解析的 https URL", () => {
+    // 这条不是「期望的行为」，而是缺陷存在的证据：少了预检，SSRF 白名单就会放行怪 URL，
+    // 用户最终看到「无法连接该站点」而不是「协议写错」。
+    const mangled = normalizeUrl("ftp://example.com/page");
+    expect(mangled).toBe("https://ftp://example.com/page");
+    expect(() => validateUrlSafety(mangled)).not.toThrow();
+  });
+
+  it("无 // 的伪协议交给格式校验，不在这里报协议错", () => {
+    expect(() => assertSupportedUserScheme("javascript:alert(1)")).not.toThrow();
+    const e = catchCrawlError(() => validateUrlSafety(normalizeUrl("javascript:alert(1)")));
+    expect(e.reason).toBe("malformed");
   });
 });

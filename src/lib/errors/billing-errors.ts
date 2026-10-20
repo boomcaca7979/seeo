@@ -13,6 +13,8 @@ export interface BillingErrorBody {
   limit?: number;
   feature?: Feature;
   used?: number;
+  /** QuotaExceededError 超限维度：daily（次日重置）/ monthly（下月 1 日重置，缺省） */
+  scope?: "daily" | "monthly";
 }
 
 /** Feature 权限不足错误（HTTP 403） */
@@ -71,6 +73,9 @@ export class QuotaExceededError extends Error {
       plan: this.plan,
       limit: this.limit,
       used: this.used,
+      // 超限维度（daily=次日重置 / monthly=下月 1 日重置）：
+      // 前端 apiErrors.QUOTA_EXCEEDED_DAILY 模板依赖此字段区分重置周期
+      scope: this.scope,
     };
   }
 }
@@ -81,14 +86,17 @@ export class PlanLimitError extends Error {
   readonly plan: PlanTier;
   readonly limit: number;
   readonly resource: string;
+  /** 当前已用量（可选）：只有调用方能给出真实计数的资源才传，前端据此分列展示而不是猜数字 */
+  readonly used?: number;
 
-  constructor(resource: string, plan: PlanTier, limit: number, code?: string) {
+  constructor(resource: string, plan: PlanTier, limit: number, code?: string, used?: number) {
     super(`当前套餐（${plan}）${resource}上限为 ${limit}，请升级套餐`);
     this.name = "PlanLimitError";
     this.plan = plan;
     this.limit = limit;
     this.resource = resource;
     this.code = code ?? "PLAN_LIMIT_REACHED";
+    this.used = used;
   }
 
   toJSON(): BillingErrorBody {
@@ -97,6 +105,7 @@ export class PlanLimitError extends Error {
       message: this.message,
       plan: this.plan,
       limit: this.limit,
+      ...(this.used === undefined ? {} : { used: this.used }),
     };
   }
 }

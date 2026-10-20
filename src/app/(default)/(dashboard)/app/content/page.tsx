@@ -9,6 +9,9 @@ import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import DomainSelect from "@/components/dashboard/DomainSelect";
 import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
+import PageHeader from "@/components/viz/PageHeader";
+import MetricCard from "@/components/viz/MetricCard";
+import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
 
 interface CheckItem {
@@ -229,6 +232,7 @@ function ContentPageInner() {
           url: url.trim(),
           keyword: targetKeywords[0],
           targetKeywords,
+          locale,
         }),
       });
       const json = await res.json();
@@ -262,17 +266,15 @@ function ContentPageInner() {
     : 1;
 
   return (
-    <div className="dash-container p-6 lg:p-8">
-      {/* 页头 */}
-      <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("title")}
-        </h1>
-        <div className="hairline flex-1" />
-      </div>
-      <p className="mt-2 font-sans text-sm text-ink-60">
-        {t("subtitle")}
-      </p>
+    <div className="dash-container p-4 lg:p-8">
+      {/* 页头：统一 PageHeader（meta 条显示当前分析对象与历史数量） */}
+      <PageHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        meta={
+          <span>{t("recentTitle")}: {formatNumber(history.length, locale)}</span>
+        }
+      />
 
       {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
       <OpportunityContextBanner />
@@ -283,7 +285,7 @@ function ContentPageInner() {
         className="card-a mt-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
-          <label className="font-mono text-xs text-ink-40">{t("urlLabel")}</label>
+          <label htmlFor="content-url" className="font-mono text-xs text-ink-40">{t("urlLabel")}</label>
           <DomainSelect
             value={domain}
             onChange={(d) => {
@@ -295,6 +297,7 @@ function ContentPageInner() {
           />
           <input
             type="text"
+            id="content-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://example.com/blog/post-1"
@@ -302,19 +305,21 @@ function ContentPageInner() {
           />
         </div>
         <div className="flex-1">
-          <label className="font-mono text-xs text-ink-40">{t("keywordsLabel")}</label>
+          <label htmlFor="content-keywords" className="font-mono text-xs text-ink-40">{t("keywordsLabel")}</label>
           <input
             type="text"
+            id="content-keywords"
             value={targetKeywordsInput}
             onChange={(e) => setTargetKeywordsInput(e.target.value)}
             placeholder={t("keywordsPlaceholder")}
             className="mt-2 w-full rounded-md border border-line bg-card px-3 py-2 font-sans text-sm text-ink placeholder:text-ink-40 focus:border-ink-25 focus:outline-none"
           />
         </div>
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 min-w-0 max-w-full">
           {history.length > 0 && (
             <select
-              className="rounded-md border border-line bg-card px-3 py-2 font-mono text-xs text-ink-60 focus:border-ink-25 focus:outline-none"
+              aria-label={t("recentTitle")}
+              className="min-w-0 max-w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-xs text-ink-60 focus:border-ink-25 focus:outline-none"
               onChange={(e) => {
                 const h = history.find((x) => x.id === Number(e.target.value));
                 if (h) {
@@ -400,38 +405,55 @@ function ContentPageInner() {
               )}
             </div>
 
-            {/* 统计卡网格 */}
+            {/* 统计卡网格（统一 MetricCard） */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-8">
-              <StatCard label={t("statWords")} value={formatNumber(analysis.wordCount, locale)} />
-              <StatCard
+              <MetricCard
+                hintStyle="plain"
+                label={t("statWords")}
+                value={formatNumber(analysis.wordCount, locale)}
+                compact
+              />
+              <MetricCard
+                hintStyle="plain"
                 label={t("statReadability")}
                 value={`${analysis.readabilityScore}`}
-                sub={analysis.readabilityLevel}
-                valueClass={scoreColorClass(analysis.readabilityScore)}
+                tone={analysis.readabilityScore >= 80 ? "pos" : analysis.readabilityScore >= 60 ? "warn" : "neg"}
+                caption={analysis.readabilityLevel}
+                compact
               />
-              <StatCard label={t("statInternal")} value={formatNumber(analysis.internalLinksCount, locale)} />
-              <StatCard label={t("statExternal")} value={formatNumber(analysis.externalLinksCount, locale)} />
-              <StatCard
+              <MetricCard
+                hintStyle="plain"
+                label={t("statInternal")}
+                value={formatNumber(analysis.internalLinksCount, locale)}
+                compact
+              />
+              <MetricCard
+                hintStyle="plain"
+                label={t("statExternal")}
+                value={formatNumber(analysis.externalLinksCount, locale)}
+                compact
+              />
+              <MetricCard
+                hintStyle="plain"
                 label={t("statImages")}
                 value={formatNumber(analysis.imagesCount, locale)}
-                sub={analysis.imagesWithoutAlt > 0 ? t("imagesMissingAlt", { n: analysis.imagesWithoutAlt }) : t("imagesAllAlt")}
-                subClass={analysis.imagesWithoutAlt > 0 ? "text-neg" : "text-pos"}
+                tone={analysis.imagesWithoutAlt > 0 ? "neg" : "pos"}
+                caption={analysis.imagesWithoutAlt > 0 ? t("imagesMissingAlt", { n: analysis.imagesWithoutAlt }) : t("imagesAllAlt")}
+                compact
               />
-              <StatCard
+              <MetricCard
+                hintStyle="plain"
                 label="Meta"
                 value={`${analysis.metaTitleLength}/${analysis.metaDescriptionLength}`}
-                sub={t("statMetaSub")}
-                valueClass={
-                  analysis.metaTitleLength >= 30 && analysis.metaTitleLength <= 60
-                    ? "text-pos"
-                    : "text-warn"
-                }
+                tone={analysis.metaTitleLength >= 30 && analysis.metaTitleLength <= 60 ? "pos" : "warn"}
+                caption={t("statMetaSub")}
+                compact
               />
             </div>
           </div>
 
           {/* 关键词密度 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("kwTitle")}</h2>
               <div className="hairline flex-1" />
@@ -442,39 +464,41 @@ function ContentPageInner() {
                   {t("kwEmpty")}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-line-soft bg-line-soft/40">
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKeyword")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thOccurrences")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thDensity")}</th>
-                        <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thStatus")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysis.keywordDensity.map((item) => {
-                        const badge = densityBadge(item.density);
-                        return (
-                          <tr key={item.keyword} className="border-b border-line-soft">
-                            <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{item.keyword}</td>
-                            <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatNumber(item.count, locale)}</td>
-                            <td className="px-4 py-3 font-mono text-sm font-semibold text-ink">{item.density}%</td>
-                            <td className="px-4 py-3">
-                              <span className={badge.cls}>{t(badge.key)}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable minWidthRem={34}>
+                  <THead>
+                    <Th>{t("thKeyword")}</Th>
+                    <Th width="8rem">{t("thOccurrences")}</Th>
+                    <Th width="7rem">{t("thDensity")}</Th>
+                    <Th width="8rem">{t("thStatus")}</Th>
+                  </THead>
+                  <TBody>
+                    {analysis.keywordDensity.map((item) => {
+                      const badge = densityBadge(item.density);
+                      return (
+                        <TR key={item.keyword}>
+                          <TD>
+                            <span className="block max-w-[16rem] truncate font-sans text-sm font-medium text-ink" title={item.keyword}>
+                              {item.keyword}
+                            </span>
+                          </TD>
+                          <TD numeric className="text-ink-60">{formatNumber(item.count, locale)}</TD>
+                          <TD numeric>
+                            <span className="font-semibold text-ink">{item.density}%</span>
+                          </TD>
+                          <TD>
+                            <span className={`${badge.cls} whitespace-nowrap`}>{t(badge.key)}</span>
+                          </TD>
+                        </TR>
+                      );
+                    })}
+                  </TBody>
+                </DataTable>
               )}
             </div>
           </div>
 
           {/* 标题建议 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("sugTitle")}</h2>
               <div className="hairline flex-1" />
@@ -503,7 +527,7 @@ function ContentPageInner() {
           </div>
 
           {/* 标题结构 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("headTitle")}</h2>
               <div className="hairline flex-1" />
@@ -541,7 +565,7 @@ function ContentPageInner() {
           </div>
 
           {/* 高频词 TOP 10 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("topTitle")}</h2>
               <div className="hairline flex-1" />
@@ -580,7 +604,7 @@ function ContentPageInner() {
           </div>
 
           {/* 内容预览 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("previewTitle")}</h2>
               <div className="hairline flex-1" />
@@ -593,7 +617,7 @@ function ContentPageInner() {
           </div>
 
           {/* 历史对比 */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("cmpTitle")}</h2>
               <div className="hairline flex-1" />
@@ -611,7 +635,7 @@ function ContentPageInner() {
           </div>
 
           {/* SEO 检测清单（保留原有） */}
-          <div className="mt-10">
+          <div className="mt-6">
             <div className="flex items-center gap-3">
               <h2 className="font-display text-lg font-semibold text-ink">{t("checklistTitle")}</h2>
               <div className="hairline flex-1" />
@@ -658,7 +682,7 @@ function ContentPageInner() {
       )}
 
       {/* 最近检测历史 */}
-      <div className="mt-10">
+      <div className="mt-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-ink">{t("recentTitle")}</h2>
           <button
@@ -676,70 +700,47 @@ function ContentPageInner() {
               {t("historyEmpty")}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-line-soft bg-line-soft/40">
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">URL</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thKeyword")}</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thContentScore")}</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thWords")}</th>
-                    <th className="px-4 py-3 text-left font-mono text-xs font-semibold text-ink-40">{t("thTime")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h) => (
-                    <tr
-                      key={h.id}
-                      className="cursor-pointer border-b border-line-soft transition-colors hover:bg-line-soft/40"
-                      onClick={() => {
-                        setUrl(h.url);
-                        setTargetKeywordsInput(h.keyword);
-                      }}
-                    >
-                      <td className="max-w-xs truncate px-4 py-3 font-mono text-sm text-ink">{h.url}</td>
-                      <td className="px-4 py-3 font-sans text-sm text-ink-60">{h.keyword}</td>
-                      <td className="px-4 py-3">
-                        <span className={`font-mono text-sm font-semibold ${
-                          (h.content_score ?? h.score) >= 80 ? "text-pos" : (h.content_score ?? h.score) >= 60 ? "text-warn" : "text-neg"
-                        }`}>
-                          {h.content_score ?? h.score}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatNumber(h.word_count, locale)}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-ink-40">{formatTime(h.created_at, locale, tc)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable minWidthRem={40} ariaLabel={t("recentTitle")}>
+              <THead>
+                <Th>URL</Th>
+                <Th width="9rem">{t("thKeyword")}</Th>
+                <Th width="7rem">{t("thContentScore")}</Th>
+                <Th width="7rem">{t("thWords")}</Th>
+                <Th width="9rem">{t("thTime")}</Th>
+              </THead>
+              <TBody>
+                {history.map((h) => (
+                  <TR
+                    key={h.id}
+                    onClick={() => {
+                      setUrl(h.url);
+                      setTargetKeywordsInput(h.keyword);
+                    }}
+                  >
+                    <TD>
+                      <span className="block max-w-xs truncate font-mono text-sm text-ink" title={h.url}>
+                        {h.url}
+                      </span>
+                    </TD>
+                    <TD className="text-ink-60">{h.keyword}</TD>
+                    <TD numeric>
+                      <span className={`font-semibold ${
+                        (h.content_score ?? h.score) >= 80 ? "text-pos" : (h.content_score ?? h.score) >= 60 ? "text-warn" : "text-neg"
+                      }`}>
+                        {h.content_score ?? h.score}
+                      </span>
+                    </TD>
+                    <TD numeric className="text-ink-60">{formatNumber(h.word_count, locale)}</TD>
+                    <TD className="whitespace-nowrap font-mono text-ink-40">{formatTime(h.created_at, locale, tc)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </DataTable>
           )}
         </div>
       </div>
 
       <Toast />
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  valueClass = "text-ink",
-  subClass = "text-ink-40",
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  valueClass?: string;
-  subClass?: string;
-}) {
-  return (
-    <div className="card-a p-4">
-      <div className="font-mono text-xs text-ink-40">{label}</div>
-      <div className={`mt-1 font-mono text-2xl font-semibold ${valueClass}`}>{value}</div>
-      {sub && <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>}
     </div>
   );
 }

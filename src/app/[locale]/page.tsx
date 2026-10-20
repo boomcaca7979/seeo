@@ -5,8 +5,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import { isLocale } from "@/i18n/config";
+import { isLocale, defaultLocale } from "@/i18n/config";
 import { seoMetadata } from "@/i18n/seo";
+import { notFoundPageMetadata } from "@/lib/not-found-meta";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import FeatureCards from "@/components/FeatureCards";
@@ -39,9 +40,12 @@ export async function generateMetadata({
   params,
 }: LocaleHomePageProps): Promise<Metadata> {
   const { locale } = await params;
-  const loc = isLocale(locale) ? locale : "en";
-  const text = homeMeta[loc];
-  return seoMetadata(loc, "/", text.title, text.description);
+  // 无效 locale 段 → 本页组件里 notFound()。metadata 也必须同步输出 404：
+  // 客户端 hydration 只按路由树（layout + page）解析 metadata，不看 not-found 边界，
+  // 少了这一行首屏正确的 404 标题会被首页营销标题覆盖。
+  if (!isLocale(locale)) return notFoundPageMetadata(defaultLocale);
+  const text = homeMeta[locale];
+  return seoMetadata(locale, "/", text.title, text.description);
 }
 
 export default async function LocaleHomePage({ params }: LocaleHomePageProps) {

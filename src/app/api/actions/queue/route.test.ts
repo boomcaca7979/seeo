@@ -123,6 +123,62 @@ describe("GET /api/actions/queue", () => {
   });
 });
 
+describe("GET /api/actions/queue 关键词统计的项目范围（BUG-03）", () => {
+  // 队列响应里的 coverage.tracking.trackedKeywords 曾被 buildWorkQueue 用账号级
+  // listTrackedKeywords(userId) 计算：所有项目显示同一个数字，且零关键词项目
+  // 永远不会报 no_tracked_keywords。这里用真实 HTTP 链路 + 真实临时库锁定范围口径。
+  const DOMAIN_B = "scope-b.api-contract.test";
+  const DOMAIN_EMPTY = "scope-empty.api-contract.test";
+
+  interface QueueShape {
+    domain: string;
+    coverage: { tracking: { trackedKeywords: number }; gaps: string[] };
+  }
+
+  beforeAll(async () => {
+    const { addTrackedKeyword } = await import("@/lib/db/keywords");
+    const seed = (keyword: string, domain: string) =>
+      addTrackedKeyword("demo-user", { keyword, location: "United States", device: "PC", domain });
+    await Promise.all([seed("scope a1", DOMAIN), seed("scope a2", DOMAIN), seed("scope b1", DOMAIN_B)]);
+  });
+
+  async function fetchQueue(domain: string): Promise<QueueShape> {
+    const res = await queueGET(new Request(`http://localhost/api/actions/queue?domain=${domain}`));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { data: QueueShape };
+    return json.data;
+  }
+
+  it("具体域名 → 只统计该域名的关键词数", async () => {
+    const q = await fetchQueue(DOMAIN);
+    expect(q.domain).toBe(DOMAIN);
+    expect(q.coverage.tracking.trackedKeywords).toBe(2);
+    expect(q.coverage.gaps).not.toContain("no_tracked_keywords");
+  });
+
+  it("另一个域名 → 自己的数字（不再是所有项目共享的账号总数）", async () => {
+    const q = await fetchQueue(DOMAIN_B);
+    expect(q.coverage.tracking.trackedKeywords).toBe(1);
+    expect(q.coverage.gaps).not.toContain("no_tracked_keywords");
+  });
+
+  it("该项目确实没追踪关键词 → 0，且 no_tracked_keywords 缺口出现", async () => {
+    const q = await fetchQueue(DOMAIN_EMPTY);
+    expect(q.coverage.tracking.trackedKeywords).toBe(0);
+    expect(q.coverage.gaps).toContain("no_tracked_keywords");
+  });
+
+  it("项目级数字与账号级总量可区分（同账号跨域名合计 3，任一单项目都不等于 3）", async () => {
+    const a = await fetchQueue(DOMAIN);
+    const b = await fetchQueue(DOMAIN_B);
+    const accountTotal = 2 + 1;
+    expect(a.coverage.tracking.trackedKeywords + b.coverage.tracking.trackedKeywords).toBe(accountTotal);
+    for (const q of [a, b]) {
+      expect(q.coverage.tracking.trackedKeywords).not.toBe(accountTotal);
+    }
+  });
+});
+
 describe("GET/POST /api/audit/issues/status", () => {
   it("GET 返回该域名的处理记录（初始为空数组，而非报错）", async () => {
     const res = await statusGET(new Request(`http://localhost/api/audit/issues/status?domain=${DOMAIN}`));

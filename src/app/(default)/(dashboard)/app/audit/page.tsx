@@ -42,6 +42,8 @@ interface IssueGroup {
   severity: "error" | "warning" | "notice";
   affectedPages: number;
   sampleUrl: string;
+  /** 该检查命中的全部 URL，与 /api/audit/latest 的 IssueGroup.urls 对应 */
+  urls: string[];
   detail: string;
   suggestion: string | null;
 }
@@ -158,10 +160,11 @@ function AuditPageInner() {
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const loadLatest = useCallback(async (d: string): Promise<AuditData | null> => {
+  const loadLatest = useCallback(async (d: string, auditId?: string): Promise<AuditData | null> => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(d)}`, { cache: "no-store" });
+      const auditQ = auditId ? `&audit=${encodeURIComponent(auditId)}` : "";
+      const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(d)}${auditQ}`, { cache: "no-store" });
       const json = await res.json();
       if (res.ok) {
         const data = json.data ?? null;
@@ -222,14 +225,41 @@ function AuditPageInner() {
 
   // 域名变化时加载
   const lastLoadedDomain = useRef<string | null>(null);
+  // 下面两个取数 effect 都会打 /api/audit/latest：一个按 domain、一个按 domain+?audit=。
+  // 进入页面（或换域名）时两者的 key 相同 → 实测同一动作发两次请求。
+  // 共用一把 "domain|auditParam" 记账：谁先发起谁占位，另一个同 key 直接跳过。
+  const lastLoadKey = useRef<string | null>(null);
+  const loadKeyOf = (d: string, param: string | null) => `${d}|${param ?? ""}`;
   useEffect(() => {
     const d = domain.trim();
-    if (d && lastLoadedDomain.current !== d) {
+    const key = loadKeyOf(d, searchParams.get("audit"));
+    if (d && lastLoadKey.current !== key) {
       lastLoadedDomain.current = d;
-      const id = window.setTimeout(() => void loadLatest(d), 0);
+      lastLoadKey.current = key;
+      const id = window.setTimeout(() => void loadLatest(d, searchParams.get("audit") ?? undefined), 0);
       return () => window.clearTimeout(id);
     }
-  }, [loadLatest, domain]);
+  }, [loadLatest, domain, searchParams]);
+
+  // ---- 历史审计视图：?audit=<id> 指定查看某次历史审计 ----
+  // URL 为唯一状态源：变化即重新加载；API 回退到最新时（id 无效/无权限）
+  // 在加载完成后清掉失效参数（不能在加载前比较 audit.id，否则会误清）。
+  const auditParam = searchParams.get("audit");
+  useEffect(() => {
+    const d = domain.trim();
+    if (!d) return;
+    const key = loadKeyOf(d, auditParam);
+    if (lastLoadKey.current !== key) {
+      lastLoadKey.current = key;
+      const id = window.setTimeout(async () => {
+        const data = await loadLatest(d, auditParam ?? undefined);
+        if (auditParam && data && String(data.id) !== auditParam) {
+          navigate({ audit: "" });
+        }
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [auditParam, domain, loadLatest, navigate, searchParams]);
 
   // ---- 断线恢复：刷新/重进时若最新审计仍在运行，自动恢复轮询 ----
   // 此前只静态显示「审计进行中」，审计在服务端完成后页面不更新，用户必须手动刷新。
@@ -453,12 +483,26 @@ function AuditPageInner() {
     if (d && searchParams.get("domain") !== d) {
       router.replace(`/app/audit?domain=${encodeURIComponent(d)}`, { scroll: false });
     }
+    // 先把这次动作的取数记账掉：否则 router.replace 让 searchParams 变化后，
+    // 域名/历史两个 effect 会各自把同一份 ?domain= 再取一遍（同一次「查看」发两次请求）
+    lastLoadedDomain.current = d;
+    lastLoadKey.current = loadKeyOf(d, searchParams.get("audit"));
     await loadLatest(d);
   };
 
   const hasResult = audit && audit.status === "completed";
   const hasFailed = audit && audit.status === "failed";
   const hasDashboard = !!audit?.dashboard;
+  // 历史审计视图：URL audit 参数指向的记录被成功加载且不是最新一次
+  const latestHistoryId = audit?.history?.[0]?.id ?? null;
+  const isHistoricalView = !!(
+    auditParam &&
+    audit &&
+    audit.status === "completed" &&
+    String(audit.id) === auditParam &&
+    latestHistoryId !== null &&
+    audit.id !== latestHistoryId
+  );
   // 抓取失败（起始页未能解析）：审计行虽标记 completed，但没有任何检查真正执行——
   // 不能把「无法判断」渲染成健康分 0/100 + 检查项全部通过。按失败路径呈现真实原因与恢复动作。
   const unusableAudit =
@@ -481,6 +525,9 @@ function AuditPageInner() {
     }
   };
 
+  // 打印页眉域名：审计结果优先，其次当前域名；trim 后为空表示尚未确认（页眉不输出「· 时间」断头）
+  const printDomain = (audit?.domain ?? domain).trim();
+
   // ---- Tab 定义 ----
   const tabs: Array<{ key: ViewKey; label: string }> = [
     { key: "overview", label: t("tabOverview") },
@@ -500,8 +547,11 @@ function AuditPageInner() {
         {/* BUG-001：audit=null 时 SSR 渲染 new Date() 时间文本，与客户端 hydration 时刻必然不一致，
             触发 React 18 生产模式整树客户端重渲染，期间页面事件未挂载（点击「快速审计」无反应）。
             suppressHydrationWarning 抑制该 mismatch，保持 SSR 树有效。 */}
+        {/* 域名尚未确认时只说明「未确认」，不留「· 时间」这种断头页眉 */}
         <h1 className="mt-1 font-display text-xl font-semibold text-ink" suppressHydrationWarning>
-          {audit?.domain ?? domain} · {audit ? formatTime(audit.finishedAt ?? audit.startedAt) : formatTime(new Date().toISOString())}
+          {printDomain
+            ? `${printDomain} · ${audit ? formatTime(audit.finishedAt ?? audit.startedAt) : formatTime(new Date().toISOString())}`
+            : t("printHeaderNoDomain")}
         </h1>
       </div>
 
@@ -564,13 +614,15 @@ function AuditPageInner() {
       {/* ===== Audit Meta 条（域名 / 状态 / 时间 / 页数 / 模式） ===== */}
       {!projectsLoading && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3 font-mono text-xs text-ink-40 print:hidden">
-          <form onSubmit={handleDomainChange} className="flex items-center gap-2">
+          {/* min-w-0 + max-w-full：select 的固有宽度是「项目名（域名）」整串，
+              390px 下会把「查看」按钮顶出屏幕且无法横向滚动；允许收缩并让按钮换行。 */}
+          <form onSubmit={handleDomainChange} className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             {/* R2：等页面初始化（URL > localStorage > 项目一）确定 domain 后再挂载，
                 避免 DomainSelect 的"无值→选第一个项目"先于初始化生效，出现瞬态覆盖 */}
             {projectsLoading ? (
               <div className="h-10 w-44 animate-pulse rounded-md border border-line bg-paper" />
             ) : (
-              <DomainSelect value={domain} onChange={setDomain} className="rounded-md border border-line bg-card px-2 py-1.5 font-mono text-xs text-ink focus:border-ink-25 focus:outline-none" />
+              <DomainSelect value={domain} onChange={setDomain} className="min-w-0 max-w-full rounded-md border border-line bg-card px-2 py-1.5 font-mono text-xs text-ink focus:border-ink-25 focus:outline-none" />
             )}
             <button type="submit" className="btn-secondary px-2 py-1.5 text-xs">{t("viewBtn")}</button>
           </form>
@@ -601,6 +653,27 @@ function AuditPageInner() {
         </div>
       )}
 
+      {/* ===== 历史审计视图 banner：正在查看的是过去某次审计的快照 ===== */}
+      {isHistoricalView && (
+        <div className="mt-4 flex flex-col items-start justify-between gap-3 rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 sm:flex-row sm:items-center print:hidden">
+          <div className="min-w-0">
+            <div className="font-mono text-sm font-medium text-ink">
+              {t("viewHistoricalTitle", { id: audit!.id, time: formatTime(audit!.finishedAt ?? audit!.startedAt) })}
+            </div>
+            <p className="mt-0.5 font-sans text-xs text-ink-60">{t("viewHistoricalBody")}</p>
+          </div>
+          <button
+            onClick={() => {
+              void loadLatest(domain.trim());
+              navigate({ audit: "", view: "overview" });
+            }}
+            className="btn-secondary flex-none"
+          >
+            {t("backToLatest")}
+          </button>
+        </div>
+      )}
+
       {/* 运行进度 */}
       {auditing && (
         <div className="card-a mt-4 p-5 print:hidden">
@@ -618,8 +691,10 @@ function AuditPageInner() {
         </div>
       )}
 
-      {/* ===== Tab 导航 ===== */}
-      {!loading && hasResult && !unusableAudit && (
+      {/* ===== Tab 导航 =====
+          视图切换只在新版 Dashboard 结果里真实存在：旧引擎审计（audit.dashboard 为空）走
+          LegacyResult，它不读 view，显示这组 Tab 会让高亮与 ?view= 跟着点击变化而正文不动。 */}
+      {!loading && hasResult && !unusableAudit && hasDashboard && (
         <nav className="mt-4 flex flex-wrap gap-1 border-b border-line print:hidden" aria-label={t("navLabel")} role="tablist">
           {tabs.map((tab) => {
             const active = view === tab.key;
@@ -710,7 +785,14 @@ function AuditPageInner() {
           {hasDashboard ? (
             <RenderDashboard audit={audit} view={view} selectedIssue={selectedIssue} issuesFilters={issuesFilters} pagesFilters={pagesFilters} navigate={navigate} />
           ) : (
-            <LegacyResult audit={audit} activeDepth={activeDepth} locale={locale} />
+            <LegacyResult
+              audit={audit}
+              activeDepth={activeDepth}
+              locale={locale}
+              linkSearch={issuesFilters.search}
+              linkIssue={selectedIssue ?? undefined}
+              onClearLink={() => navigate({ search: "", issue: "" })}
+            />
           )}
         </div>
       )}
@@ -792,6 +874,15 @@ function AuditPageInner() {
               <button onClick={handleSaveToReports} disabled={exporting || saving} className="btn-secondary disabled:opacity-60">
                 {saving ? t("saving") : t("saveToReports")}
               </button>
+              {audit?.status === "completed" && audit.domain && (
+                <Link
+                  href={`/app/reports/audit?domain=${encodeURIComponent(audit.domain)}&audit=${audit.id}`}
+                  target="_blank"
+                  className="btn-secondary disabled:opacity-60"
+                >
+                  {t("printReport")}
+                </Link>
+              )}
             </div>
           )}
           <p className="font-sans text-xs text-ink-40">
@@ -869,21 +960,39 @@ function RenderDashboard({
   if (view === "linking") {
     return (
       <div className="space-y-4">
-        <LinkingSection snapshot={snapshot} onOpenPages={(params) => navigate({ view: "pages", ...params })} />
+        <LinkingSection
+          snapshot={snapshot}
+          onOpenPages={(params) => navigate({ view: "pages", ...params })}
+          onOpenIssue={(ruleId) => navigate({ view: "issues", issue: ruleId })}
+        />
         <CrawlerStatsSection snapshot={snapshot} />
       </div>
     );
   }
   if (view === "structured") {
-    return <StructuredDataSection snapshot={snapshot} onNavigate={go} />;
+    return (
+      <StructuredDataSection
+        snapshot={snapshot}
+        onOpenPages={(params) => navigate({ view: "pages", ...params })}
+        onOpenIssue={(ruleId) => navigate({ view: "issues", issue: ruleId })}
+      />
+    );
   }
   if (view === "ai") {
     return <AiSearchSection snapshot={snapshot} />;
   }
   if (view === "history") {
-    return <HistorySection history={audit.history} />;
+    return (
+      <HistorySection
+        history={audit.history}
+        comparison={audit.comparison}
+        viewingAuditId={audit.id}
+        onOpenAudit={(id) => navigate({ audit: String(id), view: "overview" })}
+        onOpenIssue={(ruleId) => navigate({ view: "issues", issue: ruleId })}
+      />
+    );
   }
-  return <AuditOverview snapshot={snapshot} history={audit.history} comparison={audit.comparison} onNavigate={navigate} />;
+  return <AuditOverview snapshot={snapshot} history={audit.history} comparison={audit.comparison} domain={audit.domain} onNavigate={navigate} />;
 }
 
 // ===== 旧引擎审计的降级视图 =====
@@ -892,14 +1001,30 @@ function LegacyResult({
   audit,
   activeDepth,
   locale,
+  linkSearch,
+  linkIssue,
+  onClearLink,
 }: {
   audit: AuditData;
   activeDepth: AuditDepth;
   locale: Locale;
+  linkSearch?: string;
+  linkIssue?: string;
+  onClearLink: () => void;
 }) {
   const t = useTranslations("dashboard.audit");
   const healthScore = audit.healthScore ?? 0;
-  const filtered = audit.issues;
+  // BUG-46：待办清单的执行链接带 ?view=pages&search=<url> / ?view=issues&issue=<ruleId>，
+  // 旧引擎结果没有 Pages/Issues 视图，原先这两个参数被整条分支忽略——用户点「打开出问题的页面」
+  // 落到 35 行未过滤的清单上，且没有任何提示。这里用同一份数据把链接真正兑现一遍。
+  const q = (linkSearch ?? "").trim().toLowerCase();
+  const hasLink = q.length > 0 || !!linkIssue;
+  const matched = audit.issues.filter(
+    (i) =>
+      (!linkIssue || i.checkId === linkIssue) &&
+      (!q || i.urls.some((u) => u.toLowerCase().includes(q)) || i.checkName.toLowerCase().includes(q))
+  );
+  const filtered = matched.length > 0 ? matched : audit.issues;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -938,13 +1063,28 @@ function LegacyResult({
 
       <div className="card-a p-5">
         <h2 className="font-display text-lg font-semibold text-ink">{t("issuesTitle")}</h2>
+        {hasLink && (
+          <div className="mt-1 flex flex-wrap items-center gap-2 font-sans text-xs text-ink-60">
+            <span>
+              {matched.length > 0
+                ? t(linkIssue ? "legacyLinkAppliedIssue" : "legacyLinkAppliedPage", {
+                    n: formatNumber(matched.length, locale),
+                    total: formatNumber(audit.issues.length, locale),
+                  })
+                : t("legacyLinkMiss")}
+            </span>
+            <button onClick={onClearLink} className="btn-secondary px-2 py-1 text-xs">
+              {t("legacyLinkShowAll")}
+            </button>
+          </div>
+        )}
         {filtered.length === 0 ? (
           <p className="mt-4 font-sans text-sm text-ink-40">{t("issuesEmptyTitle")}</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-line-soft bg-line-soft/40 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">
+                <tr className="border-b border-line-soft bg-line-soft/40 font-mono text-xs uppercase tracking-wide text-ink-40">
                   <th className="px-3 py-2 text-left font-semibold">{t("thCheck")}</th>
                   <th className="px-3 py-2 text-left font-semibold">{t("thSeverity")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("thAffected")}</th>
@@ -962,7 +1102,7 @@ function LegacyResult({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right font-mono text-sm text-ink">{issue.affectedPages}</td>
-                    <td className="px-3 py-2 font-mono  text-ink-60">{issue.sampleUrl.replace(/^https?:\/\//, "")}</td>
+                    <td className="px-3 py-2 font-mono text-sm text-ink-60">{issue.sampleUrl.replace(/^https?:\/\//, "")}</td>
                   </tr>
                 ))}
               </tbody>

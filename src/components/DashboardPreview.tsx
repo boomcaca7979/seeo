@@ -145,9 +145,10 @@ export default function DashboardPreview() {
 
 function SummaryStat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="card-a p-3">
-      <div className="truncate font-mono text-lg font-semibold text-ink">{value}</div>
-      <div className="mt-0.5 font-mono text-xs text-ink-40">{label}</div>
+    <div className="card-a min-w-0 p-3">
+      {/* BUG-33：引擎值「V2 · 规则集 2.0」在 2 列窄屏下被 truncate 裁成「V2 · 规则…」，规则集版本是演示可信度的一部分，必须完整可读 */}
+      <div className="font-mono text-sm leading-snug break-words font-semibold text-ink sm:text-lg">{value}</div>
+      <div className="mt-0.5 font-mono text-xs leading-snug break-words text-ink-40">{label}</div>
     </div>
   );
 }
@@ -212,27 +213,27 @@ function WhatTab({ t, ta, ruleText }: { t: PreviewT; ta: ActionsT; ruleText: Rul
         {t("evidence.label")}
       </div>
       <div className="mt-3 grid grid-cols-3 gap-3">
-        <div className="card-a p-3">
-          <div className="font-mono text-lg font-semibold text-ink">
+        <div className="card-a min-w-0 p-3">
+          <div className="font-mono text-base font-semibold break-words text-ink sm:text-lg">
             {DEMO_EVIDENCE.visibleTextSize.toLocaleString()}
           </div>
-          <div className="mt-0.5 font-mono text-xs text-ink-40">
+          <div className="mt-0.5 font-mono text-xs leading-snug break-words text-ink-40">
             {t("realDemo.evidence.visibleText")}
           </div>
         </div>
-        <div className="card-a p-3">
-          <div className="font-mono text-lg font-semibold text-ink">
+        <div className="card-a min-w-0 p-3">
+          <div className="font-mono text-base font-semibold break-words text-ink sm:text-lg">
             {DEMO_EVIDENCE.htmlSize.toLocaleString()}
           </div>
-          <div className="mt-0.5 font-mono text-xs text-ink-40">
+          <div className="mt-0.5 font-mono text-xs leading-snug break-words text-ink-40">
             {t("realDemo.evidence.htmlSize")}
           </div>
         </div>
-        <div className="card-a p-3">
-          <div className="font-mono text-lg font-semibold text-ink">
+        <div className="card-a min-w-0 p-3">
+          <div className="font-mono text-base font-semibold break-words text-ink sm:text-lg">
             {DEMO_EVIDENCE.ratioPercent}%
           </div>
-          <div className="mt-0.5 font-mono text-xs text-ink-40">
+          <div className="mt-0.5 font-mono text-xs leading-snug break-words text-ink-40">
             {t("realDemo.evidence.ratio")}
           </div>
         </div>

@@ -119,6 +119,10 @@ export interface WorkTask {
   source: TaskSource;
   /** 审计规则 id 或机会类型 */
   type: string;
+  /** 受影响页面数（**显示用只读字段**：审计任务取自规则快照；机会任务无该口径 → null，不填 0） */
+  affectedPages: number | null;
+  /** 检出条数（**显示用只读字段**：审计任务取自规则快照；机会任务 → null，不填 0） */
+  findings: number | null;
   title: LocalizedText | null;
   /** 机会侧为人类可读标题（已是单语言字符串，来自服务端生成时的推荐语） */
   fallbackTitle: string | null;
@@ -348,6 +352,7 @@ export interface QueueCoverage {
     healthScore: number | null;
     partial: boolean;
   };
+  /** 与队列同域（coverage 之下的 domain 字段）的已追踪关键词数——项目级范围，不是账号总数 */
   tracking: { trackedKeywords: number };
   /** 该队列中实际贡献了任务的数据来源 */
   contributingSources: string[];
@@ -522,7 +527,9 @@ export async function buildWorkQueue(params: BuildWorkQueueParams): Promise<Work
   const [audit, resolutions, tracked, observations] = await Promise.all([
     getLatestAudit(userId, domain),
     listResolutionsByDomain(userId, domain),
-    listTrackedKeywords(userId).catch(() => []),
+    // 关键词统计必须与本队列同域（项目级）：账号级总数会让「已追踪关键词数」和
+    // no_tracked_keywords 判断在所有项目里都显示同一个数字。账号级额度仍用 countTrackedKeywords。
+    listTrackedKeywords(userId, domain).catch(() => []),
     listObservations(userId, domain).catch(() => new Map()),
   ]);
 
@@ -607,6 +614,8 @@ export async function buildWorkQueue(params: BuildWorkQueueParams): Promise<Work
         id: auditTaskId,
         source: "audit",
         type: rule.ruleId,
+        affectedPages: rule.affectedPages,
+        findings: rule.findings,
         title: rule.name,
         fallbackTitle: null,
         target: rule.sampleUrl,
@@ -662,6 +671,10 @@ export async function buildWorkQueue(params: BuildWorkQueueParams): Promise<Work
       id: oppTaskId,
       source: "opportunity",
       type: opp.type,
+      // 机会任务没有"受影响页面数 / 检出条数"这一口径（不是审计检出）→ 保持 null，
+      // 由 UI 显示为空缺，绝不用 0 冒充。
+      affectedPages: null,
+      findings: null,
       title: null,
       fallbackTitle: recommendationText ?? `${opp.type} · ${opp.target_value}`,
       target: opp.target_value,

@@ -31,14 +31,17 @@ async function withUsage<T>(payload: T, userId: string, plan: import("@/lib/auth
   return NextResponse.json({ data: payload, usage });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAuthOrDemo();
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
   }
   const userId = auth.user?.id ?? "demo-user";
   const plan = auth.plan;
-  const list = await listTrackedKeywords(userId);
+  // ?domain= 时按单个项目取数（listTrackedKeywords 在 SQL 层按 (user_id, domain) 过滤）；
+  // 不传或空串仍是账号级全量，老调用方行为不变。
+  const scopeDomain = new URL(req.url).searchParams.get("domain")?.trim() ?? "";
+  const list = await listTrackedKeywords(userId, scopeDomain || undefined);
   const usage = await peekUsage(userId, "serpapi", plan);
   return NextResponse.json({
     data: list,
@@ -92,7 +95,8 @@ export async function POST(req: Request) {
   const trackingLimit = auth.limits.max_tracked_keywords;
   const count = await countTrackedKeywords(userId);
   if (count >= trackingLimit) {
-    const err = new PlanLimitError("追踪关键词", auth.plan, trackingLimit, "KEYWORD_LIMIT_REACHED");
+    // 带上账号真实关键词总数：前端弹窗据此把「账号总数 / 套餐上限」分列显示，而不是猜一个数字
+    const err = new PlanLimitError("追踪关键词", auth.plan, trackingLimit, "KEYWORD_LIMIT_REACHED", count);
     const { status, body } = billingErrorToResponse(err);
     return NextResponse.json(body, { status });
   }

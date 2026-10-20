@@ -50,8 +50,17 @@ function rowToTracked(row: Record<string, unknown>): TrackedKeyword {
   };
 }
 
-export async function listTrackedKeywords(userId: string): Promise<TrackedKeywordWithGroups[]> {
+/**
+ * 列出追踪关键词。
+ * @param domain 传入具体域名时在 SQL 层按 (user_id, domain) 过滤 = 单个项目范围；
+ *               省略或空串保持原有账号级全量行为（关键词与项目的关联就是 domain，不存在 project_id）。
+ */
+export async function listTrackedKeywords(
+  userId: string,
+  domain?: string
+): Promise<TrackedKeywordWithGroups[]> {
   const db = await getAdapter();
+  const scopeDomain = domain && domain.trim() ? domain.trim() : null;
   const rows = await db.query(`
     SELECT
       tk.*,
@@ -63,9 +72,9 @@ export async function listTrackedKeywords(userId: string): Promise<TrackedKeywor
       ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
     LEFT JOIN rank_history yest
       ON yest.keyword_id = tk.id AND yest.date = date('now', 'localtime', '-1 day')
-    WHERE tk.user_id = ?
+    WHERE tk.user_id = ?${scopeDomain ? " AND tk.domain = ?" : ""}
     ORDER BY tk.created_at ASC
-  `, [userId]) as Record<string, unknown>[];
+  `, scopeDomain ? [userId, scopeDomain] : [userId]) as Record<string, unknown>[];
 
   // 一次性查所有分组关联，再按 keyword_id 聚合（避免 N+1）
   const allMembers = await db.query(`

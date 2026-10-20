@@ -4,18 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { createBrowser } from "@/lib/supabase/browser";
-import { isAuthEnabled } from "@/lib/auth-config";
 import { localePath } from "@/i18n/seo";
-import { useToast } from "@/components/dashboard/Toast";
-import { useEntitlements } from "@/components/billing/EntitlementsContext";
-import { track } from "@/lib/analytics/client";
-import { planLabel } from "@/lib/plan-labels";
 
 type NavItem = {
   labelKey:
     | "overview"
     | "opportunities"
+    | "actions"
     | "keywordOverview"
     | "keywordExpand"
     | "positionTracking"
@@ -49,6 +44,16 @@ const navItems: NavItem[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
         <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6L13 2Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    labelKey: "actions",
+    href: "/app/actions",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+        <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="m8 12 2.5 2.5L16 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -164,53 +169,28 @@ const navItems: NavItem[] = [
 ];
 
 interface SidebarProps {
-  displayName?: string;
-  email?: string;
-  /** 访客审计模式（未登录使用 /app/audit）：底部显示登录入口而非登出 */
-  isGuest?: boolean;
   /** 移动端（<lg）抽屉开合状态；桌面端 sidebar 常驻 */
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export default function Sidebar({ displayName, email, isGuest, mobileOpen = false, onMobileClose }: SidebarProps) {
+// 账户入口统一在 Topbar 右上角用户菜单（唯一入口）：侧边栏只负责导航与折叠。
+
+export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const { plan: currentPlan, loading: entitlementsLoading } = useEntitlements();
   const pathname = usePathname();
-  const { show, Toast } = useToast();
   const t = useTranslations("dashboard.sidebar");
   const locale = useLocale() as "en" | "zh";
-
-  // 当前用户套餐：统一从 EntitlementsContext 读取（单一数据源，避免重复 fetch）
-
-  const handleLogout = async () => {
-    if (!isAuthEnabled) {
-      show(t("demoToast"), "info");
-      return;
-    }
-    const supabase = createBrowser();
-    // 漏斗事件：在会话仍有效时上报登出（await 保证 user_id 落库）
-    await track("logout");
-    // await 完成后再导航，避免导航中断 logout 请求（ERR_ABORTED）
-    await supabase.auth.signOut({ scope: "global" });
-    // 等待浏览器完全关闭 fetch 连接，避免导航中止底层 TCP
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    window.location.assign("/login");
-  };
-
-  const userName = displayName ?? t("demoUser");
-  const userEmail = email ?? t("demoEmail");
-  const avatarLetter = userName.charAt(0).toUpperCase();
-  const currentPlanLabel = planLabel(currentPlan, locale);
-  // free / lite 显示升级 CTA；pro 不显示
-  const showUpgradeCta = currentPlan === "free" || currentPlan === "lite";
 
   return (
     <aside
       className={`flex h-screen flex-none flex-col border-r border-line bg-card ${
         collapsed ? "w-16" : "w-60"
-      } fixed inset-y-0 left-0 z-50 transition-transform duration-150 lg:static lg:translate-x-0 ${
-        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      } fixed inset-y-0 left-0 z-50 transition-[transform,visibility] duration-150 lg:static lg:translate-x-0 lg:visible ${
+        // BUG-18：收起的抽屉只是 translate 出屏，visibility 仍为 visible →
+        // 移动端 Tab 的前 10 个焦点全部落在看不见的导航链接上（实测 390px）。
+        // 用 invisible 把它移出焦点与无障碍树；lg:visible 保证桌面端常驻不受影响。
+        mobileOpen ? "translate-x-0" : "-translate-x-full invisible"
       }`}
     >
       {/* Logo：点击返回营销首页（EN → / · ZH → /zh，复用 localePath） */}
@@ -261,103 +241,6 @@ export default function Sidebar({ displayName, email, isGuest, mobileOpen = fals
         })}
       </nav>
 
-      {/* 套餐标识 + 升级 CTA（仅 free 用户显示升级按钮） */}
-      {!collapsed && (
-        <div className="flex-none px-3 pb-2">
-          <div className="rounded-lg border border-line-soft bg-paper px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs text-ink-40">{t("currentPlan")}</span>
-              <span className="font-sans text-xs font-medium text-ink">{entitlementsLoading ? "…" : currentPlanLabel}</span>
-            </div>
-            {showUpgradeCta && (
-              <Link
-                href="/pricing"
-                className="mt-2 flex h-8 w-full items-center justify-center rounded-md bg-ink font-sans text-xs font-medium text-card transition-colors hover:bg-ink/90"
-              >
-                {t("upgradeCta")}
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-      {collapsed && showUpgradeCta && (
-        <div className="flex-none px-2 pb-1">
-          <Link
-            href="/pricing"
-            title={t("upgradeCta").replace(" →", "")}
-            className="flex h-7 w-full items-center justify-center rounded bg-ink text-card"
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
-              <path d="M12 4v16M4 12h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </Link>
-        </div>
-      )}
-
-      {/* 底部用户区：始终固定底部 */}
-      <div className="flex-none border-t border-line px-3 py-3">
-        {!collapsed ? (
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-card">
-              {avatarLetter}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium text-ink">
-                {userName}
-              </div>
-              <div className="truncate text-xs text-ink-40">
-                {userEmail}
-              </div>
-            </div>
-            {isGuest ? (
-              <Link
-                href="/login"
-                title={t("login")}
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
-                aria-label={t("login")}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                  <path d="M9 12h11m0 0-4-4m4 4-4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </Link>
-            ) : (
-              <button
-                onClick={handleLogout}
-                title={t("logout")}
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
-                aria-label={t("logout")}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                  <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-          </div>
-        ) : isGuest ? (
-          <Link
-            href="/login"
-            title={t("login")}
-            className="mx-auto flex h-8 w-8 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-ink"
-            aria-label={t("login")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-              <path d="M9 12h11m0 0-4-4m4 4-4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-        ) : (
-          <button
-            onClick={handleLogout}
-            title={t("logout")}
-            className="mx-auto flex h-8 w-8 items-center justify-center rounded text-ink-40 hover:bg-line-soft hover:text-neg"
-            aria-label={t("logout")}
-          >
-            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-              <path d="M15 12H4m0 0 4-4m-4 4 4 4M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        )}
-      </div>
-
       {/* 折叠按钮（仅桌面） */}
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -372,8 +255,6 @@ export default function Sidebar({ displayName, email, isGuest, mobileOpen = fals
           <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-
-      <Toast />
     </aside>
   );
 }

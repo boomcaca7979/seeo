@@ -74,6 +74,8 @@ export default function UrlAuditBox() {
               if (error) setError(null);
             }}
             placeholder={t("placeholder")}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "audit-url-error" : undefined}
             className="h-full min-w-0 flex-1 bg-transparent px-4 text-base text-ink placeholder:text-ink-40 focus:outline-none"
             aria-label={t("label")}
           />
@@ -87,7 +89,7 @@ export default function UrlAuditBox() {
         </div>
       </form>
       {error && (
-        <p className="mt-2 text-left font-mono text-xs text-neg">{error}</p>
+        <p id="audit-url-error" role="alert" className="mt-2 text-left font-mono text-xs text-neg">{error}</p>
       )}
     </div>
   );

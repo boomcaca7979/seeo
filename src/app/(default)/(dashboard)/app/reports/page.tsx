@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useId, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { localizeReportTitle, resolveAuditDetail, resolveAuditSuggestion } from "@/lib/seo/audit-legacy-text";
@@ -8,6 +8,8 @@ import { buildCoverageFromIssues, checkMetaMap, nonCatalogCheckNames, pickText }
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
+import { PROJECT_CHANGED_EVENT, SELECTED_PROJECT_KEY, projectChangedDetail } from "@/lib/project-selector";
+import { buildAuditReportHref, reportNeedsProject, resolveProjectDomain, type ProjectDomainRef } from "@/lib/report-link";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { formatNumber, intlLocale } from "@/lib/ui-locale";
@@ -16,6 +18,9 @@ import AuditReport from "@/components/reports/AuditReport";
 import ContentReport from "@/components/reports/ContentReport";
 import WeeklyReport from "@/components/reports/WeeklyReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
+import PageHeader from "@/components/viz/PageHeader";
+import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 type ReportType = "ranking" | "audit" | "content" | "weekly";
 
@@ -214,6 +219,74 @@ export default function ReportsPage() {
     void loadReports();
   }, [loadReports]);
 
+  // BUG-07 / 报表串数据：打印入口与「生成报告」共用同一个「已确认的当前项目域名」。
+  // 域名只由 @/lib/report-link 在 /api/projects 结果中按选中项目 id 命中后才采用；
+  // 未确认（无选中项目、列表缺项、拉取失败）一律保持 null，绝不从 stats 或默认值猜一个域名。
+  const [projectDomain, setProjectDomain] = useState<string | null>(null);
+  // 「已确认过一轮」标记：用于区分「还在解析」与「确认没有可用项目」
+  const [projectResolved, setProjectResolved] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let seq = 0;
+
+    const resolve = async (projectId: string | null) => {
+      const my = ++seq;
+      if (!projectId) {
+        if (cancelled) return;
+        setProjectDomain(null);
+        setProjectResolved(true);
+        return;
+      }
+      try {
+        const res = await fetch("/api/projects", { cache: "no-store" });
+        const json = await res.json();
+        if (cancelled || my !== seq) return;
+        // 拉取失败或列表里没有该 id：一律退回「未确认」，
+        // 绝不保留上一个项目的域名（切换项目时请求失败若保留旧值就是串数据）
+        if (!res.ok) {
+          setProjectDomain(null);
+          setProjectResolved(true);
+          return;
+        }
+        const list = (json.data ?? []) as ProjectDomainRef[];
+        setProjectDomain(resolveProjectDomain(list, projectId));
+        setProjectResolved(true);
+      } catch {
+        if (cancelled || my !== seq) return;
+        setProjectDomain(null);
+        setProjectResolved(true);
+      }
+    };
+
+    const applyStored = () => {
+      let stored: string | null = null;
+      try {
+        stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
+      } catch {
+        stored = null;
+      }
+      void resolve(stored);
+    };
+
+    // 首帧读取（推迟到下一帧避免 effect 同步路径 setState）
+    const tid = window.setTimeout(applyStored, 0);
+    const onProjectChanged = (e: Event) => {
+      const detail = projectChangedDetail(e);
+      if (detail) void resolve(detail.id);
+    };
+    window.addEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+    window.addEventListener("storage", applyStored);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(tid);
+      window.removeEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+      window.removeEventListener("storage", applyStored);
+    };
+  }, []);
+
+  const printReportHref = buildAuditReportHref(projectDomain);
+
   const handleDownloadCsv = async (type: "rankings" | "content") => {
     setDownloading(type);
     try {
@@ -245,16 +318,27 @@ export default function ReportsPage() {
   };
 
   const handleGenerate = async () => {
+    // 报表取数只认「已确认的当前项目域名」；缺域名时提示而不是退回账号级最新审计，
+    // 否则切到没有审计记录的项目仍会生成另一个项目的报告（跨项目串数据）。
+    // domain 只是类型适配：需要项目的三类报表在下面被守卫拦住，空串不会进入它们的取数与标题；
+    // 内容报表以被检测 URL 为身份，不使用 domain。
+    const domain = projectDomain ?? "";
+    if (!domain && reportNeedsProject(selectedType)) {
+      show(t("needProjectNotice"), "error");
+      return;
+    }
     setGenerating(true);
     setSavedReportId(null);
     try {
       const now = formatTime(new Date().toISOString());
 
       if (selectedType === "ranking") {
-        const res = await fetch("/api/tracking", { cache: "no-store" });
+        const res = await fetch(
+          `/api/tracking?domain=${encodeURIComponent(domain)}`,
+          { cache: "no-store" }
+        );
         const json = await res.json();
         const keywords: TrackedKeyword[] = json.data ?? [];
-        const domain = keywords[0]?.domain ?? "—";
         setRankData({
           projectName: domain,
           domain,
@@ -268,7 +352,6 @@ export default function ReportsPage() {
           generatedAt: now,
         });
       } else if (selectedType === "audit") {
-        const domain = stats?.latestAudit?.domain ?? "example.com";
         const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(domain)}`, { cache: "no-store" });
         const json = await res.json();
         const data: AuditLatestData = json.data;
@@ -324,14 +407,19 @@ export default function ReportsPage() {
           generatedAt: now,
         });
       } else if (selectedType === "weekly") {
-        const [trackingRes, logsRes] = await Promise.all([
-          fetch("/api/tracking", { cache: "no-store" }),
+        const [trackingRes, logsRes, auditRes] = await Promise.all([
+          fetch(`/api/tracking?domain=${encodeURIComponent(domain)}`, { cache: "no-store" }),
           fetch("/api/automation/logs?limit=50", { cache: "no-store" }),
+          fetch(`/api/audit/latest?domain=${encodeURIComponent(domain)}`, { cache: "no-store" }),
         ]);
         const trackingJson = await trackingRes.json();
         const logsJson = await logsRes.json();
+        const auditJson = await auditRes.json().catch(() => null);
         const keywords: TrackedKeyword[] = trackingJson.data ?? [];
         const logs: AutomationLog[] = logsJson.data ?? [];
+        // 健康分取「当前项目」最近一次审计；该项目没有审计时保持 null（报表自带「暂无审计」文案），
+        // 不再用账号级 stats.latestAudit —— 那会把别的项目的分数写进本项目的周报。
+        const projectAudit = (auditJson?.data ?? null) as AuditLatestData | null;
 
         const up = keywords.filter((k) => k.change !== null && k.change > 0).length;
         const down = keywords.filter((k) => k.change !== null && k.change < 0).length;
@@ -340,7 +428,7 @@ export default function ReportsPage() {
 
         const auditLogs = logs.filter((l) => l.type === "daily_refresh" && l.status === "success");
         const auditSummary = {
-          avgScore: stats?.latestAudit?.healthScore ?? null,
+          avgScore: projectAudit?.healthScore ?? null,
           count: auditLogs.length,
         };
 
@@ -349,7 +437,7 @@ export default function ReportsPage() {
         const period = `${weekAgo.getFullYear()}.${String(weekAgo.getMonth() + 1).padStart(2, "0")}.${String(weekAgo.getDate()).padStart(2, "0")} - ${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`;
 
         setWeeklyData({
-          projectName: keywords[0]?.domain ?? "SeeO",
+          projectName: domain,
           period,
           rankSummary: { up, down, out, total: keywords.length },
           auditSummary,
@@ -458,6 +546,12 @@ export default function ReportsPage() {
     setSavePromptOpen(true);
   };
 
+  // BUG-24：本页两个浮层是自绘遮层（没走共享 Modal），同样要有 dialog 语义与焦点管理
+  const previewTitleId = useId();
+  const previewPanelRef = useDialogA11y(previewOpen, handleClosePreview);
+  const emailTitleId = useId();
+  const emailPanelRef = useDialogA11y(emailModalOpen, () => setEmailModalOpen(false));
+
   const handleSendEmail = async () => {
     if (!emailToSend.trim()) {
       show(t("errEmailEmpty"), "error");
@@ -511,17 +605,20 @@ export default function ReportsPage() {
   const reportTypes: ReportType[] = ["ranking", "audit", "content", "weekly"];
 
   return (
-    <div className="dash-container p-6 lg:p-8">
-      {/* 页头 */}
-      <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("title")}
-        </h1>
-        <div className="hairline flex-1" />
-      </div>
-      <p className="mt-2 font-sans text-sm text-ink-60">
-        {t("subtitle")}
-      </p>
+    <div className="dash-container p-4 lg:p-8">
+      {/* 页头：标题 + 副标题 + 浏览器打印版入口（与 /app/reports/audit 保持互通） */}
+      <PageHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        meta={
+          <Link
+            href={printReportHref}
+            className="underline decoration-line underline-offset-2 hover:text-ink"
+          >
+            {t("metaPrintView")}
+          </Link>
+        }
+      />
 
       {/* 生成报告区 */}
       <div className="card-a mt-5 p-5">
@@ -551,10 +648,14 @@ export default function ReportsPage() {
             );
           })}
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-col items-end gap-2">
+          {/* 项目未确认时按「禁用 + 提示」处理：宁可不给按钮，也不生成一份挂着别的项目数据的报告 */}
+          {reportNeedsProject(selectedType) && projectResolved && !projectDomain && (
+            <p className="font-sans text-xs text-neg">{t("needProjectNotice")}</p>
+          )}
           <button
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || (reportNeedsProject(selectedType) && !projectDomain)}
             className="btn-primary disabled:opacity-60"
           >
             {generating ? (
@@ -653,30 +754,32 @@ export default function ReportsPage() {
           {reportsLoading ? (
             <TableSkeleton rows={3} />
           ) : reports.length === 0 ? (
-            <div className="px-4 py-10 text-center font-sans text-xs text-ink-40">
-              {t("emptyReports")}
+            <div className="px-4 py-12 text-center">
+              <div className="font-display text-base font-semibold text-ink-60">{t("emptyReportsTitle")}</div>
+              <p className="mt-2 font-sans text-sm text-ink-40">{t("emptyReportsDesc")}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-line-soft bg-line-soft/40">
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thTitle")}</th>
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thType")}</th>
-                    <th className="px-4 py-3 text-left font-sans text-xs font-semibold text-ink-40">{t("thTime")}</th>
-                    <th className="px-4 py-3 text-right font-sans text-xs font-semibold text-ink-40">{t("thActions")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((r) => (
-                    <tr key={r.id} className="border-b border-line-soft">
-                      <td className="px-4 py-3 font-sans text-sm font-medium text-ink">{localizeReportTitle(r.title, locale)}</td>
-                      <td className="px-4 py-3">
-                        <span className={typeConfig[r.type].badge}>{typeLabel(r.type)}</span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-sm text-ink-60">{formatTime(r.created_at)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
+            <DataTable minWidthRem={40} ariaLabel={t("historyTitle")}>
+              <THead>
+                <Th>{t("thTitle")}</Th>
+                <Th width="8rem">{t("thType")}</Th>
+                <Th width="12rem">{t("thTime")}</Th>
+                <Th width="7rem" align="right">{t("thActions")}</Th>
+              </THead>
+              <TBody>
+              {reports.map((r) => (
+                <TR key={r.id} className="hover:bg-line-soft/50">
+                  <TD className="max-w-[22rem]">
+                    <span className="block truncate font-medium text-ink" title={localizeReportTitle(r.title, locale)}>
+                      {localizeReportTitle(r.title, locale)}
+                    </span>
+                  </TD>
+                  <TD className="whitespace-nowrap">
+                    <span className={typeConfig[r.type].badge}>{typeLabel(r.type)}</span>
+                  </TD>
+                  <TD className="whitespace-nowrap font-mono text-xs text-ink-60">{formatTime(r.created_at)}</TD>
+                  <TD align="right">
+                    <div className="flex justify-end gap-2">
                           <button
                             onClick={() => {
                               setSelectedType(r.type);
@@ -753,19 +856,18 @@ export default function ReportsPage() {
                             </svg>
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </TD>
+                </TR>
+              ))}
+              </TBody>
+            </DataTable>
           )}
         </div>
       </div>
 
       {/* 说明区 */}
       <div className="card-a mt-8 border-dashed border-line p-5">
-        <h2 className="font-display text-sm font-semibold text-ink">{t("aboutTitle")}</h2>
+        <h2 className="font-display text-base font-semibold text-ink">{t("aboutTitle")}</h2>
         <ul className="mt-2 space-y-2 font-sans text-xs text-ink-40">
           <li>{t("aboutPdf")}</li>
           <li>{t("aboutCsv")}</li>
@@ -778,9 +880,16 @@ export default function ReportsPage() {
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={handleClosePreview} aria-hidden />
-          <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg border border-line bg-card">
+          <div
+            ref={previewPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={previewTitleId}
+            tabIndex={-1}
+            className="relative flex max-h-[90vh] w-full max-w-5xl flex-col rounded-lg border border-line bg-card"
+          >
             <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
-              <h3 className="font-display text-base font-semibold text-ink">
+              <h3 id={previewTitleId} className="font-display text-lg font-semibold text-ink">
                 {t("previewTitle", { type: typeLabel(selectedType) })}
               </h3>
               <button
@@ -847,12 +956,20 @@ export default function ReportsPage() {
       {emailModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEmailModalOpen(false)} aria-hidden />
-          <div className="relative w-full max-w-md rounded-lg border border-line bg-card p-5">
-            <h3 className="font-display text-base font-semibold text-ink">{t("emailModalTitle")}</h3>
+          <div
+            ref={emailPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={emailTitleId}
+            tabIndex={-1}
+            className="relative w-full max-w-md rounded-lg border border-line bg-card p-5"
+          >
+            <h3 id={emailTitleId} className="font-display text-base font-semibold text-ink">{t("emailModalTitle")}</h3>
             <div className="mt-4">
-              <label className="font-sans text-xs text-ink-40">{t("emailLabel")}</label>
+              <label htmlFor="report-email" className="font-sans text-xs text-ink-40">{t("emailLabel")}</label>
               <input
                 type="email"
+                id="report-email"
                 value={emailToSend}
                 onChange={(e) => setEmailToSend(e.target.value)}
                 placeholder="recipient@example.com"

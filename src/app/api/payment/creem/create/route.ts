@@ -158,7 +158,11 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     // Creem 下单失败：本地订单标记 failed，避免悬挂 pending
-    await markOrderFailed(order.out_trade_no);
+    const marked = await markOrderFailed(order.out_trade_no);
+    if (!marked.ok) {
+      // 只是没标记成功，渠道侧根本没有 checkout，用户不会付款 → 仍返回 502 让用户重试
+      console.error("[CreemCreate] 订单标记 failed 未落库:", marked.code, marked.error);
+    }
     const status = err instanceof CreemApiError ? err.status : 0;
     console.error("[CreemCreate] 创建 checkout 失败:", { outTradeNo: order.out_trade_no, status, err });
     return NextResponse.json(

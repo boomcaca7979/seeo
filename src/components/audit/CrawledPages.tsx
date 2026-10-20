@@ -1,17 +1,27 @@
 "use client";
 
-// ===== Crawled Pages：所有被抓取页面的分析表格 =====
-// 列：URL / Status / Health / Issues / Severity / Page Type / Words / Response / Depth / Redirect
-// P1-3：全部筛选状态 URL 驱动（health/status/depth/sdStatus/pageType/severity/search/sort/dir/issue），
-//       Back / Forward / Reload / 直链均可恢复；Search 本地即时输入 + debounce 写 URL。
-// P1-1：issue=<ruleId> 过滤只显示该规则受影响页面（数据来自已保存的 snapshot，不重新抓取）。
-// P1-2：Page Detail 展开区按 Summary-first 分五层：Page Header → Primary Summary
-//       → Crawl & Links → Structured Data & Semantic → Findings。
+// ===== Crawled Pages：抓取页面工作区 =====
+//
+// 结构（与已验收的 /app、审计概览、问题清单同一套设计语言）：
+//   ① 指标卡：抓取页面数 / 成功响应 / 失败页面 / 有异常的页面（全部来自本次真实抓取）
+//   ② HTTP 状态分布：真实 2xx/3xx/4xx/5xx/other 计数，点击即筛选（复用既有 status 筛选）
+//   ③ 抓取统计：请求数 / 重定向 / 平均耗时 / 抓取错误
+//   ④ 异常快筛 + 既有筛选（全部 URL 驱动）+ 数据表格（可排序、可展开页面详情）
+//
+// 诚实边界：
+//   - 未抓取成功（ok=false）的页面不会被当作"成功"；无页面记录时给出独立空态，
+//     不与"筛选无匹配"混淆；不生成任何虚构的状态分布。
+//   - 页面级规则检出（error/warning/notice 计数）来自本次审计快照，不重新抓取。
+//
+// 冻结不变：URL 驱动的筛选（health/status/depth/sdStatus/pageType/severity/search/sort/dir/issue）、
+//           issue 钻取 chip、搜索 debounce、分页、页面详情五层结构、onOpenIssue 深链。
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { DashboardSnapshot, PageSnapshot, PageHealth, LocalizedText } from "@/lib/seo/audit-dashboard";
-import { SectionCard, HealthBadge, EmptyBlock, fmtNum, SEVERITY_COLORS } from "./ui";
+import { SectionCard, HealthBadge, EmptyBlock, fmtNum, SegmentedBar, HTTP_STATUS_COLORS, type Segment } from "./ui";
+import MetricCard from "@/components/viz/MetricCard";
+import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 400;
@@ -29,11 +39,27 @@ export interface PagesFilters {
   sort?: string;
   dir?: string;
   issue?: string;
+  /** 异常快筛（视图层，基于已抓取记录派生） */
+  failed?: string;
+  abnormal?: string;
 }
 
 function textOf(v: LocalizedText | null | undefined, locale: "en" | "zh"): string {
   if (v === null || v === undefined) return "";
   return typeof v === "string" ? v : v[locale];
+}
+
+/** HTTP 状态段 → 语义色（与审计概览的 HTTP 分布保持同一套取色） */
+const HTTP_BUCKET_COLOR: Record<string, string> = {
+  "2xx": HTTP_STATUS_COLORS["2xx"],
+  "3xx": HTTP_STATUS_COLORS["3xx"],
+  "4xx": HTTP_STATUS_COLORS["4xx"],
+  "5xx": HTTP_STATUS_COLORS["5xx"],
+  other: HTTP_STATUS_COLORS.other,
+};
+
+function statusBucket(status: number): string {
+  return status >= 500 ? "5xx" : status >= 400 ? "4xx" : status >= 300 ? "3xx" : status >= 200 ? "2xx" : "other";
 }
 
 export default function CrawledPages({
@@ -110,15 +136,41 @@ export default function CrawledPages({
     return new Set(snapshot.findings.filter((f) => f.ruleId === filters.issue).map((f) => f.url));
   }, [snapshot, filters.issue]);
 
+  // ---- 头部指标（全部来自本次真实抓取） ----
+  const stats = useMemo(() => {
+    const pages = snapshot.pages;
+    const ok = pages.filter((p) => p.ok).length;
+    return {
+      pages: pages.length,
+      ok,
+      failed: pages.length - ok,
+      withIssues: pages.filter((p) => p.issueCount > 0).length,
+      findings: pages.reduce((a, p) => a + p.issueCount, 0),
+    };
+  }, [snapshot]);
+
+  /** HTTP 分布：真实抓取记录的状态计数（与审计概览同口径） */
+  const httpSegments: Segment[] = [
+    { label: "2xx", value: snapshot.crawler.httpStatus["2xx"], color: HTTP_BUCKET_COLOR["2xx"] },
+    { label: "3xx", value: snapshot.crawler.httpStatus["3xx"], color: HTTP_BUCKET_COLOR["3xx"] },
+    { label: "4xx", value: snapshot.crawler.httpStatus["4xx"], color: HTTP_BUCKET_COLOR["4xx"] },
+    { label: "5xx", value: snapshot.crawler.httpStatus["5xx"], color: HTTP_BUCKET_COLOR["5xx"] },
+    { label: t("httpOther"), value: snapshot.crawler.httpStatus.other, color: HTTP_BUCKET_COLOR.other },
+  ];
+  // 段标签 → URL 筛选值（other 需映射回 "other"）
+  const httpFilterValue = (label: string): string => (label === t("httpOther") ? "other" : label);
+  const httpTotal = httpSegments.reduce((a, s) => a + s.value, 0);
+
   const filtered = useMemo(() => {
     const q = (filters.search ?? "").trim().toLowerCase();
     return snapshot.pages
       .filter((p) => {
         if (issueUrls && !issueUrls.has(p.url) && !issueUrls.has(p.finalUrl)) return false;
+        if (filters.failed && p.ok) return false;
+        if (filters.abnormal && p.issueCount === 0) return false;
         if (health && p.health !== health) return false;
         if (status) {
-          const bucket = p.status >= 500 ? "5xx" : p.status >= 400 ? "4xx" : p.status >= 300 ? "3xx" : p.status >= 200 ? "2xx" : "other";
-          if (bucket !== status) return false;
+          if (statusBucket(p.status) !== status) return false;
         }
         if (depth) {
           const bucket = p.depth <= 3 ? String(p.depth) : "4+";
@@ -138,7 +190,7 @@ export default function CrawledPages({
         const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""));
         return dir === "asc" ? cmp : -cmp;
       });
-  }, [snapshot, issueUrls, filters.search, health, status, depth, sdStatus, pageType, severity, sort, dir]);
+  }, [snapshot, issueUrls, filters.search, filters.failed, filters.abnormal, health, status, depth, sdStatus, pageType, severity, sort, dir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
@@ -152,15 +204,93 @@ export default function CrawledPages({
   const statusLabel = (p: PageSnapshot): string =>
     p.status === 0 ? (p.health === "redirect" ? "loop" : "err") : String(p.status);
 
-  const hasFilters = !!(filters.search || health || status || depth || sdStatus || pageType || severity || (filters.sort && filters.sort !== "issueCount") || filters.dir === "asc" || filters.issue);
-  const clearAll = () => onNavigate({ search: "", health: "", status: "", depth: "", sdStatus: "", pageType: "", severity: "", sort: "", dir: "", issue: "" });
+  const hasFilters = !!(
+    filters.search || filters.failed || filters.abnormal || health || status || depth || sdStatus || pageType || severity ||
+    (filters.sort && filters.sort !== "issueCount") || filters.dir === "asc" || filters.issue
+  );
+  const clearAll = () =>
+    onNavigate({ search: "", failed: "", abnormal: "", health: "", status: "", depth: "", sdStatus: "", pageType: "", severity: "", sort: "", dir: "", issue: "" });
+
+  /** 异常快筛（全部基于已抓取记录派生，不新增抓取） */
+  const quickFilters: Array<{ key: string; label: string; active: boolean; params: Record<string, string> }> = [
+    { key: "all", label: t("qfAll"), active: !hasFilters, params: { failed: "", abnormal: "", health: "", status: "", depth: "", sdStatus: "", pageType: "", severity: "", search: "", issue: "", sort: "", dir: "" } },
+    { key: "failed", label: t("qfFailed", { n: stats.failed }), active: !!filters.failed, params: { failed: "1", health: "", severity: "" } },
+    { key: "abnormal", label: t("qfIssues", { n: stats.withIssues }), active: !!filters.abnormal, params: { abnormal: "1", failed: "", health: "", severity: "" } },
+    { key: "redirect", label: t("qfRedirect"), active: health === "redirect", params: { health: "redirect", failed: "", abnormal: "" } },
+  ];
+
+  const sevClass = (s: "error" | "warning" | "notice") =>
+    s === "error" ? "text-neg" : s === "warning" ? "text-warn" : "text-ink-40";
 
   return (
     <div className="space-y-4">
+      {/* ===== ① 指标卡 ===== */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MetricCard
+          label={t("pcPages")}
+          value={fmtNum(stats.pages)}
+          caption={t("pcRequestsCaption", { requests: fmtNum(snapshot.pagesCrawled), redirects: fmtNum(snapshot.crawler.redirects) })}
+          hint={t("pcPagesHint")}
+          hintStyle="plain"
+        />
+        <MetricCard
+          label={t("pcOk")}
+          value={fmtNum(stats.ok)}
+          caption={t("pcOkCaption")}
+          hint={t("pcOkHint")}
+          hintStyle="plain"
+          tone={stats.ok > 0 ? "pos" : undefined}
+        />
+        <MetricCard
+          label={t("pcFailed")}
+          value={fmtNum(stats.failed)}
+          caption={stats.failed > 0 ? t("pcFailedCaption") : t("pcFailedNone")}
+          hint={t("pcFailedHint")}
+          hintStyle="plain"
+          tone={stats.failed > 0 ? "neg" : undefined}
+        />
+        <MetricCard
+          label={t("pcWithIssues")}
+          value={fmtNum(stats.withIssues)}
+          caption={t("pcFindingsCaption", { n: fmtNum(stats.findings) })}
+          hint={t("pcWithIssuesHint")}
+          hintStyle="plain"
+          tone={stats.withIssues > 0 ? "warn" : undefined}
+        />
+      </div>
+
+      {/* ===== ② HTTP 状态分布 + ③ 抓取统计 ===== */}
+      <SectionCard
+          title={t("httpStatusTitle")}
+          subtitle={t("pcHttpSub", { total: fmtNum(httpTotal) })}
+        >
+          <SegmentedBar segments={httpSegments} height={12} />
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {httpSegments.map((s) => (
+              <button
+                key={s.label}
+                onClick={() => onNavigate({ status: httpFilterValue(s.label) })}
+                className={`rounded-lg border px-2 py-2 text-left transition-colors hover:border-ink-25 ${
+                  status === httpFilterValue(s.label) ? "border-brand bg-brand/5" : "border-line bg-card"
+                }`}
+                aria-label={`${s.label}: ${s.value}`}
+              >
+                <div className="font-mono text-lg font-semibold" style={{ color: s.color }}>{fmtNum(s.value)}</div>
+                <div className="font-mono text-xs text-ink-40">
+                  {s.label}
+                  {httpTotal > 0 ? ` · ${Math.round((s.value / httpTotal) * 100)}%` : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 border-t border-line-soft pt-2 font-sans text-xs text-ink-40">{t("pcHttpNote")}</p>
+      </SectionCard>
+
+      {/* ===== ④ 数据表格 ===== */}
       <SectionCard
         title={
           <span>
-            {t("crawledPagesTitle")} <span className="font-mono text-xs text-ink-40">({fmtNum(snapshot.pages.length)})</span>
+            {t("crawledPagesTitle")} <span className="font-mono text-xs text-ink-40">({fmtNum(stats.pages)})</span>
           </span>
         }
         subtitle={t("crawledPagesSub", { crawled: fmtNum(snapshot.pagesCrawled), indexable: fmtNum(snapshot.indexablePages) })}
@@ -184,6 +314,22 @@ export default function CrawledPages({
             </button>
           </div>
         )}
+
+        {/* 异常快筛（一键定位失败 / 有异常 / 重定向页面） */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="font-sans text-xs text-ink-40">{t("qfLabel")}</span>
+          {quickFilters.map((q) => (
+            <button
+              key={q.key}
+              onClick={() => onNavigate(q.params)}
+              className={`rounded-md border px-2 py-1 font-mono text-xs transition-colors ${
+                q.active ? "border-brand bg-brand/5 text-ink" : "border-line bg-card text-ink-60 hover:border-ink-25"
+              }`}
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
 
         {/* Filters（全部 URL 驱动） */}
         <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-line-soft pb-4">
@@ -240,51 +386,51 @@ export default function CrawledPages({
           </span>
         </div>
 
-        {rows.length === 0 ? (
+        {stats.pages === 0 ? (
+          /* 独立空态：本次抓取没有可展示的页面记录（不与"筛选无匹配"混淆） */
+          <EmptyBlock title={t("pcNoPagesTitle")} hint={t("pcNoPagesHint")} />
+        ) : rows.length === 0 ? (
           <EmptyBlock title={t("noPagesMatch")} hint={t("clearFiltersHint")} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-line-soft bg-line-soft/40 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">
-                  <th className="px-3 py-2 text-left font-semibold">
-                    <button onClick={() => toggleSort("url")} className="hover:text-ink">{t("thUrl")}{sort === "url" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold">
-                    <button onClick={() => toggleSort("status")} className="hover:text-ink">{t("thStatus")}{sort === "status" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold">{t("thHealth")}</th>
-                  <th className="px-3 py-2 text-right font-semibold">
-                    <button onClick={() => toggleSort("issueCount")} className="hover:text-ink">{t("thIssues")}{sort === "issueCount" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="hidden px-3 py-2 text-left font-semibold lg:table-cell">{t("thPageType")}</th>
-                  <th className="hidden px-3 py-2 text-right font-semibold md:table-cell">
-                    <button onClick={() => toggleSort("wordCount")} className="hover:text-ink">{t("thWords")}{sort === "wordCount" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="hidden px-3 py-2 text-right font-semibold md:table-cell">
-                    <button onClick={() => toggleSort("responseTimeMs")} className="hover:text-ink">{t("thResponse")}{sort === "responseTimeMs" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="hidden px-3 py-2 text-right font-semibold sm:table-cell">
-                    <button onClick={() => toggleSort("depth")} className="hover:text-ink">{t("thDepth")}{sort === "depth" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
-                  </th>
-                  <th className="hidden px-3 py-2 text-right font-semibold sm:table-cell">{t("thRedirect")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <PageRow
-                    key={p.finalUrl}
-                    p={p}
-                    expanded={expanded === p.finalUrl}
-                    onToggle={() => setExpanded(expanded === p.finalUrl ? null : p.finalUrl)}
-                    statusLabel={statusLabel(p)}
-                    findings={findingsByUrl.get(p.url) ?? findingsByUrl.get(p.finalUrl) ?? []}
-                    onOpenIssue={onOpenIssue}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable minWidthRem={0} ariaLabel={t("crawledPagesTitle")}>
+            <THead>
+              <Th>
+                <button onClick={() => toggleSort("url")} className="hover:text-ink">{t("thUrl")}{sort === "url" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th width="5rem">
+                <button onClick={() => toggleSort("status")} className="hover:text-ink">{t("thStatus")}{sort === "status" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th width="9rem">{t("thHealth")}</Th>
+              <Th align="right" width="8rem">
+                <button onClick={() => toggleSort("issueCount")} className="hover:text-ink">{t("thIssues")}{sort === "issueCount" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th className="hidden lg:table-cell" width="8rem">{t("thPageType")}</Th>
+              <Th align="right" className="hidden md:table-cell" width="6rem">
+                <button onClick={() => toggleSort("wordCount")} className="hover:text-ink">{t("thWords")}{sort === "wordCount" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th align="right" className="hidden md:table-cell" width="6.5rem">
+                <button onClick={() => toggleSort("responseTimeMs")} className="hover:text-ink">{t("thResponse")}{sort === "responseTimeMs" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th align="right" className="hidden sm:table-cell" width="5rem">
+                <button onClick={() => toggleSort("depth")} className="hover:text-ink">{t("thDepth")}{sort === "depth" ? (dir === "asc" ? " ↑" : " ↓") : ""}</button>
+              </Th>
+              <Th align="right" className="hidden sm:table-cell" width="6rem">{t("thRedirect")}</Th>
+            </THead>
+            <TBody>
+              {rows.map((p) => (
+                <PageRow
+                  key={p.finalUrl}
+                  p={p}
+                  expanded={expanded === p.finalUrl}
+                  onToggle={() => setExpanded(expanded === p.finalUrl ? null : p.finalUrl)}
+                  statusLabel={statusLabel(p)}
+                  findings={findingsByUrl.get(p.url) ?? findingsByUrl.get(p.finalUrl) ?? []}
+                  onOpenIssue={onOpenIssue}
+                  sevClass={sevClass}
+                />
+              ))}
+            </TBody>
+          </DataTable>
         )}
 
         {/* Pagination */}
@@ -324,6 +470,7 @@ function PageRow({
   statusLabel,
   findings,
   onOpenIssue,
+  sevClass,
 }: {
   p: PageSnapshot;
   expanded: boolean;
@@ -331,76 +478,79 @@ function PageRow({
   statusLabel: string;
   findings: Array<{ ruleId: string; severity: string; message: unknown }>;
   onOpenIssue: (ruleId: string) => void;
+  sevClass: (s: "error" | "warning" | "notice") => string;
 }) {
   const t = useTranslations("dashboard.audit");
   const healthLabel = t(`health${p.health === "healthy" ? "Healthy" : p.health === "needs-attention" ? "NeedsAttention" : p.health === "critical" ? "Critical" : p.health === "redirect" ? "Redirect" : "Blocked"}`);
+  const statusClass = p.status === 0 || p.status >= 500 ? "text-neg" : p.status >= 400 ? "text-warn" : p.status >= 300 ? "text-violet-600" : "text-pos";
+  /** 问题严重度拆解：用文字计数替代无信息的圆点 */
+  const sevBreakdown = (
+    <>
+      {p.errorCount > 0 && <span className={sevClass("error")} title={t("sevError")}>E{p.errorCount}</span>}
+      {p.warningCount > 0 && <span className={sevClass("warning")} title={t("sevWarning")}>W{p.warningCount}</span>}
+      {p.noticeCount > 0 && <span className={sevClass("notice")} title={t("sevNotice")}>N{p.noticeCount}</span>}
+    </>
+  );
   return (
     <>
-      <tr
-        className="cursor-pointer border-b border-line-soft transition-colors hover:bg-line-soft/40"
-        onClick={onToggle}
-      >
-        <td className="px-3 py-2">
+      <TR className={expanded ? "bg-line-soft/40" : ""} onClick={onToggle}>
+        <TD>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-ink-40">{expanded ? "▾" : "▸"}</span>
-            <span className="block max-w-[240px] truncate font-mono text-xs text-ink" title={p.url}>
+            <span className="block max-w-[260px] truncate font-mono text-xs text-ink" title={p.url}>
               {p.url.replace(/^https?:\/\//, "")}
             </span>
           </div>
-        </td>
-        <td className="px-3 py-2 font-mono ">
-          <span className={`${p.status >= 500 ? "text-neg" : p.status >= 400 ? "text-warn" : p.status >= 300 ? "text-violet-600" : "text-pos"}`}>
-            {statusLabel}
-          </span>
-        </td>
-        <td className="px-3 py-2">
+        </TD>
+        <TD>
+          <span className={`font-mono text-xs font-semibold ${statusClass}`}>{statusLabel}</span>
+        </TD>
+        <TD>
           <HealthBadge health={p.health as PageHealth} label={healthLabel} />
-        </td>
-        <td className="px-3 py-2 text-right">
+        </TD>
+        <TD align="right" numeric>
           <span className="font-mono text-sm font-semibold text-ink">{p.issueCount}</span>
-          <span className="ml-1.5 inline-flex items-center gap-1 align-middle">
-            {p.errorCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.error }} title={`${p.errorCount} error`} aria-label={`${p.errorCount} error`} />}
-            {p.warningCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.warning }} title={`${p.warningCount} warning`} aria-label={`${p.warningCount} warning`} />}
-            {p.noticeCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.notice }} title={`${p.noticeCount} notice`} aria-label={`${p.noticeCount} notice`} />}
-          </span>
-        </td>
-        <td className="hidden px-3 py-2 font-mono  text-ink-60 lg:table-cell">{p.pageType ?? "—"}</td>
-        <td className="hidden px-3 py-2 text-right font-mono  text-ink-60 md:table-cell">{p.wordCount !== null ? fmtNum(p.wordCount) : "—"}</td>
-        <td className="hidden px-3 py-2 text-right font-mono  text-ink-60 md:table-cell">{p.responseTimeMs}ms</td>
-        <td className="hidden px-3 py-2 text-right font-mono  text-ink-60 sm:table-cell">{p.depth}</td>
-        <td className="hidden px-3 py-2 text-right font-mono  sm:table-cell">
+          <span className="ml-2 inline-flex items-center gap-1.5 font-mono text-xs">{sevBreakdown}</span>
+        </TD>
+        <TD className="hidden lg:table-cell">
+          <span className="font-mono text-xs text-ink-60">{p.pageType ?? "—"}</span>
+        </TD>
+        <TD align="right" numeric className="hidden md:table-cell">
+          <span className="text-ink-60">{p.wordCount !== null ? fmtNum(p.wordCount) : "—"}</span>
+        </TD>
+        <TD align="right" numeric className="hidden md:table-cell">
+          <span className="text-ink-60">{p.responseTimeMs}ms</span>
+        </TD>
+        <TD align="right" numeric className="hidden sm:table-cell">
+          <span className="text-ink-60">{p.depth}</span>
+        </TD>
+        <TD align="right" className="hidden sm:table-cell">
           {p.isRedirect ? (
-            <span className="badge-warn">{p.hops} hop{p.hops > 1 ? "s" : ""}</span>
+            <span className="badge-warn whitespace-nowrap">{p.hops} hop{p.hops > 1 ? "s" : ""}</span>
           ) : (
             <span className="text-ink-40">—</span>
           )}
-        </td>
-      </tr>
+        </TD>
+      </TR>
       {expanded && (
-        <tr className="border-b border-line-soft bg-[#FBFAF4]">
+        <tr className="border-b border-line-soft bg-paper">
           <td colSpan={9} className="px-4 py-4">
-            {/* ===== P1-2 LEVEL 1 — Page Header：先回答"这一页健康吗、有没有问题" ===== */}
+            {/* ===== LEVEL 1 — Page Header：先回答"这一页健康吗、有没有问题" ===== */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-soft pb-3">
               <span className="min-w-0 flex-1 break-all font-mono text-xs font-semibold text-ink">{p.url}</span>
-              <span className={`font-mono text-sm font-semibold ${p.status >= 500 ? "text-neg" : p.status >= 400 ? "text-warn" : p.status >= 300 ? "text-violet-600" : "text-pos"}`}>
-                {statusLabel}
-              </span>
+              <span className={`font-mono text-sm font-semibold ${statusClass}`}>{statusLabel}</span>
               <HealthBadge health={p.health as PageHealth} label={healthLabel} />
               <span className="badge-info font-mono">{p.pageType ?? "—"}</span>
               <span className="font-mono text-sm font-semibold text-ink">
                 {p.issueCount} {t("thIssues")}
-                <span className="ml-1.5 inline-flex items-center gap-1 align-middle">
-                  {p.errorCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.error }} title={`${p.errorCount} error`} aria-label={`${p.errorCount} error`} />}
-                  {p.warningCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.warning }} title={`${p.warningCount} warning`} aria-label={`${p.warningCount} warning`} />}
-                  {p.noticeCount > 0 && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS.notice }} title={`${p.noticeCount} notice`} aria-label={`${p.noticeCount} notice`} />}
-                </span>
+                <span className="ml-2 inline-flex items-center gap-1.5 font-mono text-xs">{sevBreakdown}</span>
               </span>
               <span className="font-mono text-xs text-ink-40">{p.responseTimeMs}ms · D{p.depth}</span>
             </div>
 
             {/* ===== LEVEL 2 — Primary Summary：核心内容事实 ===== */}
             <div className="mt-3">
-              <div className="mb-1.5 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">{t("pageSummarySection")}</div>
+              <div className="mb-1.5 font-mono text-xs uppercase tracking-wide text-ink-40">{t("pageSummarySection")}</div>
               <div className="space-y-1.5 font-mono text-xs">
                 <DetailRow label={t("titleLabel")} value={p.title ?? "—"} breakAll />
                 <DetailRow label={t("descriptionLabel")} value={p.description ?? "—"} breakAll />
@@ -417,7 +567,7 @@ function PageRow({
 
             {/* ===== LEVEL 3 — Crawl / Links ===== */}
             <div className="mt-3">
-              <div className="mb-1.5 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">{t("crawlLinksSection")}</div>
+              <div className="mb-1.5 font-mono text-xs uppercase tracking-wide text-ink-40">{t("crawlLinksSection")}</div>
               <div className="grid grid-cols-2 gap-x-6 font-mono text-xs sm:grid-cols-4">
                 <DetailRow label={t("thDepth")} value={String(p.depth)} />
                 <DetailRow label={t("internalLinks")} value={p.internalLinks !== null ? fmtNum(p.internalLinks) : "—"} />
@@ -431,7 +581,7 @@ function PageRow({
 
             {/* ===== LEVEL 4 — Structured Data / Semantic ===== */}
             <div className="mt-3">
-              <div className="mb-1.5 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">{t("sdSemanticSection")}</div>
+              <div className="mb-1.5 font-mono text-xs uppercase tracking-wide text-ink-40">{t("sdSemanticSection")}</div>
               <div className="grid grid-cols-1 gap-1.5 font-mono text-xs sm:grid-cols-2">
                 <DetailRow label={t("structuredDataTitle")} value={p.structuredDataStatus ? t(`sdStatus.${p.structuredDataStatus}`) : "—"} />
                 <DetailRow label={t("schemaTypes")} value={p.structuredDataTypes.length > 0 ? p.structuredDataTypes.slice(0, 4).join(", ") : "—"} breakAll />
@@ -442,15 +592,16 @@ function PageRow({
             {/* ===== LEVEL 5 — Findings ===== */}
             {findings.length > 0 && (
               <div className="mt-4">
-                <div className="mb-1.5 font-mono text-[0.6875rem] uppercase tracking-wide text-ink-40">{t("pageFindings")}</div>
+                <div className="mb-1.5 font-mono text-xs uppercase tracking-wide text-ink-40">{t("pageFindings")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {findings.map((f, i) => (
                     <button
                       key={`${f.ruleId}-${i}`}
                       onClick={() => onOpenIssue(f.ruleId)}
-                      className="badge-info font-mono text-xs transition-colors hover:border-ink-25"
+                      className={`font-mono text-xs transition-colors hover:border-ink-25 ${
+                        f.severity === "error" ? "badge-err" : f.severity === "warning" ? "badge-warn" : "badge-info"
+                      }`}
                     >
-                      <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[f.severity as keyof typeof SEVERITY_COLORS] }} aria-hidden />
                       {f.ruleId}
                     </button>
                   ))}

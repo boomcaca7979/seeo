@@ -2,7 +2,7 @@
 // 返回最近一次审计结果（含问题清单 + 历史对比 + 检查项覆盖 + 页面响应时间明细）
 
 import { NextResponse } from "next/server";
-import { getLatestAudit, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
+import { getLatestAudit, getAuditById, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
 import { allCheckMeta, checkMetaMap, getExecutedCheckIds, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
 import type { DashboardSnapshot } from "@/lib/seo/audit-dashboard";
 import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
@@ -18,6 +18,9 @@ interface IssueGroup {
   severity: "error" | "warning" | "notice";
   affectedPages: number;
   sampleUrl: string;
+  /** 该检查命中的全部 URL（affectedPages === urls.length）。sampleUrl 只是列表里展示的第一条，
+   *  旧引擎报告的页面级筛选必须看全集，否则「影响该页面的检查」会漏掉样本 URL 不是它的那些。 */
+  urls: string[];
   detail: string;
   suggestion: string | null;
 }
@@ -32,6 +35,8 @@ interface HistoryItem {
   checkedAt: string;
   engineVersion: string | null;
   ruleSetVersion: string | null;
+  depth: "quick" | "full";
+  pagesCrawled: number;
 }
 
 interface PageDetailEntry {
@@ -70,6 +75,7 @@ function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
     const existing = map.get(checkId);
     if (existing) {
       existing.affectedPages++;
+      existing.urls.push(issue.url);
     } else {
       map.set(checkId, {
         checkId,
@@ -77,6 +83,7 @@ function groupIssues(issues: AuditIssueRow[], locale: UiLocale): IssueGroup[] {
         severity: issue.severity,
         affectedPages: 1,
         sampleUrl: issue.url,
+        urls: [issue.url],
         detail: resolveAuditDetail(issue.detail, locale) ?? "",
         suggestion: resolveAuditSuggestion(issue.suggestion, locale),
       });
@@ -187,7 +194,19 @@ export async function GET(req: Request) {
   // 使重新进入页面时不再误显“审计进行中”，并允许用户重跑。
   await reapStaleRunningAudit(userId, domain);
 
-  const audit = await getLatestAudit(userId, domain);
+  // 可选 audit 参数：查看指定历史审计（必须属于当前用户+域名且已完成）；
+  // 参数缺失/无效/无权限时回退到最新审计，不改变默认行为。
+  const auditParam = Number(searchParams.get("audit") ?? "");
+  let audit = null;
+  if (Number.isInteger(auditParam) && auditParam > 0) {
+    const byId = await getAuditById(userId, auditParam);
+    if (byId && byId.domain === domain && byId.status === "completed") {
+      audit = byId;
+    }
+  }
+  if (!audit) {
+    audit = await getLatestAudit(userId, domain);
+  }
   if (!audit) {
     return NextResponse.json({ data: null });
   }
@@ -220,6 +239,8 @@ export async function GET(req: Request) {
     checkedAt: h.finished_at ?? h.started_at,
     engineVersion: h.engine_version,
     ruleSetVersion: h.rule_set_version,
+    depth: h.depth,
+    pagesCrawled: h.pages_crawled,
   }));
   // 解析页面响应时间明细
   let pagesDetail: PageDetailEntry[] = [];

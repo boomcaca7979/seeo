@@ -170,6 +170,10 @@
     "colProductLinks": {
       "seoAudit": "Technical SEO Audit",
       "rankTracking": "SEO Rank Tracker",
+      "keywordResearch": "Keyword Research",
+      "competitorAnalysis": "Competitor Analysis",
+      "contentOptimization": "Content Optimization",
+      "backlinkAnalysis": "Backlink Analysis",
       "allFeatures": "All features"
     },
     "colPlans": "Plans",
@@ -179,7 +183,8 @@
     "colResources": "Resources",
     "colResourcesLinks": {
       "docs": "Docs",
-      "changelog": "Changelog"
+      "changelog": "Changelog",
+      "seoIssues": "SEO Issue Fix Guides"
     },
     "colCompany": "Company",
     "colCompanyLinks": {
@@ -349,6 +354,8 @@
     "collapseDetails": "Collapse details"
   },
   "paymentResult": {
+    "metaTitle": "Payment Result — SeeO",
+    "metaDescription": "Check the status of a SeeO payment: secure Creem checkout, subscription and custom-service orders, and what to do if confirmation is still pending.",
     "pendingTitle": "Confirming your payment",
     "pendingDesc": "We are waiting for confirmation from the payment provider. This usually takes a few seconds — please keep this page open…",
     "paidTitle": "Payment successful",
@@ -359,6 +366,19 @@
     "refundedDesc": "This order has been refunded, and your membership has been recalculated based on remaining valid orders.",
     "notFoundTitle": "Order not found",
     "notFoundDesc": "No matching order was found. Please start a new purchase from the pricing page.",
+    "processingTitle": "Payment is still processing",
+    "processingDesc": "The payment provider has not returned a confirmation yet. This does not mean the payment failed — you can check again in a moment.",
+    "timeoutTitle": "We can't confirm this payment yet",
+    "timeoutDesc": "We checked several times, but the payment provider still has not confirmed this order. This does not mean the payment failed, and retrying will not charge you again — please check again later or contact support.",
+    "authTitle": "Your login session has expired",
+    "authDesc": "A valid login session is required to look up this order. Please log in again and return to this page to continue.",
+    "forbiddenTitle": "This order can't be viewed here",
+    "forbiddenDesc": "The signed-in account has no access to this order. Make sure you are using the account that made the purchase.",
+    "serviceTitle": "Service temporarily unavailable",
+    "serviceDesc": "The payment status service is temporarily unavailable. Your payment is unaffected and retrying will not charge you again — please check again shortly.",
+    "retryAction": "Check payment status again",
+    "loginAction": "Log in again",
+    "polledTimes": "Automatically checked {count} times",
     "orderNo": "Order No.",
     "customService": "Custom Service",
     "backPricing": "Back to pricing",
@@ -1378,6 +1398,88 @@
     "emailLabel": "Customer Support"
   },
   "dashboard": {
+    "metaDescription": "The SeeO workspace: run technical SEO audits, track keyword rankings daily, export reports, and analyze competitors and backlinks for the selected project.",
+    "viz": {
+      "tableLabel": "Data table",
+      "thPriority": "Priority",
+      "thIssue": "Issue",
+      "thScope": "Scope",
+      "thEvidence": "Key evidence",
+      "thStatus": "Status",
+      "thAction": "Action",
+      "scopePages": "{n} pages",
+      "scopeFindings": "{n} findings",
+      "scopeUnknown": "Scope unavailable",
+      "notApplicable": "—",
+      "openAction": "Open",
+      "unavailable": "Unavailable",
+      "verifyPending": "Awaiting re-check",
+      "verifyFail": "Re-check failed",
+      "verifyPass": "Verified resolved",
+      "verifyInconclusive": "Cannot judge"
+    },
+    "workspace": {
+      "title": "Website overview",
+      "subtitle": "See what matters right now across your projects: real crawl figures, work already in progress, and what to handle first.",
+      "metaProjects": "{n} projects",
+      "metaAudited": "{n} audited",
+      "metrics": {
+        "healthScore": "Latest audit health score",
+        "healthScoreHint": "Health score of the most recent completed audit across your projects.",
+        "pagesCrawled": "Pages crawled",
+        "pagesCrawledHint": "Pages actually fetched by the crawler in that audit — not an estimate.",
+        "openIssues": "Open issues",
+        "openIssuesHint": "Findings detected by the crawler that are not yet verified as solved.",
+        "verifiedResolved": "Verified resolved",
+        "verifiedResolvedHint": "Confirmed by a later audit that no longer detects them — not just marked as fixed.",
+        "noAudit": "No audit yet",
+        "noAuditReason": "Run an audit to get real crawl figures here.",
+        "noProjects": "No project yet",
+        "noProjectsReason": "Add a project to start measuring.",
+        "openBreakdown": "{wip} in progress · {fixed} marked fixed (unverified)",
+        "verifiedBreakdown": "{pending} still awaiting re-check",
+        "healthDeltaUp": "+{n} vs previous audit",
+        "healthDeltaDown": "-{n} vs previous audit",
+        "healthDeltaFlat": "No change vs previous audit",
+        "noPreviousAudit": "First audit for this domain"
+      },
+      "trend": {
+        "title": "Health score history",
+        "subtitle": "Completed audits of {domain}",
+        "emptyTitle": "History appears after more audits",
+        "emptyHint": "Run another audit on the same domain to compare results over time.",
+        "emptyAction": "Run an audit",
+        "seriesScore": "Health score",
+        "seriesIssues": "Findings"
+      },
+      "priority": {
+        "title": "Unresolved issues by priority",
+        "subtitle": "Open and in-progress technical issues only — SeeO's single priority engine",
+        "emptyTitle": "Nothing waiting on you",
+        "emptyHint": "Every detected item is verified resolved or dismissed."
+      },
+      "verification": {
+        "title": "Verification status",
+        "subtitle": "Technical findings and how far their fix has been verified",
+        "emptyTitle": "No technical findings to verify",
+        "emptyHint": "Verification only comes from a real re-check during a later audit.",
+        "note": "Marking an item fixed is a claim. Only a later audit that no longer detects it counts as verified."
+      },
+      "todo": {
+        "title": "First things to handle",
+        "subtitle": "Same queue as the Action Center — no separate scoring",
+        "emptyTitle": "Nothing needs attention",
+        "emptyHint": "All detected items are verified resolved or dismissed.",
+        "emptyAction": "Run a quick audit",
+        "noAuditTitle": "No audit data yet",
+        "noAuditHint": "Run an audit to get real findings with evidence and scope."
+      },
+      "gaps": {
+        "title": "What is missing",
+        "subtitle": "Real data gaps across your projects. Each one links to the place that fills it.",
+        "none": "No data gaps detected for your projects."
+      }
+    },
     "growth": {
       "title": "Search Growth Opportunities",
       "subtitle": "Real opportunities from your ranking history, audits and content checks — what happened, why it matters now, and what to do next.",
@@ -1555,7 +1657,7 @@
         "auditOk": "Technical audit #{auditId} · {depth} · {pages} pages crawled",
         "auditMissing": "No completed technical audit for this domain yet",
         "health": "Health score {score}",
-        "tracking": "{n} tracked keywords",
+        "tracking": "{n} tracked keywords in this project",
         "gapsTitle": "Known data gaps — SeeO will not fill these with placeholder numbers",
         "project": "Project: {name} · {domain}",
         "noProject": "No project selected",
@@ -1592,7 +1694,24 @@
         "auditCta": "Run free audit",
         "todayTitle": "Do this first today",
         "viewAll": "View full queue"
-      }
+      },
+      "mOpen": "Open",
+      "mOpenHint": "Tasks with queue status open",
+      "mInProgress": "In progress",
+      "mInProgressHint": "Started, but no new detection evidence yet",
+      "mClaimed": "Fix claimed",
+      "mClaimedHint": "Your claim only — not verified by a re-audit, never counted as verified resolved",
+      "mClaimedCaption": "Claimed · not verified",
+      "mVerified": "Verified resolved",
+      "mVerifiedHint": "Confirmed by detection evidence from a later audit; only a re-audit can set this status",
+      "distStatus": "Status distribution",
+      "distHint": "Click a legend item to filter the task list below",
+      "colPriority": "Priority",
+      "colTask": "Task",
+      "colSource": "Source",
+      "colTarget": "Target",
+      "colStatus": "Status",
+      "colNext": "Next step"
     },
     "sidebar": {
       "overview": "Overview",
@@ -1606,14 +1725,9 @@
       "backlinks": "Backlinks",
       "reports": "Reports",
       "settings": "Settings",
-      "currentPlan": "Current plan",
-      "upgradeCta": "Upgrade →",
       "guestUser": "Guest",
-      "login": "Log in",
-      "logout": "Log out",
       "expand": "Expand sidebar",
       "collapse": "Collapse sidebar",
-      "demoToast": "Demo mode — account system is disabled",
       "demoUser": "Alex Morgan",
       "demoEmail": "alex@acme-example.com",
       "actions": "Action Center",
@@ -1624,6 +1738,8 @@
       "menu": "Open menu",
       "switchProject": "Switch project",
       "noProjects": "No projects yet",
+      "loadFailed": "Failed to load projects",
+      "retry": "Retry",
       "health": "Health",
       "notAudited": "Not audited",
       "newProject": "New project",
@@ -1638,6 +1754,7 @@
       "docs": "Docs",
       "logout": "Log out",
       "login": "Log in",
+      "settings": "Settings",
       "demoMode": "Demo mode · Account system is disabled",
       "upgradeHint": "Upgrade below"
     },
@@ -1666,6 +1783,11 @@
       "requiredFeature": "Required feature: ",
       "reason": "Reason: ",
       "usage": "Usage: {used} / {limit}",
+      "keywordUsageTotal": "Tracked keywords in your account",
+      "keywordUsageLimit": "Your plan's keyword ceiling",
+      "keywordUsageOverLabel": "Over by",
+      "keywordUsageOver": "{count} keywords",
+      "keywordUsageShared": "Shared by every project in your account — not one quota per project.",
       "recommended": "Recommended upgrade",
       "recommendedBadge": "Recommended",
       "recommendDesc": "Unlock more features and higher limits immediately after upgrading",
@@ -1693,7 +1815,8 @@
       "errInvalidEmail": "Invalid email format",
       "errPasswordShort": "Password must be at least 8 characters",
       "errAlreadyRegistered": "This email is already registered — log in directly",
-      "errInvalidCredentials": "Invalid email or password"
+      "errInvalidCredentials": "Invalid email or password",
+      "errServiceUnavailable": "Can't reach the sign-in service right now. Check your connection and try again."
     },
     "projectList": {
       "dataUpdatedAt": "Data updated",
@@ -1765,19 +1888,52 @@
       "notInTop100Detail": "{domain} does not appear in the top 100 Google results for \"{keyword}\"",
       "currentRank": "Current rank",
       "cachedData": "Cached data",
+      "liveData": "Live result",
+      "cachedAtLabel": "Cached data time",
+      "cachedAgoMinutes": "Data fetched {minutes, plural, one {# minute} other {# minutes}} ago",
+      "cachedAgoHours": "Data fetched {hours, plural, one {# hour} other {# hours}} ago",
       "regionLabel": "Region",
       "queryTime": "Query time",
       "errKeyword": "Please enter a keyword",
       "errDomain": "Please enter a domain",
       "queryFailed": "Query failed",
       "cacheHit": "Cache hit — no quota consumed",
-      "queryDone": "Query complete (1 quota consumed)"
+      "queryDone": "Query complete (1 quota consumed)",
+      "usageThisMonth": "Used {used}/{limit} this month"
     },
     "audit": {
+      "ovParseablePages": "Includes {n} parseable pages",
+      "ovChecksExecuted": "Checks executed",
+      "ovChecksExecutedHint": "Number of rules actually run in this audit at the current depth.",
+      "ovScopeTitle": "Audit scope",
+      "ovScopeSub": "Domain, depth and completion time of this audit",
+      "ovStatusDistTitle": "Handling & verification status",
+      "ovStatusDistSub": "From the handling records saved for this domain — not from the crawl result alone",
+      "ovStatusEmpty": "No handling records yet",
+      "ovStatusEmptyHint": "Open an issue and mark it in progress or fixed; SeeO re-checks it on your next audit.",
+      "ovPriorityDistTitle": "Issue priority distribution",
+      "ovPriorityDistSub": "Failing rules grouped by the same priority engine used across SeeO",
+      "ovNeedsAttentionTitle": "Handle these first",
+      "ovNeedsAttentionSub": "Same order as the Issues tab — open an item for evidence and fix steps",
+      "ovNoOpenIssues": "No failing checks",
+      "ovNoOpenIssuesHint": "This audit found no failing rules at the current depth.",
+      "ovTrendSub": "Completed audits of this domain — score and findings per audit",
+      "ovTrendSeriesIssues": "Findings",
+      "ovTrendNeedTwo": "Trend appears after two completed audits",
+      "issuesSummaryTitle": "Issue summary",
+      "issuesSummarySub": "Counts come from this audit plus your saved handling records",
+      "issuesTableLabel": "Audit issues",
+      "issuesEvidenceNone": "No sample message captured for this rule",
+      "issuesScopePagesPct": "{pages} pages · {pct}% of indexable pages",
+      "issuesMobileScope": "Impact",
+      "issuesResUnknown": "Not tracked",
+      "issuesStatusHint": "Handling status is separate from the crawl result",
+      "issuesResLoadFailed": "Could not load handling status",
       "title": "Technical SEO Audit",
       "subtitle": "In-house crawler, no SerpApi quota used. BFS-crawls same-domain pages (up to 50), runs 20+ checks and computes a health score.",
       "subtitleQuick": "In-house crawler, no SerpApi quota used. This audit checks your homepage (1 page) and computes a health score from the page-level checks.",
       "printHeader": "SeeO · Technical Audit Report",
+      "printHeaderNoDomain": "Audit domain not confirmed yet",
       "domainLabel": "Audit domain",
       "viewBtn": "View",
       "quickAudit": "Quick audit",
@@ -1841,7 +1997,7 @@
       "thSeverity": "Severity",
       "thAffected": "Pages affected",
       "thSampleUrl": "Sample URL",
-      "thDetail": "Details",
+      "thDetail": "Detail",
       "issueDetailLabel": "Details: ",
       "suggestionLabel": "Suggestion: ",
       "issuesEmptyTitle": "No issues found",
@@ -1889,6 +2045,7 @@
       "upgradePdf": "Upgrade to unlock PDF export",
       "saving": "Saving…",
       "saveToReports": "Save to reports",
+      "printReport": "Browser print view (new tab)",
       "exportNote1": "· PDF is generated instantly in your browser — no storage used",
       "exportNote2": "· Saved reports can be viewed anytime on the Reports page",
       "toastQuickRunning": "Quick audit running — auditing the homepage…",
@@ -1932,6 +2089,10 @@
       "crawlFailedBody": "The start page request failed, so no checks were executed. No health score and no pass/fail conclusions are shown for this audit.",
       "legacyAuditNote": "This audit was created with an older engine. Run a new audit to unlock the full dashboard.",
       "legacyDetailNote": "Legacy engine result — re-run an audit for the full V2 dashboard.",
+      "legacyLinkAppliedPage": "Showing the {n} of {total} checks that affect the page you came from.",
+      "legacyLinkAppliedIssue": "Showing the {n} of {total} checks matching the issue you came from.",
+      "legacyLinkMiss": "No check in this legacy report matches the page you came from, so the full list is shown.",
+      "legacyLinkShowAll": "Show all checks",
       "healthSub": "Health score across {crawled} indexable pages",
       "hintHealthScore": "Aggregated score from the V2 engine: severity, rule weight and affected-page ratio.",
       "comparedWithPrev": "vs previous audit",
@@ -2118,24 +2279,24 @@
       "thDate": "Date",
       "engineVersion": "Engine",
       "guestCtaTitle": "Keep this audit — track your fix for free",
-    "guestCtaBody": "Sign up free to save this report, track what you fix, and let SeeO re-verify it automatically on your next audit. Your domain and this audit carry over to your account — no need to run it again.",
-    "guestCtaBtn": "Sign up free",
-    "doFirstTitle": "Do this first",
-    "doFirstSub": "Judged from {n} failing checks in this audit's crawl",
-    "whyNowTitle": "Why this one first",
-    "whyNowSub": "Computed from this audit's real findings — affected scope, health-score impact and fix leverage. No traffic estimates.",
-    "evidenceTitle": "Evidence from this crawl",
-    "topActionOpenCta": "Open details",
-    "tieHint": "{n} checks tie at this priority on this audit's data — this is one of them; the full list below is ordered by the same logic.",
-    "verifyBodyTop": "Fix it, then run the audit again — SeeO re-checks this exact rule and verifies the result.",
-    "verifyTitle": "How SeeO verifies this fix",
-    "verifySub": "Verified resolved can only come from a new audit's evidence — marking it fixed yourself never counts.",
-    "verifyBody": "After you fix it, run the audit again. SeeO re-crawls and re-checks this exact rule: if it passes, the issue is marked Verified resolved; if it still fails, SeeO shows the new findings; if the rule doesn't run in the next audit, it is marked inconclusive — never counted as fixed.",
-    "verifyStatePass": "Latest re-audit: this check passed.",
-    "verifyStateFail": "Latest re-audit: this check still fails — see the new findings.",
-    "verifyStateInconclusive": "Latest re-audit did not run this check — no verdict yet, not counted as fixed.",
-    "guestExportNote": "Create a free account to save reports to your workspace and export PDFs.",
-    "tabOverview": "Overview",
+      "guestCtaBody": "Sign up free to save this report, track what you fix, and let SeeO re-verify it automatically on your next audit. Your domain and this audit carry over to your account — no need to run it again.",
+      "guestCtaBtn": "Sign up free",
+      "doFirstTitle": "Do this first",
+      "doFirstSub": "Judged from {n} failing checks in this audit's crawl",
+      "whyNowTitle": "Why this one first",
+      "whyNowSub": "Computed from this audit's real findings — affected scope, health-score impact and fix leverage. No traffic estimates.",
+      "evidenceTitle": "Evidence from this crawl",
+      "topActionOpenCta": "Open details",
+      "tieHint": "{n} checks tie at this priority on this audit's data — this is one of them; the full list below is ordered by the same logic.",
+      "verifyBodyTop": "Fix it, then run the audit again — SeeO re-checks this exact rule and verifies the result.",
+      "verifyTitle": "How SeeO verifies this fix",
+      "verifySub": "Verified resolved can only come from a new audit's evidence — marking it fixed yourself never counts.",
+      "verifyBody": "After you fix it, run the audit again. SeeO re-crawls and re-checks this exact rule: if it passes, the issue is marked Verified resolved; if it still fails, SeeO shows the new findings; if the rule doesn't run in the next audit, it is marked inconclusive — never counted as fixed.",
+      "verifyStatePass": "Latest re-audit: this check passed.",
+      "verifyStateFail": "Latest re-audit: this check still fails — see the new findings.",
+      "verifyStateInconclusive": "Latest re-audit did not run this check — no verdict yet, not counted as fixed.",
+      "guestExportNote": "Create a free account to save reports to your workspace and export PDFs.",
+      "tabOverview": "Overview",
       "tabIssues": "Issues",
       "tabPages": "Crawled Pages",
       "tabLinking": "Internal Linking",
@@ -2185,9 +2346,150 @@
       "h1Label": "H1",
       "canonicalLabel": "Canonical",
       "descriptionLabel": "Meta description",
-      "crawledPages": "Crawling… {count} pages processed"
+      "crawledPages": "Crawling… {count} pages processed",
+      "pcPages": "Pages in this audit",
+      "pcPagesHint": "Page records saved by this audit's crawl — one row per crawled URL.",
+      "pcRequestsCaption": "{requests} crawl requests · {redirects} redirects",
+      "pcOk": "Parsed OK",
+      "pcOkCaption": "Fetched and parsed successfully",
+      "pcOkHint": "A page counts here only when its content was actually parsed — requesting it is not enough.",
+      "pcFailed": "Failed pages",
+      "pcFailedCaption": "Requested but not parsed — check HTTP status and health",
+      "pcFailedNone": "No failed pages in this audit",
+      "pcFailedHint": "Requested but not parsed. This is not the same as an HTTP failure — some failures have no HTTP status at all.",
+      "pcWithIssues": "Pages with issues",
+      "pcWithIssuesHint": "Pages where this audit's rules detected at least one finding.",
+      "pcFindingsCaption": "{n} findings across all pages",
+      "pcHttpSub": "{total} crawl requests by HTTP status",
+      "pcHttpNote": "Counts come from the crawler's real fetch records. A request without a recorded status is shown as \"Other\" — it is never counted as a pass.",
+      "qfLabel": "Quick filters",
+      "qfAll": "All",
+      "qfFailed": "Failed ({n})",
+      "qfIssues": "With issues ({n})",
+      "qfRedirect": "Redirects",
+      "pcNoPagesTitle": "No page records in this audit",
+      "pcNoPagesHint": "This audit saved no page records to show — run a deeper audit to see per-page data.",
+      "lkPages": "Pages with link data",
+      "lkPagesCaption": "{requests} crawl requests in this audit",
+      "lkPagesHint": "Only pages actually crawled in this audit are counted — page-level aggregates, not a full link graph.",
+      "lkTotalLinks": "Internal links found",
+      "lkTotalLinksCaption": "Avg {avg} per parsed page",
+      "lkTotalLinksHint": "Sum of each crawled page's outbound internal link count. Page-level counts only — individual links and anchor text are not saved.",
+      "lkPagesWithLinks": "Pages with internal links",
+      "lkPagesWithLinksCaption": "{none} of {total} pages have zero outbound internal links",
+      "lkPagesWithLinksHint": "Pages whose outbound internal link count is greater than zero.",
+      "lkAbnormal": "Link issues detected",
+      "lkAbnormalCaption": "Links-to-redirect {redirects} · broken-links {broken}",
+      "lkAbnormalHint": "Pages flagged by the link rules of this audit — page-level detections only.",
+      "lkInLinksDist": "Inbound links per page",
+      "lkInLinksDistSub": "How many pages receive each level of internal linking ({pages} pages)",
+      "lkBucketNone": "0 inlinks",
+      "lkBucketLow": "1–2 inlinks",
+      "lkBucketMid": "3–5 inlinks",
+      "lkBucketHigh": "6+ inlinks",
+      "lkLegendNote": "Page-level inbound link counts from this audit. Click \"0 inlinks\" to list those pages in the table below.",
+      "lkTableTitle": "Pages by link metrics",
+      "lkTableSub": "One row per crawled page — inbound, outbound and depth come from this audit's crawl",
+      "lkFilterLabel": "Show",
+      "lkFilterAll": "All ({n})",
+      "lkFilterNoIn": "Zero inbound ({n})",
+      "lkFilterNoOut": "Zero outbound ({n})",
+      "lkFilterDeep": "Deep pages D4+ ({n})",
+      "lkFilterRedirectLinks": "Links to redirects ({n})",
+      "lkNoMatch": "No pages match this filter",
+      "lkNoIssues": "None",
+      "lkOpenCrawl": "Open in Crawled Pages",
+      "lkScopeNote": "Data scope: the crawler saves per-page counts (inbound links, outbound internal links, external links, depth). Individual link records and anchor text are not saved — this is an aggregate view, not a full site link graph.",
+      "lkExtraStats": "Inbound total {inSum} · orphan-like pages {orphans} · avg external links {avgExternal} ({externalHint})",
+      "thOutLinks": "Out links",
+      "thInLinks": "In links",
+      "thLinkingIssues": "Link issues",
+      "sdPages": "Pages with JSON-LD",
+      "sdPagesCaption": "of {total} parsed pages",
+      "sdPagesHint": "Pages where this audit's crawler detected at least one JSON-LD block.",
+      "sdTypesCount": "Schema types detected",
+      "sdTypesCaption": "Most common: {type} on {n} pages",
+      "sdTypesHint": "Distinct schema.org types across all detected JSON-LD blocks, counted per page.",
+      "sdValid": "Valid pages",
+      "sdValidCaption": "Another {potential} pages have potential issues",
+      "sdValidHint": "Pages whose JSON-LD parsed cleanly with required fields present.",
+      "sdAbnormal": "Pages with invalid SD",
+      "sdAbnormalCaption": "Invalid or malformed JSON-LD detected by this audit",
+      "sdAbnormalHint": "Pages flagged invalid or malformed. Pages that were never parsed are never counted here.",
+      "sdStatusDistSub": "{total} parsed pages by JSON-LD detection status",
+      "sdStatusDistNote": "Click a status to filter the table below. \"Not recorded\" means the page was crawled but no structured-data result was saved — it is not a pass.",
+      "sdTypeDistNote": "Counts are pages on which each schema type appears — a page can contain several types.",
+      "sdTableTitle": "Pages by structured data",
+      "sdTableSub": "One row per parsed page — status and schema types come from this audit's crawl",
+      "sdFindingsLabel": "Findings",
+      "sdFilterCount": "{label} ({n})",
+      "sdUnrecorded": "Not recorded",
+      "thSdStatus": "SD status",
+      "thSdTypes": "Schema types",
+      "thSdIssues": "SD findings",
+      "sdOpenCrawl": "Open in Crawled Pages",
+      "sdScopeNote": "Data scope: page-level — each page records its JSON-LD detection status and schema type names. Per-object details and field-level validation are not saved; field errors appear only through the rule findings above.",
+      "hiCount": "Audits recorded",
+      "hiCountCaption": "Latest: {date}",
+      "hiCountHint": "Completed audits stored for this domain (up to the 10 most recent).",
+      "hiNoData": "No audits yet",
+      "hiLatestScore": "Latest health score",
+      "hiLatestScoreHint": "Health score of the most recent completed audit of this domain.",
+      "hiScoreUnknown": "Score not recorded",
+      "hiCompare": "Change vs previous",
+      "hiCompareCaption": "Compared with {date}",
+      "hiCompareHint": "Health-score difference between the two most recent audits. A score change is not a traffic or revenue change.",
+      "hiCompareNone": "No comparable previous audit",
+      "hiLatestFindings": "Latest findings",
+      "hiFindingsCaption": "{e} errors · {w} warnings · {n} notices",
+      "hiLatestFindingsHint": "Total rule detections in the most recent audit, split by severity.",
+      "hiScopeMixed": "Scope note: this history mixes {quick} quick and {full} full audits — quick covers only the start page, so their scores and findings are not directly comparable.",
+      "hiChangeTitle": "What changed vs the previous audit",
+      "hiChangeSub": "Finding-level comparison (rule + URL) between the two most recent audits",
+      "hiNew": "Newly detected",
+      "hiResolved": "No longer detected",
+      "hiUnchanged": "Still detected",
+      "hiChangeNote": "\"No longer detected\" means the previous audit's finding is absent from this audit's crawl — it is not a verified fix; verification only comes from the verification status on each issue.",
+      "hiChangeUnavailable": "Cannot compare yet",
+      "hiChangeUnavailableHint": "This audit has no comparable previous audit with saved findings. Run another audit to see real changes.",
+      "thMode": "Mode",
+      "hiView": "View",
+      "hiCurrent": "Viewing",
+      "viewHistoricalTitle": "Viewing historical audit #{id} · {time}",
+      "viewHistoricalBody": "This is a past snapshot. Issue handling and verification records still belong to the domain and follow their own status.",
+      "backToLatest": "Back to latest audit"
     },
     "positionTracking": {
+      "metricRanked": "With rank data",
+      "metricRankedHint": "Tracked keywords that currently have a position inside the top 100.",
+      "metricTrackedHint": "Tracked keywords within the current project, market, device and group scope.",
+      "metricUp": "Moved up",
+      "metricUpHint": "Keywords whose position improved versus the previous record (a lower number is better).",
+      "metricDown": "Moved down",
+      "metricDownHint": "Keywords whose position declined versus the previous record.",
+      "snapshotLatest": "Latest snapshot: {date}",
+      "snapshotNone": "No rank snapshot yet",
+      "staleNotice": "Today's positions have not been recorded yet. The latest snapshot is {date} — run a refresh to record today.",
+      "notRefreshedToday": "Not refreshed today",
+      "noRankRecord": "No rank record yet",
+      "colPrevRank": "Previous",
+      "colUrl": "Ranking URL",
+      "urlNone": "No data yet",
+      "changeHintUp": "Improved by {n} positions (a lower number is better)",
+      "changeHintDown": "Declined by {n} positions",
+      "changeHintFlat": "No change versus the previous record",
+      "sortLabel": "Sort",
+      "sortRank": "Position",
+      "sortChange": "Change",
+      "sortRefresh": "Last refresh",
+      "trendRange": "Last {days} days",
+      "legendRankLine": "Rank",
+      "legendImproved": "Improved",
+      "legendDeclined": "Declined",
+      "scopeLabel": "Scope",
+      "serpapiMonthly": "SerpApi this month {used}/{limit}",
+      "mobileTrendHint": "Tap a row to load its rank trend",
+      "distributionLegendTitle": "Rank buckets",
       "title": "Position Tracking",
       "subtitle": "Monitor your ranking changes continuously by keyword, region, and device. Data is persisted and refreshed daily.",
       "refreshBtn": "Refresh rankings now",
@@ -2196,7 +2498,8 @@
       "addKeywordBtn": "Add keyword",
       "apiUsage": "API usage this month: {used}/{limit}",
       "quotaTight": "Quota running low",
-      "trackingCount": "Tracking {tracked}/{limit} keywords",
+      "projectKeywordsCount": "{count} tracked keywords in this project",
+      "accountKeywordsCount": "{count} tracked keywords in your account",
       "region": "Region",
       "device": "Device",
       "deviceMobile": "Mobile",
@@ -2217,16 +2520,16 @@
       "chartChanges": "Today's rank changes",
       "chartChangesSub": "Up {up} · Down {down}",
       "trendTitle": "Rank trend",
-      "trendHint": "higher is better",
       "notInTop100": "Not in top 100",
       "loadingHistory": "Loading history…",
       "noHistory": "No history yet — click \"Refresh rankings now\" to start recording",
       "needTwoDays": "Trend shows after 2 days of tracking",
       "rank": "Rank",
       "tableTitle": "Tracked keywords",
-      "tableCountAll": "{tracked}/{limit} keywords · {remaining} slots left",
+      "tableCountAccount": "{shown} in this market & device · {account} in your account",
       "tableCountFiltered": "{shown}/{total} keywords (filtered)",
       "noKeywordsInGroup": "No keywords in this group",
+      "noKeywordsInScope": "No tracked keywords for this market and device yet",
       "keyword": "Keyword",
       "domain": "Domain",
       "colTodayRank": "Today's rank",
@@ -2247,6 +2550,7 @@
       "statusCatchingUp": "Catching up",
       "statusBehind": "Behind",
       "addModalTitle": "Add tracked keyword ({count} slots left)",
+      "addModalTitlePlain": "Add tracked keyword",
       "adding": "Adding…",
       "addSubmit": "Start tracking",
       "keywordPlaceholder": "e.g. seo tools",
@@ -2281,12 +2585,53 @@
       "emptyTitle": "No tracked keywords yet",
       "emptyHint": "Add a keyword to start monitoring its Google ranking",
       "emptyAddBtn": "+ Add keyword",
-      "quotaReached": "You've reached your plan's tracking limit ({limit} keywords). Upgrade to track more keywords."
+      "quotaReached": "You've reached your plan's tracking limit ({limit} keywords). Upgrade to track more keywords.",
+      "scopeProjectLabel": "Current project",
+      "scopeAllProjects": "All projects",
+      "scopeProjectOption": "{name} ({domain})",
+      "scopeManualDomain": "Manual domain: {domain}",
+      "scopeBannerCount": "{count} tracked keywords",
+      "scopeBannerHint": "List, metrics and trends cover this project only; keywords of other projects stay out of scope. The range is kept in the URL, so it survives refresh and back/forward.",
+      "scopeDetailLink": "Project details",
+      "planKeywordsLimit": "{plan} plan ceiling: {limit} keywords",
+      "planKeywordsSharedHint": "Shared by every project in your account — not one quota per project.",
+      "keywordsSlotsLeft": "Slots left: {count}",
+      "keywordsOverLimit": "Over the ceiling by {count}",
+      "keywordsOverLimitEffect": "Adding new keywords is blocked until you upgrade. Existing keywords and their ranking history are kept, and the keyword ceiling does not limit ranking refresh.",
+      "upgradePlanLink": "Upgrade plan",
+      "cardCaptionProject": "{inScope} in this market & device · {inProject} in this project",
+      "cardCaptionAccount": "{inScope} in this market & device · {account} in your account",
+      "scopeManualDomainBadge": "Not a project domain",
+      "tableCountProject": "{shown} in this market & device · {inProject} in this project",
+      "refreshScopeHint": "Refreshes only the {count} keywords of this project",
+      "projectEmptyTitle": "This project has no tracked keywords yet",
+      "projectEmptyHint": "This view shows only the current project's keywords — nothing from other projects is mixed in. Add a keyword to start recording its ranking.",
+      "projectEmptyAddBtn": "+ Add keyword for this project",
+      "loadErrorTitle": "Couldn't load the keyword list",
+      "loadErrorHint": "The request failed or the data is temporarily unavailable. This is not \"no keywords\" — retry to reload.",
+      "loadErrorRetry": "Retry",
+      "trendLoadErrorTitle": "Couldn't load rank history",
+      "trendLoadErrorHint": "The history request failed (e.g. search quota exhausted). This is not \"no history yet\" — retry to reload.",
+      "partialHistoryFailed": "{count, plural, one {History for # keyword failed to load} other {History for # keywords failed to load}}",
+      "otherMarketHint": "This project tracks keywords in {markets} — switch market or device to see them",
+      "addDomainOutsideScope": "Target domain {domain} isn't the current project, so it won't appear in this scope"
     },
     "keywords": {
       "overview": {
+        "metricIntent": "Estimated intent",
+        "metricResultsHint": "Organic results captured in this SERP snapshot.",
+        "metricRelatedHint": "Google related searches returned for this keyword.",
+        "metricPaaHint": "People Also Ask questions returned for this keyword.",
+        "serpTableTitle": "Top results",
+        "topNNote": "Ordered by Google position",
+        "noResults": "No organic results were returned for this keyword",
+        "domainValueLabel": "Occurrences",
+        "domainValueHint": "How many of the captured results belong to each domain.",
+        "intentNote": "Intent is estimated from keyword text rules — not a metric provided by the data source.",
         "title": "Keyword Overview",
         "subtitle": "Enter a seed keyword to view real SERP rankings and derived metrics.",
+        "marketLabel": "Search market",
+        "deviceLabel": "Device",
         "searchPlaceholder": "Enter a keyword, e.g. seo tools, website design",
         "analyze": "Analyze",
         "analyzing": "Analyzing…",
@@ -2295,8 +2640,8 @@
         "cacheHit": "Loaded \"{keyword}\" (cached data, no quota consumed)",
         "loaded": "Loaded live SERP data for \"{keyword}\"",
         "usage": "API usage this month: {used}/{limit}",
-        "emptyTitle": "Enter a seed keyword and click Analyze to see volume, difficulty and CPC",
-        "emptyHint": "Based on live Google SERP scraping; repeated queries within 24 hours hit the cache",
+        "emptyTitle": "Enter a seed keyword and click Analyze to see real SERP results, related searches and People Also Ask",
+        "emptyHint": "Live Google SERP through SerpApi. Repeat queries inside the cache window are served from cache and consume no quota.",
         "cardKeyword": "Keyword",
         "cardResults": "SERP Results",
         "cardRelated": "Related Searches",
@@ -2321,8 +2666,27 @@
         "intentNavigational": "Navigational"
       },
       "expand": {
+        "metricRelated": "Related searches",
+        "metricPaa": "People Also Ask",
+        "metricTotal": "Total ideas",
+        "metricTracked": "Added this session",
+        "metricTrackedHint": "Keywords you added to position tracking during this session.",
+        "intentChartTitle": "Estimated intent distribution",
+        "intentChartSub": "Across every expansion idea in this result",
+        "intentNote": "Intent is estimated from keyword text rules — not a metric provided by the data source.",
+        "filterIntent": "Intent",
+        "sortLabel": "Sort",
+        "sortAlpha": "A → Z",
+        "sortLength": "By length",
+        "colWords": "Length",
+        "noIntentMatch": "No keywords match this intent filter",
+        "researchAction": "SERP",
+        "researchTitle": "Open the SERP research view for this keyword",
+        "metricsNote": "Search volume and difficulty are not available in this workspace. SeeO does not estimate or substitute values.",
         "title": "Keyword Expansion",
         "subtitle": "Enter a seed keyword to get Google related searches, People Also Ask, and trackable related keywords.",
+        "marketLabel": "Search market",
+        "deviceLabel": "Device",
         "searchPlaceholder": "Enter a keyword, e.g. seo tools, website design",
         "analyze": "Analyze",
         "analyzing": "Analyzing…",
@@ -2366,7 +2730,7 @@
       "usageBar": "API usage this month {used}/{limit}",
       "quotaTight": "Quota low",
       "countsSummary": "{competitors} competitors · {keywords} keywords",
-      "manageTitle": "Competitor Domains",
+      "manageTitle": "Manage competitor sites",
       "competitorCount": "{n} competitors",
       "domainPlaceholder": "Enter a competitor domain, e.g. example.com",
       "namePlaceholder": "Name (optional)",
@@ -2388,7 +2752,7 @@
       "keywordLabel": "Keyword",
       "noKeywords": "No tracked keywords",
       "refreshing": "Refreshing…",
-      "refreshBtn": "Refresh ranks",
+      "refreshBtn": "Refresh ranks & compare",
       "thDomain": "Domain",
       "thRank": "Rank",
       "thUrl": "Ranked page",
@@ -2399,14 +2763,31 @@
       "statusBehind": "Behind us",
       "statusTied": "Tied",
       "emptyAddFirst": "Please add competitor domains first",
-      "emptyRefreshHint": "Click \"Refresh ranks\" to fetch SERP comparison data",
+          "emptyRefreshHint": "Click \"Refresh ranks\": SeeO fetches this keyword's Google SERP top 100 and compares your ranking and landing URLs against each competitor.",
+      "emptyNoKeywords": "Add tracked keywords for this project in \"Position Tracking\" first — there is nothing to compare yet.",
+      "nextStepNoCompetitor": "After adding competitor domains, pick a keyword below and click \"Refresh ranks\" to compare your ranking against competitors for the same query.",
+      "nextStepNoKeyword": "Competitor saved. Next step: add tracked keywords for this project first — ranks are compared keyword by keyword.",
+      "nextStepNoKeywordLink": "Go to Position Tracking to add keywords",
+      "nextStepReady": "Competitors ready. Pick a keyword and click \"Refresh ranks\": SeeO fetches that keyword's Google SERP and compares your ranking against each competitor (1 API credit, cached for 24h).",
+      "addedListTitle": "Added competitors",
+      "domainLabel": "Competitor domain",
+      "compStatusCompared": "Compared",
+      "compStatusPending": "Not compared yet",
+      "compareSectionTitle": "Compare your performance against competitors",
+      "compareIntro": "Adding competitors is just preparation: comparison data comes from the Google SERP rankings of your tracked keywords. Pick a keyword and click \"Refresh ranks & compare\" to see your ranking and landing pages against each competitor below; SOV share is calculated from the keywords already compared.",
+      "addKeywordsCta": "Add tracked keywords",
+      "ranksLoadFailed": "Failed to load comparison data. Please retry.",
+      "retryBtn": "Retry",
       "tableKeyword": "Keyword \"{keyword}\"",
       "cachedHint": "Cached · no duplicate billing within 24h",
       "liveHint": "Live data · 1 quota consumed",
+      "staleHint": "Data is older than 24 hours — click \"Refresh ranks & compare\" for the latest ranking.",
+      "noCacheHint": "No cached ranking for this keyword yet. Click \"Refresh ranks & compare\" to run one query and build the comparison.",
+      "checkedAtHint": "Data as of {time}",
       "domainsCompared": "{n} domains compared",
       "mySov": "My SOV",
       "mySovDetail": "Score {score} · {keywords} keywords",
-      "top3Keywords": "Top 3 keywords",
+      "top3Keywords": "Top 10 keywords",
       "top10Hint": "Keywords ranking in the top 10",
       "myAvgRank": "My average rank",
       "avgRankHint": "Average across all analyzed keywords",
@@ -2463,6 +2844,13 @@
       "thFirstSeen": "First Seen",
       "dataFrom": "Data from DataForSEO · Fetched {time}",
       "cacheHitNote": "(cache hit)",
+      "metricNoData": "No data pulled yet",
+      "metricTotalBacklinksCaption": "Total backlink records pointing to the domain",
+      "metricReferringDomainsCaption": "Number of unique referring domains",
+      "metricAuthorityCaption": "DataForSEO domain rating (0-100)",
+      "metricDofollowCaption": "Share of links passing link equity",
+      "distTitle": "DoFollow / NoFollow distribution",
+      "distHint": "Derived from the DoFollow share",
       "emptyTitle": "No backlink data yet",
       "emptyDesc": "Enter a domain and click “Analyze” to fetch real backlink data"
     },
@@ -2509,7 +2897,7 @@
       "sugGood": "Good",
       "sugAdvice": "Advice",
       "sugHint": "Hint",
-      "resolved": "Resolved",
+      "resolved": "Resolved on re-check",
       "headTitle": "Heading Structure",
       "missingH1": "Missing H1",
       "addH2": "Consider adding H2",
@@ -2567,6 +2955,7 @@
         }
       },
       "generateBtn": "Generate report",
+      "needProjectNotice": "No project selected yet — pick one in the top bar first, reports are built from that project's data",
       "generating": "Generating…",
       "csvRankingTitle": "Keyword Ranking CSV",
       "csvRankingDesc": "All tracked keywords + 30-day rank history",
@@ -2582,6 +2971,9 @@
       "thTime": "Generated at",
       "thActions": "Actions",
       "emptyReports": "No reports yet — generate one above",
+      "emptyReportsTitle": "No saved reports yet",
+      "emptyReportsDesc": "Pick a report type above and click “Generate report”. Once generated you can save it, export PDF or send it by email",
+      "metaPrintView": "Browser print view",
       "viewLabel": "View",
       "deleteLabel": "Delete",
       "aboutTitle": "About report export",
@@ -2833,40 +3225,79 @@
     "shared": {
       "projectDetail": {
         "breadcrumbHome": "Dashboard",
-        "statusActive": "Active",
-        "metricsTitle": "Key metrics",
-        "demoDataBadge": "Sample data",
-        "last30Days": "Last 30 days",
-        "metricOrganicTraffic": "Est. organic traffic",
-        "metricKeywords": "Total keywords",
-        "metricBacklinks": "Total backlinks",
+        "crumbCurrent": "Current project",
+        "pageTitle": "Project: {domain}",
+        "metaAdded": "Added {date}",
+        "metaAlerts": "{count} unread alerts",
+        "statusLoadFailed": "Data unavailable",
+        "statusNoAudit": "Not audited yet",
+        "statusHasP0": "{n} P0 items open",
+        "statusHasOpen": "{n} items open",
+        "statusNothingOpen": "Nothing pending",
+        "overviewTitle": "Project data",
+        "overviewSubtitle": "Every figure below comes from data this site has actually produced. Anything not measured is shown as “not measured”, never as zero.",
+        "dataUnavailable": "Temporarily unavailable",
+        "dataUnavailableReason": "This read failed. Reopen the page later; other projects are unaffected.",
         "metricHealth": "Health score",
-        "rankOverviewTitle": "Rank tracking overview",
-        "viewAll": "View all →",
-        "thKeyword": "Keyword",
-        "thCurrentRank": "Current rank",
-        "thChange7d": "7-day change",
-        "thSearchVolume": "Search volume",
-        "thKD": "KD",
-        "thIntent": "Intent",
-        "quickLinksTitle": "Quick links",
+        "metricHealthHint": "Health score of the latest completed audit, out of 100.",
+        "lastAuditAt": "Last audit",
+        "pagesCrawled": "{n} pages crawled",
+        "noAudit": "No audit yet",
+        "noAuditReason": "Run a technical audit to get real crawl results here.",
+        "partialAuditBadge": "Partial crawl",
+        "metricOpenTasks": "Open tasks",
+        "metricOpenTasksHint": "Items for this project marked open or in progress in the Action Center.",
+        "notMeasured": "Not measured",
+        "priorityBreakdown": "P0 {p0} · P1 {p1}",
+        "restP2": "P2 {n}",
+        "openTasksNoAuditCaption": "All of these are opportunity items; technical issues need an audit first.",
+        "allClearCaption": "No open items in the queue.",
+        "metricKeywords": "Tracked keywords",
+        "metricKeywordsHint": "Keywords added to rank tracking for this domain.",
+        "noKeywordsCaption": "No tracked keywords yet.",
+        "noRankMovement": "No comparable rank records in the last 7 days.",
+        "rankMovement": "Last 7 days: {up} up · {down} down",
+        "metricCompetitors": "Competitors added",
+        "metricCompetitorsHint": "Competitor domains saved for this project.",
+        "noCompetitorsCaption": "No competitor domains yet.",
+        "competitorsAddedOnlyCaption": "Domains saved; run the comparison on the competitors page.",
+        "todoTitle": "Open tasks for this project",
+        "todoSubtitle": "Same queue as the Action Center, filtered to this site — no second scoring system.",
+        "openAuditCta": "Open technical audit",
+        "runAuditCta": "Run technical audit",
+        "todoNoAuditTitle": "This site has no audit data yet",
+        "todoNoAuditHint": "Run a technical audit first. SeeO will list issues with real evidence and impact scope from the crawl.",
+        "todoAuditNotice": "No technical audit has run yet — the items below are opportunities already found for this project.",
+        "todoEmptyTitle": "Nothing needs your attention",
+        "todoEmptyHint": "Every detected issue has been verified as resolved or dismissed.",
+        "viewAllTasks": "View all {n} items",
+        "gapsTitle": "Data gaps",
+        "gapsSubtitle": "Gaps that genuinely exist for this site, each with a direct way to fill it.",
+        "quickLinksTitle": "Quick actions",
+        "quickLinksSubtitle": "Each entry opens with the current site ({domain}) already in context.",
         "quickLinkAuditTitle": "Technical audit",
-        "quickLinkAuditDesc": "Review technical SEO issues on this site",
-        "quickLinkBacklinksTitle": "Backlink analysis",
-        "quickLinkBacklinksDesc": "See backlink sources and growth",
+        "quickLinkAuditDesc": "Review and fix technical SEO issues on this site",
+        "quickLinkPositionTitle": "Keywords & rank tracking",
+        "quickLinkPositionDesc": "Manage daily rank tracking for this site",
         "quickLinkCompetitorsTitle": "Competitor analysis",
-        "quickLinkCompetitorsDesc": "Compare traffic and keywords with competitors",
+        "quickLinkCompetitorsDesc": "Compare this site and competitors on the same keywords",
         "quickLinkContentTitle": "Content optimization",
-        "quickLinkContentDesc": "Get page-level optimization suggestions",
+        "quickLinkContentDesc": "Get optimization suggestions for pages on this site",
+        "quickLinkBacklinksTitle": "Backlink analysis",
+        "quickLinkBacklinksDesc": "See backlink sources and growth for this site",
+        "quickLinkOpportunitiesTitle": "Growth opportunities",
+        "quickLinkOpportunitiesDesc": "Review opportunities for this site and decide what to run",
         "tagDiagnose": "Diagnostics",
+        "tagTrack": "Tracking",
         "tagInsight": "Insights",
         "tagOptimize": "Optimize",
+        "tagExecute": "Execution",
         "enter": "Open →"
       },
       "onboarding": {
         "eyebrowWelcome": "Welcome to SeeO",
         "eyebrowUpdated": "Data updated · Demo mode",
-      "eyebrowUpdatedLive": "Data updates daily · Real account",
+        "eyebrowUpdatedLive": "Data updates daily · Real account",
         "greeting": "Hi, {name}",
         "subtitle": "No projects yet. Follow these 3 steps to run your first SEO audit and see how your site performs.",
         "sectionTitle": "Get started",
@@ -2893,6 +3324,10 @@
         "placeholder": "Enter a domain, e.g. example.com",
         "backToSelect": "Back to selection",
         "noProjectsHint": "No projects yet — just enter a domain to get started",
+        "loadFailedHint": "Project list failed to load — you can still enter a domain manually.",
+        "retry": "Reload projects",
+        "selectLabel": "Project domain",
+        "inputLabel": "Domain",
         "manualOption": "Enter manually…",
         "manualOptionWithDomain": "Manual: {domain}",
         "projectOption": "{name} ({domain})"
@@ -2927,8 +3362,10 @@
         "auditResultEmptyHint": "Health scores appear after projects are audited",
         "multiRankEmpty": "No rank history",
         "multiRankEmptyHint": "Refresh ranks to see the trend",
-        "hiddenLabel": "Hidden:",
-        "legendHint": "Click the legend to toggle series · up to {max} lines",
+        "sparseTrendHint": "Only {days} record(s). Fewer than {min} cannot form a trend line, so each real record is listed below.",
+        "rankAxisHint": "Vertical axis is rank, with #{best} at the top. The scale is sized to the plotted data, down to #{worst}.",
+        "rankSemantics": "A smaller rank number is better. Green means improved, red means declined.",
+        "rankSeriesLabel": "Rank",
         "rankChangeEmpty": "No rank movement data",
         "rankChangeEmptyHint": "Shows after refreshing ranks",
         "rising": "Rising",
@@ -2968,11 +3405,13 @@
       "scoreLevelGood": "Excellent",
       "scoreLevelPass": "Passing",
       "scoreLevelPoor": "Needs work",
+      "pageTitle": "Printable Audit Report",
       "emptyTitle": "No printable audit report",
       "emptyWithDomain": "No completed audit yet for {domain}",
       "emptyNoDomain": "No audit domain selected yet",
       "emptyHint": "Run a full audit on the Technical Audit page first",
       "emptyAction": "Go to Technical Audit",
+      "gotoReports": "Go to Reports",
       "backBtn": "← Back to audit",
       "printBtn": "Print / Save as PDF",
       "reportLabel": "SeeO · Technical Audit Report",
@@ -3051,9 +3490,71 @@
         "patMode": "Personal access token",
         "ownerPlaceholder": "owner",
         "repoPlaceholder": "repository",
+        "ownerLabel": "GitHub owner or organisation",
+        "repoLabel": "Repository name",
+        "tokenLabel": "Access token (self-hosted deployments only)",
         "tokenPlaceholder": "access token (self-host)",
         "tokenHint": "The token is encrypted at rest and never displayed again. GitHub App mode is used automatically when configured on the server."
-      }
+      },
+      "metaCount": "{n} opportunities",
+      "mAll": "Total opportunities",
+      "mAllHint": "All opportunities produced by the Opportunity Engine for the current project, sorted by priority",
+      "mHigh": "High priority",
+      "mHighHint": "Opportunities with P0 / P1 priority",
+      "mHighCaption": "P0 {p0} · P1 {p1}",
+      "mNew": "To process",
+      "mNewHint": "Not yet approved for execution (new + reviewed)",
+      "mNewCaption": "New {n} · Reviewed {r}",
+      "mActive": "In execution",
+      "mActiveHint": "Approved or in-progress opportunities",
+      "mActiveCaption": "Approved {a} · In progress {i} · Completed {c}",
+      "distType": "Type distribution",
+      "distPriority": "Priority distribution",
+      "distHint": "Click a legend item to filter the list below",
+      "colEvidence": "Evidence",
+      "colAction": "Action",
+      "opStatus": {
+        "new": "New",
+        "reviewed": "Reviewed",
+        "approved": "Approved",
+        "in_progress": "In progress",
+        "completed": "Completed",
+        "dismissed": "Dismissed"
+      },
+      "opType": {
+        "rank_improvement": "Rank improvement",
+        "lost_recovery": "Lost recovery",
+        "content_refresh": "Content refresh",
+        "competitor_gap": "Competitor gap",
+        "ctr": "CTR",
+        "ai_visibility": "AI visibility",
+        "technical": "Technical"
+      },
+      "noEvidence": "No evidence recorded",
+      "filteredEmpty": "No opportunities match the current filter",
+      "filterType": "Type: {type}",
+      "filterPriority": "Priority: {p}",
+      "filterClear": "Clear filters",
+      "emptyTitle": "No opportunities yet",
+      "requestFailed": "Request failed.",
+      "execFailed": "Execution failed.",
+      "loadFailed": "Failed to load opportunities.",
+      "scanFailed": "Scan failed.",
+      "verifyFailed": "Verification failed.",
+      "previewFailed": "Preview failed.",
+      "scanDone": "Scan finished: {generated} new, {refreshed} refreshed.",
+      "scanDoneWithGaps": "Scan finished: {generated} new, {refreshed} refreshed, {gaps} data gap(s).",
+      "githubConnected": "GitHub repository connected.",
+      "githubDisconnected": "GitHub connection removed.",
+      "githubStatusFailed": "Failed to read the GitHub connection status.",
+      "prCreated": "Pull request created and waiting for review: {url}",
+      "stageAwaitingReview": "Pull request is open, waiting for review and merge.",
+      "stageMerged": "Pull request merged — verification started.",
+      "stageClosed": "Pull request was closed without merging — the action is marked failed. Re-plan it.",
+      "stageNone": "No pull request yet (nothing has executed).",
+      "actionApproved": "Execution action approved.",
+      "manualCompleted": "Manual completion recorded — verification started.",
+      "verifyDone": "Verification finished (rank re-checked now; GSC and AI data still pending)."
     }
   },
   "apiErrors": {
@@ -3102,6 +3603,8 @@
     "PAYMENT_NOT_CONFIGURED": "The payment provider is not configured. Please try again later.",
     "PURCHASE_NOT_ALLOWED": "Your current plan does not allow this purchase.",
     "ORDER_CREATE_FAILED": "Failed to create the order. Please try again later.",
+    "ORDER_QUERY_FAILED": "We cannot confirm this order right now. Your payment is unaffected — please try again shortly.",
+    "ORDER_FORBIDDEN": "This order belongs to a different account, so it cannot be viewed here.",
     "CREEM_CHECKOUT_FAILED": "Failed to start payment. Please try again later.",
     "SETTINGS_NOT_FOUND": "Settings not found.",
     "PLAN_REQUIRED": "This action requires the Pro plan.",
@@ -3120,6 +3623,9 @@
     "UPSTREAM_TIMEOUT": "The data provider did not respond in time. Please try again.",
     "CHECKER_UNAVAILABLE": "The checker is temporarily unavailable. Please try again shortly.",
     "QUOTA_EXCEEDED": "Monthly API quota exhausted ({used}/{limit}). Resets on the 1st of next month.",
+    "QUOTA_EXCEEDED_DAILY": "Daily API quota used up ({used}/{limit}). Resets tomorrow.",
+    "UPSTREAM_QUOTA": "The data provider's quota is temporarily exhausted. Please try again later.",
+    "INVALID_KEY": "This deployment's search data provider key is not valid, so results are unavailable right now. Please try again later or contact support.",
     "FREE_QUOTA_EXCEEDED": "Monthly free quota exhausted. Resets on the 1st of next month.",
     "FEATURE_NOT_AVAILABLE": "Your current plan ({plan}) does not include this feature: {feature}.",
     "PLAN_LIMIT_REACHED": "Your current plan ({plan}) has reached the limit of {limit}. Please upgrade.",
@@ -3136,10 +3642,13 @@
     "VERIFY_READ_FAILED": "Sync succeeded but verification read failed. Please retry.",
     "NO_CONTENT_CHECKS": "No content check records yet. Run a check on the Content Optimization page first.",
     "NO_TRACKING_KEYWORDS": "No tracked keywords yet. Add keywords on the Rank Tracking page first.",
-    "TIMEOUT": "Crawl timed out: {detail}",
-    "INVALID_URL": "Invalid URL: {detail}",
-    "HTTP_ERROR": "Page returned an error: {detail}",
-    "UNKNOWN": "Crawl failed: {detail}",
+    "TIMEOUT": "The page took too long to respond. Please try again.",
+    "INVALID_URL": "That page address can't be checked. Enter the full address of a public page.",
+    "INVALID_URL_FORMAT": "That page URL isn't in a valid format. Include the protocol, e.g. https://example.com/blog/post.",
+    "INVALID_URL_SCHEME": "Only http and https page URLs can be checked.",
+    "NETWORK": "We couldn't reach that site. Please check the address or your network and try again.",
+    "HTTP_ERROR": "The page returned an error: {detail}",
+    "UNKNOWN": "We couldn't load that page. Please check the URL and try again.",
     "GSC_NOT_CONFIGURED": "Google Search Console connection is not available right now. Please try again later.",
     "GSC_NOT_CONNECTED": "This project is not connected to Google Search Console yet. Connect a verified property in settings.",
     "GSC_AUTH_REQUIRED": "Search Console access was denied. Reconnect the property in settings.",
@@ -3166,7 +3675,12 @@
     "GITHUB_PROVIDER_ERROR": "The GitHub request failed. Please retry.",
     "GITHUB_REPOSITORY_NOT_CONFIGURED": "No repository is mapped to this project. Connect one explicitly.",
     "EXECUTION_TARGET_NOT_FOUND": "The target file for this action could not be determined — manual execution required.",
-    "EXECUTION_SCOPE_TOO_LARGE": "The change scope exceeds safety limits. Re-preview or execute manually."
+    "EXECUTION_SCOPE_TOO_LARGE": "The change scope exceeds safety limits. Re-preview or execute manually.",
+    "EXECUTION_CONFLICT": "This action conflicts with the current execution state, so nothing was changed (the pull request may already be merged or closed, or the target file changed after preview).",
+    "EXECUTION_NOT_SUPPORTED": "This change can't be executed automatically here. Run it manually.",
+    "EXECUTION_NOT_APPROVED": "Approve the opportunity and this action before executing it.",
+    "EXECUTION_INVALID_STATE": "The current action state doesn't allow this operation.",
+    "EXECUTION_ADAPTER_ERROR": "The execution provider returned an error. Please retry later."
   },
   "keywordResearch": {
     "meta": {
@@ -3194,10 +3708,22 @@
       "dataSource": "SerpApi (Google keyword ideas) plus DataForSEO metrics — both billed per call, with usage counting and a circuit breaker"
     },
     "capabilities": [
-      { "cat": "Keyword expansion", "items": "From one seed to a full related-keyword set, including phrase matches you might miss by hand" },
-      { "cat": "Keyword metrics", "items": "Search volume, SEO difficulty (KD), CPC, and competition for every returned term" },
-      { "cat": "Search intent", "items": "Each keyword is classified as informational, commercial, transactional, or navigational to match content type" },
-      { "cat": "Keyword grouping", "items": "Save keywords into named groups that flow directly into rank tracking and content optimization" }
+      {
+        "cat": "Keyword expansion",
+        "items": "From one seed to a full related-keyword set, including phrase matches you might miss by hand"
+      },
+      {
+        "cat": "Keyword metrics",
+        "items": "Search volume, SEO difficulty (KD), CPC, and competition for every returned term"
+      },
+      {
+        "cat": "Search intent",
+        "items": "Each keyword is classified as informational, commercial, transactional, or navigational to match content type"
+      },
+      {
+        "cat": "Keyword grouping",
+        "items": "Save keywords into named groups that flow directly into rank tracking and content optimization"
+      }
     ],
     "who": [
       "Content teams building a topic map before they brief writers",
@@ -3212,18 +3738,45 @@
       "Trend is a recent signal, not a multi-year history"
     ],
     "faqs": [
-      { "q": "Where does keyword data come from?", "a": "Expansion comes from SerpApi's Google keyword ideas, and the per-term metrics (volume, difficulty, CPC, competition, intent, trend) come from DataForSEO. Both are third-party data providers billed per call." },
-      { "q": "Can I group keywords for later use?", "a": "Yes. You can save keywords into named groups in your account, then send a group straight into rank tracking or content optimization without re-exporting." },
-      { "q": "What does the difficulty score mean?", "a": "Difficulty (KD) estimates how hard it is to rank for a term based on the competition already ranking. A lower KD with decent volume is usually the better target for a newer site." },
-      { "q": "Does it classify search intent?", "a": "Yes. Each keyword is tagged as informational, commercial, transactional, or navigational, which helps you match the right page type — a guide for informational, a product or pricing page for transactional." },
-      { "q": "Is there a limit on how many keywords I can track?", "a": "Yes. Tracked and grouped keyword counts depend on your plan (see the pricing page). Expansion itself is metered by API calls rather than by keyword count." },
-      { "q": "How is this different from a spreadsheet?", "a": "SeeO returns the metrics and intent in one pass and connects the list to rank tracking and content optimization on the same workbench, so research turns into tracked progress instead of a static sheet." }
+      {
+        "q": "Where does keyword data come from?",
+        "a": "Expansion comes from SerpApi's Google keyword ideas, and the per-term metrics (volume, difficulty, CPC, competition, intent, trend) come from DataForSEO. Both are third-party data providers billed per call."
+      },
+      {
+        "q": "Can I group keywords for later use?",
+        "a": "Yes. You can save keywords into named groups in your account, then send a group straight into rank tracking or content optimization without re-exporting."
+      },
+      {
+        "q": "What does the difficulty score mean?",
+        "a": "Difficulty (KD) estimates how hard it is to rank for a term based on the competition already ranking. A lower KD with decent volume is usually the better target for a newer site."
+      },
+      {
+        "q": "Does it classify search intent?",
+        "a": "Yes. Each keyword is tagged as informational, commercial, transactional, or navigational, which helps you match the right page type — a guide for informational, a product or pricing page for transactional."
+      },
+      {
+        "q": "Is there a limit on how many keywords I can track?",
+        "a": "Yes. Tracked and grouped keyword counts depend on your plan (see the pricing page). Expansion itself is metered by API calls rather than by keyword count."
+      },
+      {
+        "q": "How is this different from a spreadsheet?",
+        "a": "SeeO returns the metrics and intent in one pass and connects the list to rank tracking and content optimization on the same workbench, so research turns into tracked progress instead of a static sheet."
+      }
     ],
     "related": {
-      "competitorAnalysis": { "title": "Competitor Analysis →", "desc": "See the keyword gap vs rivals" },
-      "contentOptimization": { "title": "Content Optimization →", "desc": "Score pages against target terms" }
+      "competitorAnalysis": {
+        "title": "Competitor Analysis →",
+        "desc": "See the keyword gap vs rivals"
+      },
+      "contentOptimization": {
+        "title": "Content Optimization →",
+        "desc": "Score pages against target terms"
+      }
     },
-    "cta": { "title": "Start your keyword research", "subtitle": "Expand a seed term on the free plan — no credit card required" }
+    "cta": {
+      "title": "Start your keyword research",
+      "subtitle": "Expand a seed term on the free plan — no credit card required"
+    }
   },
   "competitorAnalysis": {
     "meta": {
@@ -3251,10 +3804,22 @@
       "dataSource": "SeeO's own rank data plus SerpApi SERP lookups, with usage counting and a circuit breaker"
     },
     "capabilities": [
-      { "cat": "Competitor discovery", "items": "Find the real domains competing for your keywords directly from live SERPs" },
-      { "cat": "Keyword gap", "items": "See which terms a rival ranks for that you don't, and vice versa" },
-      { "cat": "Shared keywords", "items": "Identify head-to-head terms where small gains move the most traffic" },
-      { "cat": "Domain filtering", "items": "Aggregators and platforms like Wikipedia or YouTube are excluded from the rival set" }
+      {
+        "cat": "Competitor discovery",
+        "items": "Find the real domains competing for your keywords directly from live SERPs"
+      },
+      {
+        "cat": "Keyword gap",
+        "items": "See which terms a rival ranks for that you don't, and vice versa"
+      },
+      {
+        "cat": "Shared keywords",
+        "items": "Identify head-to-head terms where small gains move the most traffic"
+      },
+      {
+        "cat": "Domain filtering",
+        "items": "Aggregators and platforms like Wikipedia or YouTube are excluded from the rival set"
+      }
     ],
     "who": [
       "SEO practitioners benchmarking against a known rival",
@@ -3269,18 +3834,45 @@
       "Discovery covers the keywords you provide, not the rival's entire site"
     ],
     "faqs": [
-      { "q": "Where does the competitor data come from?", "a": "SeeO compares your tracked rankings with live Google SERP data via SerpApi, and filters out platforms and aggregators so the rival set reflects real competition." },
-      { "q": "Do I need to enter a competitor manually?", "a": "Discovery starts from the SERP, so SeeO finds who actually competes for your keywords. You then pick one domain to compare the keyword gap against." },
-      { "q": "What is a keyword gap?", "a": "It is the set of terms a competitor ranks for that you don't (and vice versa). Gaps are usually the fastest, most defensible content opportunities." },
-      { "q": "Does it exclude Wikipedia and YouTube?", "a": "Yes. Domains that are platforms rather than true business rivals are filtered from the comparison so they don't distort the gap." },
-      { "q": "How is this different from rank tracking?", "a": "Rank tracking watches your own positions over time; competitor analysis adds the rival dimension so you can see where you lag and where you lead." },
-      { "q": "Can I act on the gaps directly?", "a": "Yes. A prioritized gap list can be sent into content optimization and rank tracking, so discovery turns into tracked work." }
+      {
+        "q": "Where does the competitor data come from?",
+        "a": "SeeO compares your tracked rankings with live Google SERP data via SerpApi, and filters out platforms and aggregators so the rival set reflects real competition."
+      },
+      {
+        "q": "Do I need to enter a competitor manually?",
+        "a": "Discovery starts from the SERP, so SeeO finds who actually competes for your keywords. You then pick one domain to compare the keyword gap against."
+      },
+      {
+        "q": "What is a keyword gap?",
+        "a": "It is the set of terms a competitor ranks for that you don't (and vice versa). Gaps are usually the fastest, most defensible content opportunities."
+      },
+      {
+        "q": "Does it exclude Wikipedia and YouTube?",
+        "a": "Yes. Domains that are platforms rather than true business rivals are filtered from the comparison so they don't distort the gap."
+      },
+      {
+        "q": "How is this different from rank tracking?",
+        "a": "Rank tracking watches your own positions over time; competitor analysis adds the rival dimension so you can see where you lag and where you lead."
+      },
+      {
+        "q": "Can I act on the gaps directly?",
+        "a": "Yes. A prioritized gap list can be sent into content optimization and rank tracking, so discovery turns into tracked work."
+      }
     ],
     "related": {
-      "keywordResearch": { "title": "Keyword Research →", "desc": "Build the set you compare against" },
-      "rankTracking": { "title": "SEO Rank Tracking →", "desc": "Watch your positions daily" }
+      "keywordResearch": {
+        "title": "Keyword Research →",
+        "desc": "Build the set you compare against"
+      },
+      "rankTracking": {
+        "title": "SEO Rank Tracking →",
+        "desc": "Watch your positions daily"
+      }
     },
-    "cta": { "title": "Run a competitor gap analysis", "subtitle": "Connect your keyword set on the free plan to see who competes" }
+    "cta": {
+      "title": "Run a competitor gap analysis",
+      "subtitle": "Connect your keyword set on the free plan to see who competes"
+    }
   },
   "contentOptimization": {
     "meta": {
@@ -3308,10 +3900,22 @@
       "dataSource": "On-page analysis runs on the fetched page or draft — no third-party index required for the core checks"
     },
     "capabilities": [
-      { "cat": "Content score", "items": "One number that reflects on-page strength across multiple signals" },
-      { "cat": "Keyword density", "items": "See how often target terms appear and which related terms are missing" },
-      { "cat": "Readability", "items": "A readability score shows whether the text is easy to read for the audience" },
-      { "cat": "On-page structure", "items": "Heading hierarchy, internal and external links, and image alt text in one view" }
+      {
+        "cat": "Content score",
+        "items": "One number that reflects on-page strength across multiple signals"
+      },
+      {
+        "cat": "Keyword density",
+        "items": "See how often target terms appear and which related terms are missing"
+      },
+      {
+        "cat": "Readability",
+        "items": "A readability score shows whether the text is easy to read for the audience"
+      },
+      {
+        "cat": "On-page structure",
+        "items": "Heading hierarchy, internal and external links, and image alt text in one view"
+      }
     ],
     "who": [
       "Writers who want a pre-publish on-page check",
@@ -3326,18 +3930,45 @@
       "It does not rewrite the content for you"
     ],
     "faqs": [
-      { "q": "What does the content score mean?", "a": "It is a 0-100 roll-up of on-page signals — keyword use, structure, readability, links, and alt text. A higher score means fewer obvious on-page gaps, not guaranteed rankings." },
-      { "q": "Can I analyze a draft before publishing?", "a": "Yes. You can paste plain text instead of a URL, so the score works during writing, not just after the page is live." },
-      { "q": "Does it check keyword stuffing?", "a": "It reports keyword density so you can see whether a term is underused or overused. Healthy density varies by topic; the tool shows the number, you make the call." },
-      { "q": "Does it look at internal links?", "a": "Yes. It counts internal and external links and flags images missing alt text, since both are basic on-page signals search engines use." },
-      { "q": "Will it rewrite my content?", "a": "No. It returns a prioritized checklist of fixes; the writing stays with you. That keeps you in control of tone and accuracy." },
-      { "q": "How does this connect to the other modules?", "a": "Target keywords often come from keyword research, and the same page can be watched in rank tracking after you publish the fixes." }
+      {
+        "q": "What does the content score mean?",
+        "a": "It is a 0-100 roll-up of on-page signals — keyword use, structure, readability, links, and alt text. A higher score means fewer obvious on-page gaps, not guaranteed rankings."
+      },
+      {
+        "q": "Can I analyze a draft before publishing?",
+        "a": "Yes. You can paste plain text instead of a URL, so the score works during writing, not just after the page is live."
+      },
+      {
+        "q": "Does it check keyword stuffing?",
+        "a": "It reports keyword density so you can see whether a term is underused or overused. Healthy density varies by topic; the tool shows the number, you make the call."
+      },
+      {
+        "q": "Does it look at internal links?",
+        "a": "Yes. It counts internal and external links and flags images missing alt text, since both are basic on-page signals search engines use."
+      },
+      {
+        "q": "Will it rewrite my content?",
+        "a": "No. It returns a prioritized checklist of fixes; the writing stays with you. That keeps you in control of tone and accuracy."
+      },
+      {
+        "q": "How does this connect to the other modules?",
+        "a": "Target keywords often come from keyword research, and the same page can be watched in rank tracking after you publish the fixes."
+      }
     ],
     "related": {
-      "keywordResearch": { "title": "Keyword Research →", "desc": "Find the terms to optimize for" },
-      "seoAudit": { "title": "Technical SEO Audit →", "desc": "Catch site-level issues too" }
+      "keywordResearch": {
+        "title": "Keyword Research →",
+        "desc": "Find the terms to optimize for"
+      },
+      "seoAudit": {
+        "title": "Technical SEO Audit →",
+        "desc": "Catch site-level issues too"
+      }
     },
-    "cta": { "title": "Score your next page", "subtitle": "Paste a URL or draft on the free plan to see the checklist" }
+    "cta": {
+      "title": "Score your next page",
+      "subtitle": "Paste a URL or draft on the free plan to see the checklist"
+    }
   },
   "alternativesSemrush": {
     "meta": {
@@ -3348,15 +3979,51 @@
     "subtitle": "Both are SEO platforms, but they are built differently. Here is an honest, side-by-side look at what each does well — including where Semrush leads.",
     "intro": "Both SeeO and Semrush help you improve organic search, but they are shaped differently. Semrush is a long-established, broad marketing suite with a very large keyword and backlink database and a wide range of PPC, social, and competitive-research features. SeeO is a focused workbench that combines the six core SEO modules — keyword research, rank tracking, technical audit, competitor analysis, content optimization, and backlink analysis — and adds AI search monitoring and an MCP server for agentic workflows. This page compares them on the dimensions that matter for an SEO team, and points out where Semrush is the stronger choice so you can decide without the hype.",
     "comparison": [
-      { "dim": "Keyword research", "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.", "other": "Very large keyword database with extensive historical volume and many filters." },
-      { "dim": "Rank tracking", "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.", "other": "Broad rank tracking across many search engines and large historical sets." },
-      { "dim": "Technical audit", "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.", "other": "Site audit with a large issue catalog and scheduling." },
-      { "dim": "Competitor analysis", "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.", "other": "Deep competitive research including traffic estimates and ad insights." },
-      { "dim": "Content optimization", "seeo": "Scores a page or draft for on-page SEO, readability, and structure.", "other": "Writing assistant with a large recommendation engine and templated briefs." },
-      { "dim": "Backlink analysis", "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).", "other": "One of the largest backlink indexes in the industry with rich link analytics." },
-      { "dim": "AI search monitoring", "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).", "other": "AI features are expanding but not its original focus." },
-      { "dim": "API / agent access", "seeo": "Ships an MCP server so AI agents can call SEO tools directly.", "other": "REST API and integrations, oriented to developers and pipelines." },
-      { "dim": "Pricing model", "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).", "other": "Monthly subscription tiers that scale with seats and data limits." }
+      {
+        "dim": "Keyword research",
+        "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.",
+        "other": "Very large keyword database with extensive historical volume and many filters."
+      },
+      {
+        "dim": "Rank tracking",
+        "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.",
+        "other": "Broad rank tracking across many search engines and large historical sets."
+      },
+      {
+        "dim": "Technical audit",
+        "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.",
+        "other": "Site audit with a large issue catalog and scheduling."
+      },
+      {
+        "dim": "Competitor analysis",
+        "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.",
+        "other": "Deep competitive research including traffic estimates and ad insights."
+      },
+      {
+        "dim": "Content optimization",
+        "seeo": "Scores a page or draft for on-page SEO, readability, and structure.",
+        "other": "Writing assistant with a large recommendation engine and templated briefs."
+      },
+      {
+        "dim": "Backlink analysis",
+        "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).",
+        "other": "One of the largest backlink indexes in the industry with rich link analytics."
+      },
+      {
+        "dim": "AI search monitoring",
+        "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).",
+        "other": "AI features are expanding but not its original focus."
+      },
+      {
+        "dim": "API / agent access",
+        "seeo": "Ships an MCP server so AI agents can call SEO tools directly.",
+        "other": "REST API and integrations, oriented to developers and pipelines."
+      },
+      {
+        "dim": "Pricing model",
+        "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).",
+        "other": "Monthly subscription tiers that scale with seats and data limits."
+      }
     ],
     "seeoFits": [
       "You want the six core SEO modules in one place without a large monthly commitment",
@@ -3371,17 +4038,41 @@
       "Your workflow already centers on Semrush reports and exports"
     ],
     "faqs": [
-      { "q": "Is SeeO a replacement for Semrush?", "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Semrush offers a broader marketing suite with very large databases and PPC/social tooling. If you need enterprise-scale data and multi-channel marketing in one place, Semrush may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit." },
-      { "q": "Does SeeO have as much backlink data as Semrush?", "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Semrush is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Semrush is the stronger choice." },
-      { "q": "Which is better for a small team or solo SEO?", "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Semrush can be worth it once you need its breadth and database scale." },
-      { "q": "Can I use SeeO alongside Semrush?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Semrush for its databases — they are not mutually exclusive." }
+      {
+        "q": "Is SeeO a replacement for Semrush?",
+        "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Semrush offers a broader marketing suite with very large databases and PPC/social tooling. If you need enterprise-scale data and multi-channel marketing in one place, Semrush may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit."
+      },
+      {
+        "q": "Does SeeO have as much backlink data as Semrush?",
+        "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Semrush is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Semrush is the stronger choice."
+      },
+      {
+        "q": "Which is better for a small team or solo SEO?",
+        "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Semrush can be worth it once you need its breadth and database scale."
+      },
+      {
+        "q": "Can I use SeeO alongside Semrush?",
+        "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Semrush for its databases — they are not mutually exclusive."
+      }
     ],
     "related": {
-      "keyword-research": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
-      "competitor-analysis": { "title": "Competitor Analysis →", "desc": "Keyword gap vs rivals" },
-      "seo-audit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+      "keyword-research": {
+        "title": "Keyword Research →",
+        "desc": "SeeO's keyword expansion and metrics"
+      },
+      "competitor-analysis": {
+        "title": "Competitor Analysis →",
+        "desc": "Keyword gap vs rivals"
+      },
+      "seo-audit": {
+        "title": "Technical SEO Audit →",
+        "desc": "20+ checks and a health score"
+      }
     },
-    "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
+    "cta": {
+      "title": "Try SeeO free",
+      "subtitle": "Start with the free plan — no credit card required"
+    }
   },
   "alternativesAhrefs": {
     "meta": {
@@ -3392,15 +4083,51 @@
     "subtitle": "Both are SEO platforms, but they are shaped differently. Here is an honest, side-by-side look at what each does well — including where Ahrefs leads.",
     "intro": "Both SeeO and Ahrefs help you earn organic traffic, but they are shaped differently. Ahrefs is a long-established SEO toolset famous for one of the largest backlink indexes in the industry, alongside Site Audit, Keyword Explorer, and Content Explorer. SeeO is a focused workbench that combines the six core SEO modules — keyword research, rank tracking, technical audit, competitor analysis, content optimization, and backlink analysis — and adds AI search monitoring and an MCP server for agentic workflows. This page compares them on the dimensions that matter for an SEO team, and points out where Ahrefs is the stronger choice so you can decide without the hype.",
     "comparison": [
-      { "dim": "Keyword research", "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.", "other": "Keyword Explorer with a large database and click/share-of-voice estimates." },
-      { "dim": "Rank tracking", "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.", "other": "Rank Tracker with broad search-engine coverage and position history." },
-      { "dim": "Technical audit", "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.", "other": "Site Audit with a large issue catalog and crawl scheduling." },
-      { "dim": "Competitor analysis", "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.", "other": "Competing Domains and content gap tools with large index coverage." },
-      { "dim": "Content optimization", "seeo": "Scores a page or draft for on-page SEO, readability, and structure.", "other": "Content Explorer plus on-page recommendations and briefs." },
-      { "dim": "Backlink analysis", "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).", "other": "One of the largest backlink indexes in the industry with rich link analytics." },
-      { "dim": "AI search monitoring", "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).", "other": "AI features are expanding but not its original focus." },
-      { "dim": "API / agent access", "seeo": "Ships an MCP server so AI agents can call SEO tools directly.", "other": "API and integrations oriented to developers and pipelines." },
-      { "dim": "Pricing model", "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).", "other": "Monthly subscription tiers that scale with seats and data limits." }
+      {
+        "dim": "Keyword research",
+        "seeo": "Seed-to-related expansion with volume, difficulty, CPC, intent, and trend per term.",
+        "other": "Keyword Explorer with a large database and click/share-of-voice estimates."
+      },
+      {
+        "dim": "Rank tracking",
+        "seeo": "Daily Google rankings by keyword, location, and device, with trend curves and alerts.",
+        "other": "Rank Tracker with broad search-engine coverage and position history."
+      },
+      {
+        "dim": "Technical audit",
+        "seeo": "Crawler runs 20+ checks per page with a 0-100 health score and fix priorities.",
+        "other": "Site Audit with a large issue catalog and crawl scheduling."
+      },
+      {
+        "dim": "Competitor analysis",
+        "seeo": "Discovers SERP rivals and shows the keyword gap vs a chosen domain.",
+        "other": "Competing Domains and content gap tools with large index coverage."
+      },
+      {
+        "dim": "Content optimization",
+        "seeo": "Scores a page or draft for on-page SEO, readability, and structure.",
+        "other": "Content Explorer plus on-page recommendations and briefs."
+      },
+      {
+        "dim": "Backlink analysis",
+        "seeo": "Backlink snapshot: totals, referring domains, Domain Rank, anchor mix (Pro).",
+        "other": "One of the largest backlink indexes in the industry with rich link analytics."
+      },
+      {
+        "dim": "AI search monitoring",
+        "seeo": "Tracks brand presence and citations in AI search results (AI Overview / LLM answers).",
+        "other": "AI features are expanding but not its original focus."
+      },
+      {
+        "dim": "API / agent access",
+        "seeo": "Ships an MCP server so AI agents can call SEO tools directly.",
+        "other": "API and integrations oriented to developers and pipelines."
+      },
+      {
+        "dim": "Pricing model",
+        "seeo": "Free plan plus one-time 30-day Lite/Pro memberships (USD).",
+        "other": "Monthly subscription tiers that scale with seats and data limits."
+      }
     ],
     "seeoFits": [
       "You want the six core SEO modules in one place without a large monthly commitment",
@@ -3415,17 +4142,41 @@
       "Your workflow already centers on Ahrefs reports and exports"
     ],
     "faqs": [
-      { "q": "Is SeeO a replacement for Ahrefs?", "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Ahrefs is renowned for its backlink index and link-building toolset. If backlink depth and link prospecting are your top priority, Ahrefs may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit." },
-      { "q": "Does SeeO have as much backlink data as Ahrefs?", "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Ahrefs is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Ahrefs is the stronger choice." },
-      { "q": "Which is better for a small team or solo SEO?", "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Ahrefs can be worth it once you need its breadth and database scale." },
-      { "q": "Can I use SeeO alongside Ahrefs?", "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Ahrefs for its backlink index — they are not mutually exclusive." }
+      {
+        "q": "Is SeeO a replacement for Ahrefs?",
+        "a": "Not always. SeeO covers the six core SEO workflows and adds AI search monitoring and an MCP server. Ahrefs is renowned for its backlink index and link-building toolset. If backlink depth and link prospecting are your top priority, Ahrefs may fit better; if you want focused SEO plus AI-search and agent access, SeeO is a strong fit."
+      },
+      {
+        "q": "Does SeeO have as much backlink data as Ahrefs?",
+        "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Ahrefs is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Ahrefs is the stronger choice."
+      },
+      {
+        "q": "Which is better for a small team or solo SEO?",
+        "a": "SeeO's free plan plus low-cost one-time memberships are often easier to start with than a seat-based monthly suite. Ahrefs can be worth it once you need its breadth and database scale."
+      },
+      {
+        "q": "Can I use SeeO alongside Ahrefs?",
+        "a": "Yes. Many teams use SeeO for its AI-search monitoring and MCP agent access while keeping Ahrefs for its backlink index — they are not mutually exclusive."
+      }
     ],
     "related": {
-      "keyword-research": { "title": "Keyword Research →", "desc": "SeeO's keyword expansion and metrics" },
-      "content-optimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" },
-      "seo-audit": { "title": "Technical SEO Audit →", "desc": "20+ checks and a health score" }
+      "keyword-research": {
+        "title": "Keyword Research →",
+        "desc": "SeeO's keyword expansion and metrics"
+      },
+      "content-optimization": {
+        "title": "Content Optimization →",
+        "desc": "Score pages for on-page SEO"
+      },
+      "seo-audit": {
+        "title": "Technical SEO Audit →",
+        "desc": "20+ checks and a health score"
+      }
     },
-    "cta": { "title": "Try SeeO free", "subtitle": "Start with the free plan — no credit card required" }
+    "cta": {
+      "title": "Try SeeO free",
+      "subtitle": "Start with the free plan — no credit card required"
+    }
   },
   "guideTechnicalSeoAudit": {
     "meta": {
@@ -3436,29 +4187,93 @@
     "subtitle": "A practical framework for auditing a website's technical health — what to check, in what order, and how to prioritize fixes that actually move rankings",
     "intro": "A technical SEO audit reviews the foundation a site is built on: can search engines crawl and index it, is the on-page markup correct, does it load fast, and is it secure and mobile-friendly? This guide walks through a repeatable audit process you can run yourself, whether you use SeeO's audit tool or another crawler. Each step lists what to look for and why it matters, so you can turn a long to-do list into a prioritized plan.",
     "steps": [
-      { "n": "01", "title": "Crawl the site and inventory pages", "body": "Start with a full crawl from your sitemap (or a crawler) so you have every indexable URL. Note the total page count and any crawl errors. A crawl is the baseline — without it you are guessing." },
-      { "n": "02", "title": "Check indexability", "body": "Review robots.txt, the XML sitemap, canonical tags, and noindex rules. Look for pages blocked from indexing, canonicals pointing to the wrong URL, and redirect chains that waste crawl budget." },
-      { "n": "03", "title": "On-page basics", "body": "For each important page, check the title tag, meta description, H1 hierarchy, and image alt text. These are the fundamentals search engines use to understand and rank a page." },
-      { "n": "04", "title": "Site architecture and internal links", "body": "Map how pages link to each other. Fix orphaned pages (no internal links), tighten deep click paths, and make sure important pages are reachable within a few clicks from the homepage." },
-      { "n": "05", "title": "Page speed and Core Web Vitals", "body": "Measure LCP, INP, and CLS. Slow pages hurt both rankings and users; prioritize templates and pages with the most traffic." },
-      { "n": "06", "title": "Mobile-friendliness", "body": "Confirm the site renders correctly on mobile, uses a responsive layout, and passes mobile usability checks. Most indexing is mobile-first, so this is not optional." },
-      { "n": "07", "title": "HTTPS and security", "body": "Verify the SSL certificate is valid and every page redirects to HTTPS. Mixed content and expired certificates are easy, high-impact fixes." },
-      { "n": "08", "title": "Structured data", "body": "Validate schema markup (Organization, Product, FAQ, BreadcrumbList, and others). Correct structured data can unlock rich results and clearer indexing." },
-      { "n": "09", "title": "Backlinks and off-page signals", "body": "Review the link profile: total backlinks, referring domains, and anchor text distribution. A sudden drop in referring domains often explains a rankings drop." },
-      { "n": "10", "title": "Prioritize and track fixes", "body": "Score issues by impact and sort them into a fix list. Re-audit after changes so you can prove the health score and rankings improved." }
+      {
+        "n": "01",
+        "title": "Crawl the site and inventory pages",
+        "body": "Start with a full crawl from your sitemap (or a crawler) so you have every indexable URL. Note the total page count and any crawl errors. A crawl is the baseline — without it you are guessing."
+      },
+      {
+        "n": "02",
+        "title": "Check indexability",
+        "body": "Review robots.txt, the XML sitemap, canonical tags, and noindex rules. Look for pages blocked from indexing, canonicals pointing to the wrong URL, and redirect chains that waste crawl budget."
+      },
+      {
+        "n": "03",
+        "title": "On-page basics",
+        "body": "For each important page, check the title tag, meta description, H1 hierarchy, and image alt text. These are the fundamentals search engines use to understand and rank a page."
+      },
+      {
+        "n": "04",
+        "title": "Site architecture and internal links",
+        "body": "Map how pages link to each other. Fix orphaned pages (no internal links), tighten deep click paths, and make sure important pages are reachable within a few clicks from the homepage."
+      },
+      {
+        "n": "05",
+        "title": "Page speed and Core Web Vitals",
+        "body": "Measure LCP, INP, and CLS. Slow pages hurt both rankings and users; prioritize templates and pages with the most traffic."
+      },
+      {
+        "n": "06",
+        "title": "Mobile-friendliness",
+        "body": "Confirm the site renders correctly on mobile, uses a responsive layout, and passes mobile usability checks. Most indexing is mobile-first, so this is not optional."
+      },
+      {
+        "n": "07",
+        "title": "HTTPS and security",
+        "body": "Verify the SSL certificate is valid and every page redirects to HTTPS. Mixed content and expired certificates are easy, high-impact fixes."
+      },
+      {
+        "n": "08",
+        "title": "Structured data",
+        "body": "Validate schema markup (Organization, Product, FAQ, BreadcrumbList, and others). Correct structured data can unlock rich results and clearer indexing."
+      },
+      {
+        "n": "09",
+        "title": "Backlinks and off-page signals",
+        "body": "Review the link profile: total backlinks, referring domains, and anchor text distribution. A sudden drop in referring domains often explains a rankings drop."
+      },
+      {
+        "n": "10",
+        "title": "Prioritize and track fixes",
+        "body": "Score issues by impact and sort them into a fix list. Re-audit after changes so you can prove the health score and rankings improved."
+      }
     ],
     "faqs": [
-      { "q": "How often should I run a technical SEO audit?", "a": "At least once per quarter, and immediately after any redesign, migration, or platform change. Continuous monitoring catches regressions between full audits." },
-      { "q": "Do I need a paid tool to audit a site?", "a": "You can start with free crawlers and Search Console, but a tool like SeeO's audit automates the 20+ checks and keeps history so you can compare runs. The method in this guide works with any crawler." },
-      { "q": "What is the most important audit metric?", "a": "There is no single number, but indexability issues (pages that should be indexed but aren't) and Core Web Vitals tend to have the widest impact. Start there before cosmetic fixes." },
-      { "q": "How do I know if my fixes worked?", "a": "Re-run the audit and compare the health score and issue count against the previous run. Pair it with rank tracking so you can connect a fix to a ranking change." }
+      {
+        "q": "How often should I run a technical SEO audit?",
+        "a": "At least once per quarter, and immediately after any redesign, migration, or platform change. Continuous monitoring catches regressions between full audits."
+      },
+      {
+        "q": "Do I need a paid tool to audit a site?",
+        "a": "You can start with free crawlers and Search Console, but a tool like SeeO's audit automates the 20+ checks and keeps history so you can compare runs. The method in this guide works with any crawler."
+      },
+      {
+        "q": "What is the most important audit metric?",
+        "a": "There is no single number, but indexability issues (pages that should be indexed but aren't) and Core Web Vitals tend to have the widest impact. Start there before cosmetic fixes."
+      },
+      {
+        "q": "How do I know if my fixes worked?",
+        "a": "Re-run the audit and compare the health score and issue count against the previous run. Pair it with rank tracking so you can connect a fix to a ranking change."
+      }
     ],
     "related": {
-      "seo-audit": { "title": "Technical SEO Audit Tool →", "desc": "Run 20+ checks automatically" },
-      "keyword-research": { "title": "Keyword Research →", "desc": "Find terms worth targeting" },
-      "content-optimization": { "title": "Content Optimization →", "desc": "Score pages for on-page SEO" }
+      "seo-audit": {
+        "title": "Technical SEO Audit Tool →",
+        "desc": "Run 20+ checks automatically"
+      },
+      "keyword-research": {
+        "title": "Keyword Research →",
+        "desc": "Find terms worth targeting"
+      },
+      "content-optimization": {
+        "title": "Content Optimization →",
+        "desc": "Score pages for on-page SEO"
+      }
     },
-    "cta": { "title": "Run a free technical audit", "subtitle": "SeeO's free plan includes single-page quick audits" }
+    "cta": {
+      "title": "Run a free technical audit",
+      "subtitle": "SeeO's free plan includes single-page quick audits"
+    }
   },
   "guideKeywordRankings": {
     "meta": {
@@ -3928,5 +4743,23 @@
     "heading": "Page not found",
     "desc": "The page you are looking for does not exist.",
     "back": "Back to Home"
+  },
+  "authPage": {
+    "loginTitle": "Log In to SeeO — SEO Audits & Rank Tracking",
+    "loginDescription": "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
+    "signupTitle": "Create a SeeO Account — SEO Audits & Rank Tracking",
+    "signupDescription": "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
+    "ogAlt": "SeeO — SEO Audits, Rank Tracking & Keyword Research"
+  },
+  "unsubscribePage": {
+    "metaTitle": "Unsubscribed — SeeO",
+    "entryTitle": "Unsubscribe",
+    "doneTitle": "You're unsubscribed",
+    "doneBody": "You will no longer receive marketing and lifecycle emails from SeeO. Account and security emails (like sign-in) are not affected.",
+    "alreadyTitle": "You were already unsubscribed",
+    "alreadyBody": "Marketing emails were already turned off for this address.",
+    "invalidTitle": "This unsubscribe link is not valid",
+    "invalidBody": "The link seems broken or incomplete. If you keep receiving marketing emails, contact support@seeo.asia.",
+    "back": "Back to SeeO"
   }
 }

@@ -23,7 +23,10 @@ export default function Footer() {
       links: [
         { label: t("colProductLinks.seoAudit"), href: href("/features/seo-audit") },
         { label: t("colProductLinks.rankTracking"), href: href("/features/rank-tracking") },
-        { label: t("colProductLinks.allFeatures"), href: href("/features/seo-audit") },
+        { label: t("colProductLinks.keywordResearch"), href: href("/features/keyword-research") },
+        { label: t("colProductLinks.competitorAnalysis"), href: href("/features/competitor-analysis") },
+        { label: t("colProductLinks.contentOptimization"), href: href("/features/content-optimization") },
+        { label: t("colProductLinks.backlinkAnalysis"), href: href("/features/backlink-analysis") },
       ],
     },
     {
@@ -37,6 +40,7 @@ export default function Footer() {
       links: [
         { label: t("colResourcesLinks.docs"), href: href("/docs") },
         { label: t("colResourcesLinks.changelog"), href: href("/changelog") },
+        { label: t("colResourcesLinks.seoIssues"), href: href("/seo-issues") },
       ],
     },
     {

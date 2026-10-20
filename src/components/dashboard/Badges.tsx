@@ -1,11 +1,17 @@
 interface ChangeBadgeProps {
   value: number;
   suffix?: string;
+  /** 变化口径说明（悬停可见）：排名数字变小 = 上升，因此这里用正向色 */
+  title?: string;
 }
 
-export function ChangeBadge({ value, suffix = "" }: ChangeBadgeProps) {
+export function ChangeBadge({ value, suffix = "", title }: ChangeBadgeProps) {
   if (value === 0) {
-    return <span className="font-mono text-sm text-ink-40">—</span>;
+    return (
+      <span className="font-mono text-sm text-ink-40" title={title}>
+        —
+      </span>
+    );
   }
   const positive = value > 0;
   return (
@@ -13,6 +19,7 @@ export function ChangeBadge({ value, suffix = "" }: ChangeBadgeProps) {
       className={`inline-flex items-center gap-0.5 font-mono text-sm font-semibold ${
         positive ? "text-pos" : "text-neg"
       }`}
+      title={title}
     >
       {positive ? "▲" : "▼"} {Math.abs(value)}
       {suffix}

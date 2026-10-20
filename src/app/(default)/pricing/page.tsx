@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { useToast } from "@/components/dashboard/Toast";
+import { ToastProvider, useToast } from "@/components/dashboard/Toast";
 import { getPlanCardState } from "@/lib/pricing-plan-state";
 import { track } from "@/lib/analytics/client";
 import PricingHero from "@/components/pricing/PricingHero";
@@ -59,14 +59,14 @@ export interface PricingPageProps {
 
 export default function PricingPage({ initialPlans = null }: PricingPageProps) {
   return (
-    <>
+    <ToastProvider>
       {/* Checkout 取消回流提示单独包 Suspense：useSearchParams 会触发 CSR bailout，
           若包住整页会导致 SSR 输出空 body（缺 H1/H2/H3，技术审计误报） */}
       <Suspense fallback={null}>
         <CheckoutCancelToast />
       </Suspense>
       <PricingContent initialPlans={initialPlans} />
-    </>
+    </ToastProvider>
   );
 }
 

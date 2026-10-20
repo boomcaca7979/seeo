@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { applyResultFeedback, executionFor, explainOpportunityPriority, opportunityVerificationKind, valueCategoryFor, withOpportunityContext } from "./work-queue";
-import { evaluateLostRecovery, evaluateContentCheck } from "./opportunity-service";
+import { evaluateLostRecovery, evaluateContentCheck, daysAgoLabel } from "./opportunity-service";
 import { computeAuditOutcome, computeRankOutcome, verificationChannelFor } from "./task-observations";
 
 describe("A. 执行入口映射：必须指向真实功能，否则如实说明", () => {
@@ -216,6 +216,22 @@ describe("E. 内容机会：过期或达标的结果不产生机会", () => {
     const fresh = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 19).replace("T", " ");
     expect(evaluateContentCheck({ url: "https://x.test/a", keyword: "kw", score: 43, createdAt: fresh })).not.toBeNull();
     expect(evaluateContentCheck({ url: "https://x.test/a", keyword: "kw", score: 88, createdAt: fresh })).toBeNull();
+  });
+
+  // BUG-22：证据摘要恒为英文（审计侧走 pickText(..., "en")），所以天数也要按英文单复数，
+  // 否则英文界面直接出现 "1 days ago" 这种可见语病。
+  it("1 天前的证据写作 \"1 day ago\"，不出现 \"1 days ago\"", () => {
+    const oneDay = new Date(Date.now() - 86_400_000).toISOString().slice(0, 19).replace("T", " ");
+    const c = evaluateContentCheck({ url: "https://x.test/a", keyword: "kw", score: 43, createdAt: oneDay });
+    expect(c).not.toBeNull();
+    expect(c!.evidence[0].summary).toContain("(1 day ago)");
+    expect(c!.evidence[0].summary).not.toContain("1 days ago");
+  });
+
+  it("daysAgoLabel：仅 1 用单数（0 / 多位数保持复数）", () => {
+    expect(daysAgoLabel(1)).toBe("1 day ago");
+    expect(daysAgoLabel(0)).toBe("0 days ago");
+    expect(daysAgoLabel(3)).toBe("3 days ago");
   });
 
   it("超过 30 天的旧结果 → 不作为机会依据（避免用过时结果指导改动）", () => {

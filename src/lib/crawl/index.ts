@@ -44,14 +44,24 @@ export interface DetailedFetchResult {
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 export const MAX_REDIRECT_HOPS = 10;
 
+/**
+ * INVALID_URL 的机器可分辨成因。
+ * BUG-44：`message` 是给日志看的技术原文（中文），不能进用户可见文案；
+ * 路由要靠这个 reason 选对本地化 code，而不是去 match 中文句子。
+ */
+export type CrawlErrorReason = "malformed" | "scheme" | "private_host";
+
 export class CrawlError extends Error {
   code: "TIMEOUT" | "NETWORK" | "HTTP_ERROR" | "INVALID_URL";
+  reason?: CrawlErrorReason;
   constructor(
     code: "TIMEOUT" | "NETWORK" | "HTTP_ERROR" | "INVALID_URL",
-    message: string
+    message: string,
+    reason?: CrawlErrorReason
   ) {
     super(message);
     this.code = code;
+    this.reason = reason;
     this.name = "CrawlError";
   }
 }
@@ -62,16 +72,16 @@ export function validateUrlSafety(rawUrl: string): URL {
   try {
     url = new URL(rawUrl);
   } catch {
-    throw new CrawlError("INVALID_URL", `URL 格式无效：${rawUrl}`);
+    throw new CrawlError("INVALID_URL", `URL 格式无效：${rawUrl}`, "malformed");
   }
   // 协议白名单：只允许 http/https
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new CrawlError("INVALID_URL", `不允许的协议：${url.protocol}`);
+    throw new CrawlError("INVALID_URL", `不允许的协议：${url.protocol}`, "scheme");
   }
   const hostname = url.hostname.toLowerCase();
   // 禁止 localhost 及常见本地回环
   if (hostname === "localhost" || hostname === "::1" || hostname === "[::1]") {
-    throw new CrawlError("INVALID_URL", `禁止访问本地地址：${hostname}`);
+    throw new CrawlError("INVALID_URL", `禁止访问本地地址：${hostname}`, "private_host");
   }
   // 禁止 IPv4 回环 / 私网 / 链路本地 / 保留段
   const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
@@ -88,12 +98,12 @@ export function validateUrlSafety(rawUrl: string): URL {
       first === 0 || // 0.0.0.0/8 本机网络
       first >= 224 // 224.0.0.0/4 组播、240.0.0.0/4 保留
     ) {
-      throw new CrawlError("INVALID_URL", `禁止访问私有/保留 IP：${hostname}`);
+      throw new CrawlError("INVALID_URL", `禁止访问私有/保留 IP：${hostname}`, "private_host");
     }
   }
   // 禁止 .local / .internal 等 mDNS / 本地域名
   if (hostname.endsWith(".local") || hostname.endsWith(".internal") || hostname.endsWith(".localhost")) {
-    throw new CrawlError("INVALID_URL", `禁止访问本地域名：${hostname}`);
+    throw new CrawlError("INVALID_URL", `禁止访问本地域名：${hostname}`, "private_host");
   }
   return url;
 }
@@ -658,6 +668,20 @@ export function keywordAnalysis(page: PageData, keyword: string): KeywordAnalysi
 }
 
 // ---------- 工具：补全 URL ----------
+
+/**
+ * 用户手输地址的协议白名单（必须在 normalizeUrl 之前调用）。
+ * BUG-44b：normalizeUrl 会给任何非 http(s) 开头的输入补 `https://`，于是
+ * `ftp://example.com` 变成 `https://ftp://example.com` —— 它能解析（主机名=ftp），
+ * SSRF 检查放行，最后请求失败，用户看到的是「无法连接该站点，请检查网络」，
+ * 完全不知道是自己协议写错了。协议判断只能在补全之前对着原文做。
+ */
+export function assertSupportedUserScheme(rawInput: string): void {
+  const m = rawInput.trim().match(/^([a-z][a-z0-9+.-]*):\/\//i);
+  if (m?.[1] && !["http", "https"].includes(m[1].toLowerCase())) {
+    throw new CrawlError("INVALID_URL", `不支持的协议：${m[1]}`, "scheme");
+  }
+}
 
 export function normalizeUrl(input: string): string {
   const trimmed = input.trim();

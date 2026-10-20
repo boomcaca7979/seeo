@@ -29,9 +29,21 @@ const h = vi.hoisted(() => {
         opened: true,
       })
     ),
-    markOrderFailedMock: vi.fn(async () => {}),
+    markOrderFailedMock: vi.fn(
+      async (): Promise<{ ok: boolean; order: unknown; opened: boolean }> => ({
+        ok: true,
+        order: null,
+        opened: false,
+      })
+    ),
     syncSubscriptionPeriodMock: vi.fn(async () => true),
-    handleRefundSuccessMock: vi.fn(async () => ({ ok: true })),
+    handleRefundSuccessMock: vi.fn(
+      async (): Promise<{ ok: boolean; order: unknown; opened: boolean }> => ({
+        ok: true,
+        order: null,
+        opened: false,
+      })
+    ),
     recordPaymentCompletedMock: vi.fn(async () => {}),
     // ---- Owner Console：analytics 事件 ----
     recordCheckoutCompletedMock: vi.fn(async () => {}),
@@ -75,19 +87,23 @@ vi.mock("@/lib/orders/service", () => ({
   syncSubscriptionPeriod: h.syncSubscriptionPeriodMock,
   handleRefundSuccess: h.handleRefundSuccessMock,
   amountsMatch: (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100),
-  getOrderByOutTradeNo: vi.fn(async (no: string) => h.orderDb.get(no) ?? null),
-  getOrderByOutTradeNoForUser: vi.fn(async () => null),
+  // 三态信封：found / absent（本测试桩只区分这两种）
+  getOrderByOutTradeNo: vi.fn(async (no: string) => {
+    const row = h.orderDb.get(no);
+    return row ? { kind: "found", order: row } : { kind: "absent" };
+  }),
+  getOrderByOutTradeNoForUser: vi.fn(async () => ({ kind: "absent" })),
   findOrderByCreemSubscriptionId: vi.fn(async (subId: string) => {
     for (const o of h.orderDb.values()) {
-      if (o.api_trade_no === subId) return o;
+      if (o.api_trade_no === subId) return { kind: "found", order: o };
     }
-    return null;
+    return { kind: "absent" };
   }),
   findOrderByCreemOrderId: vi.fn(async (ordId: string) => {
     for (const o of h.orderDb.values()) {
-      if (o.trade_no === ordId) return o;
+      if (o.trade_no === ordId) return { kind: "found", order: o };
     }
-    return null;
+    return { kind: "absent" };
   }),
   listUserOrders: vi.fn(async () => []),
   parseOrderParam: vi.fn(() => ({})),

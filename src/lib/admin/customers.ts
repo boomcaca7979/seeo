@@ -58,13 +58,13 @@ export function classifyCustomer(args: {
   now?: number;
 }): CustomerStatus {
   const status = args.subscriptionStatus as SubscriptionStatus;
-  const active = isSubscriptionActive(status, args.currentPeriodEnd);
+  const now = args.now ?? Date.now();
+  const active = isSubscriptionActive(status, args.currentPeriodEnd, now);
   if (active && status === "trialing") return "trial";
   if (active && args.plan !== "free") return "paying";
   if (status === "canceled" || status === "expired") return "canceled";
   if (args.lastActiveAt) {
     const t = Date.parse(args.lastActiveAt);
-    const now = args.now ?? Date.now();
     if (!Number.isNaN(t) && now - t > INACTIVE_AFTER_DAYS * 86_400_000) return "inactive";
   }
   return "free";

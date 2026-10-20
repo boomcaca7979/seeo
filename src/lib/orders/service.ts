@@ -119,44 +119,108 @@ export async function createPendingOrder(args: {
 }
 
 /**
- * 根据 out_trade_no 查询订单
+ * 订单查询三态。
+ * failure（admin 客户端不可用 / PostgREST 报错 / 请求抛异常）绝不能塌成 absent：
+ * 一旦塌成「查不到 = 没有这个订单」，webhook 就会对支付成功事件返回 200 确认收货，
+ * Creem 停止重投，已付款用户的会员开通永久丢失。
+ */
+export type OrderLookupResult =
+  | { kind: "found"; order: OrderRecord }
+  | { kind: "absent" }
+  /** 订单存在但不属于当前用户（对外仍是 403，不回传任何订单内容） */
+  | { kind: "foreign" }
+  | { kind: "failure"; reason: string };
+
+/** SUPABASE_SERVICE_ROLE_KEY 缺失等：依赖不可用，属于故障而非「没有数据」 */
+export const ADMIN_CLIENT_UNAVAILABLE = "ADMIN_CLIENT_UNAVAILABLE";
+
+/** PostgREST 对 .single() 命中 0 行（或多行）返回的固定错误码 */
+const SINGLE_ROW_NO_MATCH = "PGRST116";
+
+type PostgrestErrorLike = { code?: string; message?: string } | null | undefined;
+
+/** 把一次「条件查询」的真实结果映射为三态；只有 PGRST116（0 行）才是 absent */
+function lookupFromSingle(
+  data: Record<string, unknown> | null,
+  error: PostgrestErrorLike
+): OrderLookupResult {
+  if (error) {
+    if (data === null && error.code === SINGLE_ROW_NO_MATCH) return { kind: "absent" };
+    return { kind: "failure", reason: error.message ?? "ORDER_QUERY_FAILED" };
+  }
+  if (!data) return { kind: "absent" };
+  return { kind: "found", order: data as unknown as OrderRecord };
+}
+
+/** limit(1) 型查询（按订阅号 / 渠道订单号定位）：空数组才是 absent */
+function lookupFromList(
+  rows: Array<Record<string, unknown>> | null,
+  error: PostgrestErrorLike
+): OrderLookupResult {
+  if (error) return { kind: "failure", reason: error.message ?? "ORDER_QUERY_FAILED" };
+  const row = rows?.[0];
+  if (!row) return { kind: "absent" };
+  return { kind: "found", order: row as unknown as OrderRecord };
+}
+
+function lookupFromException(err: unknown): OrderLookupResult {
+  return { kind: "failure", reason: err instanceof Error ? err.message : String(err) };
+}
+
+/**
+ * 根据 out_trade_no 查询订单（三态）
  */
 export async function getOrderByOutTradeNo(
   outTradeNo: string
-): Promise<OrderRecord | null> {
+): Promise<OrderLookupResult> {
   const admin = getAdminClient();
-  if (!admin) return null;
+  if (!admin) return { kind: "failure", reason: ADMIN_CLIENT_UNAVAILABLE };
   try {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("orders")
       .select("*")
       .eq("out_trade_no", outTradeNo)
       .single();
-    return (data as unknown as OrderRecord) ?? null;
-  } catch {
-    return null;
+    return lookupFromSingle(data as Record<string, unknown> | null, error);
+  } catch (err) {
+    return lookupFromException(err);
   }
 }
 
 /**
- * 根据 out_trade_no 查询用户自己的订单（带 user_id 校验）
+ * 「按用户查订单」的结果：四种情况必须分开，不能把依赖故障说成订单不存在。
+ * - found：确实是这个用户的订单；
+ * - absent：库里没有这个订单号；
+ * - foreign：订单存在但属于别的账号（对外与 absent 一样不返回订单内容，状态码用 403）；
+ * - failure：服务故障，调用方必须返回 5xx，让支付结果页显示「暂时无法确认」，
+ *   而不是「未找到订单，请重新购买」。
  */
 export async function getOrderByOutTradeNoForUser(
   outTradeNo: string,
   userId: string
-): Promise<OrderRecord | null> {
+): Promise<OrderLookupResult> {
   const admin = getAdminClient();
-  if (!admin) return null;
+  if (!admin) return { kind: "failure", reason: ADMIN_CLIENT_UNAVAILABLE };
   try {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("orders")
       .select("*")
       .eq("out_trade_no", outTradeNo)
       .eq("user_id", userId)
       .single();
-    return (data as unknown as OrderRecord) ?? null;
-  } catch {
-    return null;
+    const own = lookupFromSingle(data as Record<string, unknown> | null, error);
+    if (own.kind !== "absent") return own;
+    // 只在「本用户查不到」这条少见的分支上再判一次：区分订单不存在 / 属于他人。
+    // 探测本身故障时仍按 absent 处理 —— 第一次按 user_id 的查询已确证「这不是你的订单」，
+    // 探测只用于区分 404/403，不能因探测失败把明确结果升级成 503。
+    const probe = await getOrderByOutTradeNo(outTradeNo);
+    if (probe.kind === "found") return { kind: "foreign" };
+    if (probe.kind === "failure") {
+      console.warn("[Orders] 订单归属探测失败，按「订单不属于当前用户」处理:", probe.reason);
+    }
+    return { kind: "absent" };
+  } catch (err) {
+    return lookupFromException(err);
   }
 }
 
@@ -179,6 +243,39 @@ export function parseOrderParam(order: OrderRecord): Record<string, unknown> {
 }
 
 /**
+ * 订单写入类操作的失败语义。
+ * retryable=true：本次处理没有安全落库，调用方（webhook）必须返回 5xx 让渠道重投；
+ * retryable=false：永久性拒绝（订单不存在、金额不符），重投也不会成功。
+ */
+export type OrderServiceFailureCode =
+  | "ADMIN_CLIENT_UNAVAILABLE"
+  | "ORDER_QUERY_FAILED"
+  | "ORDER_NOT_FOUND"
+  | "AMOUNT_MISMATCH"
+  | "PLAN_PRICING_MISSING"
+  | "ORDER_UPDATE_FAILED"
+  | "ORDER_NOT_PAYABLE"
+  | "REFUND_AMOUNT_EXCEEDS";
+
+export interface OrderServiceResult {
+  ok: boolean;
+  order: OrderRecord | null;
+  opened: boolean;
+  error?: string;
+  code?: OrderServiceFailureCode;
+  retryable?: boolean;
+}
+
+function serviceFailure(
+  code: OrderServiceFailureCode,
+  error: string,
+  retryable: boolean,
+  order: OrderRecord | null = null
+): OrderServiceResult {
+  return { ok: false, order, opened: false, error, code, retryable };
+}
+
+/**
  * 完成订单：支付成功后的统一开通会员逻辑
  *
  * 幂等设计：
@@ -193,11 +290,6 @@ export function parseOrderParam(order: OrderRecord): Record<string, unknown> {
  *   会员周期通过 PostgreSQL RPC 原子更新，
  *   使用 FOR UPDATE 行锁串行化同一用户的并发续费。
  *   不再在 JS 层读取 current_period_end 后计算，避免读到旧值。
- *
- * 返回值：
- *   - { ok: true, order, opened: true }  首次开通成功
- *   - { ok: true, order, opened: false } 订单已处理过（幂等）
- *   - { ok: false, error }  失败
  */
 export async function completeOrder(args: {
   outTradeNo: string;
@@ -219,22 +311,22 @@ export async function completeOrder(args: {
     subscriptionId?: string;
     transactionId?: string;
   };
-}): Promise<{
-  ok: boolean;
-  order: OrderRecord | null;
-  opened: boolean;
-  error?: string;
-}> {
+}): Promise<OrderServiceResult> {
   const admin = getAdminClient();
   if (!admin) {
-    return { ok: false, order: null, opened: false, error: "admin client 不可用" };
+    return serviceFailure("ADMIN_CLIENT_UNAVAILABLE", "admin client 不可用", true);
   }
 
-  // 1. 查询订单
-  const order = await getOrderByOutTradeNo(args.outTradeNo);
-  if (!order) {
-    return { ok: false, order: null, opened: false, error: "订单不存在" };
+  // 1. 查询订单：故障与「不存在」是两件事，只有后者可以永久放弃
+  const lookup = await getOrderByOutTradeNo(args.outTradeNo);
+  if (lookup.kind === "failure") {
+    console.error("[Orders] completeOrder 订单查询失败:", args.outTradeNo, lookup.reason);
+    return serviceFailure("ORDER_QUERY_FAILED", `订单查询失败：${lookup.reason}`, true);
   }
+  if (lookup.kind !== "found") {
+    return serviceFailure("ORDER_NOT_FOUND", "订单不存在", false);
+  }
+  const order = lookup.order;
 
   // 2. 幂等：已支付或已退款则不再处理
   if (order.payment_status === "paid" || order.payment_status === "refunded") {
@@ -248,13 +340,13 @@ export async function completeOrder(args: {
       expected: order.amount,
       actual: args.paidAmount,
     });
-    return { ok: false, order, opened: false, error: "订单金额不匹配" };
+    return serviceFailure("AMOUNT_MISMATCH", "订单金额不匹配", false, order);
   }
 
   // 4. 获取套餐配置（用于 periodDays）
   const pricing = PLAN_PRICING[order.plan];
   if (!pricing) {
-    return { ok: false, order, opened: false, error: "套餐价格配置缺失" };
+    return serviceFailure("PLAN_PRICING_MISSING", "套餐价格配置缺失", false, order);
   }
 
   // 5. 使用条件 UPDATE 标记订单为 paid（并发安全）
@@ -285,13 +377,27 @@ export async function completeOrder(args: {
     .single();
 
   if (updateError || !updatedOrder) {
-    // 可能是并发竞争，重新查询订单状态
-    const reloaded = await getOrderByOutTradeNo(args.outTradeNo);
-    if (reloaded && (reloaded.payment_status === "paid" || reloaded.payment_status === "refunded")) {
-      return { ok: true, order: reloaded, opened: false };
+    // 条件 UPDATE 未命中或报错：必须重查确认，既不能凭空断言「已幂等处理」，
+    // 也不能把查询故障说成失败原因不明 —— 重查失败时交给调用方重试。
+    const reload = await getOrderByOutTradeNo(args.outTradeNo);
+    if (reload.kind === "failure") {
+      console.error("[Orders] 条件 UPDATE 失败且重查故障:", updateError?.message, reload.reason);
+      return serviceFailure(
+        "ORDER_UPDATE_FAILED",
+        `订单状态更新失败且无法确认：${reload.reason}`,
+        true,
+        order
+      );
     }
-    console.error("[Orders] 条件 UPDATE 失败:", updateError?.message);
-    return { ok: false, order: reloaded ?? order, opened: false, error: "订单状态更新失败" };
+    if (reload.kind === "found") {
+      if (reload.order.payment_status === "paid" || reload.order.payment_status === "refunded") {
+        return { ok: true, order: reload.order, opened: false };
+      }
+      console.error("[Orders] 条件 UPDATE 失败:", updateError?.message);
+      return serviceFailure("ORDER_UPDATE_FAILED", "订单状态更新失败", true, reload.order);
+    }
+    console.error("[Orders] 条件 UPDATE 后订单消失:", updateError?.message);
+    return serviceFailure("ORDER_UPDATE_FAILED", "订单状态更新失败", true, order);
   }
 
   const finalOrder = updatedOrder as unknown as OrderRecord;
@@ -436,19 +542,36 @@ export async function completeOrder(args: {
 }
 
 /**
- * 标记订单为失败
+ * 标记订单为失败（渠道明确报告支付失败时）。
+ * 返回失败 = 未落库，调用方必须让渠道重投：留在 pending 的失败订单会让
+ * 支付结果页永远显示「确认中」，而 200 确认收货会让这次纠正永久丢失。
  */
-export async function markOrderFailed(outTradeNo: string): Promise<void> {
+export async function markOrderFailed(outTradeNo: string): Promise<OrderServiceResult> {
   const admin = getAdminClient();
-  if (!admin) return;
+  if (!admin) {
+    return serviceFailure("ADMIN_CLIENT_UNAVAILABLE", "admin client 不可用", true);
+  }
   try {
-    await admin
+    const { error } = await admin
       .from("orders")
       .update({ payment_status: "failed" })
       .eq("out_trade_no", outTradeNo)
       .eq("payment_status", "pending");
+    if (error) {
+      return serviceFailure(
+        "ORDER_UPDATE_FAILED",
+        `标记支付失败未落库：${error.message ?? "unknown"}`,
+        true
+      );
+    }
+    return { ok: true, order: null, opened: false };
   } catch (err) {
     console.error("[Orders] 标记失败异常:", err);
+    return serviceFailure(
+      "ORDER_UPDATE_FAILED",
+      `标记支付失败异常：${err instanceof Error ? err.message : String(err)}`,
+      true
+    );
   }
 }
 
@@ -474,30 +597,36 @@ export async function handleRefundSuccess(args: {
   outTradeNo: string;
   refundAmount: number;
   outRefundNo?: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<OrderServiceResult> {
   const admin = getAdminClient();
   if (!admin) {
-    return { ok: false, error: "admin client 不可用" };
+    return serviceFailure("ADMIN_CLIENT_UNAVAILABLE", "admin client 不可用", true);
   }
 
-  // 1. 查询订单
-  const order = await getOrderByOutTradeNo(args.outTradeNo);
-  if (!order) {
-    return { ok: false, error: "订单不存在" };
+  // 1. 查询订单（故障 ≠ 不存在）
+  const lookup = await getOrderByOutTradeNo(args.outTradeNo);
+  if (lookup.kind === "failure") {
+    console.error("[Orders] handleRefundSuccess 订单查询失败:", args.outTradeNo, lookup.reason);
+    return serviceFailure("ORDER_QUERY_FAILED", `订单查询失败：${lookup.reason}`, true);
   }
+  if (lookup.kind !== "found") {
+    return serviceFailure("ORDER_NOT_FOUND", "订单不存在", false);
+  }
+  const order = lookup.order;
 
   // 2. 防止重复退款
   if (order.payment_status === "refunded") {
-    return { ok: true };
+    return { ok: true, order, opened: false };
   }
 
+  // 未支付（含 pending）：退款事件通常先于我们自己的完成处理落库，重投有可能成功
   if (order.payment_status !== "paid") {
-    return { ok: false, error: "订单未支付，不可退款" };
+    return serviceFailure("ORDER_NOT_PAYABLE", "订单未支付，不可退款", true, order);
   }
 
-  // 3. 校验退款金额
+  // 3. 校验退款金额（永久性不一致，重投也不会通过）
   if (args.refundAmount > order.amount) {
-    return { ok: false, error: "退款金额超过订单金额" };
+    return serviceFailure("REFUND_AMOUNT_EXCEEDS", "退款金额超过订单金额", false, order);
   }
 
   // 4. 条件 UPDATE 标记订单为 refunded（防止并发）
@@ -515,12 +644,28 @@ export async function handleRefundSuccess(args: {
     .single();
 
   if (updateError || !updated) {
-    const reloaded = await getOrderByOutTradeNo(args.outTradeNo);
-    if (reloaded?.payment_status === "refunded") {
-      return { ok: true };
+    const reload = await getOrderByOutTradeNo(args.outTradeNo);
+    if (reload.kind === "failure") {
+      console.error("[Orders] 退款更新失败且重查故障:", updateError?.message, reload.reason);
+      return serviceFailure(
+        "ORDER_UPDATE_FAILED",
+        `退款状态更新失败且无法确认：${reload.reason}`,
+        true,
+        order
+      );
     }
-    return { ok: false, error: "订单状态更新失败" };
+    if (reload.kind === "found" && reload.order.payment_status === "refunded") {
+      return { ok: true, order: reload.order, opened: false };
+    }
+    return serviceFailure(
+      "ORDER_UPDATE_FAILED",
+      "订单状态更新失败",
+      true,
+      reload.kind === "found" ? reload.order : order
+    );
   }
+
+  const refundedOrder = updated as unknown as OrderRecord;
 
   // 5. 调用 recompute_membership_after_refund RPC 原子重新计算套餐（B3 修复）
   //    RPC 内部查询所有有效订单，按优先级（pro > lite）计算应得套餐
@@ -538,7 +683,7 @@ export async function handleRefundSuccess(args: {
     console.error("[Orders] recompute_membership_after_refund RPC 异常:", err);
   }
 
-  return { ok: true };
+  return { ok: true, order: refundedOrder, opened: false };
 }
 
 /**
@@ -593,20 +738,22 @@ export async function retryMembershipActivation(order: OrderRecord): Promise<boo
  */
 export async function findOrderByCreemSubscriptionId(
   subscriptionId: string
-): Promise<OrderRecord | null> {
+): Promise<OrderLookupResult> {
   const admin = getAdminClient();
-  if (!admin) return null;
+  if (!admin) return { kind: "failure", reason: ADMIN_CLIENT_UNAVAILABLE };
   try {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("orders")
       .select("*")
       .eq("api_trade_no", subscriptionId)
       .order("created_at", { ascending: false })
       .limit(1);
-    const row = (data as unknown as OrderRecord[] | null)?.[0];
-    return row ?? null;
-  } catch {
-    return null;
+    return lookupFromList(
+      (data as unknown as Array<Record<string, unknown>> | null) ?? null,
+      error
+    );
+  } catch (err) {
+    return lookupFromException(err);
   }
 }
 
@@ -616,20 +763,22 @@ export async function findOrderByCreemSubscriptionId(
  */
 export async function findOrderByCreemOrderId(
   creemOrderId: string
-): Promise<OrderRecord | null> {
+): Promise<OrderLookupResult> {
   const admin = getAdminClient();
-  if (!admin) return null;
+  if (!admin) return { kind: "failure", reason: ADMIN_CLIENT_UNAVAILABLE };
   try {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("orders")
       .select("*")
       .eq("trade_no", creemOrderId)
       .order("created_at", { ascending: false })
       .limit(1);
-    const row = (data as unknown as OrderRecord[] | null)?.[0];
-    return row ?? null;
-  } catch {
-    return null;
+    return lookupFromList(
+      (data as unknown as Array<Record<string, unknown>> | null) ?? null,
+      error
+    );
+  } catch (err) {
+    return lookupFromException(err);
   }
 }
 

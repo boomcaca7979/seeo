@@ -12,8 +12,8 @@ import {
   listTrackedKeywords,
 } from "@/lib/db";
 import { getCompetitorKeywordGap } from "@/lib/seo/competitor-service";
-import { peekUsage, QuotaExceededError } from "@/lib/seo/cache";
-import { SeoProviderError } from "@/lib/seo/provider";
+import { peekUsage } from "@/lib/seo/cache";
+import { serpApiErrorResponse } from "@/lib/seo/serp-route-errors";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 import { resolveSqliteProjectId } from "@/lib/project-ref";
@@ -21,23 +21,7 @@ import { resolveSqliteProjectId } from "@/lib/project-ref";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function mapError(e: unknown) {
-  if (e instanceof SeoProviderError) {
-    const status =
-      e.code === "INVALID_KEY" ? 401 :
-      e.code === "QUOTA_EXCEEDED" ? 429 :
-      e.code === "TIMEOUT" ? 504 :
-      e.code === "BAD_REQUEST" ? 400 : 502;
-    return NextResponse.json<SeoApiError>({ error: e.message, code: e.code }, { status });
-  }
-  if (e instanceof QuotaExceededError) {
-    return NextResponse.json<SeoApiError>({ error: e.message, code: "QUOTA_EXCEEDED" }, { status: 429 });
-  }
-  return NextResponse.json<SeoApiError>(
-    { error: `服务器内部错误：${(e as Error).message}`, code: "UPSTREAM_ERROR" },
-    { status: 500 }
-  );
-}
+
 
 function parseBool(value: string | null): boolean {
   return value === "true" || value === "1";
@@ -117,6 +101,6 @@ export async function GET(req: Request) {
       },
     });
   } catch (e) {
-    return mapError(e);
+    return serpApiErrorResponse(e);
   }
 }

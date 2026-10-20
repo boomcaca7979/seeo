@@ -57,3 +57,9 @@ next-env.d.ts
 # 这是「历史 outreach 的最高可信来源」，与 leads.csv 同级敏感；只做对账，不是第二份潜客库。
 /seo-growth/send-ledger.csv
 /seo-growth/send-ledger.csv.tmp
+
+# L｜主动拓客流水线的**运行中间产物**（probe.jsonl 等含抓取到的公开邮箱，与 leads.csv 同级敏感）
+# 只忽略 runs/ 数据，脚本本身仍需可提交（pipeline.py / probe_lib.py / README.md）。
+/seo-growth/operations/prospecting/runs/
+/seo-growth/operations/prospecting/**/__pycache__/
+seo-growth/operations/prospecting/__pycache__/

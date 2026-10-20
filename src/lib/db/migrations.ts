@@ -4,56 +4,280 @@
 // 以后迁移 Supabase 时只需替换本文件实现，页面/API 路由不动
 
 import * as fsSync from "node:fs";
+import * as os from "node:os";
 import path from "node:path";
-import { SQLiteAdapter, type DBAdapter } from "./adapter";
+import {
+  applyLocalSqlitePragmas,
+  isBusyDbError,
+  SQLiteAdapter,
+  type DBAdapter,
+  type MigrationControl,
+} from "./adapter";
 
-const DB_PATH = path.join(process.cwd(), "data", "seeo.db");
+/**
+ * demo 分支本地 SQLite 路径。
+ * 默认仍是 `<cwd>/data/seeo.db`（生产/demo 行为不变）；`SEO_SQLITE_DB_PATH`
+ * 只用于把这条路径显式指向别处——测试隔离要求每条用例都能声明并断言自己的库。
+ */
+const EXPLICIT_DB_PATH_ENV = "SEO_SQLITE_DB_PATH";
 
-let dbInstance: DBAdapter | null = null;
+export function localSqliteDbPath(): string {
+  const explicit = process.env[EXPLICIT_DB_PATH_ENV]?.trim();
+  return explicit ? path.resolve(explicit) : path.join(process.cwd(), "data", "seeo.db");
+}
 
-export async function getAdapter(): Promise<DBAdapter> {
-  if (!dbInstance) {
-    const tursoUrl = process.env.TURSO_DATABASE_URL;
-    const tursoToken = process.env.TURSO_AUTH_TOKEN;
-    // URL 必须是 libsql:// / https?:// / file: 等合法格式，
-    // 否则 libsql 会在运行时抛晦涩的 URL_INVALID 并演变成 500
-    // （本地常见诱因：next start 加载了从 Vercel 导出的 .env.production 占位值）
-    const isAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
-    const urlValid = !!tursoUrl && /^(libsql|https?|file):\/\//i.test(tursoUrl.trim());
-    if (urlValid && tursoToken) {
-      const { TursoAdapter } = await import("./turso-adapter");
-      dbInstance = new TursoAdapter(tursoUrl.trim(), tursoToken);
-      await migrate(dbInstance);
-    } else if (isAuthEnabled) {
-      // auth-enabled（生产/真实后端）：缺 Turso 配置属部署错误，显式报错而非隐蔽 500
-      throw new Error(
-        "[db] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN missing or invalid. " +
-          "Set valid Turso credentials (libsql://… or https://…) for auth-enabled environments."
+/**
+ * 测试进程绝不允许打开仓库内（或任何临时目录之外）的数据库文件。
+ * 上一轮验收的归属疑问正是「并发测试打开了 <repo>/data/seeo.db」，而事后只能看
+ * 当前 hash、无法证明改动是否由测试产生。判据用「必须在系统临时目录内」而不是
+ * 「不能等于 <cwd>/data」：demo 分支的默认路径就是 `<cwd>/data/seeo.db`，而跨进程
+ * 并发用例正是在临时目录里伪造一个 cwd 来复现 next build worker——前者要被拦，
+ * 后者必须放行，只有临时目录判据能同时满足。
+ */
+function refuseNonTempDbInTests(dbPath: string, source: string): void {
+  if (process.env.VITEST !== "true") return;
+  const tmp = os.tmpdir();
+  const realTmp = fsSync.existsSync(tmp) ? fsSync.realpathSync(tmp) : tmp;
+  if (dbPath.startsWith(tmp) || dbPath.startsWith(realTmp)) return;
+  throw new Error(
+    `[db] Test isolation: refusing the non-temporary database at ${dbPath} (resolved from ${source}); ` +
+      `tests must run on a database inside ${realTmp}. Set ${EXPLICIT_DB_PATH_ENV}=<tmpdir>/xxx.db ` +
+      "(or TURSO_DATABASE_URL=file://<tmpdir>/xxx.db) so every case runs on its own temporary database."
+  );
+}
+
+/** `file://` URL → 可比较的绝对路径（非 file: 协议返回 null，远程库不归本闸门管） */
+function localPathFromDbUrl(url: string): string | null {
+  if (!/^file:\/\//i.test(url)) return null;
+  return path.resolve(decodeURIComponent(url.replace(/^file:\/\//i, "")));
+}
+
+/**
+ * schema 版本契约（写在库里的 `PRAGMA user_version`）。
+ * 等于 SCHEMA_VERSION 表示下面的 migrate() 已完整应用过一次；旧库存的是 0，
+ * 首次初始化会幂等补跑一遍再盖章，因此不需要人工搬数据。
+ * 增删迁移步骤时把 SCHEMA_VERSION +1；读到比它更大的值说明代码比库旧（回滚部署），
+ * 此时只做观测、不覆写、不报错——绝不能把新库的版本号倒退回旧版本。
+ */
+export const SCHEMA_VERSION = 1;
+
+export type SchemaInitReason = "applied" | "current" | "ahead" | "unversioned";
+
+export interface SchemaInitResult {
+  /** 本次初始化是否真的执行了迁移体（false = 库里版本已满足，只做了一次读） */
+  applied: boolean;
+  version: number;
+  reason: SchemaInitReason;
+}
+
+/** 写锁冲突重试上限（busy_timeout 已让并发 worker 排队，这里只兜住排队仍超时的情况） */
+const MIGRATION_ATTEMPTS = 4;
+
+let dbPromise: Promise<DBAdapter> | null = null;
+let lastSchemaInit: SchemaInitResult | null = null;
+
+export function getAdapter(): Promise<DBAdapter> {
+  // 记忆化 promise 而不是实例：同进程内的并发首调共享同一次建连 + 同一次迁移，
+  // 不再各跑各的迁移去抢写锁。失败必须清空，让下一次调用重新初始化。
+  if (!dbPromise) {
+    dbPromise = openAdapter().catch((err: unknown) => {
+      dbPromise = null;
+      throw err;
+    });
+  }
+  return dbPromise;
+}
+
+/** 最近一次初始化的迁移结论（诊断与并发测试用；尚未初始化时为 null） */
+export function getSchemaInitResult(): SchemaInitResult | null {
+  return lastSchemaInit;
+}
+
+async function openAdapter(): Promise<DBAdapter> {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+  // URL 必须是 libsql:// / https?:// / file: 等合法格式，
+  // 否则 libsql 会在运行时抛晦涩的 URL_INVALID 并演变成 500
+  // （本地常见诱因：next start 加载了从 Vercel 导出的 .env.production 占位值）
+  const isAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
+  const urlValid = !!tursoUrl && /^(libsql|https?|file):\/\//i.test(tursoUrl.trim());
+
+  let db: DBAdapter;
+  if (urlValid && tursoToken) {
+    const local = localPathFromDbUrl(tursoUrl!.trim());
+    if (local) refuseNonTempDbInTests(local, "TURSO_DATABASE_URL");
+    const { TursoAdapter } = await import("./turso-adapter");
+    db = new TursoAdapter(tursoUrl.trim(), tursoToken);
+  } else if (isAuthEnabled) {
+    // auth-enabled（生产/真实后端）：缺 Turso 配置属部署错误，显式报错而非隐蔽 500
+    throw new Error(
+      "[db] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN missing or invalid. " +
+        "Set valid Turso credentials (libsql://… or https://…) for auth-enabled environments."
+    );
+  } else {
+    // demo / auth-disabled：无需远程数据库，回退本地 SQLite（data/seeo.db）
+    const dbPath = localSqliteDbPath();
+    refuseNonTempDbInTests(
+      dbPath,
+      process.env[EXPLICIT_DB_PATH_ENV]?.trim() ? EXPLICIT_DB_PATH_ENV : "implicit demo default"
+    );
+    if (tursoUrl || tursoToken) {
+      console.warn(
+        "[db] Ignored invalid TURSO_DATABASE_URL/TURSO_AUTH_TOKEN (demo mode, auth disabled) — falling back to local SQLite."
       );
-    } else {
-      // demo / auth-disabled：无需远程数据库，回退本地 SQLite（data/seeo.db）
-      if (tursoUrl || tursoToken) {
-        console.warn(
-          "[db] Ignored invalid TURSO_DATABASE_URL/TURSO_AUTH_TOKEN (demo mode, auth disabled) — falling back to local SQLite."
-        );
+    }
+    // local SQLite（动态 import 避免 Vercel 构建时加载原生模块）
+    const dir = path.dirname(dbPath);
+    if (!fsSync.existsSync(dir)) fsSync.mkdirSync(dir, { recursive: true });
+    const { default: Database } = await import("better-sqlite3");
+    const raw = new Database(dbPath);
+    // busy_timeout / foreign_keys / WAL 的连接级准备（含 WAL 转换的等锁退避）
+    // 必须在任何迁移语句之前完成，否则并发 worker 会在这里抛「database is locked」。
+    await applyLocalSqlitePragmas(raw);
+    db = new SQLiteAdapter(raw);
+  }
+
+  try {
+    lastSchemaInit = await ensureSchema(db);
+  } catch (err) {
+    // 迁移没成功 = 这个连接不可信：关掉并把原始错误抛给调用方，
+    // 绝不返回一个「看起来初始化完成」的半迁移实例。
+    db.close();
+    throw err;
+  }
+  return db;
+}
+
+/**
+ * 迁移闸门：把「检查版本 → 应用迁移 → 盖章」放进独占写锁，多 worker 只有一个真跑。
+ *
+ * 稳态（user_version 已等于 SCHEMA_VERSION）只剩一次 PRAGMA 读、零写入，
+ * 因此 `next build` 的 9 个 worker 不再互相踩写锁；
+ * 冷启动时后进者按 busy_timeout 排队，拿到锁后在锁内复查版本 → 直接跳过。
+ * 任何一步真失败都原样上抛：不吞 SQLITE_BUSY、不把失败的迁移当成成功、也不无条件跳过。
+ */
+export async function ensureSchema(db: DBAdapter): Promise<SchemaInitResult> {
+  const control = db.migrationControl?.() ?? null;
+  if (!control) {
+    // 远端 Turso 没有本地文件写锁语义（服务端自己串行化写），
+    // 维持旧行为：每次进程初始化幂等执行迁移体，不做版本盖章。
+    await migrate(db);
+    return { applied: true, version: 0, reason: "unversioned" };
+  }
+
+  const version = await control.readVersion();
+  if (version > SCHEMA_VERSION) return { applied: false, version, reason: "ahead" };
+  if (version === SCHEMA_VERSION) return { applied: false, version, reason: "current" };
+
+  return applyUnderLock(control);
+}
+
+async function applyUnderLock(control: MigrationControl): Promise<SchemaInitResult> {
+  let lastBusy: unknown = null;
+
+  for (let attempt = 0; attempt < MIGRATION_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(50 * 2 ** (attempt - 1));
+
+    let lock;
+    try {
+      // BEGIN IMMEDIATE：拿不到写锁时连接级 busy_timeout 会先等，等满才抛错
+      lock = await control.acquireLock();
+    } catch (err) {
+      if (!isBusyDbError(err)) throw err;
+      lastBusy = err;
+      continue;
+    }
+
+    try {
+      // 锁内复查：排队期间可能已有 worker 把迁移跑完并提交
+      const inside = await lock.getVersion();
+      if (inside >= SCHEMA_VERSION) {
+        await lock.commit();
+        return {
+          applied: false,
+          version: inside,
+          reason: inside > SCHEMA_VERSION ? "ahead" : "current",
+        };
       }
-      // local SQLite（动态 import 避免 Vercel 构建时加载原生模块）
-      const dir = path.dirname(DB_PATH);
-      if (!fsSync.existsSync(dir)) fsSync.mkdirSync(dir, { recursive: true });
-      const { default: Database } = await import("better-sqlite3");
-      const raw = new Database(DB_PATH);
-      raw.pragma("journal_mode = WAL");
-      raw.pragma("foreign_keys = ON");
-      dbInstance = new SQLiteAdapter(raw);
-      await migrate(dbInstance);
+      await migrate(lock.adapter);
+      await lock.setVersion(SCHEMA_VERSION);
+      await lock.commit();
+      return { applied: true, version: SCHEMA_VERSION, reason: "applied" };
+    } catch (err) {
+      // SQLite 的 DDL 是事务性的：回滚后库里不会留下半套结构，
+      // 只有锁冲突这种「别人正占着写锁」才重试，其余错误直接上抛。
+      await lock.rollback();
+      if (!isBusyDbError(err)) throw err;
+      lastBusy = err;
     }
   }
-  return dbInstance;
+
+  throw new Error(
+    `[db] migration still blocked after ${MIGRATION_ATTEMPTS} attempts (write lock held by another connection)`,
+    { cause: lastBusy }
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** PRAGMA 不接受绑定参数，标识符必须先过白名单，避免拼接面被打开 */
+const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+async function tableExists(db: DBAdapter, table: string): Promise<boolean> {
+  const row = (await db.get(
+    `SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`,
+    [table]
+  )) as { ok?: number } | undefined;
+  return row?.ok === 1;
+}
+
+/**
+ * 附加式补列：表不存在就什么也不做（新库由下面的 CREATE TABLE 直接带出该列），
+ * 列已存在就什么也不做，其余情况真正执行 ALTER。
+ * 出错一律上抛——旧写法把「duplicate column」之外的故障（表缺了、锁超时、语法错）
+ * 一起当成「列已存在」吞掉，迁移失败也能盖章成功。
+ */
+async function addColumnIfMissing(
+  db: DBAdapter,
+  table: string,
+  column: string,
+  definition: string
+): Promise<void> {
+  if (!SAFE_IDENTIFIER.test(table) || !SAFE_IDENTIFIER.test(column)) {
+    throw new Error(`[db] unsafe identifier in migration: ${table}.${column}`);
+  }
+  if (!(await tableExists(db, table))) return;
+  const columns = (await db.query(`PRAGMA table_info(${table})`)) as { name: string }[];
+  if (columns.some((c) => c.name === column)) return;
+  await db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/**
+ * 旧库表重建：只有 sqlite_master 里确实读到旧定义（legacyMarker）时才重建。
+ * 不 catch——重建失败必须让整个迁移失败，否则「升级没做成」会被当成成功盖章。
+ */
+async function rebuildTableIfLegacy(
+  db: DBAdapter,
+  table: string,
+  legacyMarker: string,
+  rebuildSql: string
+): Promise<void> {
+  if (!SAFE_IDENTIFIER.test(table)) {
+    throw new Error(`[db] unsafe identifier in migration: ${table}`);
+  }
+  const row = (await db.get(
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name=?`,
+    [table]
+  )) as { sql: string | null } | undefined;
+  if (!row?.sql || !row.sql.includes(legacyMarker)) return;
+  await db.exec(rebuildSql);
 }
 
 async function migrate(db: DBAdapter): Promise<void> {
   // 先补 user_id 列：旧库的表已存在但缺 user_id，需在 CREATE INDEX 引用前补上
-  // 新库此时表不存在，ALTER TABLE 报错被 catch 忽略，随后 CREATE TABLE 会建带 user_id 的表
+  // 新库此时表不存在，addColumnIfMissing 直接跳过，随后 CREATE TABLE 建带 user_id 的表
   const userIdTables = [
     'tracked_keywords', 'rank_history', 'content_checks', 'audits',
     'audit_issues', 'alerts', 'projects', 'automation_settings',
@@ -62,27 +286,15 @@ async function migrate(db: DBAdapter): Promise<void> {
     'backlink_summaries', 'backlinks',
   ];
   for (const table of userIdTables) {
-    try {
-      await db.run(`ALTER TABLE ${table} ADD COLUMN user_id TEXT NOT NULL DEFAULT 'demo-user'`);
-    } catch {
-      // 表不存在或列已存在，忽略
-    }
+    await addColumnIfMissing(db, table, "user_id", "TEXT NOT NULL DEFAULT 'demo-user'");
   }
 
   // P0-02-D：rank_history 补 feature_types 列（旧库已存在表，需 ALTER；新库由 CREATE TABLE 建出）
-  try {
-    await db.run(`ALTER TABLE rank_history ADD COLUMN feature_types TEXT`);
-  } catch {
-    // 表不存在或列已存在，忽略
-  }
+  await addColumnIfMissing(db, "rank_history", "feature_types", "TEXT");
 
   // 2026-10-09 合规整改：email_preferences 补**显式营销同意**时间列。
   // 旧库只有退订列（opt-out），需 ALTER；新库由下方 CREATE TABLE 建出。NULL = 未同意。
-  try {
-    await db.run(`ALTER TABLE email_preferences ADD COLUMN marketing_opt_in_at TEXT`);
-  } catch {
-    // 表不存在或列已存在，忽略
-  }
+  await addColumnIfMissing(db, "email_preferences", "marketing_opt_in_at", "TEXT");
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_keywords (
@@ -915,169 +1127,119 @@ async function migrate(db: DBAdapter): Promise<void> {
   `);
 
   // Owner Console：analytics_events 补 content / term 列（归因完整性，附加式、旧数据不动）
-  try {
-    await db.run(`ALTER TABLE analytics_events ADD COLUMN content TEXT`);
-  } catch {
-    // 列已存在，忽略
-  }
-  try {
-    await db.run(`ALTER TABLE analytics_events ADD COLUMN term TEXT`);
-  } catch {
-    // 列已存在，忽略
-  }
+  await addColumnIfMissing(db, "analytics_events", "content", "TEXT");
+  await addColumnIfMissing(db, "analytics_events", "term", "TEXT");
 
   // projects 表升级：旧表 domain 是全局 UNIQUE，多用户下同域名冲突，重建为 (user_id, domain) 联合唯一
-  try {
-    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='projects'`) as { sql: string } | undefined;
-    if (tableDef?.sql && tableDef.sql.includes('domain TEXT NOT NULL UNIQUE')) {
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS projects_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          domain TEXT NOT NULL,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          user_id TEXT NOT NULL DEFAULT 'demo-user',
-          UNIQUE (user_id, domain)
-        );
-        INSERT OR IGNORE INTO projects_new (id, name, domain, created_at, user_id)
-        SELECT id, name, domain, created_at, user_id FROM projects;
-        DROP TABLE projects;
-        ALTER TABLE projects_new RENAME TO projects;
-        CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
-        CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
-      `);
-    }
-  } catch {
-    // 升级失败（可能已是新结构），忽略
-  }
+  await rebuildTableIfLegacy(
+    db,
+    "projects",
+    "domain TEXT NOT NULL UNIQUE",
+    `
+      CREATE TABLE IF NOT EXISTS projects_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        user_id TEXT NOT NULL DEFAULT 'demo-user',
+        UNIQUE (user_id, domain)
+      );
+      INSERT OR IGNORE INTO projects_new (id, name, domain, created_at, user_id)
+      SELECT id, name, domain, created_at, user_id FROM projects;
+      DROP TABLE projects;
+      ALTER TABLE projects_new RENAME TO projects;
+      CREATE INDEX IF NOT EXISTS idx_projects_domain ON projects(domain);
+      CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
+    `
+  );
 
   // backlink_summaries 表升级：同 projects，domain 全局 UNIQUE 改为 (user_id, domain) 联合唯一
-  try {
-    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='backlink_summaries'`) as { sql: string } | undefined;
-    if (tableDef?.sql && tableDef.sql.includes('domain TEXT NOT NULL UNIQUE')) {
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS backlink_summaries_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          domain TEXT NOT NULL,
-          total_backlinks INTEGER,
-          referring_domains INTEGER,
-          domain_rank INTEGER,
-          dofollow_pct REAL,
-          raw_json TEXT,
-          fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
-          user_id TEXT NOT NULL DEFAULT 'demo-user',
-          UNIQUE (user_id, domain)
-        );
-        INSERT OR IGNORE INTO backlink_summaries_new (id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id)
-        SELECT id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id FROM backlink_summaries;
-        DROP TABLE backlink_summaries;
-        ALTER TABLE backlink_summaries_new RENAME TO backlink_summaries;
-        CREATE INDEX IF NOT EXISTS idx_backlink_summaries_user ON backlink_summaries(user_id);
-      `);
-    }
-  } catch {
-    // 升级失败（可能已是新结构），忽略
-  }
+  await rebuildTableIfLegacy(
+    db,
+    "backlink_summaries",
+    "domain TEXT NOT NULL UNIQUE",
+    `
+      CREATE TABLE IF NOT EXISTS backlink_summaries_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        domain TEXT NOT NULL,
+        total_backlinks INTEGER,
+        referring_domains INTEGER,
+        domain_rank INTEGER,
+        dofollow_pct REAL,
+        raw_json TEXT,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+        user_id TEXT NOT NULL DEFAULT 'demo-user',
+        UNIQUE (user_id, domain)
+      );
+      INSERT OR IGNORE INTO backlink_summaries_new (id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id)
+      SELECT id, domain, total_backlinks, referring_domains, domain_rank, dofollow_pct, raw_json, fetched_at, user_id FROM backlink_summaries;
+      DROP TABLE backlink_summaries;
+      ALTER TABLE backlink_summaries_new RENAME TO backlink_summaries;
+      CREATE INDEX IF NOT EXISTS idx_backlink_summaries_user ON backlink_summaries(user_id);
+    `
+  );
 
   // automation_settings 表升级：旧表有 CHECK (id = 1) 单行约束，需重建为多行（按 user_id）
-  try {
-    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='automation_settings'`) as { sql: string } | undefined;
-    if (tableDef?.sql && tableDef.sql.includes('CHECK (id = 1)')) {
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS automation_settings_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          daily_refresh_enabled INTEGER NOT NULL DEFAULT 0,
-          daily_refresh_time TEXT NOT NULL DEFAULT '09:00',
-          weekly_report_enabled INTEGER NOT NULL DEFAULT 0,
-          weekly_report_day INTEGER NOT NULL DEFAULT 1,
-          weekly_report_time TEXT NOT NULL DEFAULT '09:00',
-          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-          user_id TEXT NOT NULL UNIQUE DEFAULT 'demo-user'
-        );
-        INSERT OR IGNORE INTO automation_settings_new (id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id)
-        SELECT id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id FROM automation_settings;
-        DROP TABLE automation_settings;
-        ALTER TABLE automation_settings_new RENAME TO automation_settings;
-        CREATE INDEX IF NOT EXISTS idx_automation_settings_user ON automation_settings(user_id);
-      `);
-    }
-  } catch {
-    // 升级失败（可能已是新结构），忽略
-  }
+  await rebuildTableIfLegacy(
+    db,
+    "automation_settings",
+    "CHECK (id = 1)",
+    `
+      CREATE TABLE IF NOT EXISTS automation_settings_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        daily_refresh_enabled INTEGER NOT NULL DEFAULT 0,
+        daily_refresh_time TEXT NOT NULL DEFAULT '09:00',
+        weekly_report_enabled INTEGER NOT NULL DEFAULT 0,
+        weekly_report_day INTEGER NOT NULL DEFAULT 1,
+        weekly_report_time TEXT NOT NULL DEFAULT '09:00',
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        user_id TEXT NOT NULL UNIQUE DEFAULT 'demo-user'
+      );
+      INSERT OR IGNORE INTO automation_settings_new (id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id)
+      SELECT id, daily_refresh_enabled, daily_refresh_time, weekly_report_enabled, weekly_report_day, weekly_report_time, updated_at, user_id FROM automation_settings;
+      DROP TABLE automation_settings;
+      ALTER TABLE automation_settings_new RENAME TO automation_settings;
+      CREATE INDEX IF NOT EXISTS idx_automation_settings_user ON automation_settings(user_id);
+    `
+  );
 
   // api_usage_per_user 表升级：旧表 CHECK 约束仅含 serpapi/dataforseo，需重建以支持 content_check
-  try {
-    const tableDef = await db.get(`SELECT sql FROM sqlite_master WHERE type='table' AND name='api_usage_per_user'`) as { sql: string } | undefined;
-    if (tableDef?.sql && tableDef.sql.includes("CHECK (api_type IN ('serpapi', 'dataforseo'))")) {
-      await db.exec(`
-        CREATE TABLE IF NOT EXISTS api_usage_per_user_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id TEXT NOT NULL,
-          api_type TEXT NOT NULL CHECK (api_type IN ('serpapi', 'dataforseo', 'content_check')),
-          month TEXT NOT NULL,
-          used INTEGER NOT NULL DEFAULT 0,
-          "limit" INTEGER NOT NULL DEFAULT 100,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          UNIQUE (user_id, api_type, month)
-        );
-        INSERT OR IGNORE INTO api_usage_per_user_new (id, user_id, api_type, month, used, "limit", created_at, updated_at)
-        SELECT id, user_id, api_type, month, used, "limit", created_at, updated_at FROM api_usage_per_user;
-        DROP TABLE api_usage_per_user;
-        ALTER TABLE api_usage_per_user_new RENAME TO api_usage_per_user;
-        CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_user ON api_usage_per_user(user_id);
-        CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_month ON api_usage_per_user(month);
-      `);
-    }
-  } catch {
-    // 升级失败（可能已是新结构），忽略
-  }
+  await rebuildTableIfLegacy(
+    db,
+    "api_usage_per_user",
+    "CHECK (api_type IN ('serpapi', 'dataforseo'))",
+    `
+      CREATE TABLE IF NOT EXISTS api_usage_per_user_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        api_type TEXT NOT NULL CHECK (api_type IN ('serpapi', 'dataforseo', 'content_check')),
+        month TEXT NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        "limit" INTEGER NOT NULL DEFAULT 100,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (user_id, api_type, month)
+      );
+      INSERT OR IGNORE INTO api_usage_per_user_new (id, user_id, api_type, month, used, "limit", created_at, updated_at)
+      SELECT id, user_id, api_type, month, used, "limit", created_at, updated_at FROM api_usage_per_user;
+      DROP TABLE api_usage_per_user;
+      ALTER TABLE api_usage_per_user_new RENAME TO api_usage_per_user;
+      CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_user ON api_usage_per_user(user_id);
+      CREATE INDEX IF NOT EXISTS idx_api_usage_per_user_month ON api_usage_per_user(month);
+    `
+  );
 
-  // 审计表新增 comparison 字段（ALTER TABLE 兼容已有数据）
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN comparison TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
-
-  // 审计表新增 error 字段（ALTER TABLE 兼容已有数据）
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN error TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
-
-  // 审计表新增 depth 字段（ALTER TABLE 兼容已有数据）
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN depth TEXT NOT NULL DEFAULT 'quick'`);
-  } catch {
-    // 字段已存在，忽略
-  }
-
-  // 审计表新增 pages_detail 字段（JSON：[{url, responseTimeMs, status}]，用于响应时间分布图）
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN pages_detail TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
-
+  // 审计表新增字段（ALTER TABLE 兼容已有数据）
+  await addColumnIfMissing(db, "audits", "comparison", "TEXT");
+  await addColumnIfMissing(db, "audits", "error", "TEXT");
+  await addColumnIfMissing(db, "audits", "depth", "TEXT NOT NULL DEFAULT 'quick'");
+  // pages_detail：JSON [{url, responseTimeMs, status}]，用于响应时间分布图
+  await addColumnIfMissing(db, "audits", "pages_detail", "TEXT");
   // Audit Engine V2：记录引擎与规则集版本，规则演进后历史结果仍可解释
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN engine_version TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN rule_set_version TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
+  await addColumnIfMissing(db, "audits", "engine_version", "TEXT");
+  await addColumnIfMissing(db, "audits", "rule_set_version", "TEXT");
   // Audit Dashboard V2：完整快照（页面/规则/分数/分类/报告），Dashboard 单一数据源
-  try {
-    await db.run(`ALTER TABLE audits ADD COLUMN dashboard_json TEXT`);
-  } catch {
-    // 字段已存在，忽略
-  }
+  await addColumnIfMissing(db, "audits", "dashboard_json", "TEXT");
 
   // content_checks 表新增字段（ALTER TABLE 兼容已有数据）
   const contentCheckColumns: Array<[string, string]> = [
@@ -1099,11 +1261,7 @@ async function migrate(db: DBAdapter): Promise<void> {
     ["comparison", "TEXT"],
   ];
   for (const [col, type] of contentCheckColumns) {
-    try {
-      await db.run(`ALTER TABLE content_checks ADD COLUMN ${col} ${type}`);
-    } catch {
-      // 字段已存在，忽略
-    }
+    await addColumnIfMissing(db, "content_checks", col, type);
   }
 
   // 插入默认自动化配置（单条记录，id=1）
@@ -1125,10 +1283,12 @@ async function migrateProjectsFromTrackedKeywords(db: DBAdapter): Promise<void> 
 }
 
 export function closeDb(): void {
-  if (dbInstance) {
-    dbInstance.close();
-    dbInstance = null;
-  }
+  const pending = dbPromise;
+  dbPromise = null;
+  lastSchemaInit = null;
+  if (!pending) return;
+  // 连接可能仍在初始化中：等它落地再关，避免留下半开连接
+  void pending.then((db) => db.close()).catch(() => {});
 }
 
 // 注意：不在模块顶层调用 ensureDir()

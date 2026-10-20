@@ -8,7 +8,8 @@ import { isAuthEnabled } from "@/lib/auth-config";
 import { createBrowser } from "@/lib/supabase/browser";
 import { handleBillingError } from "@/lib/billing-error-client";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
-import { PLAN_LABELS, planLabel, FEATURE_LABELS, featureLabel } from "@/lib/plan-labels";
+import { PLAN_LABELS, planLabel, FEATURE_LABELS, featureLabel, subscriptionStatusLabel } from "@/lib/plan-labels";
+import PageHeader from "@/components/viz/PageHeader";
 
 type TabKey = "account" | "plan" | "usage" | "automation";
 
@@ -306,26 +307,23 @@ function SettingsContent() {
   ];
 
   return (
-    <div className="dash-container p-6 lg:p-8">
-      {/* 页头：编号 + 标题 + 发丝线 */}
-      <div className="flex items-center gap-3">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("title")}
-        </h1>
-        <div className="hairline flex-1" />
-      </div>
-      <p className="mt-2 font-sans text-sm text-ink-60">
-        {t("subtitle")}
-      </p>
+    <div className="dash-container p-4 lg:p-8">
+      {/* 页头：标题 + 副标题（统一 PageHeader） */}
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* 左侧 Tab */}
-        <nav className="lg:col-span-3">
-          <ul className="flex gap-1 overflow-x-auto rounded-lg border border-line bg-card p-2 lg:flex-col lg:overflow-visible">
+        <nav className="lg:col-span-3" aria-label={t("title")}>
+          {/* BUG-36：与审计页同一套「标签」语义（audit 早已 role=tablist/aria-selected），设置页四个标签此前只是普通按钮 */}
+          <ul role="tablist" className="flex gap-1 overflow-x-auto rounded-lg border border-line bg-card p-2 lg:flex-col lg:overflow-visible">
             {tabs.map((t) => (
-              <li key={t.key} className="flex-shrink-0">
+              <li key={t.key} role="presentation" className="flex-shrink-0">
                 <button
                   onClick={() => setTab(t.key)}
+                  id={`settings-tab-${t.key}`}
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  aria-controls="settings-panel"
                   className={`w-full whitespace-nowrap rounded-md px-3 py-2 text-left font-sans text-sm font-medium transition-colors ${
                     tab === t.key
                       ? "bg-brand/15 text-ink"
@@ -340,7 +338,7 @@ function SettingsContent() {
         </nav>
 
         {/* 右侧内容 */}
-        <div className="lg:col-span-9">
+        <div className="lg:col-span-9" id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
           {/* 账号信息 */}
           {tab === "account" && (
             <div className="card-a p-6">
@@ -695,12 +693,13 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               {t("dailyDesc")}
             </p>
           </div>
-          <Toggle checked={dailyEnabled} onChange={setDailyEnabled} />
+          <Toggle checked={dailyEnabled} onChange={setDailyEnabled} label={t("dailyTitle")} />
         </div>
         {dailyEnabled && (
           <div className="mt-5 flex items-center gap-3 border-t border-line-soft pt-5">
-            <label className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
+            <label htmlFor="daily-refresh-time" className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
             <input
+              id="daily-refresh-time"
               type="time"
               value={dailyTime}
               onChange={(e) => setDailyTime(e.target.value)}
@@ -720,13 +719,14 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               {t("weeklyDesc")}
             </p>
           </div>
-          <Toggle checked={weeklyEnabled} onChange={setWeeklyEnabled} />
+          <Toggle checked={weeklyEnabled} onChange={setWeeklyEnabled} label={t("weeklyTitle")} />
         </div>
         {weeklyEnabled && (
           <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line-soft pt-5">
             <div className="flex items-center gap-2">
-              <label className="font-mono text-xs text-ink-60">{t("runDayLabel")}</label>
+              <label htmlFor="weekly-run-day" className="font-mono text-xs text-ink-60">{t("runDayLabel")}</label>
               <select
+                id="weekly-run-day"
                 value={weeklyDay}
                 onChange={(e) => setWeeklyDay(Number(e.target.value))}
                 className="rounded-md border border-line bg-card h-8 px-3 font-sans text-sm text-ink focus:border-ink-25 focus:outline-none"
@@ -737,8 +737,9 @@ function AutomationPanel({ showToast }: { showToast: (msg: string, type?: "info"
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
+              <label htmlFor="weekly-run-time" className="font-mono text-xs text-ink-60">{t("runTimeLabel")}</label>
               <input
+                id="weekly-run-time"
                 type="time"
                 value={weeklyTime}
                 onChange={(e) => setWeeklyTime(e.target.value)}
@@ -911,14 +912,15 @@ function CacheManagement({ showToast }: { showToast: (msg: string, type?: "info"
 
   return (
     <div className="card-a p-6">
-      <div className="flex items-center justify-between gap-4">
+      {/* BUG-39：窄屏下三段内容（文案 / 条目数 / 按钮）挤在一行，标题被压到 16px 宽、数字压到文案上；小屏改为纵向堆叠 */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h2 className="font-display text-lg font-semibold text-ink">{t("cacheTitle")}</h2>
           <p className="mt-1 font-mono text-xs text-ink-40">
             {t("cacheDesc")}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-4">
+        <div className="flex items-center justify-between gap-4 sm:flex-shrink-0">
           <div className="text-right">
             <div className="font-mono text-2xl font-semibold text-ink">
               {total === null ? "—" : formatNumber(total, locale)}
@@ -980,6 +982,7 @@ function UsageDashboard({
   }
 
   const currentPlanName = planLabel(usageData.plan, locale);
+  const currentStatusName = subscriptionStatusLabel(usageData.subscriptionStatus, locale);
 
   // 用量项列表（serpapiDaily 仅在套餐配置了每日限额时展示，limit=0 表示无日度限制）
   const usageItems = [
@@ -1000,7 +1003,7 @@ function UsageDashboard({
           <div>
             <h2 className="font-display text-lg font-semibold text-ink">{t("planUsageTitle")}</h2>
             <p className="mt-1 font-mono text-xs text-ink-40">
-              {t("currentStatusLine", { plan: currentPlanName, status: usageData.subscriptionStatus })}
+              {t("currentStatusLine", { plan: currentPlanName, status: currentStatusName })}
             </p>
           </div>
           <button onClick={onRefresh} className="btn-secondary">
@@ -1103,12 +1106,13 @@ function UsageDashboard({
 
 // ===== Toggle 开关组件 =====
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border transition-colors ${
         checked

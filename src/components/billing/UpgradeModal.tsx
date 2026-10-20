@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { planLabel, featureLabel } from "@/lib/plan-labels";
 import { formatNumber } from "@/lib/ui-locale";
+import { useDialogA11y } from "@/lib/useDialogA11y";
 
 // ===== 升级引导 Modal =====
 // 由全局 BillingEventBus 触发，或由各页面手动 open
@@ -18,6 +19,12 @@ export interface UpgradeModalState {
   feature?: string;
   limit?: number;
   used?: number;
+  /**
+   * 关键词数量上限专用口径（KEYWORD_LIMIT_REACHED）：
+   * total = 账号追踪关键词总数，limit = 当前套餐允许的追踪关键词上限。
+   * 传入后不再渲染通用「用量：used / limit」单行比例，避免被当成单个指标或误读成 API 用量。
+   */
+  keywordQuota?: { total: number; limit: number };
 }
 
 const PLAN_ORDER: string[] = ["free", "lite", "pro"];
@@ -37,22 +44,16 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
   const t = useTranslations("dashboard.upgrade");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
-  const { open, currentPlan, requiredPlan, reason, feature, limit, used } = state;
+  const { open, currentPlan, requiredPlan, reason, feature, limit, used, keywordQuota } = state;
   const recommendPlan = requiredPlan ?? getNextPlan(currentPlan);
   const recommendLabel = recommendPlan ? planLabel(recommendPlan, locale) : null;
   const currentPlanLabel = planLabel(currentPlan, locale);
   const featureLabelText = feature ? featureLabel(feature, locale) : null;
   const isTopPlan = !recommendPlan;
 
-  // ESC 关闭
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  // ESC 关闭 + 焦点进入/归还 + Tab 循环（与共享 Modal 同一套语义）
+  const titleId = useId();
+  const panelRef = useDialogA11y(open, onClose);
 
   if (!open) return null;
 
@@ -62,13 +63,18 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className="w-full max-w-md rounded-lg border border-line bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题 */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="font-display text-lg font-semibold text-ink">
+            <h3 id={titleId} className="font-display text-lg font-semibold text-ink">
               {isTopPlan ? t("topTitle") : t("title")}
             </h3>
             <p className="mt-1 font-mono text-xs text-ink-40">
@@ -100,10 +106,39 @@ export default function UpgradeModal({ state, onClose }: UpgradeModalProps) {
               {reason}
             </p>
           )}
-          {typeof used === "number" && typeof limit === "number" && (
-            <p className="mt-1 font-mono text-xs text-ink-60">
-              {t("usage", { used: formatNumber(used, locale), limit: formatNumber(limit, locale) })}
-            </p>
+          {keywordQuota ? (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-sans text-xs text-ink-40">{t("keywordUsageTotal")}</span>
+                <span className="font-mono text-xs font-semibold text-ink">
+                  {formatNumber(keywordQuota.total, locale)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-sans text-xs text-ink-40">{t("keywordUsageLimit")}</span>
+                <span className="font-mono text-xs font-semibold text-ink">
+                  {formatNumber(keywordQuota.limit, locale)}
+                </span>
+              </div>
+              {keywordQuota.total > keywordQuota.limit && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-sans text-xs text-ink-40">{t("keywordUsageOverLabel")}</span>
+                  <span className="font-mono text-xs font-semibold text-neg">
+                    {t("keywordUsageOver", {
+                      count: formatNumber(keywordQuota.total - keywordQuota.limit, locale),
+                    })}
+                  </span>
+                </div>
+              )}
+              <p className="font-sans text-xs leading-relaxed text-ink-40">{t("keywordUsageShared")}</p>
+            </div>
+          ) : (
+            typeof used === "number" &&
+            typeof limit === "number" && (
+              <p className="mt-1 font-mono text-xs text-ink-60">
+                {t("usage", { used: formatNumber(used, locale), limit: formatNumber(limit, locale) })}
+              </p>
+            )
           )}
         </div>
 
@@ -161,6 +196,7 @@ export function triggerUpgradeModal(params: {
   feature?: string;
   limit?: number;
   used?: number;
+  keywordQuota?: { total: number; limit: number };
 }) {
   if (listener) {
     listener({ open: true, ...params });

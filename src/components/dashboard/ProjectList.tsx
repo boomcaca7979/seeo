@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { isAuthEnabled } from "@/lib/auth-config";
 import type { ProjectWithMetrics, AlertRow } from "@/lib/db";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
 import { useCreateProject } from "@/components/dashboard/CreateProjectContext";
 import { canSubmitDelete } from "@/lib/delete-guard";
+import { alertText } from "@/lib/alert-text";
 import { formatRelativeTime } from "@/lib/relative-time";
 import ChartCard from "@/components/dashboard/charts/ChartCard";
 import HealthScoreBars from "@/components/dashboard/charts/HealthScoreBars";
@@ -18,8 +18,6 @@ import AlertAreaChart from "@/components/dashboard/charts/AlertAreaChart";
 interface ProjectListProps {
   projects: ProjectWithMetrics[];
   alerts: AlertRow[];
-  displayName: string;
-  unreadAlertCount: number;
 }
 
 /** 健康分着色：≥80 绿 / 60-79 橙 / <60 红 */
@@ -44,31 +42,8 @@ const alertBadgeClass: Record<string, string> = {
   warning: "badge-warn",
   info: "badge-good",
 };
-function useTodayLabel(locale: "en" | "zh"): string {
-  const [label, setLabel] = useState("");
-  useEffect(() => {
-    const d = new Date();
-    // 按当前 UI locale 输出「2026年8月17日 · 星期一」/「Aug 17, 2026 · Monday」
-    const datePart = d.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const weekday = d.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
-      weekday: "long",
-    });
-    const id = window.setTimeout(() => setLabel(`${datePart} · ${weekday}`), 0);
-    return () => window.clearTimeout(id);
-  }, [locale]);
-  return label;
-}
 
-export default function ProjectList({
-  projects,
-  alerts,
-  displayName,
-  unreadAlertCount,
-}: ProjectListProps) {
+export default function ProjectList({ projects, alerts }: ProjectListProps) {
   const router = useRouter();
   const { show, Toast } = useToast();
   const t = useTranslations("dashboard.projectList");
@@ -77,7 +52,6 @@ export default function ProjectList({
   const [deleteTarget, setDeleteTarget] = useState<ProjectWithMetrics | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { openCreateProject } = useCreateProject();
-  const todayLabel = useTodayLabel(locale);
 
   // 各项目健康分（仅含已审计的）
   const healthData = useMemo(
@@ -139,42 +113,12 @@ export default function ProjectList({
 
   return (
     <div>
-      <div className="dash-container px-6 py-8 sm:px-8">
-        {/* eyebrow 行 */}
-        <div className="flex items-center justify-between font-sans text-xs text-ink-40">
-          <span>{todayLabel || "\u00A0"}</span>
-          <span>
-            {isAuthEnabled ? t("dataUpdatedAt") : t("dataUpdatedAtDemo")}
-          </span>
-        </div>
-
-        {/* 主标题 + 新建按钮 */}
-        <div className="mt-3 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h1
-              className="font-display font-semibold tracking-tight text-ink"
-              style={{ fontSize: 32, lineHeight: 1.2 }}
-            >
-              {t("greeting", { name: displayName })}
-            </h1>
-            <p className="mt-2 font-sans text-sm text-ink-60">
-              {t("summary", { projects: projects.length, alerts: unreadAlertCount })}
-            </p>
-          </div>
-          <button
-            onClick={openCreateProject}
-            className="btn-primary"
-          >
-            <span className="text-base leading-none">＋</span>
-            {t("newProject")}
-          </button>
-        </div>
-
+      <div className="dash-container px-6 pb-8 pt-10 sm:px-8">
         {/* 01 我的项目 */}
         <section className="mt-10">
           {/* 区块头：编号 + 标题 + 发丝线 + 计数 */}
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-base font-semibold text-ink">{t("myProjects")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("myProjects")}</h2>
             <div className="hairline flex-1" />
             <span className="font-sans text-xs text-ink-40">{t("total", { count: projects.length })}</span>
           </div>
@@ -309,7 +253,7 @@ export default function ProjectList({
         {/* 02 图表概览（健康分横条 + 预警面积图） */}
         <section className="mt-10">
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-base font-semibold text-ink">{t("overview")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("overview")}</h2>
             <div className="hairline flex-1" />
           </div>
 
@@ -336,7 +280,7 @@ export default function ProjectList({
         {/* 03 预警提醒 */}
         <section className="mt-10">
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-base font-semibold text-ink">{t("alertsSection")}</h2>
+            <h2 className="font-display text-lg font-semibold text-ink">{t("alertsSection")}</h2>
             <div className="hairline flex-1" />
             <span
               className="font-sans text-xs font-semibold tracking-wider text-brand"
@@ -368,7 +312,7 @@ export default function ProjectList({
                 >
                   <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${alertDotColor[a.level]}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="font-sans text-sm text-ink">{a.title}</div>
+                    <div className="font-sans text-sm text-ink">{alertText(a.title, locale)}</div>
                     <div className="font-sans text-xs text-ink-40">
                       {a.domain ?? "—"} · {formatRelativeTime(a.created_at, locale, tc)}
                     </div>

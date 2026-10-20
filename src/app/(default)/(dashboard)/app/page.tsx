@@ -4,7 +4,10 @@ import { getTranslations } from "next-intl/server";
 import { isAuthEnabled } from "@/lib/auth-config";
 import ProjectList from "@/components/dashboard/ProjectList";
 import GrowthOpportunityPanel from "@/components/dashboard/GrowthOpportunityPanel";
+import WorkspaceHeader from "@/components/dashboard/WorkspaceHeader";
+import WorkspaceDashboard from "@/components/dashboard/WorkspaceDashboard";
 import { getWorkspaceActionSummary } from "@/lib/seo/work-queue";
+import { getWorkspaceOverview, type WorkspaceOverviewData } from "@/lib/seo/workspace-overview";
 import Onboarding from "@/components/dashboard/Onboarding";
 import { listProjectsWithMetrics, listProjectsWithMetricsForUser, listAlerts, countUnreadAlerts } from "@/lib/db";
 
@@ -37,17 +40,61 @@ async function loadActionSummary(
   }
 }
 
-/** 决策面板容器（与 ProjectList 的 dash-container 对齐） */
-function withActionPanel(
-  summary: Awaited<ReturnType<typeof loadActionSummary>>,
-  list: React.ReactNode
-) {
+/** 工作台可视化概览（只读聚合）。失败一律降级为"无数据"，不填任何占位数字。 */
+async function loadOverview(
+  userId: string,
+  projects: Array<{ id: number; domain: string }>
+): Promise<WorkspaceOverviewData> {
+  try {
+    return await getWorkspaceOverview(userId, projects);
+  } catch {
+    return {
+      hasProjects: projects.length > 0,
+      hasAudit: false,
+      auditedDomains: 0,
+      audit: null,
+      counts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
+      auditCounts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
+      auditPriority: { P0: 0, P1: 0, P2: 0 },
+      verification: { pass: 0, fail: 0, inconclusive: 0, pending: 0 },
+      tasks: [],
+      trend: null,
+      gaps: ["no_completed_audit"],
+    };
+  }
+}
+
+/** 工作台首屏：头部 → 可视化概览 → 增长机会决策面板 → 项目与预警明细 */
+function WorkbenchBody({
+  displayName,
+  projects,
+  alerts,
+  unread,
+  actionSummary,
+  overview,
+}: {
+  displayName: string;
+  projects: Awaited<ReturnType<typeof listProjectsWithMetrics>>;
+  alerts: Awaited<ReturnType<typeof listAlerts>>;
+  unread: number;
+  actionSummary: Awaited<ReturnType<typeof loadActionSummary>>;
+  overview: WorkspaceOverviewData;
+}) {
   return (
     <>
-      <div className="dash-container px-6 pt-8 pb-0 sm:px-8">
-        <GrowthOpportunityPanel summary={summary} />
+      <WorkspaceHeader
+        displayName={displayName}
+        projectCount={projects.length}
+        auditedCount={overview.auditedDomains}
+        unreadAlertCount={unread}
+      />
+      <div className="dash-container px-6 pt-6 sm:px-8">
+        <WorkspaceDashboard data={overview} />
+        <div className="mt-6">
+          <GrowthOpportunityPanel summary={actionSummary} />
+        </div>
       </div>
-      {list}
+      <ProjectList projects={projects} alerts={alerts} />
     </>
   );
 }
@@ -63,18 +110,19 @@ export default async function WorkbenchPage() {
     }
     const alerts = await listAlerts("demo-user", 50);
     const unread = await countUnreadAlerts("demo-user");
-    const actionSummary = await loadActionSummary(
-      "demo-user",
-      projects.map((p) => p.domain),
-      projects.map((p) => ({ id: Number(p.id), domain: p.domain }))
-    );
-    return withActionPanel(
-      actionSummary,
-      <ProjectList
+    const scoped = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
+    const [actionSummary, overview] = await Promise.all([
+      loadActionSummary("demo-user", projects.map((p) => p.domain), scoped),
+      loadOverview("demo-user", scoped),
+    ]);
+    return (
+      <WorkbenchBody
+        displayName={ts("demoUser")}
         projects={projects}
         alerts={alerts}
-        displayName={ts("demoUser")}
-        unreadAlertCount={unread}
+        unread={unread}
+        actionSummary={actionSummary}
+        overview={overview}
       />
     );
   }
@@ -113,19 +161,20 @@ export default async function WorkbenchPage() {
 
   const alerts = await listAlerts(user.id, 50);
   const unread = await countUnreadAlerts(user.id);
-  const actionSummary = await loadActionSummary(
-    user.id,
-    projects.map((p) => p.domain),
-    projects.map((p) => ({ id: Number(p.id), domain: p.domain }))
-  );
+  const scoped = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
+  const [actionSummary, overview] = await Promise.all([
+    loadActionSummary(user.id, projects.map((p) => p.domain), scoped),
+    loadOverview(user.id, scoped),
+  ]);
 
-  return withActionPanel(
-    actionSummary,
-    <ProjectList
+  return (
+    <WorkbenchBody
+      displayName={displayName}
       projects={projects}
       alerts={alerts}
-      displayName={displayName}
-      unreadAlertCount={unread}
+      unread={unread}
+      actionSummary={actionSummary}
+      overview={overview}
     />
   );
 }

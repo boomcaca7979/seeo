@@ -1,40 +1,47 @@
 import { Suspense } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 import type { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
+import { localeToOgLocale, type Locale } from "@/i18n/config";
 import JsonLd from "@/components/JsonLd";
 import { breadcrumbSchema } from "@/lib/seo/schema";
 
-export const metadata: Metadata = {
-  title: "Create a SeeO Account — SEO Audits & Rank Tracking",
-  description:
-    "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
-  alternates: { canonical: "/signup" },
-  openGraph: {
-    type: "website",
-    url: "https://www.seeo.asia/signup",
-    siteName: "SeeO",
-    locale: "en_US",
-    title: "Create a SeeO Account — SEO Audits & Rank Tracking",
-    description:
-      "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
-    images: [
-      {
-        url: "/og.jpg",
-        width: 1200,
-        height: 630,
-        alt: "SeeO — SEO Audits, Rank Tracking & Keyword Research",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Create a SeeO Account — SEO Audits & Rank Tracking",
-    description:
-      "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
-    images: ["/og.jpg"],
-  },
-  // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
-};
+// 与 /login 同源：无 [locale] 段，metadata 在服务端按 cookie/header 解析的
+// UI locale 输出，保证中文界面拿到中文标题、英文界面拿到英文标题。
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = (await getLocale()) as Locale;
+  const t = await getTranslations("authPage");
+  const title = t("signupTitle");
+  const description = t("signupDescription");
+  return {
+    title,
+    description,
+    alternates: { canonical: "/signup" },
+    openGraph: {
+      type: "website",
+      url: "https://www.seeo.asia/signup",
+      siteName: "SeeO",
+      locale: localeToOgLocale[locale],
+      title,
+      description,
+      images: [
+        {
+          url: "/og.jpg",
+          width: 1200,
+          height: 630,
+          alt: t("ogAlt"),
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/og.jpg"],
+    },
+    // robots 继承 (default) layout 的 noindex,follow（认证工具页，不进 sitemap）
+  };
+}
 
 export default function SignupPage() {
   return (
