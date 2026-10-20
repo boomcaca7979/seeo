@@ -16,7 +16,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
-import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId } from "@/lib/project-selector";
+import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, validStoredProjectId, loadProjectList } from "@/lib/project-selector";
 import MetricCard from "@/components/viz/MetricCard";
 import PageHeader from "@/components/viz/PageHeader";
 import { StatusBadge } from "@/components/viz/StatusBadge";
@@ -119,7 +119,8 @@ interface WorkQueue {
 }
 
 interface ProjectLite {
-  id: number;
+  /** 项目 id 统一按 string 传递（鉴权模式 UUID / 演示模式整数），与顶部选择器同一契约 */
+  id: string;
   name: string;
   domain: string;
 }
@@ -167,10 +168,10 @@ export default function ActionCenterPage() {
     didInit.current = true;
     void (async () => {
       try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const json = await res.json();
+        // 共享取数入口：与 Topbar / 其他页面并发调用时只发一次 /api/projects
+        const json = await loadProjectList();
         const list: ProjectLite[] = Array.isArray(json?.data)
-          ? (json.data as ProjectLite[]).map((p) => ({ id: p.id, name: p.name, domain: p.domain }))
+          ? json.data.map((p) => ({ id: String(p.id), name: p.name, domain: p.domain }))
           : [];
         setProjects(list);
         if (list.length > 0) {

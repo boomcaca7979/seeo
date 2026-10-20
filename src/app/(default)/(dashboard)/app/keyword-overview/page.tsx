@@ -240,6 +240,10 @@ function KeywordOverviewInner() {
         }
       />
 
+      {/* 作用域说明：本页是关键词研究（按关键词查 SERP），不是项目维度页面。
+          顶部切换项目不会过滤本页数据；写明这一点，避免用户以为切换失效。 */}
+      <p className="mt-2 font-sans text-xs text-ink-40">{t("scopeNote")}</p>
+
       {/* 机会上下文：从机会卡深链进入时显示"你为什么来到这里"（无参数时不渲染） */}
       <OpportunityContextBanner />
 

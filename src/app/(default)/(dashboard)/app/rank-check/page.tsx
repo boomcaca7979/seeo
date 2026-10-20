@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
 import type { RankResult, ApiUsage } from "@/lib/seo/types";
 
 const REGION_CITIES: Record<string, string[]> = {
@@ -47,6 +48,18 @@ export default function RankCheckPage() {
 
   const [keyword, setKeyword] = useState("");
   const [domain, setDomain] = useState("");
+  // 顶部当前项目：本页默认查该项目；顶部切换项目时本页域名跟着换（不跳转）
+  const { activeId, activeDomain, loading: projectsLoading } = useActiveProject();
+  const appliedProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (appliedProjectRef.current === activeId) return;
+    appliedProjectRef.current = activeId;
+    if (!activeDomain) return;
+    // 延迟一拍写入，避免 effect 同步体内 setState（lint: react-hooks/set-state-in-effect）
+    const id = window.setTimeout(() => setDomain(activeDomain), 0);
+    return () => window.clearTimeout(id);
+  }, [activeDomain, activeId, projectsLoading]);
   const [result, setResult] = useState<RankResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

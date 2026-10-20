@@ -67,7 +67,18 @@ const GAP_ACTION: Record<string, string> = {
   backlink_source_unavailable: "/admin/data-sources",
 };
 
-export default function WorkspaceDashboard({ data }: { data: WorkspaceOverviewData }) {
+/**
+ * scopeAll：数据范围是「全部项目汇总」（默认）还是「当前项目」。
+ * 只影响少数提到"全部项目"的说明文案，不改变任何数据渲染逻辑——
+ * 数据本身由调用方（ScopedOverview / page.tsx）按范围取好。
+ */
+export default function WorkspaceDashboard({
+  data,
+  scopeAll = true,
+}: {
+  data: WorkspaceOverviewData;
+  scopeAll?: boolean;
+}) {
   const tw = useTranslations("dashboard.workspace");
   const tv = useTranslations("dashboard.viz");
   const ta = useTranslations("dashboard.actions");
@@ -133,7 +144,7 @@ export default function WorkspaceDashboard({ data }: { data: WorkspaceOverviewDa
               ? `${audit!.domain} · ${formatDay(audit!.finishedAt, locale)}`
               : tw("metrics.noAuditReason")
           }
-          hint={tw("metrics.healthScoreHint")}
+          hint={scopeAll ? tw("metrics.healthScoreHint") : tw("metrics.healthScoreHintProject")}
           unavailableLabel={tw("metrics.noAudit")}
           status={
             hasAudit && audit!.pagesCrawled !== null
@@ -317,7 +328,9 @@ export default function WorkspaceDashboard({ data }: { data: WorkspaceOverviewDa
         {/* 数据缺口：如实解释缺什么、点哪里补 */}
         <section className="card-a p-5 lg:col-span-7">
           <h3 className="font-display text-lg font-semibold text-ink">{tw("gaps.title")}</h3>
-          <p className="mt-0.5 font-sans text-xs text-ink-40">{tw("gaps.subtitle")}</p>
+          <p className="mt-0.5 font-sans text-xs text-ink-40">
+            {scopeAll ? tw("gaps.subtitle") : tw("gaps.subtitleProject")}
+          </p>
           {data.gaps.length === 0 ? (
             <p className="mt-4 font-sans text-sm text-pos">{tw("gaps.none")}</p>
           ) : (

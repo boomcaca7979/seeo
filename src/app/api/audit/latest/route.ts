@@ -2,7 +2,7 @@
 // 返回最近一次审计结果（含问题清单 + 历史对比 + 检查项覆盖 + 页面响应时间明细）
 
 import { NextResponse } from "next/server";
-import { getLatestAudit, getAuditById, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
+import { getAuditById, getAuditIssues, getAuditHistory, reapStaleRunningAudit, type AuditIssueRow } from "@/lib/db";
 import { allCheckMeta, checkMetaMap, getExecutedCheckIds, nonCatalogCheckNames, pickText, type CheckMeta, type IssueSeverity } from "@/lib/seo/audit-checks";
 import type { DashboardSnapshot } from "@/lib/seo/audit-dashboard";
 import { resolveAuditDetail, resolveAuditSuggestion, type UiLocale } from "@/lib/seo/audit-legacy-text";
@@ -192,7 +192,9 @@ export async function GET(req: Request) {
 
   // 回收因 after() 被服务器回收而永久停留在 running 的审计行，
   // 使重新进入页面时不再误显“审计进行中”，并允许用户重跑。
-  await reapStaleRunningAudit(userId, domain);
+  // 返回值即 reap 内部读取到的最新审计（含回收后的最终状态）——直接复用，
+  // 不再对同一行重复调 getLatestAudit（2026-10 性能修复：省一次数据库往返）。
+  const reapedLatest = await reapStaleRunningAudit(userId, domain);
 
   // 可选 audit 参数：查看指定历史审计（必须属于当前用户+域名且已完成）；
   // 参数缺失/无效/无权限时回退到最新审计，不改变默认行为。
@@ -205,13 +207,18 @@ export async function GET(req: Request) {
     }
   }
   if (!audit) {
-    audit = await getLatestAudit(userId, domain);
+    audit = reapedLatest;
   }
   if (!audit) {
     return NextResponse.json({ data: null });
   }
 
-  const issues = audit.status === "completed" ? await getAuditIssues(userId, audit.id) : [];
+  // issues（依赖 audit.id）与 history（只依赖 domain）相互独立，并行读取；
+  // 远端 Turso 下把两次串行网络往返压缩为一层。
+  const [issues, historyRows] = await Promise.all([
+    audit.status === "completed" ? getAuditIssues(userId, audit.id) : Promise.resolve([]),
+    getAuditHistory(userId, domain, 10),
+  ]);
   const locale = readUiLocale(req);
   const grouped = groupIssues(issues, locale);
   const coverage = computeCheckCoverage(issues, locale, audit.depth);
@@ -226,9 +233,6 @@ export async function GET(req: Request) {
       comparison = null;
     }
   }
-
-  // 历史记录（最近 10 次；含分项计数与引擎版本，供趋势多指标切换与版本标记）
-  const historyRows = await getAuditHistory(userId, domain, 10);
   const history: HistoryItem[] = historyRows.map((h) => ({
     id: h.id,
     score: h.health_score,

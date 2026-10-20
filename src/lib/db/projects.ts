@@ -169,11 +169,13 @@ export async function getRankStats7d(userId: string, domain: string): Promise<{ 
 
 /**
  * 批量构建项目指标（核心辅助函数）。
- * 用 4 次批量查询替代 4N 次循环查询，避免 N+1 问题。
- * - 第 1 次：按 domain 批量统计 tracked_keywords
- * - 第 2 次：按 domain 批量取最新 audit（MAX(id)）
- * - 第 3 次：按 domain 批量计算近 7 天排名升降数
- * - 第 4 次：按 domain 批量统计未读 alerts
+ * 用 4 次批量查询替代 4N 次循环查询，避免 N+1 问题；四次查询只依赖
+ * userId + domains，相互独立 → 并行执行（2026-10 性能修复：远端 Turso 下
+ * 把 4 次串行网络往返压缩为一层；本地 file: 驱动天然串行，无行为差异）。
+ * - 批量统计 tracked_keywords
+ * - 批量取最新 audit（MAX(id)）
+ * - 批量计算近 7 天排名升降数
+ * - 批量统计未读 alerts
  */
 async function buildProjectsWithMetricsBase(
   userId: string,
@@ -185,27 +187,54 @@ async function buildProjectsWithMetricsBase(
   const domains = projects.map((p) => p.domain);
   const placeholders = domains.map(() => "?").join(",");
 
-  // 1. 批量获取关键词计数
-  const keywordRows = await db.query(
-    `SELECT domain, COUNT(*) AS c FROM tracked_keywords WHERE domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
-    [...domains, userId]
-  ) as Array<{ domain: string; c: number }>;
+  const [keywordRows, auditRows, rankRows, alertRows] = await Promise.all([
+    // 1. 批量获取关键词计数
+    db.query(
+      `SELECT domain, COUNT(*) AS c FROM tracked_keywords WHERE domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
+      [...domains, userId]
+    ) as Promise<Array<{ domain: string; c: number }>>,
+
+    // 2. 批量获取每个 domain 的最新审计（MAX(id) 等价于 ORDER BY started_at DESC LIMIT 1）
+    db.query(
+      `SELECT domain, health_score, started_at, finished_at
+       FROM audits
+       WHERE domain IN (${placeholders}) AND user_id = ?
+         AND id IN (SELECT MAX(id) FROM audits a2 GROUP BY a2.domain)`,
+      [...domains, userId]
+    ) as Promise<Array<{
+        domain: string;
+        health_score: number | null;
+        started_at: string;
+        finished_at: string | null;
+      }>>,
+
+    // 3. 批量获取每个 domain 近 7 天排名升降数（today vs 7-day-ago）
+    db.query(
+      `SELECT tk.domain,
+         SUM(CASE WHEN today.position IS NOT NULL AND past.position IS NOT NULL
+                   AND today.position < past.position THEN 1 ELSE 0 END) AS up,
+         SUM(CASE WHEN today.position IS NOT NULL AND past.position IS NOT NULL
+                   AND today.position > past.position THEN 1 ELSE 0 END) AS down
+       FROM tracked_keywords tk
+       LEFT JOIN rank_history today
+         ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
+       LEFT JOIN rank_history past
+         ON past.keyword_id = tk.id AND past.date = date('now', 'localtime', '-7 day')
+       WHERE tk.domain IN (${placeholders}) AND tk.user_id = ?
+       GROUP BY tk.domain`,
+      [...domains, userId]
+    ) as Promise<Array<{ domain: string; up: number | null; down: number | null }>>,
+
+    // 4. 批量获取每个 domain 未读预警数
+    db.query(
+      `SELECT domain, COUNT(*) AS c FROM alerts WHERE read = 0 AND domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
+      [...domains, userId]
+    ) as Promise<Array<{ domain: string; c: number }>>,
+  ]);
+
   const keywordMap = new Map<string, number>();
   for (const r of keywordRows) keywordMap.set(r.domain, Number(r.c));
 
-  // 2. 批量获取每个 domain 的最新审计（MAX(id) 等价于 ORDER BY started_at DESC LIMIT 1）
-  const auditRows = await db.query(
-    `SELECT domain, health_score, started_at, finished_at
-     FROM audits
-     WHERE domain IN (${placeholders}) AND user_id = ?
-       AND id IN (SELECT MAX(id) FROM audits a2 GROUP BY a2.domain)`,
-    [...domains, userId]
-  ) as Array<{
-      domain: string;
-      health_score: number | null;
-      started_at: string;
-      finished_at: string | null;
-    }>;
   const auditMap = new Map<string, { healthScore: number | null; lastTime: string }>();
   for (const r of auditRows) {
     auditMap.set(r.domain, {
@@ -214,22 +243,6 @@ async function buildProjectsWithMetricsBase(
     });
   }
 
-  // 3. 批量获取每个 domain 近 7 天排名升降数（today vs 7-day-ago）
-  const rankRows = await db.query(
-    `SELECT tk.domain,
-       SUM(CASE WHEN today.position IS NOT NULL AND past.position IS NOT NULL
-                 AND today.position < past.position THEN 1 ELSE 0 END) AS up,
-       SUM(CASE WHEN today.position IS NOT NULL AND past.position IS NOT NULL
-                 AND today.position > past.position THEN 1 ELSE 0 END) AS down
-     FROM tracked_keywords tk
-     LEFT JOIN rank_history today
-       ON today.keyword_id = tk.id AND today.date = date('now', 'localtime')
-     LEFT JOIN rank_history past
-       ON past.keyword_id = tk.id AND past.date = date('now', 'localtime', '-7 day')
-     WHERE tk.domain IN (${placeholders}) AND tk.user_id = ?
-     GROUP BY tk.domain`,
-    [...domains, userId]
-  ) as Array<{ domain: string; up: number | null; down: number | null }>;
   const rankMap = new Map<string, { up: number; down: number }>();
   for (const r of rankRows) {
     rankMap.set(r.domain, {
@@ -238,11 +251,6 @@ async function buildProjectsWithMetricsBase(
     });
   }
 
-  // 4. 批量获取每个 domain 未读预警数
-  const alertRows = await db.query(
-    `SELECT domain, COUNT(*) AS c FROM alerts WHERE read = 0 AND domain IN (${placeholders}) AND user_id = ? GROUP BY domain`,
-    [...domains, userId]
-  ) as Array<{ domain: string; c: number }>;
   const alertMap = new Map<string, number>();
   for (const r of alertRows) alertMap.set(r.domain, Number(r.c));
 

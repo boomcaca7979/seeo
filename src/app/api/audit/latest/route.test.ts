@@ -22,7 +22,9 @@ const state: { audit: AuditRow | null; issues: AuditIssueRow[] } = {
 };
 
 vi.mock("@/lib/db", () => ({
-  reapStaleRunningAudit: vi.fn(async () => undefined),
+  // 新契约：reap 返回其读取到的最新审计行（含回收后的最终状态），路由直接复用，
+  // 不再单独调 getLatestAudit —— mock 与 getLatestAudit 返回同一份 state.audit
+  reapStaleRunningAudit: vi.fn(async () => state.audit),
   getLatestAudit: vi.fn(async () => state.audit),
   getAuditIssues: vi.fn(async () => state.issues),
   getAuditHistory: vi.fn(async () => []),

@@ -8,6 +8,7 @@ import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { decideEntitlementFetch } from "@/lib/entitlement-fetch";
 import { formatNumber, intlLocale, type Locale } from "@/lib/ui-locale";
@@ -71,7 +72,7 @@ function BacklinksPageInner() {
   const { show, Toast } = useToast();
   const { features, loading: entitlementsLoading } = useEntitlements();
   // 初始值必须为空字符串：SSR 与客户端 hydration 首帧渲染一致，避免 hydration mismatch。
-  // 记忆域名在挂载 effect 中恢复（见下方 initRef effect），域名记忆功能保持不变。
+  // 记忆域名在挂载 effect 中恢复（见下方「挂载/切换项目时确定域名」），域名记忆功能保持不变。
   const [domain, setDomain] = useState("");
   const [data, setData] = useState<BacklinkData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,30 +97,38 @@ function BacklinksPageInner() {
     }
   }, [t]);
 
-  // 挂载时确定域名（优先级：URL ?domain= > localStorage 上次查询域名），
+  // 挂载/切换项目时确定域名（优先级：URL ?domain= > 顶部当前项目 > localStorage 上次查询域名），
   // 但**不在此处发请求**：外链是 Pro 专属，权益未确定/无权限时请求只会拿到 403。
   // 域名先落到 autoDomain，由下面的权益门控 effect 决定何时真正加载。
-  // initRef 保证只解析一次（StrictMode 双执行下第二次被跳过）。
+  // 顶部切项目 → activeId 变化 → 本页域名跟着换（旧实现只认自有 key，永远停在旧域名）。
   const searchParams = useSearchParams();
-  const initRef = useRef(false);
+  const { activeId, activeDomain, loading: projectsLoading } = useActiveProject();
+  const appliedProjectRef = useRef<string | null>(null);
   const [autoDomain, setAutoDomain] = useState("");
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
+    if (projectsLoading) return;
     const queryDomain = (searchParams.get("domain") ?? "").trim();
+    // URL 显式指定域名：属于深链范围，不被全局项目覆盖
+    if (queryDomain) {
+      appliedProjectRef.current = activeId;
+      return;
+    }
+    if (appliedProjectRef.current === activeId) return;
+    appliedProjectRef.current = activeId;
+
     let saved = "";
-    if (!queryDomain) {
+    if (!activeDomain) {
       try {
         saved = (localStorage.getItem("seeo:last-backlink-domain") ?? "").trim();
       } catch {
         // ignore
       }
     }
-    const target = queryDomain || saved;
+    const target = activeDomain || saved;
     if (!target) return;
     setDomain(target);
     setAutoDomain(target);
-  }, [searchParams]);
+  }, [activeDomain, activeId, projectsLoading, searchParams]);
 
   // 三态门控：套餐未加载 → 等待；已确认无权限 → 不发请求（后端 guard 原样保留）；
   // 已确认有权限 → 每个域名只自动加载一次（ref 去重，避免重渲染或重进入时重复请求）。

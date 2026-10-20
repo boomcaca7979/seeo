@@ -19,15 +19,15 @@ const DOMAIN_SELECT_SRC = readFileSync(
 );
 
 describe("F2：刷新后恢复上次审计域名（初始化优先级）", () => {
-  it("优先级固定：URL query > last-audit-domain > 第一个项目 > 空", () => {
-    expect(PAGE_SRC).toContain("URL ?domain= 参数 > localStorage 上次审计域名 > 项目列表第一个 > 空");
-    // 顺序契约：queryDomain 分支在前，lastAuditDomain 分支次之，list[0] 分支最后
-    const qIdx = PAGE_SRC.indexOf("if (queryDomain) {");
-    const lIdx = PAGE_SRC.indexOf("} else if (lastAuditDomain) {");
-    const pIdx = PAGE_SRC.indexOf("} else if (list.length > 0) {");
-    expect(qIdx).toBeGreaterThan(-1);
-    expect(lIdx).toBeGreaterThan(qIdx);
-    expect(pIdx).toBeGreaterThan(lIdx);
+  it("优先级固定：URL query > 顶部当前项目 > last-audit-domain（无可用项目时）> 空", () => {
+    // 2026-10：初始化改为「读全局项目」，last-audit-domain 降级为无项目时兜底；
+    // URL 显式域名仍然最高优先（深链不被全局项目覆盖）。
+    const urlIdx = PAGE_SRC.indexOf('if ((searchParams.get("domain") ?? "").trim()) return;');
+    const targetIdx = PAGE_SRC.indexOf("const target = activeDomain || lastAuditDomain;");
+    expect(urlIdx).toBeGreaterThan(-1);
+    expect(targetIdx).toBeGreaterThan(urlIdx);
+    // 顺序契约：URL 判断在全局项目之前；全局项目在 lastAuditDomain 之前
+    expect(PAGE_SRC).toContain("// URL 明确指定域名：这是显式范围，不被全局项目无条件覆盖");
   });
 
   it("初始化读取 localStorage['seeo:last-audit-domain']（与审计写入同一 key）", () => {
@@ -47,12 +47,13 @@ describe("F2：刷新后恢复上次审计域名（初始化优先级）", () =>
 });
 
 describe("R2：DomainSelect deep-link 竞态（stale closure 覆盖）", () => {
-  it("默认选第一个项目前读取 valueRef.current（最新 value），不用闭包旧值", () => {
+  it("默认选值前读取 valueRef.current（最新 value），不用闭包旧值", () => {
     expect(DOMAIN_SELECT_SRC).toContain("const valueRef = useRef(value);");
     expect(DOMAIN_SELECT_SRC).toContain("valueRef.current = value;");
-    expect(DOMAIN_SELECT_SRC).toContain("if (!valueRef.current && json.data.length > 0)");
+    // 默认值本身也改了：优先顶部当前项目，兜底才是列表第一个
+    expect(DOMAIN_SELECT_SRC).toContain("if (!valueRef.current && fallback)");
     // 不允许回退到闭包 value 判断
-    expect(DOMAIN_SELECT_SRC).not.toContain("if (!value && json.data.length > 0)");
+    expect(DOMAIN_SELECT_SRC).not.toContain("if (!value && fallback)");
   });
 });
 

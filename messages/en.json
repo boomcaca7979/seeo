@@ -15,11 +15,11 @@
     "switchLang": "中文"
   },
   "cookieBanner": {
-  "notice": "We use cookies to improve your experience. Essential cookies are always on; analytics cookies are only set with your consent.",
-  "learnMore": "Learn more",
-  "decline": "Decline",
-  "accept": "Accept"
-},
+    "notice": "We use cookies to improve your experience. Essential cookies are always on; analytics cookies are only set with your consent.",
+    "learnMore": "Learn more",
+    "decline": "Decline",
+    "accept": "Accept"
+  },
   "hero": {
     "badge": "Real site audit · What to fix first · Verify the fix",
     "title": "Find the SEO problem worth fixing first. Then verify the fix.",
@@ -1441,7 +1441,8 @@
         "healthDeltaUp": "+{n} vs previous audit",
         "healthDeltaDown": "-{n} vs previous audit",
         "healthDeltaFlat": "No change vs previous audit",
-        "noPreviousAudit": "First audit for this domain"
+        "noPreviousAudit": "First audit for this domain",
+        "healthScoreHintProject": "Health score of the most recent completed audit for the current project."
       },
       "trend": {
         "title": "Health score history",
@@ -1477,7 +1478,17 @@
       "gaps": {
         "title": "What is missing",
         "subtitle": "Real data gaps across your projects. Each one links to the place that fills it.",
-        "none": "No data gaps detected for your projects."
+        "none": "No data gaps detected for your projects.",
+        "subtitleProject": "Data gaps that actually exist for the current project. Each one links to the place that fills it."
+      },
+      "subtitleProject": "Your current project's real crawl data, work in progress, and what to handle first.",
+      "scope": {
+        "aria": "Overview data scope",
+        "current": "Current project",
+        "all": "All projects",
+        "syncing": "Loading overview data…",
+        "error": "Failed to load overview data. The project may be unavailable or the network failed.",
+        "retry": "Retry"
       }
     },
     "growth": {
@@ -2630,6 +2641,7 @@
         "intentNote": "Intent is estimated from keyword text rules — not a metric provided by the data source.",
         "title": "Keyword Overview",
         "subtitle": "Enter a seed keyword to view real SERP rankings and derived metrics.",
+        "scopeNote": "This page researches a single keyword's live SERP — it is not filtered by the project selected at the top.",
         "marketLabel": "Search market",
         "deviceLabel": "Device",
         "searchPlaceholder": "Enter a keyword, e.g. seo tools, website design",
@@ -2763,7 +2775,7 @@
       "statusBehind": "Behind us",
       "statusTied": "Tied",
       "emptyAddFirst": "Please add competitor domains first",
-          "emptyRefreshHint": "Click \"Refresh ranks\": SeeO fetches this keyword's Google SERP top 100 and compares your ranking and landing URLs against each competitor.",
+      "emptyRefreshHint": "Click \"Refresh ranks\": SeeO fetches this keyword's Google SERP top 100 and compares your ranking and landing URLs against each competitor.",
       "emptyNoKeywords": "Add tracked keywords for this project in \"Position Tracking\" first — there is nothing to compare yet.",
       "nextStepNoCompetitor": "After adding competitor domains, pick a keyword below and click \"Refresh ranks\" to compare your ranking against competitors for the same query.",
       "nextStepNoKeyword": "Competitor saved. Next step: add tracked keywords for this project first — ranks are compared keyword by keyword.",
@@ -3561,6 +3573,8 @@
     "AUTH_REQUIRED": "Please log in to continue.",
     "INVALID_JSON": "Invalid request body: JSON expected.",
     "BAD_REQUEST": "Invalid request parameters.",
+    "INVALID_SCOPE": "Missing scope=all or projectId parameter.",
+    "DASHBOARD_FAILED": "Failed to build the dashboard overview.",
     "DOMAIN_REQUIRED": "Domain is required.",
     "INVALID_DOMAIN": "Invalid domain format, e.g. example.com",
     "MISSING_DOMAIN": "Missing domain parameter.",

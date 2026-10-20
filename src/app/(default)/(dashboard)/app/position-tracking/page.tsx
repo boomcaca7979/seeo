@@ -36,6 +36,7 @@ import {
   SELECTED_PROJECT_KEY,
   projectChangedDetail,
   setActiveProject,
+  loadProjectList,
 } from "@/lib/project-selector";
 
 import {
@@ -213,9 +214,10 @@ function PositionTrackingInner() {
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch("/api/projects", { cache: "no-store", signal: controller.signal });
-        const json = await res.json();
-        if (!res.ok || !Array.isArray(json.data)) return;
+        // 共享取数入口：与 Topbar / 其他页面并发调用时只发一次 /api/projects
+        const json = await loadProjectList();
+        if (controller.signal.aborted) return;
+        if (!json.ok || !Array.isArray(json.data)) return;
         setProjects(
           (json.data as Array<{ id: number | string; name: string; domain: string }>).map((p) => ({
             id: String(p.id),

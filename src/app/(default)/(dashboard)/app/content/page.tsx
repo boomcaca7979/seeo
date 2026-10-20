@@ -8,6 +8,7 @@ import { handleBillingError } from "@/lib/billing-error-client";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import ScoreRing from "@/components/dashboard/ScoreRing";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
 import OpportunityContextBanner from "@/components/dashboard/OpportunityContextBanner";
 import PageHeader from "@/components/viz/PageHeader";
 import MetricCard from "@/components/viz/MetricCard";
@@ -161,6 +162,8 @@ function ContentPageInner() {
   const locale = useLocale() as Locale;
   const { show, Toast } = useToast();
   const searchParams = useSearchParams();
+  // 顶部当前项目：进入本页时默认分析该项目，切换项目时本页跟着换（不跳转）
+  const { activeId, activeDomain, loading: projectsLoading } = useActiveProject();
   const [url, setUrl] = useState("");
   const [domain, setDomain] = useState("");
   const [targetKeywordsInput, setTargetKeywordsInput] = useState("");
@@ -186,6 +189,23 @@ function ContentPageInner() {
     }, 0);
     return () => window.clearTimeout(id);
   }, [searchParams]);
+
+  // 未指定深链时：用顶部当前项目填充分析对象；切换项目时同步换到新项目。
+  // （?url=/?domain= 是显式范围，优先级更高，绝不被全局项目覆盖）
+  const appliedProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (projectsLoading) return;
+    if ((searchParams.get("url") ?? "").trim() || (searchParams.get("domain") ?? "").trim()) return;
+    if (appliedProjectRef.current === activeId) return;
+    appliedProjectRef.current = activeId;
+    if (!activeDomain) return;
+    // 延迟一拍写入，避免 effect 同步体内 setState（lint: react-hooks/set-state-in-effect）
+    const id = window.setTimeout(() => {
+      setDomain(activeDomain);
+      setUrl(`https://${activeDomain}`);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [activeDomain, activeId, projectsLoading, searchParams]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);

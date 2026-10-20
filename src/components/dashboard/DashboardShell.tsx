@@ -6,6 +6,7 @@ import Topbar from "@/components/dashboard/Topbar";
 import { useUpgradeModalProvider } from "@/components/billing/UpgradeModal";
 import { EntitlementsProvider, useEntitlements } from "@/components/billing/EntitlementsContext";
 import { CreateProjectProvider } from "@/components/dashboard/CreateProjectContext";
+import { ActiveProjectProvider } from "@/components/dashboard/ActiveProjectContext";
 
 interface DashboardShellProps {
   displayName: string;
@@ -17,13 +18,17 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ displayName, email, isGuest, children }: DashboardShellProps) {
   return (
-    <CreateProjectProvider>
-      <EntitlementsProvider>
-        <DashboardShellInner displayName={displayName} email={email} isGuest={isGuest}>
-          {children}
-        </DashboardShellInner>
-      </EntitlementsProvider>
-    </CreateProjectProvider>
+    // ActiveProjectProvider 必须包住 Topbar 与所有 /app 页面：
+    // 它是「当前项目」的唯一真源（顶部选择器写、页面读），缺了它 useActiveProject 会直接报错。
+    <ActiveProjectProvider>
+      <CreateProjectProvider>
+        <EntitlementsProvider>
+          <DashboardShellInner displayName={displayName} email={email} isGuest={isGuest}>
+            {children}
+          </DashboardShellInner>
+        </EntitlementsProvider>
+      </CreateProjectProvider>
+    </ActiveProjectProvider>
   );
 }
 

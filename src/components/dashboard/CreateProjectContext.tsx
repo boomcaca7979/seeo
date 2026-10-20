@@ -11,6 +11,7 @@ import { useTranslations } from "next-intl";
 import Modal from "@/components/dashboard/Modal";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
+import { PROJECTS_CHANGED_EVENT, invalidateProjectList } from "@/lib/project-selector";
 
 interface CreateProjectContextValue {
   openCreateProject: () => void;
@@ -50,6 +51,10 @@ export function CreateProjectProvider({ children }: { children: ReactNode }) {
       }
       setModalOpen(false);
       show(t("createdToast"), "success");
+      // 项目列表变了：让共享列表缓存失效并通知 Provider 重取，
+      // 否则顶部下拉与各页面的项目选项会漏掉刚创建的项目（旧实现靠各页 Mount 重取，现已共享）。
+      invalidateProjectList();
+      window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT));
       // 优先使用服务端返回的 domain（已规范化），跳转到审计页
       const savedDomain = (data?.data?.domain ?? domain) as string;
       router.push(`/app/audit?domain=${encodeURIComponent(savedDomain)}`);

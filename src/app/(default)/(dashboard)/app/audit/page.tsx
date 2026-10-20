@@ -20,6 +20,8 @@ import OpportunityContextBanner from "@/components/dashboard/OpportunityContextB
 import AuditReport from "@/components/reports/AuditReport";
 import { generatePDF, downloadPDF } from "@/lib/pdf/generator";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
+import { PROJECT_CHANGED_EVENT, projectChangedDetail } from "@/lib/project-selector";
 import AuditScoreTrend from "@/components/dashboard/charts/AuditScoreTrend";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { track } from "@/lib/analytics/client";
@@ -141,9 +143,16 @@ function AuditPageInner() {
   );
 
   // ---- 数据状态 ----
+  // 项目列表与「当前项目」来自 ActiveProjectContext（顶部选择器的唯一真源）：
+  // 本页不再自己 fetch /api/projects，也不再自己决定"默认看哪个项目"。
+  const {
+    projects: activeProjects,
+    loading: projectsLoading,
+    activeId,
+    activeDomain,
+  } = useActiveProject();
+  const projects: ProjectItem[] = activeProjects;
   const [domain, setDomain] = useState("");
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -160,12 +169,17 @@ function AuditPageInner() {
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // 请求序号：快速连续切项目（A→B）时，A 的慢响应不得覆盖 B 的结果。
+  // 每次取数领一个号，回来时只有"最新号"才允许写状态。
+  const loadSeqRef = useRef(0);
   const loadLatest = useCallback(async (d: string, auditId?: string): Promise<AuditData | null> => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const auditQ = auditId ? `&audit=${encodeURIComponent(auditId)}` : "";
       const res = await fetch(`/api/audit/latest?domain=${encodeURIComponent(d)}${auditQ}`, { cache: "no-store" });
       const json = await res.json();
+      if (seq !== loadSeqRef.current) return null; // 已有更新的请求 → 丢弃过期结果
       if (res.ok) {
         const data = json.data ?? null;
         setAudit(data);
@@ -175,53 +189,52 @@ function AuditPageInner() {
     } catch {
       return null;
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, []);
 
-  // 挂载时拉取项目列表
-  const didInitProjectsRef = useRef(false);
+  // 域名初始化与跟随（本项目上下文修复的核心）：
+  //   优先级：URL ?domain=（显式深链/子对象） > 顶部当前项目 > 上次审计域名（访客/无项目时） > 空
+  //   1. 进入页面：顶部选的是 A，这里就用 A，不再要求用户重新选；
+  //   2. 顶部把 A 切成 B：activeId 变化 → 本页域名跟着换 → 下方 effect 自动重取 B 的审计；
+  //   3. 刷新 / 前进后退：localStorage 里的当前项目由 Provider 恢复，本页得到同一个项目；
+  //   4. 上次审计域名只在"没有可用项目"时兜底（例如未登录访客）。
+  const appliedProjectRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (didInitProjectsRef.current) return;
-    didInitProjectsRef.current = true;
-    (async () => {
-      setProjectsLoading(true);
-      try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const json = await res.json();
-        const list: ProjectItem[] = (json.data ?? []).map((p: ProjectItem) => ({
-          id: p.id,
-          name: p.name,
-          domain: p.domain,
-          healthScore: p.healthScore,
-        }));
-        setProjects(list);
-        // 优先级：URL ?domain= 参数 > localStorage 上次审计域名 > 项目列表第一个 > 空
-        // （F2：审计完成写入 seeo:last-audit-domain 后刷新，必须恢复同一域名，
-        //   否则回退到项目列表第一个，刚审计的结果看起来"消失"）
-        const queryDomain = searchParams.get("domain")?.trim();
-        let lastAuditDomain = "";
-        try {
-          lastAuditDomain = window.localStorage.getItem("seeo:last-audit-domain")?.trim() ?? "";
-        } catch {
-          lastAuditDomain = "";
-        }
-        if (queryDomain) {
-          setDomain(queryDomain);
-        } else if (lastAuditDomain) {
-          setDomain(lastAuditDomain);
-        } else if (list.length > 0) {
-          setDomain(list[0].domain);
-        } else {
-          setDomain("");
-        }
-      } catch {
-        setDomain("");
-      } finally {
-        setProjectsLoading(false);
+    if (projectsLoading) return;
+    // URL 明确指定域名：这是显式范围，不被全局项目无条件覆盖
+    if ((searchParams.get("domain") ?? "").trim()) return;
+    // 同一个项目只应用一次（避免 setDomain 自我循环 / 覆盖用户手动输入）。
+    // 首次必须应用：activeId 可能为 null（无项目的访客），此时要靠 last-audit-domain 兜底。
+    if (appliedProjectRef.current !== undefined && appliedProjectRef.current === activeId) return;
+
+    let lastAuditDomain = "";
+    try {
+      lastAuditDomain = window.localStorage.getItem("seeo:last-audit-domain")?.trim() ?? "";
+    } catch {
+      lastAuditDomain = "";
+    }
+    const target = activeDomain || lastAuditDomain;
+    appliedProjectRef.current = activeId;
+    setDomain(target);
+  }, [activeDomain, activeId, projectsLoading, searchParams]);
+
+  // 顶部切换项目 = 当前页换数据，不跳转。
+  // 切换时清掉 URL 里的 ?domain=（它代表"上一轮显式范围"，继续留着会压住新项目）。
+  useEffect(() => {
+    const onProjectChanged = (e: Event) => {
+      const detail = projectChangedDetail(e);
+      if (!detail || detail.source !== "user") return;
+      if ((searchParams.get("domain") ?? "").trim()) {
+        const next = new URLSearchParams(searchParams.toString());
+        next.delete("domain");
+        const qs = next.toString();
+        router.replace(`/app/audit${qs ? `?${qs}` : ""}`, { scroll: false });
       }
-    })();
-  }, [loadLatest, searchParams]);
+    };
+    window.addEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+    return () => window.removeEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
+  }, [router, searchParams]);
 
   // 域名变化时加载
   const lastLoadedDomain = useRef<string | null>(null);
@@ -327,6 +340,9 @@ function AuditPageInner() {
       } catch {
         // ignore
       }
+      // 本次审计的域名写进 URL：刷新后仍打开同一份结果（F2）。
+      // 这同时把"显式范围"与"顶部全局项目"分开——只有用户切项目时才清掉它。
+      navigate({ domain: domain.trim() });
       if (json.data?.status === "running") {
         await loadLatest(domain);
         // P1-5：运行期只轮询轻量 status 端点（不反复下载完整 latest 载荷）

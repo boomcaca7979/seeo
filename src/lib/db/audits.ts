@@ -161,14 +161,14 @@ export async function getLatestAudit(userId: string, domain: string): Promise<Au
  */
 const STALE_RUNNING_MS = 15 * 60 * 1000;
 
-export async function reapStaleRunningAudit(userId: string, domain: string): Promise<void> {
+export async function reapStaleRunningAudit(userId: string, domain: string): Promise<AuditRow | null> {
   const latest = await getLatestAudit(userId, domain);
-  if (!latest || latest.status !== "running") return;
+  if (!latest || latest.status !== "running") return latest;
   const startedAt = new Date(
     latest.started_at.endsWith("Z") ? latest.started_at : latest.started_at + "Z"
   ).getTime();
-  if (Number.isNaN(startedAt)) return;
-  if (Date.now() - startedAt < STALE_RUNNING_MS) return;
+  if (Number.isNaN(startedAt)) return latest;
+  if (Date.now() - startedAt < STALE_RUNNING_MS) return latest;
   await finishAudit(userId, latest.id, {
     health_score: 0,
     errors: 0,
@@ -177,6 +177,10 @@ export async function reapStaleRunningAudit(userId: string, domain: string): Pro
     status: "failed",
     error: "审计超时未完成（后台任务可能被服务器回收，请重新运行）",
   });
+  // 仅在真正回收时重读一次：内存中的 latest 已过期（status 仍 running），
+  // 返回值必须与库内最终状态一致（2026-10 性能修复：调用方直接复用本返回值，
+  // 不再对同一行重复调 getLatestAudit）。
+  return getLatestAudit(userId, domain);
 }
 
 /** 获取某域名在指定 auditId 之前最近一次审计 */

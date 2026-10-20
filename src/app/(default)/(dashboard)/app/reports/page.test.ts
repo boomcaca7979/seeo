@@ -39,7 +39,7 @@ describe("BUG-07：报告中心入口链接的构建接线", () => {
 
   it("域名必须按选中 id 在项目列表中命中后才写入链接（未确认保持 null）", () => {
     expect(EFFECT).toContain("setProjectDomain(resolveProjectDomain(");
-    expect(EFFECT).toContain('fetch("/api/projects"');
+    expect(EFFECT).toContain("loadProjectList()");
     expect(EFFECT).toContain("useState<string | null>(null)");
     // 过期响应与已卸载实例的结果都不写状态
     expect(EFFECT).toContain("if (cancelled || my !== seq) return;");
@@ -48,7 +48,7 @@ describe("BUG-07：报告中心入口链接的构建接线", () => {
 
   it("拉取失败不得保留上一个项目的域名（切换项目时避免串数据）", () => {
     const failurePaths = [
-      EFFECT.slice(EFFECT.indexOf("if (!res.ok) {"), EFFECT.indexOf("const list =")),
+      EFFECT.slice(EFFECT.indexOf("if (!json.ok) {"), EFFECT.indexOf("const list =")),
       EFFECT.slice(EFFECT.indexOf("} catch {")),
     ];
     for (const block of failurePaths) {

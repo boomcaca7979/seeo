@@ -8,7 +8,7 @@ import { buildCoverageFromIssues, checkMetaMap, nonCatalogCheckNames, pickText }
 import { useToast } from "@/components/dashboard/Toast";
 import Modal from "@/components/dashboard/Modal";
 import { handleBillingError, resolveApiErrorMessage } from "@/lib/billing-error-client";
-import { PROJECT_CHANGED_EVENT, SELECTED_PROJECT_KEY, projectChangedDetail } from "@/lib/project-selector";
+import { PROJECT_CHANGED_EVENT, SELECTED_PROJECT_KEY, projectChangedDetail, loadProjectList } from "@/lib/project-selector";
 import { buildAuditReportHref, reportNeedsProject, resolveProjectDomain, type ProjectDomainRef } from "@/lib/report-link";
 import { TableSkeleton } from "@/components/dashboard/Skeleton";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
@@ -239,12 +239,12 @@ export default function ReportsPage() {
         return;
       }
       try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const json = await res.json();
+        // 共享取数入口：与 Topbar / 其他页面并发调用时只发一次 /api/projects
+        const json = await loadProjectList();
         if (cancelled || my !== seq) return;
         // 拉取失败或列表里没有该 id：一律退回「未确认」，
         // 绝不保留上一个项目的域名（切换项目时请求失败若保留旧值就是串数据）
-        if (!res.ok) {
+        if (!json.ok) {
           setProjectDomain(null);
           setProjectResolved(true);
           return;

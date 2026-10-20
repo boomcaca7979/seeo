@@ -97,6 +97,10 @@ export const config = {
     // 排除静态资源与爬虫文件（sitemap/robots/llms），只处理页面路由。
     // 爬虫文件必须完全绕过 middleware（含 locale 路由与 auth session），
     // 保证搜索引擎在任何配置下都能拿到 deterministic 响应。
-    "/((?!_next/static|_next/image|favicon\\.ico|sitemap\\.xml|robots\\.txt|llms\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // /api 同样完全绕过：updateSession 在这里做的唯一一件事是 supabase.auth.getUser()
+    // （/api 不是 /app 前缀、不是 auth 页、没有项目 id），而每个 API 路由本来就有
+    // 自己的 requireAuth/requireAuthAllowGuest 校验与 token 刷新 —— middleware 再查一次
+    // 纯属重复的 Supabase 网络往返（2026-10 性能修复：生产 fetch failed 与慢接口的共同放大器）。
+    "/((?!_next/static|_next/image|api(?:/|$)|favicon\\.ico|sitemap\\.xml|robots\\.txt|llms\\.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

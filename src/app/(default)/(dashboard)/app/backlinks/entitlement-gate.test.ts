@@ -13,7 +13,8 @@ const API = readFileSync(
 );
 
 // INIT 只取「域名解析 effect」那一段：门控 effect 从 autoLoadedRef 起，不在本段范围内
-const INIT = PAGE.slice(PAGE.indexOf("const initRef = useRef"), PAGE.indexOf("const autoLoadedRef"));
+// 2026-10：域名解析改为跟随全局项目（appliedProjectRef），锚点随之更新
+const INIT = PAGE.slice(PAGE.indexOf("// 挂载/切换项目时确定域名"), PAGE.indexOf("const autoLoadedRef"));
 const GATED = PAGE.slice(PAGE.indexOf("const autoLoadedRef"), PAGE.indexOf("const handleDomainChange"));
 
 describe("BUG-08：挂载 effect 不再无条件请求 Pro 数据", () => {

@@ -111,10 +111,11 @@ describe("F1：额度分支（未达额度→Modal，达额度→升级提示）
     expect(SRC).not.toMatch(/maxProjects\s*=\s*2\b/);
   });
 
-  it("下拉打开时刷新项目列表（loadProjects），避免创建/删除后额度校验用旧数据", () => {
-    expect(SRC).toContain("const loadProjects = useCallback(async () => {");
-    expect(SRC).toContain("if (!projectOpen) void loadProjects();");
-    expect(SRC).toMatch(/useEffect\(\(\) => \{\s*void \(async \(\) => \{ await loadProjects\(\); \}\)\(\);\s*\}, \[loadProjects\]\);/);
+  it("下拉打开时刷新项目列表（force），避免创建/删除后额度校验用旧数据", () => {
+    // 2026-10：列表由共享上下文持有，Topbar 只触发「强制刷新」，不再自己发请求
+    expect(SRC).toContain("const refreshProjects = () => void reloadProjects({ force: true });");
+    expect(SRC).toContain("if (!projectOpen) refreshProjects();");
+    expect(SRC).toContain("reload: reloadProjects");
   });
 });
 
@@ -147,23 +148,26 @@ describe("BUG-45：项目切换器必须 shrink-safe", () => {
 // 以为自己的项目被删了（在鉴权实例 /api/projects 500 的真实复现中确认）。
 
 describe("BUG-16：加载失败与空列表是两种状态", () => {
-  it("存在独立的 projectsFailed 状态，失败分支不读取 data.data", () => {
-    expect(SRC).toContain("const [projectsFailed, setProjectsFailed] = useState(false);");
-    const load = SRC.slice(SRC.indexOf("const loadProjects = useCallback"), SRC.indexOf("// 拉取预警"));
-    expect(load).toContain("if (!res.ok) {");
-    expect(load).toContain("setProjectsFailed(true);");
-    expect(load).toContain("setProjectsFailed(false);");
-    // 失败时提前 return，绝不把空数组当成功结果继续走选中项恢复逻辑
-    const failBranch = load.slice(load.indexOf("if (!res.ok) {"));
-    expect(failBranch.slice(0, 260)).toContain("return;");
-    expect(load).toMatch(/catch \{[\s\S]{0,200}setProjectsFailed\(true\)/);
+  const PROVIDER_SRC = readFileSync(
+    fileURLToPath(new URL("./ActiveProjectContext.tsx", import.meta.url)),
+    "utf-8",
+  );
+
+  it("失败状态由共享上下文维护，失败分支提前 return，不把空数组当成功结果", () => {
+    // 2026-10：列表取数从 Topbar 移到 ActiveProjectContext，语义保持不变
+    expect(PROVIDER_SRC).toContain("setFailed(true)");
+    expect(PROVIDER_SRC).toContain("setFailed(false)");
+    const failStart = PROVIDER_SRC.indexOf("if (!result.ok) {");
+    expect(failStart).toBeGreaterThan(-1);
+    expect(PROVIDER_SRC.slice(failStart, failStart + 220)).toContain("return;");
+    expect(PROVIDER_SRC).toMatch(/catch \{[\s\S]{0,200}setFailed\(true\)/);
   });
 
   it("菜单渲染：projectsFailed 优先于「尚无项目」，并提供重试", () => {
     const menu = SRC.slice(SRC.indexOf('{t("switchProject")}'), SRC.indexOf("{projects.map("));
     expect(menu).toContain("projectsFailed ? (");
     expect(menu).toContain('{t("loadFailed")}');
-    expect(menu).toContain("onClick={() => void loadProjects()}");
+    expect(menu).toContain("onClick={() => refreshProjects()}");
     expect(menu).toContain('{t("retry")}');
     // 「尚无项目」只能在非失败状态下渲染
     expect(menu.indexOf("projectsFailed ?")).toBeLessThan(menu.indexOf('{t("noProjects")}'));

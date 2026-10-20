@@ -1,30 +1,32 @@
 import { createServer } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { isAuthEnabled } from "@/lib/auth-config";
 import ProjectList from "@/components/dashboard/ProjectList";
-import GrowthOpportunityPanel from "@/components/dashboard/GrowthOpportunityPanel";
-import WorkspaceHeader from "@/components/dashboard/WorkspaceHeader";
-import WorkspaceDashboard from "@/components/dashboard/WorkspaceDashboard";
-import { getWorkspaceActionSummary } from "@/lib/seo/work-queue";
-import { getWorkspaceOverview, type WorkspaceOverviewData } from "@/lib/seo/workspace-overview";
+import ScopedOverview from "@/components/dashboard/ScopedOverview";
+import { getWorkspaceDashboard, type WorkspaceDashboardData, type OverviewScope } from "@/lib/seo/workspace-overview";
+import type { WorkspaceActionSummary } from "@/lib/seo/work-queue";
 import Onboarding from "@/components/dashboard/Onboarding";
 import { listProjectsWithMetrics, listProjectsWithMetricsForUser, listAlerts, countUnreadAlerts } from "@/lib/db";
+import { OVERVIEW_SCOPE_COOKIE } from "@/lib/project-selector";
 
 // 演示模式下读 Turso/SQLite，避免 Vercel 构建期静态预渲染导致 router.refresh() 拿到旧快照
 export const dynamic = "force-dynamic";
 
-/** 决策面板数据：真实审计/追踪汇总 + 增长机会分层 + 今日 top action。任何失败都降级为"无数据"，绝不阻塞工作台渲染。 */
-async function loadActionSummary(
+/**
+ * 首页数据：概览 + 增长机会面板。
+ * 两者共用同一次队列构建（getWorkspaceDashboard），不再对同一批项目各跑一遍。
+ * 任何失败都降级为"无数据"，绝不阻塞工作台渲染。
+ */
+async function loadDashboardData(
   userId: string,
-  domains: string[],
-  projects?: Array<{ id: number; domain: string }>
-) {
+  projects: Array<{ id: number; domain: string }>
+): Promise<WorkspaceDashboardData> {
   try {
-    // 上限 5 个域名，避免多项目时把首页查询打成 N+1
-    return await getWorkspaceActionSummary(userId, domains.slice(0, 5), projects);
+    return await getWorkspaceDashboard(userId, projects);
   } catch {
-    return {
+    const actionSummary: WorkspaceActionSummary = {
       open: 0,
       inProgress: 0,
       fixedClaimed: 0,
@@ -37,69 +39,87 @@ async function loadActionSummary(
         gaps: [],
       },
     };
-  }
-}
-
-/** 工作台可视化概览（只读聚合）。失败一律降级为"无数据"，不填任何占位数字。 */
-async function loadOverview(
-  userId: string,
-  projects: Array<{ id: number; domain: string }>
-): Promise<WorkspaceOverviewData> {
-  try {
-    return await getWorkspaceOverview(userId, projects);
-  } catch {
     return {
-      hasProjects: projects.length > 0,
-      hasAudit: false,
-      auditedDomains: 0,
-      audit: null,
-      counts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
-      auditCounts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
-      auditPriority: { P0: 0, P1: 0, P2: 0 },
-      verification: { pass: 0, fail: 0, inconclusive: 0, pending: 0 },
-      tasks: [],
-      trend: null,
-      gaps: ["no_completed_audit"],
+      overview: {
+        hasProjects: projects.length > 0,
+        hasAudit: false,
+        auditedDomains: 0,
+        audit: null,
+        counts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
+        auditCounts: { open: 0, in_progress: 0, fixed_claimed: 0, verified_resolved: 0, dismissed: 0 },
+        auditPriority: { P0: 0, P1: 0, P2: 0 },
+        verification: { pass: 0, fail: 0, inconclusive: 0, pending: 0 },
+        tasks: [],
+        trend: null,
+        gaps: ["no_completed_audit"],
+      },
+      actionSummary,
     };
   }
 }
 
-/** 工作台首屏：头部 → 可视化概览 → 增长机会决策面板 → 项目与预警明细 */
+/**
+ * 概况页 SSR 数据范围（2026-10 单项目模式）：
+ * 按范围 cookie 把 SSR 数据收敛到「当前项目」自己的聚合；cookie 缺失/非法时回退
+ * 「全部项目」（客户端 ScopedOverview 挂载后会按顶部项目上下文纠正到当前项目）。
+ * cookie 只是范围选择，不携带授权语义：项目必须命中当前用户自己的项目列表，
+ * 否则一律回退，绝不为伪造的 id 取数据。
+ */
+function resolveInitialScope(
+  cookieValue: string,
+  projects: Array<{ id: number; domain: string }>,
+  /** 鉴权模式：UUID → domain（来自本人 Supabase 项目列表）；演示模式传 null */
+  domainByUuid: Map<string, string> | null
+): { scope: OverviewScope; scopedProjects: Array<{ id: number; domain: string }> } {
+  if (!cookieValue || cookieValue === "all") {
+    return { scope: { kind: "all" }, scopedProjects: projects };
+  }
+  if (domainByUuid) {
+    const domain = domainByUuid.get(cookieValue);
+    const matched = domain ? projects.find((p) => p.domain === domain) : undefined;
+    if (matched) return { scope: { kind: "project", id: cookieValue }, scopedProjects: [matched] };
+  } else {
+    const matched = projects.find((p) => String(p.id) === cookieValue);
+    if (matched) return { scope: { kind: "project", id: cookieValue }, scopedProjects: [matched] };
+  }
+  return { scope: { kind: "all" }, scopedProjects: projects };
+}
+
+/** 工作台首屏：范围边界（头部 + 可视化概览 + 增长机会面板）→ 项目与预警明细（跨项目列表） */
 function WorkbenchBody({
   displayName,
   projects,
   alerts,
   unread,
-  actionSummary,
-  overview,
+  dashboard,
+  initialScope,
 }: {
   displayName: string;
   projects: Awaited<ReturnType<typeof listProjectsWithMetrics>>;
   alerts: Awaited<ReturnType<typeof listAlerts>>;
   unread: number;
-  actionSummary: Awaited<ReturnType<typeof loadActionSummary>>;
-  overview: WorkspaceOverviewData;
+  dashboard: WorkspaceDashboardData;
+  initialScope: OverviewScope;
 }) {
   return (
     <>
-      <WorkspaceHeader
+      <ScopedOverview
+        initialScope={initialScope}
+        initialOverview={dashboard.overview}
+        initialActionSummary={dashboard.actionSummary}
         displayName={displayName}
-        projectCount={projects.length}
-        auditedCount={overview.auditedDomains}
+        totalProjects={projects.length}
         unreadAlertCount={unread}
       />
-      <div className="dash-container px-6 pt-6 sm:px-8">
-        <WorkspaceDashboard data={overview} />
-        <div className="mt-6">
-          <GrowthOpportunityPanel summary={actionSummary} />
-        </div>
-      </div>
       <ProjectList projects={projects} alerts={alerts} />
     </>
   );
 }
 
 export default async function WorkbenchPage() {
+  const cookieStore = await cookies();
+  const scopeCookie = cookieStore.get(OVERVIEW_SCOPE_COOKIE)?.value ?? "";
+
   // 演示模式：直接读 SQLite
   if (!isAuthEnabled) {
     const ts = await getTranslations("dashboard.sidebar");
@@ -110,19 +130,18 @@ export default async function WorkbenchPage() {
     }
     const alerts = await listAlerts("demo-user", 50);
     const unread = await countUnreadAlerts("demo-user");
-    const scoped = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
-    const [actionSummary, overview] = await Promise.all([
-      loadActionSummary("demo-user", projects.map((p) => p.domain), scoped),
-      loadOverview("demo-user", scoped),
-    ]);
+    const scopedAll = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
+    const { scope: initialScope, scopedProjects } = resolveInitialScope(scopeCookie, scopedAll, null);
+    // 概览与增长机会面板共用一次队列构建（范围为当前项目时只构建该项目的队列）
+    const dashboard = await loadDashboardData("demo-user", scopedProjects);
     return (
       <WorkbenchBody
         displayName={ts("demoUser")}
         projects={projects}
         alerts={alerts}
         unread={unread}
-        actionSummary={actionSummary}
-        overview={overview}
+        dashboard={dashboard}
+        initialScope={initialScope}
       />
     );
   }
@@ -161,11 +180,14 @@ export default async function WorkbenchPage() {
 
   const alerts = await listAlerts(user.id, 50);
   const unread = await countUnreadAlerts(user.id);
-  const scoped = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
-  const [actionSummary, overview] = await Promise.all([
-    loadActionSummary(user.id, projects.map((p) => p.domain), scoped),
-    loadOverview(user.id, scoped),
-  ]);
+  const scopedAll = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
+  // UUID → domain 映射来自本人项目列表（RLS 过滤），同时是范围 cookie 的所有权凭证
+  const domainByUuid = new Map(
+    (userProjects ?? []).map((p) => [p.id as string, p.domain as string]),
+  );
+  const { scope: initialScope, scopedProjects } = resolveInitialScope(scopeCookie, scopedAll, domainByUuid);
+  // 概览与增长机会面板共用一次队列构建（范围为当前项目时只构建该项目的队列）
+  const dashboard = await loadDashboardData(user.id, scopedProjects);
 
   return (
     <WorkbenchBody
@@ -173,8 +195,8 @@ export default async function WorkbenchPage() {
       projects={projects}
       alerts={alerts}
       unread={unread}
-      actionSummary={actionSummary}
-      overview={overview}
+      dashboard={dashboard}
+      initialScope={initialScope}
     />
   );
 }

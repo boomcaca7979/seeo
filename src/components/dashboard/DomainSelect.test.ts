@@ -48,7 +48,7 @@ describe("BUG-17 DomainSelect：失败降级必须与空项目区分", () => {
   it("成功分支先清掉 failed，重试成功后不会残留错误提示", () => {
     // 复位必须在响应回来后、分支判定之前（effect 同步体里 setState 会触发级联渲染）
     expect(SRC).toMatch(
-      /try \{[\s\S]{0,240}setFailed\(false\);\s*if \(res\.ok && Array\.isArray\(json\.data\)\)/
+      /try \{[\s\S]{0,1200}setFailed\(false\);\s*if \(json\.ok && Array\.isArray\(json\.data\)\)/
     );
   });
 
@@ -63,7 +63,22 @@ describe("BUG-17 DomainSelect：失败降级必须与空项目区分", () => {
 
   it("取数回调不依赖 onChange：父级重渲染不得再触发一次 /api/projects", () => {
     expect(SRC).toMatch(/const loadProjects = useCallback\(async \(\) => \{[\s\S]*?\}, \[\]\);/);
-    expect(SRC).toMatch(/onChangeRef\.current\(\(json\.data\[0\] as Project\)\.domain\)/);
+    expect(SRC).toMatch(/onChangeRef\.current\(fallback\)/);
+  });
+
+  it("默认值优先取「顶部当前项目」，没有才回落第一个项目（不再固定选最早创建的项目）", () => {
+    // 根因：旧逻辑 `if (!valueRef.current) onChange(json.data[0].domain)` 让每个页面
+    // 都默认选「最早创建的項目」，与顶部当前选择无关。
+    expect(SRC).toMatch(/const fallback = ctxRef\.current\?\.activeDomain \?\? \(json\.data\[0\] as Project \| undefined\)\?\.domain \?\? ""/);
+    expect(SRC).not.toMatch(/if \(!valueRef\.current && json\.data\.length > 0\) \{\s*onChangeRef\.current\(\(json\.data\[0\] as Project\)\.domain\);/);
+  });
+
+  it("控制台内直接用共享列表：Provider 有项目时不再单独请求 /api/projects", () => {
+    expect(SRC).toContain("useActiveProjectOptional()");
+    expect(SRC).toMatch(/if \(shared && shared\.projects\.length > 0\) \{/);
+    expect(SRC).toContain("const json = await loadProjectList();");
+    // 独立渲染（无 Provider）时走共享取数入口，并发调用合并为一次
+    expect(SRC).not.toContain('fetch("/api/projects"');
   });
 
   it("en/zh 都提供失败提示与重试文案，且语义不同于空项目文案", () => {

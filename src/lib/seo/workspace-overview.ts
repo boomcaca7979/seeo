@@ -10,7 +10,13 @@
 //   3. 趋势只在**同一域名存在 ≥2 次已完成审计**时才算"可比较"，否则返回 null。
 
 import type { LocalizedText } from "./audit-checks";
-import { buildWorkQueue, type UnifiedTaskStatus, type WorkQueue } from "./work-queue";
+import {
+  buildWorkspaceQueues,
+  summarizeActionQueues,
+  type UnifiedTaskStatus,
+  type WorkQueue,
+  type WorkspaceActionSummary,
+} from "./work-queue";
 import { getAuditHistory } from "@/lib/db/audits";
 
 export interface WorkspaceTaskItem {
@@ -112,11 +118,57 @@ export async function getWorkspaceOverview(
   projects: Array<{ id: number; domain: string }>
 ): Promise<WorkspaceOverviewData> {
   const scoped = projects.slice(0, MAX_DOMAINS);
-  const queues = await Promise.all(
-    scoped.map((p) =>
-      buildWorkQueue({ userId, domain: p.domain, projectId: p.id }).catch(() => null)
-    )
-  );
+  const queues = await buildWorkspaceQueues(userId, scoped.map((p) => p.domain), projects);
+  return buildOverviewFromQueues(userId, scoped, queues);
+}
+
+/** 首页一次渲染需要的两套视图模型（概览 + 增长机会面板），队列只构建一次 */
+export interface WorkspaceDashboardData {
+  overview: WorkspaceOverviewData;
+  actionSummary: WorkspaceActionSummary;
+}
+
+/** 概况页数据范围与比较函数定义在 client-safe 的 project-selector，这里原样再导出 */
+export type { OverviewScope, OverviewScopeKind } from "@/lib/project-selector";
+export { sameOverviewScope } from "@/lib/project-selector";
+
+/**
+ * /api/app/dashboard 的返回载荷（client-safe：只被当作类型导入）。
+ * 与 getWorkspaceDashboard 同源同构，不在客户端做任何二次聚合。
+ */
+export interface OverviewDashboardPayload {
+  scope: import("@/lib/project-selector").OverviewScopeKind;
+  overview: WorkspaceOverviewData;
+  actionSummary: WorkspaceActionSummary;
+}
+
+/**
+ * /app 首页的唯一入口：同一批项目只构建一次工作队列，再分别投影成
+ * 「可视化概览」与「Action Center / 增长机会面板」两套视图模型。
+ *
+ * 为什么要有这个函数：此前页面同时调用 getWorkspaceOverview 与
+ * getWorkspaceActionSummary，两者各自对每个域名跑一次 buildWorkQueue
+ * → 每域 2 次、最多 5 域 = 10 次队列构建（每次 5 条查询）。
+ * 两处聚合口径本来就同源（都来自 buildWorkQueue），复用同一份队列不改变任何业务结果。
+ */
+export async function getWorkspaceDashboard(
+  userId: string,
+  projects: Array<{ id: number; domain: string }>
+): Promise<WorkspaceDashboardData> {
+  const scoped = projects.slice(0, MAX_DOMAINS);
+  const queues = await buildWorkspaceQueues(userId, scoped.map((p) => p.domain), projects);
+  return {
+    overview: await buildOverviewFromQueues(userId, scoped, queues),
+    actionSummary: summarizeActionQueues(queues),
+  };
+}
+
+/** 视图模型拼装（队列由调用方构建并共享；趋势查询仍按需触发） */
+async function buildOverviewFromQueues(
+  userId: string,
+  scoped: Array<{ id: number; domain: string }>,
+  queues: Array<WorkQueue | null>
+): Promise<WorkspaceOverviewData> {
 
   const counts: Record<UnifiedTaskStatus, number> = {
     open: 0,

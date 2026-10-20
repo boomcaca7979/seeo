@@ -11,8 +11,14 @@
 // 技术问题（audit / technical / ai_visibility）不冒充增长机会——单独以 issue 语义呈现。
 // 无数据时如实说明需要什么数据才能解锁，绝不伪造机会或填 0。
 
+"use client";
+
+// 2026-10 概况页单项目范围改造：本组件需要随「当前项目 / 全部项目」范围切换而
+// 用客户端取回的数据重新渲染，因此从 server component（getTranslations）改为
+// client component（useTranslations/useLocale）。渲染输出与之前逐字一致。
+
 import Link from "next/link";
-import { getTranslations, getLocale } from "next-intl/server";
+import { useLocale, useTranslations } from "next-intl";
 import type { TopOpportunity } from "@/lib/seo/work-queue";
 
 type LocalizedText = string | { en: string; zh: string };
@@ -77,12 +83,12 @@ function formatDate(iso: string | null, locale: string): string {
     : ` (observed ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
 }
 
-export default async function GrowthOpportunityPanel({ summary }: GrowthOpportunityPanelProps) {
-  const tg = await getTranslations("dashboard.growth");
-  const tp = await getTranslations("dashboard.actions.panel");
+export default function GrowthOpportunityPanel({ summary }: GrowthOpportunityPanelProps) {
+  const tg = useTranslations("dashboard.growth");
+  const tp = useTranslations("dashboard.actions.panel");
   // 注意：reason.* / act.* / unavailableReason 自带命名空间前缀，用上一级命名空间渲染
-  const ta = await getTranslations("dashboard.actions");
-  const locale = await getLocale();
+  const ta = useTranslations("dashboard.actions");
+  const locale = useLocale();
   const hasAudit = summary.auditedDomains > 0;
   const top = summary.growth.top;
   const featured = top[0] ?? null;

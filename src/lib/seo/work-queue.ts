@@ -977,12 +977,8 @@ function toTopOpportunity(domain: string, task: WorkTask): TopOpportunity {
 
 const GROWTH_RANK: Record<string, number> = { regain: 0, capture: 1, improve: 2 };
 
-export async function getWorkspaceActionSummary(
-  userId: string,
-  domains: string[],
-  /** 可选的 domain → 项目 id 映射；提供后机会（seo_opportunities）才会进入统计与 top action */
-  projects?: Array<{ id: number; domain: string }>
-): Promise<{
+/** Action Center / 增长机会面板的视图模型（getWorkspaceActionSummary 的返回类型） */
+export interface WorkspaceActionSummary {
   open: number;
   inProgress: number;
   fixedClaimed: number;
@@ -995,25 +991,46 @@ export async function getWorkspaceActionSummary(
     /** 各域名 coverage.gaps 的并集（去重）；UI 据此如实解释"为什么现在没有增长机会" */
     gaps: string[];
   };
-}> {
+}
+
+/**
+ * 队列构建的唯一入口。
+ * /app 首页同一批项目既要出「可视化概览」又要出「增长机会面板」，两处若各自调用
+ * getWorkspaceActionSummary / getWorkspaceOverview，就会对同一批域名构建两遍队列
+ * （此前实测每域 2 次 × 最多 5 域 = 10 次，每次 5 条数据库查询）。
+ * 现在两边共用同一份构建结果，语义不变。
+ */
+export async function buildWorkspaceQueues(
+  userId: string,
+  domains: string[],
+  /** 可选的 domain → 项目 id 映射；提供后机会（seo_opportunities）才会进入统计与 top action */
+  projects?: Array<{ id: number; domain: string }>
+): Promise<Array<WorkQueue | null>> {
   const projectIdFor = (d: string): number | null =>
     projects?.find((p) => p.domain === d)?.id ?? null;
-  const summaries = await Promise.all(
+  return Promise.all(
     domains.map((d) =>
       buildWorkQueue({ userId, domain: d, projectId: projectIdFor(d) }).catch(() => null)
     )
   );
-  const out = {
+}
+
+/**
+ * 纯汇总（不访问数据库）：把已构建的队列聚合成 Action Center 视图模型。
+ * 分类口径、稳定重排、top 3 上限与拆分前逐字一致——这里只搬位置，不改规则。
+ */
+export function summarizeActionQueues(summaries: Array<WorkQueue | null>): WorkspaceActionSummary {
+  const out: WorkspaceActionSummary = {
     open: 0,
     inProgress: 0,
     fixedClaimed: 0,
     verifiedResolved: 0,
     auditedDomains: 0,
-    topAction: null as TodayTopAction | null,
+    topAction: null,
     growth: {
       counts: { regain: 0, capture: 0, improve: 0 },
-      top: [] as TopOpportunity[],
-      gaps: [] as string[],
+      top: [],
+      gaps: [],
     },
   };
   const gapSet = new Set<string>();
@@ -1061,4 +1078,17 @@ export async function getWorkspaceActionSummary(
   out.growth.top = growthCandidates.slice(0, 3).map((c) => c.opp);
   out.growth.gaps = [...gapSet];
   return out;
+}
+
+/**
+ * Action Center 数据（保留原有函数签名，供 /app/actions 等消费方继续使用）。
+ * 内部先构建队列再汇总——与首页共用同一套 buildWorkspaceQueues / summarizeActionQueues。
+ */
+export async function getWorkspaceActionSummary(
+  userId: string,
+  domains: string[],
+  projects?: Array<{ id: number; domain: string }>
+): Promise<WorkspaceActionSummary> {
+  const summaries = await buildWorkspaceQueues(userId, domains, projects);
+  return summarizeActionQueues(summaries);
 }

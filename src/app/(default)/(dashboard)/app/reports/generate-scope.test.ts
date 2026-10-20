@@ -97,7 +97,7 @@ describe("打印入口与生成入口共用同一份项目状态", () => {
   it("域名解析失败时清除旧值，避免切换项目失败后继续用上一个项目", () => {
     const effect = PAGE_SRC.slice(PAGE_SRC.indexOf("const [projectDomain"), GEN_START);
     const failurePaths = [
-      effect.slice(effect.indexOf("if (!res.ok) {"), effect.indexOf("const list =")),
+      effect.slice(effect.indexOf("if (!json.ok) {"), effect.indexOf("const list =")),
       effect.slice(effect.indexOf("} catch {")),
     ];
     for (const block of failurePaths) {

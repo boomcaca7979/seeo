@@ -28,7 +28,7 @@ import CompetitorRankBars, { CompetitorRankRow } from "@/components/dashboard/ch
 import PageHeader from "@/components/viz/PageHeader";
 import MetricCard from "@/components/viz/MetricCard";
 import { DataTable, THead, Th, TBody, TR, TD } from "@/components/viz/DataTable";
-import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT } from "@/lib/project-selector";
+import { SELECTED_PROJECT_KEY, PROJECT_CHANGED_EVENT, loadProjectList } from "@/lib/project-selector";
 import { formatNumber, intlLocale } from "@/lib/ui-locale";
 import { useDialogA11y } from "@/lib/useDialogA11y";
 
@@ -312,10 +312,10 @@ export default function CompetitorsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/projects", { cache: "no-store" });
-        const json = await res.json();
+        // 共享取数入口：与 Topbar / 其他页面并发调用时只发一次 /api/projects
+        const json = await loadProjectList();
         if (cancelled) return;
-        if (res.ok) {
+        if (json.ok) {
           const proj = (json.data ?? []).find(
             (p: { id: string; domain: string }) => p.id === projectId
           );

@@ -17,7 +17,7 @@
 //   - 搜索量与关键词难度在本工作区不可用 → 不显示、不估算、不用替代值（metricsNote 明示）。
 //   - 意图是文本规则**估算**，表头标注「意图（估算）」。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import {
   Bar,
@@ -31,6 +31,7 @@ import {
 } from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
 import DomainSelect from "@/components/dashboard/DomainSelect";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
 import { handleBillingError } from "@/lib/billing-error-client";
 import {
   RK,
@@ -131,6 +132,20 @@ export default function KeywordExpandPage() {
   const [intentFilter, setIntentFilter] = useState<"all" | IntentKey>("all");
   const [sortMode, setSortMode] = useState<"alpha" | "length">("alpha");
   const { show, Toast } = useToast();
+
+  // 顶部当前项目：进入本页即为「目标项目」，顶部切换后本页跟着换（不跳转）。
+  // 关键词扩展是按关键词展开的，但"要追踪到哪"由项目决定，所以这里必须跟随全局项目。
+  const { activeId, activeDomain, loading: projectsLoading } = useActiveProject();
+  const appliedProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (projectsLoading) return;
+    if (appliedProjectRef.current === activeId) return;
+    appliedProjectRef.current = activeId;
+    if (!activeDomain) return;
+    // 延迟一拍写入，避免 effect 同步体内 setState（lint: react-hooks/set-state-in-effect）
+    const id = window.setTimeout(() => setTrackDomain(activeDomain), 0);
+    return () => window.clearTimeout(id);
+  }, [activeDomain, activeId, projectsLoading]);
 
   // 单请求：「分析」只调 /api/keywords/expand（related/paa/metrics/usage 一次带回）。
   // 此前并行还调 /api/seo/serp，同一缓存 key 未命中时会双倍扣费、双份错误提示。

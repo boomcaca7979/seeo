@@ -21,42 +21,51 @@ import {
 const SRC = {
   topbar: readFileSync(fileURLToPath(new URL("../components/dashboard/Topbar.tsx", import.meta.url)), "utf-8"),
   competitors: readFileSync(fileURLToPath(new URL("../app/(default)/(dashboard)/app/competitors/page.tsx", import.meta.url)), "utf-8"),
+  // 2026-10：项目列表/选中态从 Topbar 移到共享上下文，契约断言随之指向新位置
+  provider: readFileSync(
+    fileURLToPath(new URL("../components/dashboard/ActiveProjectContext.tsx", import.meta.url)),
+    "utf-8",
+  ),
 };
 
-describe("共享常量（Topbar 与 competitors 使用同一契约）", () => {
+describe("共享常量（唯一真源与消费方使用同一契约）", () => {
   it("localStorage key 与事件名稳定", () => {
     expect(SELECTED_PROJECT_KEY).toBe("seeo:selected-project-id");
     expect(PROJECT_CHANGED_EVENT).toBe("seeo:project-changed");
   });
 
-  it("两个消费方文件均从共享模块导入（无重复定义）", () => {
-    for (const src of [SRC.topbar, SRC.competitors]) {
-      expect(src).toMatch(/import \{[^}]*SELECTED_PROJECT_KEY[^}]*PROJECT_CHANGED_EVENT[^}]*\} from "@\/lib\/project-selector"/);
+  it("消费方文件均从共享模块导入（无重复定义）", () => {
+    for (const src of [SRC.provider, SRC.competitors]) {
+      const importBlock = src.match(/import \{[^}]*\} from "@\/lib\/project-selector"/)?.[0] ?? "";
+      expect(importBlock, "必须从共享模块导入").not.toBe("");
+      expect(importBlock).toContain("SELECTED_PROJECT_KEY");
+      expect(importBlock).toContain("PROJECT_CHANGED_EVENT");
       expect(src).not.toMatch(/const SELECTED_PROJECT_KEY/);
       expect(src).not.toMatch(/const PROJECT_CHANGED_EVENT/);
     }
   });
 });
 
-describe("Topbar 项目 id 全链路 string（防回归）", () => {
-  it("selectedId 状态为 string，无 Number() 转换残留", () => {
-    expect(SRC.topbar).toContain("useState<string | null>(null)");
-    expect(SRC.topbar).not.toContain("Number(stored)");
+describe("项目 id 全链路 string（防回归）", () => {
+  it("选中态为 string，无 Number() 转换残留", () => {
+    expect(SRC.provider).toContain("useState<string | null>(null)");
+    expect(SRC.provider).not.toContain("Number(stored)");
     expect(SRC.topbar).not.toContain("handleSelectProject = (id: number)");
   });
 
-  it("localStorage 直接存取 string UUID（setItem 原样写入）", () => {
-    expect(SRC.topbar).toContain("localStorage.setItem(SELECTED_PROJECT_KEY, id)");
-    expect(SRC.topbar).not.toContain("String(list[0].id)"); // 不再需要 String() 包装
+  it("恢复逻辑使用 validStoredProjectId 校验（旧值/已删项目 → 回落首个项目）", () => {
+    expect(SRC.provider).toContain("validStoredProjectId(readStoredId(), result.data.map((p) => p.id))");
   });
 
-  it("事件 payload 为 string：Topbar 用户切换与挂载广播分别标注 source", () => {
-    expect(SRC.topbar).toMatch(/CustomEvent\(PROJECT_CHANGED_EVENT, \{ detail: \{ id, source: "user" as const \} \}\)/);
-    expect(SRC.topbar).toMatch(/detail: \{ id: initialId, source: "init" as const \}/);
+  it("用户切换走唯一写入路径：setActiveProject(id, \"user\")", () => {
+    expect(SRC.provider).toContain('writeActiveProject(id, "user")');
   });
 
-  it("恢复逻辑使用 validStoredProjectId 校验（旧值 fallback 第一个项目）", () => {
-    expect(SRC.topbar).toContain("validStoredProjectId(stored, list.map((p) => p.id))");
+  it("Topbar 不再自持项目列表/选中态，也不再自己取 /api/projects", () => {
+    expect(SRC.topbar).toContain("useActiveProject()");
+    expect(SRC.topbar).toContain("setActive(id)");
+    expect(SRC.topbar).not.toContain('fetch("/api/projects"');
+    expect(SRC.topbar).not.toContain("useState<string | null>(null)");
   });
 });
 

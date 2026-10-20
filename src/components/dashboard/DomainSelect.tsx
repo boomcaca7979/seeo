@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { loadProjectList } from "@/lib/project-selector";
+import { useActiveProjectOptional } from "@/components/dashboard/ActiveProjectContext";
 
 interface Project {
-  id: number;
+  id: string;
   name: string;
   domain: string;
 }
@@ -26,6 +28,10 @@ const MANUAL_KEY = "__manual__";
  */
 export default function DomainSelect({ value, onChange, placeholder, className, label }: DomainSelectProps) {
   const t = useTranslations("dashboard.shared.domainSelect");
+  // 控制台内由 ActiveProjectContext 提供项目列表与"当前项目"；
+  // 单独渲染（测试、控制台外）时 ctx 为 null，走下面的既有降级路径。
+  const ctx = useActiveProjectOptional();
+  const ctxRef = useRef(ctx);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [manual, setManual] = useState(false);
@@ -47,6 +53,11 @@ export default function DomainSelect({ value, onChange, placeholder, className, 
     onChangeRef.current = onChange;
   });
 
+  // ref 同步放在 effect 里（渲染期写 ref 违反 react-compiler 规则）
+  useEffect(() => {
+    ctxRef.current = ctx;
+  });
+
   // BUG-17：加载失败与「确实没有项目」必须区分。两者都会退化成手动输入框，
   // 但只有后者才该说「暂无项目」——把 500 / 网络异常说成没有项目，
   // 用户会以为自己的项目被删了，而且不知道该重试。
@@ -58,15 +69,28 @@ export default function DomainSelect({ value, onChange, placeholder, className, 
     controllerRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch("/api/projects", { cache: "no-store", signal: controller.signal });
-      const json = await res.json();
+      // 控制台内：项目列表已由 ActiveProjectProvider 持有 → 直接用，不再打 /api/projects。
+      // （此前 Topbar + 每个页面的 DomainSelect 各取一份，同一份数据被取 2~4 次）
+      const shared = ctxRef.current;
+      if (shared && shared.projects.length > 0) {
+        setFailed(false);
+        setProjects(shared.projects as Project[]);
+        const fallback = shared.activeDomain || (shared.projects[0] as Project).domain;
+        if (!valueRef.current && fallback) onChangeRef.current(fallback);
+        setLoading(false);
+        return;
+      }
+      // 独立渲染（无 Provider）：走共享取数入口，并发调用自动合并为一次请求
+      const json = await loadProjectList();
       // 复位只在响应回来后做：effect 体里同步 setState 会触发级联渲染
       setFailed(false);
-      if (res.ok && Array.isArray(json.data)) {
+      if (json.ok && Array.isArray(json.data)) {
         setProjects(json.data as Project[]);
-        // 无值且项目存在时，默认选中第一个（读最新 value，避免覆盖 URL/localStorage 恢复值）
-        if (!valueRef.current && json.data.length > 0) {
-          onChangeRef.current((json.data[0] as Project).domain);
+        // 无值时优先用「顶部的当前项目」，没有才回落第一个项目。
+        // 只回落第一个项目正是"顶部选 B、页面显示最早项目 A"的根因。
+        const fallback = ctxRef.current?.activeDomain ?? (json.data[0] as Project | undefined)?.domain ?? "";
+        if (!valueRef.current && fallback) {
+          onChangeRef.current(fallback);
         }
         // 无项目时切到手动输入
         if (json.data.length === 0) {

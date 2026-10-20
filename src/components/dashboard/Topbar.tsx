@@ -1,16 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useId } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { createBrowser } from "@/lib/supabase/browser";
 import { isAuthEnabled } from "@/lib/auth-config";
-import {
-  SELECTED_PROJECT_KEY,
-  PROJECT_CHANGED_EVENT,
-  projectChangedDetail,
-  validStoredProjectId,
-} from "@/lib/project-selector";
+import { useActiveProject } from "@/components/dashboard/ActiveProjectContext";
 import { useEntitlements } from "@/components/billing/EntitlementsContext";
 import { planLabel } from "@/lib/plan-labels";
 import { formatRelativeTime } from "@/lib/relative-time";
@@ -47,21 +42,14 @@ interface AlertItem {
   created_at: string;
 }
 
-interface ProjectItem {
-  /** 项目 id：鉴权模式为 Supabase UUID string，演示模式为 SQLite 整数（string） */
-  id: string;
-  name: string;
-  domain: string;
-  healthScore: number | null;
-}
-
 const alertDotColor: Record<string, string> = {
   error: "bg-neg",
   warning: "bg-warn",
   info: "bg-ink-40",
 };
 
-// SELECTED_PROJECT_KEY / PROJECT_CHANGED_EVENT 统一从共享模块导入（与 competitors 页保持同一契约）
+// 当前项目由 ActiveProjectContext 统一持有（唯一真源）：顶部只负责"显示"与"发起切换"。
+// 列表、选中 id、id→域名映射都在 Provider 里解析，页面侧读同一份，不再各自取列表。
 
 
 export default function Topbar({ displayName, email, isGuest, onMobileMenuClick, mobileMenuOpen }: TopbarProps) {
@@ -69,11 +57,15 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick,
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
   const [projectOpen, setProjectOpen] = useState(false);
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
   // BUG-16：加载失败 ≠ 没有项目。之前 500 / 网络异常都落到 (data.data ?? [])，
   // 菜单直接说「尚无项目」，用户会以为自己项目被删了。
-  const [projectsFailed, setProjectsFailed] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const {
+    projects,
+    failed: projectsFailed,
+    activeId: selectedId,
+    setActive,
+    reload: reloadProjects,
+  } = useActiveProject();
   const [bellOpen, setBellOpen] = useState(false);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unread, setUnread] = useState(0);
@@ -93,70 +85,10 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick,
   const userMenuPanelId = useId();
 
 
-  // 拉取真实项目列表 + 从 localStorage 恢复选中项
-  // （下拉打开时也会调用：创建/删除项目后刷新，保证额度校验不用旧数据）
-  const loadProjects = useCallback(async () => {
-    try {
-      const res = await fetch("/api/projects", { cache: "no-store" });
-      if (!res.ok) {
-        setProjectsFailed(true);
-        setProjects([]);
-        setSelectedId(null);
-        return;
-      }
-      const data = await res.json();
-      const list: ProjectItem[] = (data.data ?? []).map((p: ProjectItem) => ({
-        id: p.id,
-        name: p.name,
-        domain: p.domain,
-        healthScore: p.healthScore,
-      }));
-      setProjectsFailed(false);
-      setProjects(list);
-
-      // 恢复 localStorage 选中项（string id；旧版本遗留数字 id / 已删项目会校验失败 → fallback 第一个）
-      const stored = window.localStorage.getItem(SELECTED_PROJECT_KEY);
-      const storedId = validStoredProjectId(stored, list.map((p) => p.id));
-      let initialId: string | null = null;
-      if (storedId !== null) {
-        initialId = storedId;
-        setSelectedId(storedId);
-      } else if (list.length > 0) {
-        // 默认选第一个
-        initialId = list[0].id;
-        setSelectedId(list[0].id);
-        window.localStorage.setItem(SELECTED_PROJECT_KEY, list[0].id);
-      } else {
-        setSelectedId(null);
-      }
-      // 通知同 tab 的页面（如 competitors）初始项目已就绪
-      if (initialId !== null) {
-        window.dispatchEvent(
-          new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id: initialId, source: "init" as const } }),
-        );
-      }
-    } catch {
-      // 网络层失败同样如实标记：菜单显示「加载失败 + 重试」，而不是「尚无项目」
-      setProjectsFailed(true);
-      setProjects([]);
-      setSelectedId(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    void (async () => { await loadProjects(); })();
-  }, [loadProjects]);
-
-  // 外部同步：项目详情页 / 带范围参数的页面会把该项目设为活跃项目（setActiveProject）。
-  // 这里只更新选中态、不再派发事件，避免与 setActiveProject 形成回环。
-  useEffect(() => {
-    const onProjectChanged = (e: Event) => {
-      const detail = projectChangedDetail(e);
-      if (detail) setSelectedId(detail.id);
-    };
-    window.addEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
-    return () => window.removeEventListener(PROJECT_CHANGED_EVENT, onProjectChanged);
-  }, []);
+  // 列表与选中态由 ActiveProjectContext 持有：这里不再 fetch /api/projects，
+  // 也不再自己从 localStorage 恢复（否则又会出现"顶部一套、页面一套"两份状态）。
+  // 下拉打开时强制刷新一次列表：创建/删除项目后额度校验与选项保持新鲜。
+  const refreshProjects = () => void reloadProjects({ force: true });
 
   // 拉取预警
   useEffect(() => {
@@ -220,10 +152,9 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick,
   };
 
   const handleSelectProject = (id: string) => {
-    setSelectedId(id);
-    window.localStorage.setItem(SELECTED_PROJECT_KEY, id);
-    // 通知同 tab 页面项目已切换
-    window.dispatchEvent(new CustomEvent(PROJECT_CHANGED_EVENT, { detail: { id, source: "user" as const } }));
+    // 唯一写入路径：写 localStorage + 广播 source:"user"，当前页面靠事件即时跟随，
+    // 不触发任何导航（切换项目不是导航操作）。
+    setActive(id);
     setProjectOpen(false);
   };
 
@@ -288,7 +219,7 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick,
         <button
           onClick={() => {
             // 打开下拉时刷新项目列表（创建/删除后额度校验数据保持新鲜）
-            if (!projectOpen) void loadProjects();
+            if (!projectOpen) refreshProjects();
             setProjectOpen((o) => !o);
           }}
           aria-haspopup="true"
@@ -323,7 +254,7 @@ export default function Topbar({ displayName, email, isGuest, onMobileMenuClick,
               <div className="px-2 py-3">
                 <div className="font-sans text-xs text-neg">{t("loadFailed")}</div>
                 <button
-                  onClick={() => void loadProjects()}
+                  onClick={() => refreshProjects()}
                   className="btn-secondary mt-2 px-2 py-1 text-xs"
                 >
                   {t("retry")}

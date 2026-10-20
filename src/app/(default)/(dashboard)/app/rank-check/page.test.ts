@@ -64,7 +64,8 @@ describe("BUG-05：排名结果缓存标识常驻", () => {
   });
 
   it("请求失败不进入结果分支：发起前先清空 result/error，失败只 setError，不会显示成缓存或未进前 100", () => {
-    const handler = PAGE_SRC.slice(PAGE_SRC.indexOf("const handleCheck = async"), PAGE_SRC.indexOf("return ("));
+    // 锚点用 cachedMinutes（handler 之后的稳定声明），避免命中 effect 里的 `return () =>`
+    const handler = PAGE_SRC.slice(PAGE_SRC.indexOf("const handleCheck = async"), PAGE_SRC.indexOf("const cachedMinutes"));
     const clearResult = handler.indexOf("setResult(null)");
     expect(clearResult).toBeGreaterThan(-1);
     expect(clearResult).toBeLessThan(handler.indexOf("await fetch"));

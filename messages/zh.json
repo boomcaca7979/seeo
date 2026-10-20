@@ -15,11 +15,11 @@
     "switchLang": "EN"
   },
   "cookieBanner": {
-  "notice": "我们使用 Cookie 来改善体验。必要的 Cookie 始终启用，分析 Cookie 仅在您同意后启用。",
-  "learnMore": "了解更多",
-  "decline": "拒绝",
-  "accept": "同意"
-},
+    "notice": "我们使用 Cookie 来改善体验。必要的 Cookie 始终启用，分析 Cookie 仅在您同意后启用。",
+    "learnMore": "了解更多",
+    "decline": "拒绝",
+    "accept": "同意"
+  },
   "hero": {
     "badge": "真实站点审计 · 先修最重要的 · 修完可验证",
     "title": "找出现在最值得处理的那个 SEO 问题，修完再验证。",
@@ -1434,7 +1434,8 @@
         "healthDeltaUp": "较上次审计 +{n}",
         "healthDeltaDown": "较上次审计 -{n}",
         "healthDeltaFlat": "较上次审计无变化",
-        "noPreviousAudit": "该域名首次审计"
+        "noPreviousAudit": "该域名首次审计",
+        "healthScoreHintProject": "当前项目最近一次已完成审计的健康分。"
       },
       "trend": {
         "title": "健康分历史变化",
@@ -1470,7 +1471,17 @@
       "gaps": {
         "title": "数据缺口",
         "subtitle": "各项目当前真实存在的数据缺口，每一项都可直达补齐入口。",
-        "none": "当前项目未检测到数据缺口。"
+        "none": "当前项目未检测到数据缺口。",
+        "subtitleProject": "当前项目真实存在的数据缺口，每一项都可直达补齐入口。"
+      },
+      "subtitleProject": "当前项目的真实抓取数据、正在处理的工作，以及最该先做的事。",
+      "scope": {
+        "aria": "概况数据范围",
+        "current": "当前项目",
+        "all": "全部项目",
+        "syncing": "正在加载概况数据…",
+        "error": "概况数据加载失败，可能是项目不可用或网络异常。",
+        "retry": "重试"
       }
     },
     "growth": {
@@ -2623,6 +2634,7 @@
         "intentNote": "意图由关键词文本规则估算，不是数据源提供的指标。",
         "title": "关键词概览",
         "subtitle": "输入种子词，查看 SERP 真实排名结果与可派生指标。",
+        "scopeNote": "本页按关键词查看真实 SERP，不受顶部所选项目筛选。",
         "marketLabel": "搜索市场",
         "deviceLabel": "设备",
         "searchPlaceholder": "输入关键词，如：SEO工具、网站建设",
@@ -2757,20 +2769,20 @@
       "statusTied": "持平",
       "emptyAddFirst": "请先添加竞品域名",
       "emptyRefreshHint": "点击「刷新排名」：拉取该关键词的 Google SERP 前 100，对比自己与竞品的排名与目标链接。",
-    "emptyNoKeywords": "先在「位置追踪」为本项目添加要对比的关键词，才能刷新排名。",
-    "nextStepNoCompetitor": "添加竞品域名后，选择下方关键词并点击「刷新排名」，即可对比同一关键词下自己与竞品的排名。",
-    "nextStepNoKeyword": "竞品已保存。下一步：先为本项目添加追踪关键词（排名按关键词逐一对比），再回来刷新排名。",
-    "nextStepNoKeywordLink": "前往位置追踪添加关键词",
-    "nextStepReady": "竞品已就绪。选择关键词并点击「刷新排名」：拉取该词的 Google SERP，对比自己与竞品的排名（消耗 1 次额度，24h 内缓存不重复计费）。",
-    "addedListTitle": "已添加竞品",
-    "domainLabel": "竞品网站域名",
-    "compStatusCompared": "已参与对比",
-    "compStatusPending": "尚未比较",
-    "compareSectionTitle": "对比你与竞品的表现",
-    "compareIntro": "添加竞品只是准备工作：对比数据来自追踪关键词的 Google SERP 排名。选择一个关键词并点击「刷新排名并对比」，即可在下方看到你与每个竞品的排名与落地页；SOV 份额由已比较的关键词计算。",
-    "addKeywordsCta": "添加追踪关键词",
-    "ranksLoadFailed": "对比数据加载失败，请重试。",
-    "retryBtn": "重试",
+      "emptyNoKeywords": "先在「位置追踪」为本项目添加要对比的关键词，才能刷新排名。",
+      "nextStepNoCompetitor": "添加竞品域名后，选择下方关键词并点击「刷新排名」，即可对比同一关键词下自己与竞品的排名。",
+      "nextStepNoKeyword": "竞品已保存。下一步：先为本项目添加追踪关键词（排名按关键词逐一对比），再回来刷新排名。",
+      "nextStepNoKeywordLink": "前往位置追踪添加关键词",
+      "nextStepReady": "竞品已就绪。选择关键词并点击「刷新排名」：拉取该词的 Google SERP，对比自己与竞品的排名（消耗 1 次额度，24h 内缓存不重复计费）。",
+      "addedListTitle": "已添加竞品",
+      "domainLabel": "竞品网站域名",
+      "compStatusCompared": "已参与对比",
+      "compStatusPending": "尚未比较",
+      "compareSectionTitle": "对比你与竞品的表现",
+      "compareIntro": "添加竞品只是准备工作：对比数据来自追踪关键词的 Google SERP 排名。选择一个关键词并点击「刷新排名并对比」，即可在下方看到你与每个竞品的排名与落地页；SOV 份额由已比较的关键词计算。",
+      "addKeywordsCta": "添加追踪关键词",
+      "ranksLoadFailed": "对比数据加载失败，请重试。",
+      "retryBtn": "重试",
       "tableKeyword": "关键词「{keyword}」",
       "cachedHint": "缓存数据 · 24h 内不重复计费",
       "liveHint": "实时数据 · 已消耗 1 次额度",
@@ -3554,6 +3566,8 @@
     "AUTH_REQUIRED": "请登录后继续操作。",
     "INVALID_JSON": "请求体格式错误，需要 JSON",
     "BAD_REQUEST": "请求参数无效",
+    "INVALID_SCOPE": "缺少 scope=all 或 projectId 参数",
+    "DASHBOARD_FAILED": "概况数据构建失败",
     "DOMAIN_REQUIRED": "域名不能为空",
     "INVALID_DOMAIN": "域名格式无效，如 example.com",
     "MISSING_DOMAIN": "缺少 domain 参数",

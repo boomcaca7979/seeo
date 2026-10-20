@@ -30,6 +30,11 @@ export interface WorkspaceHeaderProps {
   auditedCount: number;
   /** 未读预警数（右上角入口保留原有语义） */
   unreadAlertCount: number;
+  /**
+   * 概况数据范围（2026-10 单项目模式）：影响副标题文案。
+   * "project" = 当前项目自己的数据；"all" = 全部项目汇总（默认，保持原副标题）。
+   */
+  scope?: "project" | "all";
 }
 
 export default function WorkspaceHeader({
@@ -37,6 +42,7 @@ export default function WorkspaceHeader({
   projectCount,
   auditedCount,
   unreadAlertCount,
+  scope = "all",
 }: WorkspaceHeaderProps) {
   const t = useTranslations("dashboard.projectList");
   const tw = useTranslations("dashboard.workspace");
@@ -54,7 +60,7 @@ export default function WorkspaceHeader({
 
       <PageHeader
         title={t("greeting", { name: displayName })}
-        subtitle={tw("subtitle")}
+        subtitle={scope === "project" ? tw("subtitleProject") : tw("subtitle")}
         actions={
           <>
             <button onClick={openCreateProject} className="btn-primary">
