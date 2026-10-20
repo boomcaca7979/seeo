@@ -1,11 +1,10 @@
-import { createServer } from "@/lib/supabase/server";
+import { getDashboardSession } from "@/lib/dashboard-session";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { isAuthEnabled } from "@/lib/auth-config";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import type { DatabaseProfile } from "@/lib/types";
 import { startAutomation, isStarted } from "@/lib/automation/cron";
 import {
   DASHBOARD_BRAND,
@@ -55,12 +54,9 @@ export default async function DashboardLayout({
     );
   }
 
-  const supabase = await createServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getDashboardSession();
 
-  if (!user) {
+  if (!session.userId) {
     // 访客审计：/app/audit 是 Free SEO Audit 获客入口，允许未登录使用
     //（与 proxy 的 isPublicAudit 豁免一致），其余 /app 页面仍重定向登录。
     // proxy 注入的 x-seeo-pathname 在初始文档加载时也可用（next-url 仅 RSC 导航有）。
@@ -81,22 +77,17 @@ export default async function DashboardLayout({
     // 初始加载时 proxy(middleware) 已处理 redirect，此处为兜底
     const nextUrl = headersList.get("next-url");
     const redirectPath = nextUrl && nextUrl.startsWith("/app") ? nextUrl : pathname.startsWith("/app") ? pathname : "/app";
-    redirect(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+    // 上游没能给出答案 ≠ 这个用户没登录：带标记，让登录页说「一时连不上，请重试」，
+    // 而不是把基础设施故障伪装成一次失败的登录。判定仍是「故障即登出」，绝不放行。
+    redirect(
+      `/login?redirect=${encodeURIComponent(redirectPath)}${
+        session.authUnavailable ? "&auth=unavailable" : ""
+      }`
+    );
   }
 
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  const profile = profileData as DatabaseProfile | null;
-  const displayName =
-    profile?.display_name || user.email?.split("@")[0] || "SeeO";
-  const email = user.email ?? "";
-
   return (
-    <DashboardShell displayName={displayName} email={email}>
+    <DashboardShell displayName={session.displayName} email={session.email}>
       {children}
     </DashboardShell>
   );

@@ -9,7 +9,7 @@
 //   4. 未登录仍先跳 /login（原有保护顺序不变）；
 //   5. 改写响应要带上本次刷新的会话 cookie（rewrite 返回的是新响应对象）。
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const cfg = { isAuthEnabled: false };
@@ -28,11 +28,26 @@ const auth = {
   error: null as { code?: string; message?: string } | null,
   filters: [] as Array<[string, unknown]>,
   refresh: false,
+  /** getUser 返回的 error 字段（auth-js 把网络级失败归入 AuthRetryableFetchError） */
+  userError: null as { name?: string; status?: number } | null,
+  /** getUser 直接抛出（裸 TypeError: fetch failed 的形状） */
+  userThrows: null as Error | null,
 };
+
+/** 捕获传给 createServerClient 的 options，用于断言超时 fetch 已接线 */
+const clientOptions: Array<{ global?: { fetch?: unknown } }> = [];
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(
-    (_url: string, _key: string, options: { cookies: { setAll: (c: unknown[]) => void } }) => {
+    (
+      _url: string,
+      _key: string,
+      options: {
+        cookies: { setAll: (c: unknown[]) => void };
+        global?: { fetch?: unknown };
+      },
+    ) => {
+      clientOptions.push(options);
       // 模拟 Supabase 在 getUser 过程中刷新 token：中间件必须把这些 cookie 带到响应上
       if (auth.refresh) {
         options.cookies.setAll([
@@ -40,7 +55,12 @@ vi.mock("@supabase/ssr", () => ({
         ]);
       }
       return {
-        auth: { getUser: async () => ({ data: { user: auth.user } }) },
+        auth: {
+          getUser: async () => {
+            if (auth.userThrows) throw auth.userThrows;
+            return { data: { user: auth.user }, error: auth.userError };
+          },
+        },
         from: () => ({
           select: () => ({
             eq: (column: string, value: unknown) => ({
@@ -101,6 +121,9 @@ beforeEach(() => {
   auth.error = null;
   auth.filters = [];
   auth.refresh = false;
+  auth.userError = null;
+  auth.userThrows = null;
+  clientOptions.length = 0;
 });
 
 describe("演示模式：/app/projects/<id> 文档请求", () => {
@@ -220,5 +243,252 @@ describe("启用鉴权：/app/projects/<id> 文档请求", () => {
     expect(res.headers.get("location")).toContain("/login?redirect=");
     expect(rewriteTarget(res)).toBeNull();
     expect(auth.filters).toEqual([]);
+  });
+});
+
+// ===== 上游认证故障：绝不 500、绝不无限等待、绝不伪装成「你没登录」 =====
+// 生产 2026-10-20T10:09:29Z 的形状是 proxy 里 `TypeError: fetch failed`
+// （SocketError: other side closed）打穿 updateSession → 500 + Unhandled Rejection，
+// 站内 router.push 的 flight 请求因此静默失败，用户看到「点了登录约 30 秒没反应」。
+describe("认证上游不可用：降级而不是挂住 / 500", () => {
+  beforeEach(() => {
+    cfg.isAuthEnabled = true;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+  });
+
+  it("getUser 抛裸 TypeError（fetch failed）→ 受保护页跳登录并带可重试标记", async () => {
+    auth.user = null;
+    auth.userThrows = new TypeError("fetch failed");
+    const res = await updateSession(request("/app"));
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location")!;
+    expect(location).toContain("redirect=%2Fapp");
+    expect(location).toContain("auth=unavailable");
+  });
+
+  it("getUser 返回 AuthRetryableFetchError(status 0) → 同样带标记", async () => {
+    auth.user = null;
+    auth.userError = { name: "AuthRetryableFetchError", status: 0 };
+    const res = await updateSession(request("/app/audit-report/abc"));
+    const location = res.headers.get("location")!;
+    expect(res.status).toBe(307);
+    expect(location).toContain("auth=unavailable");
+  });
+
+  it("限流 429 → 带标记：瞬时故障不能让用户以为是自己的凭据问题", async () => {
+    auth.user = null;
+    auth.userError = { name: "AuthApiError", status: 429 };
+    const location = (await updateSession(request("/app"))).headers.get("location")!;
+    expect(location).toContain("auth=unavailable");
+  });
+
+  it("真·无效会话（401）→ 正常跳登录，不带可重试标记", async () => {
+    auth.user = null;
+    auth.userError = { name: "AuthApiError", status: 401 };
+    const location = (await updateSession(request("/app"))).headers.get("location")!;
+    expect(location).toContain("redirect=%2Fapp");
+    expect(location).not.toContain("auth=unavailable");
+  });
+
+  it("确实没登录（无会话 → AuthSessionMissingError）→ 不带标记", async () => {
+    auth.user = null;
+    auth.userError = { name: "AuthSessionMissingError" };
+    const location = (await updateSession(request("/app"))).headers.get("location")!;
+    expect(location).not.toContain("auth=unavailable");
+  });
+
+  it("公开页 /login 遇上游抛错 → 原样放行渲染，不重定向、不 500", async () => {
+    auth.user = null;
+    auth.userThrows = new TypeError("fetch failed");
+    const res = await updateSession(request("/login"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("受保护页仍严格执行「故障即登出」：抛错时绝不放行", async () => {
+    auth.user = null;
+    auth.userThrows = new Error("socket hang up");
+    const res = await updateSession(request("/app/projects"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("x-middleware-next")).toBeNull();
+  });
+
+  it("会话校验这条路接了带硬超时的 fetch", async () => {
+    cfg.isAuthEnabled = true;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+    await updateSession(request("/login"));
+    expect(typeof clientOptions[0]?.global?.fetch).toBe("function");
+  });
+});
+
+// ===== 上游故障必须留痕（但正常未登录与凭据错误绝不能留痕）=====
+// catch 之后静默 = 「问题被藏起来」：部署后无法判断上游是否仍在抖。
+// 这里同时锁死日志字段：只有阶段 / 路径类别 / 故障类别 / 安全状态码。
+describe("proxy 上游故障的可观测性", () => {
+  let warnings: Array<Array<unknown>>;
+
+  beforeEach(() => {
+    cfg.isAuthEnabled = true;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+    warnings = [];
+    vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** 日志那一趟的全部文本内容（用于「绝不含敏感串」断言） */
+  const line = () => JSON.stringify(warnings);
+
+  it("裸抛 TypeError（生产 fetch failed 形状）→ 一条 warning，类别 network_error", async () => {
+    auth.user = null;
+    auth.userThrows = new TypeError("fetch failed");
+    await updateSession(request("/app"));
+    expect(warnings.length).toBe(1);
+    expect(warnings[0][0]).toContain("[AuthUpstream]");
+    expect(warnings[0][1]).toMatchObject({
+      stage: "proxy_auth",
+      path: "dashboard",
+      category: "network_error",
+    });
+  });
+
+  it("AuthRetryableFetchError(status 0) → network_error；502 → upstream_5xx；429 → rate_limited", async () => {
+    const cases: Array<[Record<string, unknown>, string, number | null]> = [
+      [{ name: "AuthRetryableFetchError", status: 0 }, "network_error", 0],
+      [{ name: "AuthApiError", status: 502 }, "upstream_5xx", 502],
+      [{ name: "AuthApiError", status: 429 }, "rate_limited", 429],
+      [{ name: "TimeoutError" }, "timeout", null],
+    ];
+    for (const [error, category, status] of cases) {
+      warnings = [];
+      auth.user = null;
+      auth.userError = error;
+      await updateSession(request("/app"));
+      expect(warnings.length, JSON.stringify(error)).toBe(1);
+      expect(warnings[0][1]).toMatchObject({ category, status, path: "dashboard" });
+    }
+  });
+
+  it("正常未登录（AuthSessionMissingError）与无效凭据（401）→ 不打错误日志", async () => {
+    for (const error of [
+      { name: "AuthSessionMissingError", status: 400 },
+      { name: "AuthApiError", status: 401 },
+      { name: "AuthApiError", status: 403 },
+    ]) {
+      warnings = [];
+      auth.user = null;
+      auth.userError = error;
+      await updateSession(request("/app"));
+      expect(warnings.length, JSON.stringify(error)).toBe(0);
+    }
+    // 验证成功也不留痕
+    warnings = [];
+    auth.user = { id: "user-1" };
+    auth.userError = null;
+    await updateSession(request("/app"));
+    expect(warnings.length).toBe(0);
+  });
+
+  it("日志不含 message 原文、token、Cookie、邮箱或 query string", async () => {
+    auth.user = null;
+    auth.userError = {
+      name: "AuthRetryableFetchError",
+      status: 0,
+      message:
+        "Bearer sekret-jwt.eyJhbGciOi JWT access_token=refresh_token_value zhou@example.com sb-access-token",
+    } as Record<string, unknown>;
+    const req = new NextRequest(
+      "http://localhost:3300/app/projects?redirect=%2Fapp%3Ftoken%3Dabc&email=zhou@example.com",
+      { headers: new Headers({ host: "localhost:3300" }) }
+    );
+    await updateSession(req);
+    expect(warnings.length).toBe(1);
+    for (const forbidden of [
+      "sekret",
+      "eyJhbGci",
+      "Bearer",
+      "access_token",
+      "refresh_token",
+      "zhou@",
+      "example.com",
+      "sb-access-token",
+      "redirect",
+      "token=abc",
+      "/app/projects?",
+    ]) {
+      expect(line(), forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it("路径类别只到类别为止：/app/audit 记 public_audit，/login 记 login", async () => {
+    for (const [path, category] of [
+      ["/app/audit/abc", "public_audit"],
+      ["/login", "login"],
+      ["/signup", "signup"],
+    ] as const) {
+      warnings = [];
+      auth.user = null;
+      auth.userThrows = new TypeError("fetch failed");
+      await updateSession(request(path));
+      expect(warnings.length, path).toBe(1);
+      expect(warnings[0][1]).toMatchObject({ path: category });
+    }
+  });
+});
+
+// ===== 正常会话的基本走向：新加的超时与留痕都不该插手 =====
+// 最容易误伤的正是这两条平常路（未登录打开登录页、已登录进工作台 / 回跳）。
+// 三条都必须照旧放行/跳转，且 0 条错误日志。
+describe("正常会话的基本走向（本轮机制不得改变）", () => {
+  let warnings: Array<Array<unknown>> = [];
+
+  beforeEach(() => {
+    cfg.isAuthEnabled = true;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+    warnings = [];
+    vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("未登录访问 /login → 原样放行渲染：不重定向、不带标记、不打错误日志", async () => {
+    auth.user = null;
+    auth.userError = { name: "AuthSessionMissingError", status: 400 };
+    const res = await updateSession(request("/login"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("location")).toBeNull();
+    expect(warnings.length).toBe(0);
+  });
+
+  it("会话有效访问 /app → 照常放行，不带任何标记", async () => {
+    auth.user = { id: "user-1" };
+    const res = await updateSession(request("/app"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("location")).toBeNull();
+    expect(warnings.length).toBe(0);
+  });
+
+  it("会话有效访问 /login → 跳回工作台（登录成功后的那一跳不变）", async () => {
+    auth.user = { id: "user-1" };
+    const res = await updateSession(request("/login"));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location")!).pathname).toBe("/app");
+    expect(res.headers.get("location")).not.toContain("auth=");
+    expect(warnings.length).toBe(0);
   });
 });

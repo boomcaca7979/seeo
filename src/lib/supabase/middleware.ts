@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { safeRedirectTarget } from "@/lib/auth-redirect";
 import {
@@ -7,6 +8,11 @@ import {
   readOwnedProject,
   type ProjectSource,
 } from "@/lib/project-access";
+import {
+  createBoundedFetch,
+  isAuthUnavailable,
+  logAuthUpstreamFailure,
+} from "./bounded-fetch";
 
 /**
  * 只改写「要 HTML 文档」的请求。
@@ -54,6 +60,48 @@ function rewriteToNotFound(request: NextRequest, headers: Headers, carry?: NextR
   return response;
 }
 
+/**
+ * 日志里只出现的「路径类别」：绝不带 query string（redirect / token / code /
+ * 邮箱都可能出现在里面），也不带任何标识符。
+ */
+function pathCategoryOf(pathname: string): string {
+  if (pathname === "/login" || pathname.startsWith("/login/")) return "login";
+  if (pathname === "/signup" || pathname.startsWith("/signup/")) return "signup";
+  if (pathname === "/app/audit" || pathname.startsWith("/app/audit/")) return "public_audit";
+  if (pathname.startsWith("/app")) return "dashboard";
+  return "other";
+}
+
+/**
+ * 会话校验：永不向上抛。
+ *
+ * 此前 `await supabase.auth.getUser()` 直接暴露给 proxy：上游一旦异常，整条
+ * 文档 / RSC flight 请求变成 500 且留下未处理的 Promise 拒绝（2026-10-20 生产
+ * 日志的形状），站内 router.push 的导航因此静默失败 —— 用户看到的正是「点了
+ * 登录之后长时间没反应」。现在失败即返回一个可判定状态，让调用方按既有
+ * 语义「故障即登出」（受保护页仍跳登录，绝不放行），而不是挂住或 500。
+ *
+ * 「不可用」与「未登录」在日志与文案两条路上都必须分开：正常未登录不留痕，
+ * 真故障必须留痕，否则异常被捕获就等于问题被藏起来。
+ */
+async function verifySession(
+  supabase: SupabaseClient,
+  pathCategory: string,
+): Promise<{ user: { id: string } | null; unavailable: boolean }> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (data.user) return { user: data.user, unavailable: false };
+    if (isAuthUnavailable(error)) {
+      logAuthUpstreamFailure({ stage: "proxy_auth", pathCategory, error });
+      return { user: null, unavailable: true };
+    }
+    return { user: null, unavailable: false };
+  } catch (error) {
+    logAuthUpstreamFailure({ stage: "proxy_auth", pathCategory, error });
+    return { user: null, unavailable: true };
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   // 下游 server 组件（dashboard layout 访客审计分支、以及 dashboard 的
   // generateMetadata）需要当前 pathname：初始文档加载时 next-url header 不存在，
@@ -91,14 +139,15 @@ export async function updateSession(request: NextRequest) {
           );
         },
       },
+      // 会话校验与项目归属读取都经这条路：给上游一个硬上限，避免半开连接把
+      // 整条请求挂到 undici 的 300s 默认超时（详见 @/lib/supabase/bounded-fetch）。
+      global: { fetch: createBoundedFetch() },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
+  const { user, unavailable } = await verifySession(supabase, pathCategoryOf(pathname));
+
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   // /app/audit 是公开获客入口（Free SEO Audit 漏斗）：允许未登录访客直接审计，
   // 其余 /app 工作台页面仍要求登录。
@@ -112,6 +161,9 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/login";
     url.search = "";
     url.searchParams.set("redirect", redirectTarget);
+    // 认证上游不可用而不是「没登录」：带标记，让登录页说「暂时连不上，请重试」，
+    // 不再把基础设施故障伪装成一次失败的登录。判定仍然是故障即登出，绝不放行。
+    if (unavailable) url.searchParams.set("auth", "unavailable");
     return NextResponse.redirect(url);
   }
 

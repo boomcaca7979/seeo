@@ -1827,7 +1827,8 @@
       "errPasswordShort": "Password must be at least 8 characters",
       "errAlreadyRegistered": "This email is already registered — log in directly",
       "errInvalidCredentials": "Invalid email or password",
-      "errServiceUnavailable": "Can't reach the sign-in service right now. Check your connection and try again."
+      "errServiceUnavailable": "Can't reach the sign-in service right now. Check your connection and try again.",
+      "authUnavailableNotice": "We couldn't reach the sign-in service, so you were returned to the login page. Your password was not rejected — please try again."
     },
     "projectList": {
       "dataUpdatedAt": "Data updated",

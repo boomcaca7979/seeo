@@ -128,3 +128,57 @@ describe("BUG-10：认证流程与文案未被改写", () => {
     expect(SRC).toContain('autoComplete={isSignup ? "new-password" : "current-password"}');
   });
 });
+
+// ===== 生产 2026-10-20 登录延迟：认证上游不可用 ≠ 凭据错误 =====
+// proxy 判定「上游不可用」后带 ?auth=unavailable 跳回登录页。这里钉住接线：
+// 提示必须读的是 URL 标记、用 role="status"（不能抢 role="alert" 的提交结果播报），
+// 且不得改动提交流程本身；文案必须中英双份。
+describe("登录页的「上游不可用」可重试提示", () => {
+  const en = JSON.parse(
+    readFileSync(fileURLToPath(new URL("../../../messages/en.json", import.meta.url)), "utf-8")
+  ) as { dashboard: { authForm: Record<string, string> } };
+  const zh = JSON.parse(
+    readFileSync(fileURLToPath(new URL("../../../messages/zh.json", import.meta.url)), "utf-8")
+  ) as { dashboard: { authForm: Record<string, string> } };
+
+  it("标记来自 searchParams，而不是表单状态", () => {
+    expect(SRC).toContain('searchParams.get("auth") === "unavailable"');
+  });
+
+  it("提示与本次提交结果互斥：有 formError 时只播提交结果", () => {
+    const notice = SRC.slice(SRC.indexOf("{/* 上游不可用提示"), SRC.indexOf("<button"));
+    expect(notice).toContain("{!formError && authUnavailable && (");
+    expect(notice).toContain('id="auth-unavailable-notice"');
+    expect(notice).toContain("{t(\"authUnavailableNotice\")}");
+    // 顺序：表单级错误块在前，提示块在后，再是提交按钮
+    const formErrIdx = SRC.indexOf("{/* 表单级错误");
+    const noticeIdx = SRC.indexOf("{/* 上游不可用提示");
+    expect(formErrIdx).toBeGreaterThan(0);
+    expect(noticeIdx).toBeGreaterThan(formErrIdx);
+    expect(noticeIdx).toBeLessThan(SRC.indexOf("<button"));
+  });
+
+  it("用 role=\"status\"（隐含 polite），不新增 role=\"alert\" 或显式 aria-live", () => {
+    const notice = SRC.slice(SRC.indexOf("{/* 上游不可用提示"), SRC.indexOf("<button"));
+    expect(notice).toContain('role="status"');
+    expect(notice).not.toContain('role="alert"');
+    expect(notice).not.toContain("aria-live");
+  });
+
+  it("提示只是文案，不替换校验、Supabase 调用或跳转", () => {
+    expect(SRC).toContain("supabase.auth.signInWithPassword({");
+    expect(SRC).toContain("router.push(safeRedirect);");
+    expect(SRC).toContain("const validationError = validate();");
+  });
+
+  it("中英双份文案齐全，且明确「不是凭据错误、可重试」", () => {
+    const enNotice = en.dashboard.authForm.authUnavailableNotice;
+    const zhNotice = zh.dashboard.authForm.authUnavailableNotice;
+    expect(typeof enNotice).toBe("string");
+    expect(typeof zhNotice).toBe("string");
+    expect(enNotice).toMatch(/password was not rejected/i);
+    expect(enNotice).toMatch(/try again/i);
+    expect(zhNotice).toContain("密码输错");
+    expect(zhNotice).toContain("重试");
+  });
+});

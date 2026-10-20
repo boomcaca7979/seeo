@@ -39,6 +39,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
   // 读取 redirect 参数（安全：站内白名单前缀，见 @/lib/auth-redirect）
   const redirectTarget = searchParams.get("redirect");
   const safeRedirect = safeRedirectTarget(redirectTarget);
+  // proxy 判定「认证上游不可用」时带这个标记跳回登录页。它不是凭据错误：
+  // 必须说成「暂时连不上，可重试」，否则用户会以为是密码不对而反复改正确的密码。
+  const authUnavailable = searchParams.get("auth") === "unavailable";
   // 切换登录/注册时保留 redirect 参数
   const switchHref = isSignup ? "/login" : "/signup";
   const switchHrefWithRedirect = redirectTarget ? `${switchHref}?redirect=${encodeURIComponent(redirectTarget)}` : switchHref;
@@ -222,6 +225,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
             {formError && (
               <div id="auth-form-error" role="alert" className="rounded-md border border-neg/30 bg-neg/10 px-3 py-2 font-sans text-xs text-neg">
                 {formError}
+              </div>
+            )}
+
+            {/* 上游不可用提示：与本次提交结果并存时以提交结果为准，不叠两条 */}
+            {!formError && authUnavailable && (
+              <div
+                id="auth-unavailable-notice"
+                role="status"
+                className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 font-sans text-xs font-medium text-warn"
+              >
+                {t("authUnavailableNotice")}
               </div>
             )}
 

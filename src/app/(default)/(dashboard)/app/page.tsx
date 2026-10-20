@@ -1,4 +1,5 @@
 import { createServer } from "@/lib/supabase/server";
+import { getDashboardSession } from "@/lib/dashboard-session";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -146,23 +147,23 @@ export default async function WorkbenchPage() {
     );
   }
 
-  const supabase = await createServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // 身份与展示字段与 layout 共享同一次查询（@/lib/dashboard-session）：
+  // 此前 layout 与本页面各打一次 /auth/v1/user + profiles，登录后的首屏要串行等两轮。
+  const session = await getDashboardSession();
 
-  if (!user) {
-    redirect(`/login?redirect=${encodeURIComponent("/app")}`);
+  if (!session.userId) {
+    // 上游不可用与「确实未登录」都跳登录（故障即登出，绝不放行工作台内容），
+    // 只有前者带可重试标记，避免把基础设施故障说成用户凭据的问题。
+    redirect(
+      `/login?redirect=${encodeURIComponent("/app")}${
+        session.authUnavailable ? "&auth=unavailable" : ""
+      }`
+    );
   }
 
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  const displayName =
-    profileData?.display_name || user.email?.split("@")[0] || "SeeO";
+  const supabase = await createServer();
+  const userId = session.userId;
+  const displayName = session.displayName;
 
   // 查询当前用户的项目（Supabase RLS 自动按 user_id 过滤）
   const { data: userProjects } = await supabase
@@ -171,15 +172,15 @@ export default async function WorkbenchPage() {
     .order("created_at", { ascending: true });
 
   // 用 domain 关联本地 SQLite/Turso 获取指标
-  const projects = await listProjectsWithMetricsForUser(user.id, userProjects ?? []);
+  const projects = await listProjectsWithMetricsForUser(userId, userProjects ?? []);
 
   // 无项目时显示首次使用 Onboarding
   if (projects.length === 0) {
     return <Onboarding displayName={displayName} mode="live" />;
   }
 
-  const alerts = await listAlerts(user.id, 50);
-  const unread = await countUnreadAlerts(user.id);
+  const alerts = await listAlerts(userId, 50);
+  const unread = await countUnreadAlerts(userId);
   const scopedAll = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
   // UUID → domain 映射来自本人项目列表（RLS 过滤），同时是范围 cookie 的所有权凭证
   const domainByUuid = new Map(
@@ -187,7 +188,7 @@ export default async function WorkbenchPage() {
   );
   const { scope: initialScope, scopedProjects } = resolveInitialScope(scopeCookie, scopedAll, domainByUuid);
   // 概览与增长机会面板共用一次队列构建（范围为当前项目时只构建该项目的队列）
-  const dashboard = await loadDashboardData(user.id, scopedProjects);
+  const dashboard = await loadDashboardData(userId, scopedProjects);
 
   return (
     <WorkbenchBody

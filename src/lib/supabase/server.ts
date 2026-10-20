@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function createServer() {
+/**
+ * 默认：完全保持既有行为（不带任何应用层超时），所有业务数据查询照旧。
+ *
+ * 只有认证/身份链路会传入 transport（@/lib/supabase/bounded-fetch 的
+ * createBoundedFetch）：给上游一个硬上限，避免半开连接把整趟渲染挂到
+ * undici 的默认超时。共享客户端的普通数据读取不加限制，防止把一次
+ * 只是慢的查询变成错误。
+ */
+export async function createServer(fetch?: typeof globalThis.fetch) {
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +29,7 @@ export async function createServer() {
           }
         },
       },
+      ...(fetch ? { global: { fetch } } : null),
     }
   );
 }

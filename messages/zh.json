@@ -1820,7 +1820,8 @@
       "errPasswordShort": "密码至少 8 位",
       "errAlreadyRegistered": "这个邮箱已注册，请直接登录",
       "errInvalidCredentials": "邮箱或密码不正确",
-      "errServiceUnavailable": "暂时连不上登录服务，请检查网络后重试"
+      "errServiceUnavailable": "暂时连不上登录服务，请检查网络后重试",
+      "authUnavailableNotice": "登录服务一时没有响应，已把你送回登录页。这不是密码输错了，请直接重试一次。"
     },
     "projectList": {
       "dataUpdatedAt": "数据更新时间",
