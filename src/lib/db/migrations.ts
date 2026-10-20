@@ -6,6 +6,7 @@
 import * as fsSync from "node:fs";
 import * as os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   applyLocalSqlitePragmas,
   isBusyDbError,
@@ -53,15 +54,17 @@ function localPathFromDbUrl(url: string): string | null {
 }
 
 /**
- * schema 版本契约（写在库里的 `PRAGMA user_version`）。
- * 等于 SCHEMA_VERSION 表示下面的 migrate() 已完整应用过一次；旧库存的是 0，
+ * schema 版本契约（写在库里的持久记录，两种载体）：
+ * - 本地文件库：`PRAGMA user_version`，配合独占写锁做 check-and-apply
+ * - 远端 Turso：`schema_meta` 单行表（见下方远端闸门）
+ * 等于 SCHEMA_VERSION 表示下面的 migrate() 已完整应用过一次；旧库存的是 0 或干脆没有记录，
  * 首次初始化会幂等补跑一遍再盖章，因此不需要人工搬数据。
  * 增删迁移步骤时把 SCHEMA_VERSION +1；读到比它更大的值说明代码比库旧（回滚部署），
  * 此时只做观测、不覆写、不报错——绝不能把新库的版本号倒退回旧版本。
  */
 export const SCHEMA_VERSION = 1;
 
-export type SchemaInitReason = "applied" | "current" | "ahead" | "unversioned";
+export type SchemaInitReason = "applied" | "current" | "ahead";
 
 export interface SchemaInitResult {
   /** 本次初始化是否真的执行了迁移体（false = 库里版本已满足，只做了一次读） */
@@ -149,27 +152,342 @@ async function openAdapter(): Promise<DBAdapter> {
 }
 
 /**
- * 迁移闸门：把「检查版本 → 应用迁移 → 盖章」放进独占写锁，多 worker 只有一个真跑。
+ * 迁移闸门：先读库里的版本记录，只有确实落后时才应用迁移。
  *
- * 稳态（user_version 已等于 SCHEMA_VERSION）只剩一次 PRAGMA 读、零写入，
- * 因此 `next build` 的 9 个 worker 不再互相踩写锁；
- * 冷启动时后进者按 busy_timeout 排队，拿到锁后在锁内复查版本 → 直接跳过。
+ * 本地文件库（better-sqlite3、libsql `file:`）走 `PRAGMA user_version` + BEGIN IMMEDIATE：
+ * 稳态一次 PRAGMA 读、零写入，`next build` 的 9 个 worker 不再互相踩写锁。
+ * 远端 Turso 走 `schema_meta` 版本表 + 带续租的租约抢占：稳态两次远程读，
+ * 取代过去「每个冷进程无条件重放整套迁移」的 ~93 次串行远程往返（实测约 20 秒）。
+ * 接管只发生在持有者不再续租（进程真死或续租结果不确定）之后；持有状态一旦转入失效，
+ * 该进程停止发出后续迁移语句、不能盖章、也不能清除新持有者的租约。
  * 任何一步真失败都原样上抛：不吞 SQLITE_BUSY、不把失败的迁移当成成功、也不无条件跳过。
  */
 export async function ensureSchema(db: DBAdapter): Promise<SchemaInitResult> {
   const control = db.migrationControl?.() ?? null;
-  if (!control) {
-    // 远端 Turso 没有本地文件写锁语义（服务端自己串行化写），
-    // 维持旧行为：每次进程初始化幂等执行迁移体，不做版本盖章。
-    await migrate(db);
-    return { applied: true, version: 0, reason: "unversioned" };
-  }
+  if (control) return ensureLocalSchema(control);
+  return ensureRemoteSchema(db);
+}
 
+async function ensureLocalSchema(control: MigrationControl): Promise<SchemaInitResult> {
   const version = await control.readVersion();
   if (version > SCHEMA_VERSION) return { applied: false, version, reason: "ahead" };
   if (version === SCHEMA_VERSION) return { applied: false, version, reason: "current" };
-
   return applyUnderLock(control);
+}
+
+// ---------- 远端 Turso 版本闸门 ----------
+//
+// 为什么用表而不用 `PRAGMA user_version`：赋值型 PRAGMA 在这条路径上从来没有被用过，
+// 而适配器构造函数已经按「远端会话可能直接拒 PRAGMA 写」处理 foreign_keys / busy_timeout。
+// 这里用到的每一条语句（sqlite_master 探测、SELECT、UPDATE、INSERT OR IGNORE、
+// CREATE TABLE IF NOT EXISTS）都是现有迁移体在生产远程路径上已经在跑的语句类型。
+const SCHEMA_META_TABLE = "schema_meta";
+
+/** 单行表：id 恒为 1；version 只增不减，claim_* 是「谁正在应用迁移」的租约 */
+const SCHEMA_META_DDL = `CREATE TABLE IF NOT EXISTS ${SCHEMA_META_TABLE} (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  version INTEGER NOT NULL DEFAULT 0,
+  applied_at TEXT,
+  claim_owner TEXT,
+  claim_expires_at INTEGER
+)`;
+
+/**
+ * 租约：「多久没被续租」才算持有者已经死了，而不是「迁移最多能跑多久」。
+ * 一次远程迁移只有中位数可测、没有上界可测（RTT 抖动、冷库、数据量都在推高它），
+ * 所以时长安全不能靠这个数担保，靠的是下面的按间隔续租。
+ * 导出给测试：租约边界用例必须在可控时钟上按同一个上界推进，不能抄魔数。
+ */
+export const REMOTE_MIGRATION_LEASE_MS = 45_000;
+
+/**
+ * 续租间隔：持有者还活着就一直把租约往后推，慢-but-活着的迁移不会被判死，
+ * 因而不会出现「两个实例同时改同一批表结构」。
+ * 需要担保的量从「整场迁移的时长」缩小为「一个间隔 + 一次往返」。
+ * 代价只落在冷启动路径：每个间隔一条只碰 schema_meta 的 UPDATE；稳态初始化仍是两条读。
+ * 导出给测试：失效保护用例必须按真实间隔推时钟，不能抄魔数。
+ */
+export const REMOTE_LEASE_RENEW_MS = 15_000;
+
+/** 没抢到租约时的退避轮询；总预算略大于租约，好让死掉的持有者能被接管 */
+export const REMOTE_CLAIM_WAIT_MS = [
+  250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 12000,
+] as const;
+
+/** -1 = 库里还没有版本记录（表尚未建立，或单行还没写入）→ 按「落后」处理 */
+async function readRemoteVersion(db: DBAdapter): Promise<number> {
+  if (!(await tableExists(db, SCHEMA_META_TABLE))) return -1;
+  const row = (await db.get(
+    `SELECT version AS v FROM ${SCHEMA_META_TABLE} WHERE id = 1`
+  )) as { v?: number | bigint } | undefined;
+  if (row?.v === undefined) return -1;
+  return Math.trunc(Number(row.v));
+}
+
+async function ensureRemoteSchema(db: DBAdapter): Promise<SchemaInitResult> {
+  const version = await readRemoteVersion(db);
+  if (version > SCHEMA_VERSION) return { applied: false, version, reason: "ahead" };
+  if (version === SCHEMA_VERSION) return { applied: false, version, reason: "current" };
+  return applyRemoteUnderClaim(db);
+}
+
+/** 建表 + 保证单行存在：都是幂等语句，多个进程同时执行只会有一方真正改写 */
+async function ensureMetaRow(db: DBAdapter): Promise<void> {
+  await db.exec(SCHEMA_META_DDL);
+  await db.run(`INSERT OR IGNORE INTO ${SCHEMA_META_TABLE} (id, version) VALUES (1, 0)`);
+}
+
+/**
+ * 原子抢占：只在「无人持有」或「租约已过时」时改写成功。
+ * changes===1 才算拿到，两个进程同时抢只会有一个拿到。
+ */
+async function tryClaimMigration(db: DBAdapter, owner: string): Promise<boolean> {
+  const res = await db.run(
+    `UPDATE ${SCHEMA_META_TABLE}
+        SET claim_owner = ?, claim_expires_at = ?
+      WHERE id = 1
+        AND (claim_owner IS NULL OR claim_expires_at IS NULL OR claim_expires_at <= ?)`,
+    [owner, Date.now() + REMOTE_MIGRATION_LEASE_MS, Date.now()]
+  );
+  return res.changes === 1;
+}
+
+async function releaseMigrationClaim(db: DBAdapter, owner: string): Promise<void> {
+  await db.run(
+    `UPDATE ${SCHEMA_META_TABLE} SET claim_owner = NULL, claim_expires_at = NULL
+      WHERE id = 1 AND claim_owner = ?`,
+    [owner]
+  );
+}
+
+/**
+ * 盖章必须同时满足两个条件：版本号只会往前走（`version < ?`），且**盖章的人正是当前持有人**
+ * （`claim_owner = ?`）。
+ * 少了 owner 守卫会出两件事：跑过租约的慢持有者会在别人正迁移到一半时把结构宣布为「已应用」，
+ * 并把别人的租约清成 NULL —— 于是第三个实例立刻能抢约再开一套迁移。
+ * 返回是否真的写上：调用方据此决定能不能报「applied」。
+ */
+async function stampRemoteVersion(db: DBAdapter, owner: string): Promise<boolean> {
+  const res = await db.run(
+    `UPDATE ${SCHEMA_META_TABLE}
+        SET version = ?, applied_at = ?, claim_owner = NULL, claim_expires_at = NULL
+      WHERE id = 1 AND version < ? AND claim_owner = ?`,
+    [SCHEMA_VERSION, new Date().toISOString(), SCHEMA_VERSION, owner]
+  );
+  return res.changes === 1;
+}
+
+/**
+ * 一次远端迁移的持有状态。续租与迁移体共用它，且只有一个方向的不可逆转移：
+ * `active → lost`。宁可让这一个进程的初始化失败，也不允许一个「已确认失去租约」
+ * 或「续租结果不确定」的进程继续往外发 DDL。
+ */
+interface RemoteClaim {
+  readonly owner: string;
+  lost: boolean;
+  reason: string;
+}
+
+/** 失效原因里只放类别，不放语句、令牌或连接串 */
+function markClaimLost(claim: RemoteClaim, reason: string): void {
+  if (!claim.lost) {
+    claim.lost = true;
+    claim.reason = reason;
+  }
+}
+
+class LostRemoteClaimError extends Error {
+  constructor(reason: string) {
+    super(
+      `[db] lost remote migration claim (${reason}) — stopping before further migration ` +
+        `statements; an unowned schema is never marked applied`
+    );
+    this.name = "LostRemoteClaimError";
+  }
+}
+
+/**
+ * 迁移体的执行通道：每条语句**发出之前**查一次失效信号。
+ *
+ * 为什么不能只在末尾查 owner：续租失败到 `migrate()` 返回之间还压着几十条 DDL，
+ * 那些语句才是「两个实例并发改同一批表结构」的实际动作；一个已经知道自己失去租约的
+ * 进程继续往下发，正是本轮要消灭的窗口。
+ *
+ * 保证的边界（必须如实理解）：这里能阻止的是**尚未发出**的语句。一条已经交到 HTTP
+ * 传输层的远程请求撤不回来，服务端照样会执行它——失效时那条语句确实会落库。
+ * 因此本闸门保证的是「失效后不再新增语句 + 绝不盖章」，不是「原子回滚」。
+ * 半套结构由下一次重试靠迁移体自身的幂等性补全。
+ */
+function guardMigrationStatements(db: DBAdapter, claim: RemoteClaim): DBAdapter {
+  const assertOwned = (): void => {
+    if (claim.lost) throw new LostRemoteClaimError(claim.reason);
+  };
+  return {
+    query: (sql, params) => {
+      assertOwned();
+      return db.query(sql, params);
+    },
+    get: (sql, params) => {
+      assertOwned();
+      return db.get(sql, params);
+    },
+    run: (sql, params) => {
+      assertOwned();
+      return db.run(sql, params);
+    },
+    exec: (sql) => {
+      assertOwned();
+      return db.exec(sql);
+    },
+    // 生命周期归调用方：这层只是执行通道，不能替主连接关连接
+    close: () => undefined,
+    migrationControl: () => null,
+  };
+}
+
+/** 续租语句（同时也是测试识别续租的锚点）：只在自己的租约上顺延 */
+function leaseRenewalSql(): string {
+  return `UPDATE ${SCHEMA_META_TABLE} SET claim_expires_at = ? WHERE id = 1 AND claim_owner = ?`;
+}
+
+/**
+ * 迁移期间按固定间隔续租；返回停止函数。
+ *
+ * 三条硬约束：
+ * 1. **不重叠**：用「上一轮落定后才排下一次」的链式 `setTimeout`，而不是 `setInterval`。
+ *    远程一条语句 = 一次 HTTP 往返，RTT 抖动时 `setInterval` 会把续租请求堆成一条队，
+ *    既放大延迟，又让「哪一轮的结论」失去意义。
+ * 2. **fail-closed**：`changes !== 1` = 确认已被接管；请求报错/结果不确定 = 同样失效。
+ *    不重试、不猜测、不降级成「当它还在」。
+ * 3. **停止即失效结论作废**：`stop()` 之后在途续租的返回值不再改状态——本方已经开始
+ *    收尾（盖章或让约），那几步自有 owner 守卫兜着。
+ */
+function startLeaseRenewal(db: DBAdapter, claim: RemoteClaim): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const schedule = (): void => {
+    if (stopped || claim.lost) return;
+    timer = setTimeout(tick, REMOTE_LEASE_RENEW_MS);
+    // 后台定时器不能吊住进程退出（serverless 实例与测试进程都靠 await 链结束）
+    const handle = timer as { unref?: () => void };
+    handle.unref?.();
+  };
+
+  async function tick(): Promise<void> {
+    timer = null;
+    if (stopped || claim.lost) return;
+    let changes: number;
+    try {
+      const res = await db.run(leaseRenewalSql(), [
+        Date.now() + REMOTE_MIGRATION_LEASE_MS,
+        claim.owner,
+      ]);
+      changes = res.changes;
+    } catch {
+      // 不知道这条 UPDATE 落没落地，也不知道这期间是否已被接管 → 失效保护
+      markClaimLost(claim, "renewal request failed; lease state unknown");
+      return;
+    }
+    if (stopped) return;
+    if (changes !== 1) {
+      markClaimLost(claim, "claim is no longer held by this instance");
+      return;
+    }
+    schedule();
+  }
+
+  schedule();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+}
+
+async function applyRemoteUnderClaim(db: DBAdapter): Promise<SchemaInitResult> {
+  await ensureMetaRow(db);
+  const owner = randomUUID();
+  let lastObserved = -1;
+
+  for (let attempt = 0; attempt <= REMOTE_CLAIM_WAIT_MS.length; attempt++) {
+    if (attempt > 0) await sleep(REMOTE_CLAIM_WAIT_MS[attempt - 1]);
+
+    // 每轮先看版本：排队期间持有者可能已经应用完并盖章
+    const version = await readRemoteVersion(db);
+    lastObserved = version;
+    if (version >= SCHEMA_VERSION) {
+      return {
+        applied: false,
+        version,
+        reason: version > SCHEMA_VERSION ? "ahead" : "current",
+      };
+    }
+
+    if (!(await tryClaimMigration(db, owner))) continue;
+
+    // 锁内复查（与本地路径同一语义）：从「读到落后」到「抢到手」之间隔着一条
+    // 会被写锁排队的 UPDATE，这段时间里持有者完全可能已经应用完并盖章。
+    // 不复查就会出现两个进程各自重放整套迁移。
+    const inside = await readRemoteVersion(db);
+    if (inside >= SCHEMA_VERSION) {
+      // 结构已经是目标版本，让出租约即可；这里再盖一次章没有意义，也绝不重跑迁移
+      await releaseMigrationClaim(db, owner);
+      return {
+        applied: false,
+        version: inside,
+        reason: inside > SCHEMA_VERSION ? "ahead" : "current",
+      };
+    }
+
+    const claim: RemoteClaim = { owner, lost: false, reason: "" };
+    const stopRenewal = startLeaseRenewal(db, claim);
+    try {
+      // 迁移体走「失效可检查」的通道：续租一旦把状态打成 lost，尚未发出的下一条语句
+      // 就地中止，而不是把剩下几十条 DDL 跑完再回头看结果。
+      await migrate(guardMigrationStatements(db, claim));
+    } catch (err) {
+      // 迁移没跑完就把租约让出去，下一个进程不必等满一个租约周期；但绝不盖章——
+      // 库里可能只有半套结构，标成「已应用」等于让后续进程跳过迁移继续用坏 schema。
+      // 让约本身带 owner 守卫，所以也不会误清别人的租约；失败也不能掩盖原始迁移错误。
+      await releaseMigrationClaim(db, owner).catch(() => undefined);
+      throw err;
+    } finally {
+      stopRenewal();
+    }
+
+    // migrate() 干净返回也不等于可以盖章：最后一条语句在途期间，续租可能刚确认失去
+    // 租约，或因网络错误进入「结果不确定」。fail-closed 优先于「我跑完了」。
+    if (claim.lost) {
+      await releaseMigrationClaim(db, owner).catch(() => undefined);
+      throw new LostRemoteClaimError(claim.reason);
+    }
+
+    if (!(await stampRemoteVersion(db, owner))) {
+      // 盖章没落地只有两种可能：别人已把版本推到位（那库里结构就是齐的），
+      // 或我们在迁移期间失去了租约且版本仍落后。后者绝不能报「applied」：
+      // 我们既已不是持有人，就无从知道并发的那套迁移进行到了哪一步。
+      const now = await readRemoteVersion(db);
+      if (now >= SCHEMA_VERSION) {
+        return {
+          applied: false,
+          version: now,
+          reason: now > SCHEMA_VERSION ? "ahead" : "current",
+        };
+      }
+      throw new Error(
+        `[db] lost remote migration claim before stamping (another instance took over ` +
+          `while this process was migrating; version still ${now}) — refusing to mark an ` +
+          `unowned schema as applied`
+      );
+    }
+    return { applied: true, version: SCHEMA_VERSION, reason: "applied" };
+  }
+
+  throw new Error(
+    `[db] remote migration still claimed by another instance after ` +
+      `${REMOTE_CLAIM_WAIT_MS.length + 1} attempts (last observed version: ${lastObserved})`
+  );
 }
 
 async function applyUnderLock(control: MigrationControl): Promise<SchemaInitResult> {

@@ -8,7 +8,7 @@
 // 注意：并发用例必须跨进程——better-sqlite3/libsql 的本地驱动是同步的，
 // 同进程里让两条连接互相等只会阻塞事件循环，那不是我复现出的真实场景。
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import Database from "better-sqlite3";
 import { createClient } from "@libsql/client";
 import { spawn } from "node:child_process";
@@ -25,6 +25,9 @@ import {
   type DBAdapter,
 } from "./adapter";
 import {
+  REMOTE_CLAIM_WAIT_MS,
+  REMOTE_LEASE_RENEW_MS,
+  REMOTE_MIGRATION_LEASE_MS,
   SCHEMA_VERSION,
   closeDb,
   ensureSchema,
@@ -105,6 +108,168 @@ function wrapWrites(db: DBAdapter, beforeWrite: (sql: string) => void): DBAdapte
 function countWrites(db: DBAdapter): { proxy: DBAdapter; writes: () => number } {
   let writes = 0;
   return { proxy: wrapWrites(db, () => (writes += 1)), writes: () => writes };
+}
+
+/**
+ * 远端库的分支身份 = 「适配器不提供本地写锁」（`migrationControl()` 返回 null）。
+ * 用真实 SQLite 文件披上这个身份，就能在本机跑通整条远端闸门：版本表、租约抢占、
+ * 盖章与失败让约都不依赖传输层，只有往返延迟依赖（延迟在测量脚本里单独建模）。
+ *
+ * `log` 记录**每一条**经过的语句（含抛错的那条）：远程路径上一条语句 = 一次 HTTP
+ * 往返，所以这个数组就是「冷启动到底发了多少条 SQL」的直接计量。
+ */
+function asRemoteAdapter(db: DBAdapter, log: string[]): DBAdapter {
+  const track = <T>(sql: string, run: () => Promise<T>): Promise<T> => {
+    log.push(sql.replace(/\s+/g, " ").trim().slice(0, 90));
+    return run();
+  };
+  return {
+    query: (sql, params) => track(sql, () => db.query(sql, params)),
+    get: (sql, params) => track(sql, () => db.get(sql, params)),
+    run: (sql, params) => track(sql, () => db.run(sql, params)),
+    exec: (sql) => track(sql, () => db.exec(sql)),
+    close: () => db.close(),
+    migrationControl: () => null,
+  };
+}
+
+/** 版本表单行（闸门的全部持久状态） */
+async function readMetaRow(
+  db: DBAdapter
+): Promise<{ version: number; claim_owner: string | null; claim_expires_at: number | null } | undefined> {
+  return (await db.get(
+    `SELECT version, claim_owner, claim_expires_at FROM schema_meta WHERE id = 1`
+  )) as
+    | { version: number; claim_owner: string | null; claim_expires_at: number | null }
+    | undefined;
+}
+
+/**
+ * 在 `asRemoteAdapter` 之上再加一道「迁移体的第一条业务写语句挂起」的闸门。
+ *
+ * 为什么需要它：租约过期这个状态在真实世界里要迁移跑满 45 秒才会出现，而测试既不能
+ * 真等 45 秒，也不能靠改短租约（那测的就不是同一份契约）。挂起迁移体里的第一条写语句，
+ * 就能确定性地造出「进程还活着、迁移还没跑完、租约已过期」，然后用可控时钟推过去。
+ *
+ * 判据只用**写语句**：闸门自己只读库或改 schema_meta，所以「第一条不碰 schema_meta 的
+ * 写」必然来自迁移体。用读语句判会误判——版本探测也是读，会把「还没抢到租约」当成
+ * 「正在迁移」（这个坑本文件踩过一次，代价是整条用例在真实退避预算上白等 46 秒）。
+ * `insideMigrate()` 因此就是「这个实例正在跑 migrate()」的直接证据。
+ */
+/** 续租语句（与 `leaseRenewalSql()` 同锚点）：闸门簿记里唯一按周期重复的那条 */
+function isLeaseRenewal(sql: string): boolean {
+  return /^UPDATE schema_meta SET claim_expires_at/i.test(sql);
+}
+
+/**
+ * 在 `asRemoteAdapter` 之上再加两道可注入的故障，用来造出真实世界要等满 45 秒才会
+ * 出现的状态，而不用真等：
+ *
+ * 1. `gate`：挂起迁移体的**第一条业务写语句**。进程还活着、迁移还没跑完，租约随可控
+ *    时钟过期 —— 这是「接管 vs 并发迁移」的最小模型。
+ * 2. `renewal`：改写续租请求的命运。`"fail"` 让它根本没拿到结果（HTTP 层网络错误/超时，
+ *    对应「不确定」），`"hold"` 让它永远悬在途（对应 RTT 抖动下的重叠堆积风险）。
+ *    两者都不碰库，所以 `claim_expires_at` 停在旧值，能区分「库里确认我不是持有人」
+ *    和「我压根不知道」这两条不同的失效路径。
+ *
+ * 判据只用**写语句**：闸门自己只读库或改 schema_meta，所以「第一条不碰 schema_meta 的
+ * 写」必然来自迁移体。用读语句判会误判——版本探测也是读，会把「还没抢到租约」当成
+ * 「正在迁移」（这个坑本文件踩过一次，代价是整条用例在真实退避预算上白等 46 秒）。
+ * `insideMigrate()` 因此就是「这个实例正在跑 migrate()」的直接证据。
+ *
+ * `renewals()` 只数**发出的请求**，`renewalInflight()` 数其中未落定的，
+ * `maxRenewalInflight()` 是历史峰值：峰值 > 1 就等于续租请求在排队堆积。
+ */
+function gatedRemote(
+  db: DBAdapter,
+  log: string[],
+  opts: {
+    gate?: Promise<void>;
+    renewal?: "fail" | "hold";
+    renewalSettle?: Promise<void>;
+  } = {}
+): {
+  remote: DBAdapter;
+  insideMigrate: () => boolean;
+  renewals: () => number;
+  renewalInflight: () => number;
+  maxRenewalInflight: () => number;
+} {
+  let inside = false;
+  let armed = !!opts.gate;
+  let held = false;
+  let renewals = 0;
+  let inflight = 0;
+  let peak = 0;
+  const call = async <T>(sql: string, isWrite: boolean, run: () => Promise<T>): Promise<T> => {
+    log.push(sql.replace(/\s+/g, " ").trim().slice(0, 90));
+    if (isLeaseRenewal(sql)) {
+      renewals += 1;
+      inflight += 1;
+      peak = Math.max(peak, inflight);
+      try {
+        // hold 只掐住第一次续租：放开后链必须能自己往下走，否则测不到「续租继续」
+        if (opts.renewal === "fail") throw new Error("injected renewal transport failure");
+        if (opts.renewal === "hold" && !held && opts.renewalSettle) {
+          held = true;
+          await opts.renewalSettle;
+        }
+        return await run();
+      } finally {
+        inflight -= 1;
+      }
+    }
+    if (isWrite && !/schema_meta/i.test(sql)) {
+      inside = true;
+      if (armed && opts.gate) {
+        armed = false;
+        await opts.gate;
+      }
+    }
+    return run();
+  };
+  return {
+    insideMigrate: () => inside,
+    renewals: () => renewals,
+    renewalInflight: () => inflight,
+    maxRenewalInflight: () => peak,
+    remote: {
+      query: (sql, params) => call(sql, false, () => db.query(sql, params)),
+      get: (sql, params) => call(sql, false, () => db.get(sql, params)),
+      run: (sql, params) => call(sql, true, () => db.run(sql, params)),
+      exec: (sql) => call(sql, true, () => db.exec(sql)),
+      close: () => db.close(),
+      migrationControl: () => null,
+    },
+  };
+}
+
+/** 迁移体真正改结构的语句（闸门簿记除外）：用于断言「 parked 期间没跑任何业务写」 */
+function bodyWrites(log: string[]): string[] {
+  return log.filter(
+    (sql) => /^(ALTER|CREATE|DROP|INSERT|UPDATE|DELETE)/i.test(sql) && !/schema_meta/i.test(sql)
+  );
+}
+
+/** 挂起点的 drain：fake timers 下不能靠 setTimeout 轮询，只能排干微任务 */
+async function waitUntil(cond: () => boolean, label: string): Promise<void> {
+  for (let tick = 0; tick < 20000; tick++) {
+    if (cond()) return;
+    await Promise.resolve();
+  }
+  throw new Error(`等待超时：${label}`);
+}
+
+/** 把远端版本退回 0（业务结构留着）：模拟「库里还没盖章」的冷启动场景 */
+async function rewindRemoteVersion(file: string): Promise<void> {
+  const db = openSqliteAdapter(file);
+  try {
+    await db.run(
+      `UPDATE schema_meta SET version = 0, claim_owner = NULL, claim_expires_at = NULL WHERE id = 1`
+    );
+  } finally {
+    db.close();
+  }
 }
 
 function readUserVersion(file: string): number {
@@ -257,26 +422,672 @@ describe("迁移闸门：版本化 + 独占写锁", () => {
     }
   });
 
-  it("适配器不提供写锁（远端 Turso）时回退为直接幂等迁移", async () => {
+  it("远端分支（无本地写锁）首次初始化应用迁移并把版本写进库", async () => {
     const file = nextDbFile();
     const db = openSqliteAdapter(file);
-    const noLock: DBAdapter = {
-      query: (sql, params) => db.query(sql, params),
-      run: (sql, params) => db.run(sql, params),
-      get: (sql, params) => db.get(sql, params),
-      exec: (sql) => db.exec(sql),
-      close: () => db.close(),
-      migrationControl: () => null,
-    };
+    const statements: string[] = [];
     try {
-      const result = await ensureSchema(noLock);
-      expect(result).toEqual({ applied: true, version: 0, reason: "unversioned" });
+      const result = await ensureSchema(asRemoteAdapter(db, statements));
+      expect(result).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
       expect((await tableNames(db)).has("projects")).toBe(true);
-      // 无闸门路径不盖章：版本仍是 0，下次进程初始化会再幂等跑一遍
-      expect(readUserVersion(file)).toBe(0);
+      // 版本记在库里，不是进程内状态：否则换一个冷启动实例就又要重放整套迁移
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+        claim_expires_at: null,
+      });
     } finally {
       db.close();
     }
+  });
+});
+
+describe("远端 Turso 版本闸门：冷启动不再重放整套迁移", () => {
+  /** 迁移体里的语句特征：稳态初始化里一条都不该出现 */
+  const MIGRATION_MARKERS = [
+    "CREATE TABLE IF NOT EXISTS tracked_keywords",
+    "INSERT OR IGNORE INTO automation_settings",
+    "ALTER TABLE",
+  ];
+
+  function seededRemote(file: string): { db: DBAdapter; log: string[]; remote: DBAdapter } {
+    const db = openSqliteAdapter(file);
+    const log: string[] = [];
+    return { db, log, remote: asRemoteAdapter(db, log) };
+  }
+
+  it("冷启动成本对照：重放整套迁移的语句数 vs 版本闸门的 2 条", async () => {
+    const file = nextDbFile();
+
+    // 先把库带到「已是当前版本」的状态（生产库此刻就长这样：所有表都在）
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+
+    // 对照组：版本记录落后 → 整套迁移必须在「结构已全部存在」的库上重放一遍，
+    // 每个 addColumnIfMissing 都要先探测表、再读 PRAGMA，这正是远程往返的来源。
+    const rewind = openSqliteAdapter(file);
+    try {
+      await rewind.run(`UPDATE schema_meta SET version = 0 WHERE id = 1`);
+    } finally {
+      rewind.close();
+    }
+    const replay = seededRemote(file);
+    let replayStatements = 0;
+    try {
+      const result = await ensureSchema(replay.remote);
+      expect(result).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      replayStatements = replay.log.length;
+      expect(replay.log.join("\n")).toContain("CREATE TABLE IF NOT EXISTS tracked_keywords");
+    } finally {
+      replay.db.close();
+    }
+
+    // 修复组：结构没变、请求没变、计时方式没变，只剩一次表探测 + 一次版本读
+    const steady = seededRemote(file);
+    try {
+      const result = await ensureSchema(steady.remote);
+      expect(result).toEqual({ applied: false, version: SCHEMA_VERSION, reason: "current" });
+      expect(steady.log).toHaveLength(2);
+      expect(steady.log.every((sql) => sql.startsWith("SELECT"))).toBe(true);
+      // 按实测单程 ~220ms 折算：~93 条串行远程语句 ≈ 20 秒，2 条 ≈ 0.4 秒
+      expect(replayStatements).toBeGreaterThanOrEqual(90);
+      expect(replayStatements / steady.log.length).toBeGreaterThanOrEqual(45);
+    } finally {
+      steady.db.close();
+    }
+  });
+
+  it("版本已满足的库：新进程初始化只剩两次远程读、零写入", async () => {
+    const file = nextDbFile();
+    const first = seededRemote(file);
+    try {
+      await ensureSchema(first.remote);
+    } finally {
+      first.db.close();
+    }
+
+    // 换一条连接 = 换一个全新进程（闸门状态只可能来自库里）
+    const { db, log, remote } = seededRemote(file);
+    try {
+      const result = await ensureSchema(remote);
+      expect(result).toEqual({ applied: false, version: SCHEMA_VERSION, reason: "current" });
+      expect(log, `稳态初始化发出了 ${log.length} 条语句`).toHaveLength(2);
+      for (const marker of MIGRATION_MARKERS) {
+        expect(log.join("\n")).not.toContain(marker);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("同一进程内重复初始化同样只剩两次读（不只是跨进程有效）", async () => {
+    const { db, log, remote } = seededRemote(nextDbFile());
+    try {
+      await ensureSchema(remote);
+      const after = log.length;
+      const again = await ensureSchema(remote);
+      expect(again).toEqual({ applied: false, version: SCHEMA_VERSION, reason: "current" });
+      expect(log.length - after).toBe(2);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("版本落后时完整执行迁移，并只把版本号往前推", async () => {
+    const file = nextDbFile();
+    const seed = seededRemote(file);
+    try {
+      await ensureSchema(seed.remote);
+      // 代码回滚/别人抢先：把版本记成一个更低的值，必须重跑迁移而不是跳过
+      await seed.db.run(`UPDATE schema_meta SET version = 0 WHERE id = 1`);
+    } finally {
+      seed.db.close();
+    }
+
+    const { db, log, remote } = seededRemote(file);
+    try {
+      const result = await ensureSchema(remote);
+      expect(result).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      expect(log.join("\n")).toContain("CREATE TABLE IF NOT EXISTS tracked_keywords");
+      expect(await readMetaRow(db)).toMatchObject({ version: SCHEMA_VERSION });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("库里版本比代码新时不倒退盖章，也不重复迁移", async () => {
+    const file = nextDbFile();
+    const seed = seededRemote(file);
+    try {
+      await ensureSchema(seed.remote);
+      await seed.db.run(`UPDATE schema_meta SET version = ? WHERE id = 1`, [
+        SCHEMA_VERSION + 3,
+      ]);
+    } finally {
+      seed.db.close();
+    }
+
+    const { db, log, remote } = seededRemote(file);
+    try {
+      const result = await ensureSchema(remote);
+      expect(result).toEqual({
+        applied: false,
+        version: SCHEMA_VERSION + 3,
+        reason: "ahead",
+      });
+      expect(log).toHaveLength(2);
+      expect(await readMetaRow(db)).toMatchObject({ version: SCHEMA_VERSION + 3 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("迁移中途失败：让出租约、不盖章，下一次初始化能重试并成功", async () => {
+    const file = nextDbFile();
+    const db = openSqliteAdapter(file);
+    const boom: string[] = [];
+    const sabotage = asRemoteAdapter(db, boom);
+    const failing: DBAdapter = {
+      ...sabotage,
+      exec: (sql) => {
+        if (sql.includes("CREATE TABLE IF NOT EXISTS tracked_keywords")) {
+          throw new Error("injected remote migration failure");
+        }
+        return sabotage.exec(sql);
+      },
+    };
+    try {
+      await expect(ensureSchema(failing)).rejects.toThrow(/injected remote migration failure/);
+      const meta = await readMetaRow(db);
+      expect(meta).toMatchObject({ version: 0 });
+      // 租约已交回：下一个进程不必等满 45 秒才接手
+      expect(meta?.claim_owner).toBeNull();
+      expect((await tableNames(db)).size).toBe(1); // 只有 schema_meta，业务表一套都没落地
+
+      const ok: string[] = [];
+      const retry = await ensureSchema(asRemoteAdapter(db, ok));
+      expect(retry).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("别人持有未过期租约时不抢、不自跑迁移，等满预算后报错而不是假装成功", async () => {
+    const file = nextDbFile();
+    const seed = seededRemote(file);
+    try {
+      await ensureSchema(seed.remote);
+      // 「别的实例」正在应用迁移：版本被退回 0，租约远未过期
+      await seed.db.run(
+        `UPDATE schema_meta SET version = 0, claim_owner = 'other-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() + 3_600_000]
+      );
+    } finally {
+      seed.db.close();
+    }
+
+    vi.useFakeTimers();
+    const db = openSqliteAdapter(file);
+    const log: string[] = [];
+    try {
+      const pending = ensureSchema(asRemoteAdapter(db, log));
+      // 先挂上断言再推进定时器：否则拒绝发生在 drain 期间，会被记成未处理拒绝
+      const assertion = expect(pending).rejects.toThrow(/still claimed by another instance/);
+      await vi.runAllTimersAsync();
+      await assertion;
+      const meta = await readMetaRow(db);
+      expect(meta).toMatchObject({ version: 0, claim_owner: "other-instance" });
+      // 一次迁移都没跑，也没偷偷盖章
+      expect(log.join("\n")).not.toContain("ALTER TABLE");
+      expect(log.join("\n")).not.toContain("CREATE TABLE IF NOT EXISTS tracked_keywords");
+    } finally {
+      db.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("持有者退出留下过期租约时，下一个进程接管并完成迁移", async () => {
+    const file = nextDbFile();
+    const db = openSqliteAdapter(file);
+    try {
+      // 版本表已存在（真实闸门建的），但单行停在「别人持有且租约已过期」的状态
+      const boot: string[] = [];
+      await ensureSchema(asRemoteAdapter(db, boot));
+      await db.run(
+        `UPDATE schema_meta SET version = 0, claim_owner = 'dead-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() - 1]
+      );
+      await db.run(`DROP TABLE projects`);
+
+      const log: string[] = [];
+      const result = await ensureSchema(asRemoteAdapter(db, log));
+      expect(result).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      expect((await tableNames(db)).has("projects")).toBe(true);
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  // ===== 租约过期边界：45 秒这个上界本身是不是安全，不能靠 22.7 秒的模拟中位数担保 =====
+  // 三条用例都用可控时钟 + 挂起迁移体语句构造状态，不真等 45 秒。
+
+  it("迁移超过租约：旧持有者还在跑 migrate 时，第二个实例不得并发进入迁移体", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    vi.useFakeTimers();
+    const holder = openSqliteAdapter(file);
+    const taker = openSqliteAdapter(file);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const holderLog: string[] = [];
+    const takerLog: string[] = [];
+    let takenResult: SchemaInitResult | null = null;
+    let takenError: string | null = null;
+    try {
+      // 实例 A：抢到租约后卡在迁移体第一条业务写上（进程还活着，只是慢）
+      const a = gatedRemote(holder, holderLog, { gate });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "实例 A 进入迁移体");
+
+      // 实例 B：同时在跑冷启动，它会一路排队直到租约过期
+      const b = gatedRemote(taker, takerLog);
+      void ensureSchema(b.remote).then(
+        (r) => {
+          takenResult = r;
+        },
+        (err: unknown) => {
+          takenError = String((err as Error)?.message ?? err);
+        }
+      );
+      await waitUntil(() => takerLog.length > 0, "实例 B 开始读版本");
+
+      // 把时钟推过「租约上界 + B 的退避预算末尾」：此刻 A 仍挂在同一条业务写上，
+      // 既没进展也没退出。任何接管都等于两个实例并发改同一批表结构。
+      const claimBudget = REMOTE_CLAIM_WAIT_MS.reduce((total, ms) => total + ms, 0);
+      await vi.advanceTimersByTimeAsync(claimBudget + REMOTE_MIGRATION_LEASE_MS / 8);
+
+      expect(
+        b.insideMigrate(),
+        "租约一过期就接管，而旧持有者还活着并在跑 migrate() = 两个实例同时改同一批表结构"
+      ).toBe(false);
+      const during = await readMetaRow(taker);
+      expect(during).toMatchObject({ version: 0 });
+      expect(
+        (during?.claim_expires_at ?? 0) > Date.now(),
+        "活着的持有者必须还在续租，否则等待方会把它当死租约抢走"
+      ).toBe(true);
+      expect(
+        takenError ?? (takenResult ? JSON.stringify(takenResult) : "pending"),
+        "等不到租约时只能报错，不能假装初始化成功"
+      ).toMatch(/still claimed by another instance/);
+
+      // 释放旧持有者：它一直是合法持有人，必须正常完成并盖章
+      release();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await held).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      expect(b.insideMigrate()).toBe(false);
+      expect(await readMetaRow(taker)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+        claim_expires_at: null,
+      });
+    } finally {
+      holder.close();
+      taker.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("慢但活着的持有者会续租：租约不会被时间本身判死", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    vi.useFakeTimers();
+    const db = openSqliteAdapter(file);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const log: string[] = [];
+    try {
+      const a = gatedRemote(db, log, { gate });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "持有者进入迁移体");
+
+      // 恰好推到「一次完整迁移」的实测上限：此刻租约绝不该已经失效
+      await vi.advanceTimersByTimeAsync(REMOTE_MIGRATION_LEASE_MS);
+      const meta = await readMetaRow(db);
+      expect(
+        (meta?.claim_expires_at ?? 0) > Date.now(),
+        `持有者仍在迁移且还活着，但租约已到期（expires_at=${String(meta?.claim_expires_at)}）`
+      ).toBe(true);
+      // 续租只碰版本表；挂起期间迁移体一条业务写都没往前走
+      const renewals = log.filter((sql) =>
+        /^UPDATE schema_meta SET claim_expires_at/i.test(sql)
+      );
+      expect(renewals.length).toBeGreaterThanOrEqual(1);
+      expect(bodyWrites(log), "挂起期间不该有其他业务写").toHaveLength(1);
+
+      release();
+      expect(await held).toMatchObject({ applied: true, reason: "applied" });
+    } finally {
+      db.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("租约被别的实例接管后，旧持有者不得盖章、也不得清除对方的租约", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    const db = openSqliteAdapter(file);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    try {
+      const a = gatedRemote(db, [], { gate });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "持有者进入迁移体");
+
+      // 别的实例接管了租约（真实诱因：迁移跑过租约 / 时钟偏移 / 续租请求失败）
+      await db.run(
+        `UPDATE schema_meta SET claim_owner = 'other-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() + 600_000]
+      );
+
+      release();
+      // 旧持有者跑完了自己的迁移，但它已不再持有租约：不能替别人宣布「结构已就位」
+      await expect(held).rejects.toThrow(/lost remote migration claim/);
+      expect(await readMetaRow(db)).toMatchObject({
+        version: 0,
+        claim_owner: "other-instance",
+      });
+
+      // 拒绝盖章是可恢复的，不是死锁：租约过期后新进程照样能完成并盖章
+      await db.run(
+        `UPDATE schema_meta SET claim_owner = 'other-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() - 1]
+      );
+      const log: string[] = [];
+      expect(await ensureSchema(asRemoteAdapter(db, log))).toEqual({
+        applied: true,
+        version: SCHEMA_VERSION,
+        reason: "applied",
+      });
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  // ===== 续租失效：盖章时的 owner 守卫只挡住「盖章」，挡不住失效之后那几十条 DDL =====
+  // 下面三条都靠注入的续租行为 + 可控时钟造状态，不真等 45 秒，也不改短租约契约。
+
+  it("续租确认 owner 已变：停止发出后续迁移语句，不盖章、不碰新持有人的租约", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    vi.useFakeTimers();
+    const db = openSqliteAdapter(file);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const log: string[] = [];
+    try {
+      const a = gatedRemote(db, log, { gate });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "持有者进入迁移体");
+      const parkedWrites = bodyWrites(log).length;
+
+      // 真实接管：租约换了主人且远未过期 → 我们的续租 UPDATE 只会匹配 0 行
+      await db.run(
+        `UPDATE schema_meta SET claim_owner = 'other-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() + 600_000]
+      );
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS);
+      expect(a.renewals(), "租约被别人持有期间，自己这一轮续租必须真的发出去了").toBe(1);
+
+      release();
+      await expect(held).rejects.toThrow(/lost remote migration claim/);
+
+      // 失效信号必须在**每条语句发出前**生效：迁移体就此停在那条已经放行的写上，
+      // 而不是把剩下整套 DDL 跑完再在末尾发现自己是局外人。
+      expect(
+        log.join("\n"),
+        "失去租约后仍在推进迁移体 = 与新持有人并发改同一批表结构"
+      ).not.toContain("INSERT OR IGNORE INTO automation_settings");
+      expect(bodyWrites(log)).toHaveLength(parkedWrites);
+
+      // 边界要说清楚：挡住的是「尚未发出」的语句。那条已经交到传输层的写确实落库了，
+      // 本闸门不撤销、也撤销不了已发出的请求（remote 分支更没有事务可回滚）。
+      expect((await tableNames(db)).has("tracked_keywords"), "已放行的语句应当照常落库").toBe(
+        true
+      );
+
+      const after = await readMetaRow(db);
+      expect(after).toMatchObject({ version: 0, claim_owner: "other-instance" });
+      expect(
+        (after?.claim_expires_at ?? 0) > Date.now(),
+        "让约必须带 owner 守卫：不是自己持有的租约一条都不能清"
+      ).toBe(true);
+      expect(vi.getTimerCount(), "失败路径退出后不得残留续租定时器").toBe(0);
+
+      // 拒绝盖章是可恢复的：等新持有人也死了，下一个进程照样接管并盖章
+      await db.run(
+        `UPDATE schema_meta SET claim_owner = 'other-instance', claim_expires_at = ? WHERE id = 1`,
+        [Date.now() - 1]
+      );
+      const takeover: string[] = [];
+      expect(await ensureSchema(asRemoteAdapter(db, takeover))).toEqual({
+        applied: true,
+        version: SCHEMA_VERSION,
+        reason: "applied",
+      });
+      // 对照：同一个库、同一条代码路径，没有失效时一路跑到迁移体末尾那条写
+      expect(takeover.join("\n")).toContain("INSERT OR IGNORE INTO automation_settings");
+      expect(bodyWrites(takeover).length).toBeGreaterThan(parkedWrites);
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      db.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("续租请求本身失败（结果不确定）：fail-closed 停在当前语句，绝不盖章", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    vi.useFakeTimers();
+    const db = openSqliteAdapter(file);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const log: string[] = [];
+    try {
+      const a = gatedRemote(db, log, { gate, renewal: "fail" });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "持有者进入迁移体");
+
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS);
+      expect(a.renewals()).toBe(1);
+
+      release();
+      await expect(held).rejects.toThrow(/renewal request failed; lease state unknown/);
+      expect(bodyWrites(log)).toHaveLength(1);
+      expect(log.join("\n")).not.toContain("INSERT OR IGNORE INTO automation_settings");
+
+      // 「不知道这条 UPDATE 落没落地」不能当成「还在持有」：HTTP 传输层的失败与
+      // 「库里确认我不是持有人」这两种结论，适配器给不出区分，只能一律按失效处理。
+      // 但租约本身仍是我们自己的，所以让约（带 owner 守卫）会成功——
+      // 于是下一个进程不必等满一个租约周期就能接管。
+      expect(await readMetaRow(db)).toMatchObject({ version: 0, claim_owner: null });
+      expect(vi.getTimerCount(), "失败路径退出后不得残留续租定时器").toBe(0);
+
+      expect(await ensureSchema(asRemoteAdapter(db, []))).toMatchObject({
+        applied: true,
+        reason: "applied",
+      });
+    } finally {
+      db.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("续租不重叠堆积：在途时不排第二条，落定后链继续，收尾不残留定时器", async () => {
+    const file = nextDbFile();
+    const boot = seededRemote(file);
+    try {
+      expect((await ensureSchema(boot.remote)).applied).toBe(true);
+    } finally {
+      boot.db.close();
+    }
+    await rewindRemoteVersion(file);
+
+    vi.useFakeTimers();
+    const db = openSqliteAdapter(file);
+    let releaseGate: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (releaseGate = resolve));
+    let settle: () => void = () => {};
+    const renewalSettle = new Promise<void>((resolve) => (settle = resolve));
+    const log: string[] = [];
+    try {
+      const a = gatedRemote(db, log, { gate, renewal: "hold", renewalSettle });
+      const held = ensureSchema(a.remote);
+      await waitUntil(a.insideMigrate, "持有者进入迁移体");
+
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS);
+      expect(a.renewals()).toBe(1);
+      expect(a.renewalInflight()).toBe(1);
+
+      // 一条续租卡在传输层时把时钟推过好几个周期：不得堆出第二条在途请求
+      // （远程一条语句 = 一次往返，堆积既放大延迟，也让「哪一轮的结论」失去意义）
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS * 5);
+      expect(a.renewals()).toBe(1);
+      expect(a.maxRenewalInflight(), "同时最多只允许一条续租在途").toBe(1);
+
+      // 落定后链必须继续：否则慢-but-活着的持有者会被时间本身判死，退回上一轮的缺陷
+      settle();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(a.renewalInflight()).toBe(0);
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS);
+      expect(a.renewals()).toBe(2);
+
+      // 下一轮已排上、迁移此时收尾：停止函数要清掉待发的定时器，
+      // 且已经排出去的续租落定后不得重新排链（否则停止形同无效）
+      releaseGate();
+      expect(await held).toMatchObject({ applied: true, reason: "applied" });
+      expect(log.join("\n"), "持有者没失效时迁移必须完整跑完").toContain(
+        "INSERT OR IGNORE INTO automation_settings"
+      );
+      expect(vi.getTimerCount(), "成功路径退出后不得残留续租定时器").toBe(0);
+      await vi.advanceTimersByTimeAsync(REMOTE_LEASE_RENEW_MS * 4);
+      expect(a.renewals()).toBe(2);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      settle();
+      db.close();
+      vi.useRealTimers();
+    }
+  });
+
+  it("本地文件库路径完全不变：仍走 user_version，库里不出现 schema_meta", async () => {
+    const file = nextDbFile();
+    const db = openSqliteAdapter(file);
+    try {
+      const result = await ensureSchema(db);
+      expect(result).toEqual({ applied: true, version: SCHEMA_VERSION, reason: "applied" });
+      expect(readUserVersion(file)).toBe(SCHEMA_VERSION);
+      expect((await tableNames(db)).has("schema_meta")).toBe(false);
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe("SCHEMA_VERSION 升级契约", () => {
+  /**
+   * 「改了迁移体却忘记把 SCHEMA_VERSION +1」是这套闸门唯一无法自愈的失误：
+   * 已盖章的库会永远跳过新迁移，直到某个请求撞上缺列/缺表才暴露，而那时库里已经
+   * 记着「结构已就位」。migrations.ts 顶部只有注释约束（注释会腐烂），所以这里把
+   * 它变成会失败的测试。
+   *
+   * 指纹取的是**去掉注释、折叠空白后的 migrate() 源码**：纯格式化/注释改动不会触发，
+   * 增删一条迁移语句必然触发。指纹变了只有两条出路——要么这条改动本就不该存在，
+   * 要么把它连同版本号一起提交。
+   */
+  const MIGRATE_BODY_SHA256 = "ab3568af7aa0b3c6e6413ad9c4e52bbc3e9f5f0bffd2bce6d48ccccfcb69e8b5";
+
+  function migrateBody(): string {
+    const source = fs.readFileSync(path.join(HERE, "migrations.ts"), "utf8");
+    const file = ts.createSourceFile("migrations.ts", source, ts.ScriptTarget.Latest, true);
+    let decl: ts.FunctionDeclaration | undefined;
+    file.forEachChild((node) => {
+      if (ts.isFunctionDeclaration(node) && node.name?.getText(file) === "migrate") {
+        decl = node;
+      }
+    });
+    if (!decl) throw new Error("migrations.ts 里找不到 migrate()：迁移入口被改名或删除");
+    return ts
+      .transpileModule(decl!.getFullText(file), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, removeComments: true },
+      })
+      .outputText.replace(/\s+/g, " ")
+      .trim();
+  }
+
+  it("迁移体指纹与记录的常量一致（否则必须同时把 SCHEMA_VERSION +1）", () => {
+    const hash = crypto.createHash("sha256").update(migrateBody()).digest("hex");
+    expect(
+      hash,
+      `迁移体已改动。若这是必要的结构变更：把 migrations.ts 的 SCHEMA_VERSION +1 并按新指纹更新本常量；` +
+        `否则回退迁移体的改动。未 bump 版本时，已盖章（schema_meta.version / user_version 已到目标值）` +
+        `的库会永久跳过这套新迁移。`
+    ).toBe(MIGRATE_BODY_SHA256);
   });
 });
 
@@ -629,6 +1440,84 @@ setTimeout(() => {
         `SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'`
       );
       expect(indexes.length).toBeGreaterThan(50);
+    } finally {
+      db.close();
+    }
+  }, 90_000);
+
+  it("远端闸门跨进程竞争：只有一个实例应用迁移，其余排队后确认已 current", async () => {
+    // 独立进程才是这里的真实并发（同进程里两条 SQLite 连接只会阻塞事件循环）。
+    // 传输层用不上：闸门只依赖「库里那一行版本记录」，所以把本地 SQLite 适配器
+    // 披上「无本地写锁」的身份跑同一条远端分支，就等价于两个 Vercel 冷启动实例。
+    const adapterJs = path.join(outDir, "adapter.js");
+    const worker = path.join(outDir, "remote-gate-worker.cjs");
+    fs.writeFileSync(
+      worker,
+      `const Database = require("better-sqlite3");
+const adapter = require(${JSON.stringify(adapterJs)});
+const m = require(${JSON.stringify(migrationJs)});
+const raw = new Database(process.argv[2]);
+const a = new adapter.SQLiteAdapter(raw);
+let statements = 0;
+const track = (fn) => (...args) => { statements += 1; return fn(...args); };
+const remote = {
+  query: track((s, p) => a.query(s, p)),
+  get: track((s, p) => a.get(s, p)),
+  run: track((s, p) => a.run(s, p)),
+  exec: track((s) => a.exec(s)),
+  close: () => a.close(),
+  migrationControl: () => null,
+};
+setTimeout(() => {
+  m.ensureSchema(remote).then(
+    (r) => console.log("RESULT " + JSON.stringify({ schema: r, statements })),
+    (e) => { console.log("ERROR " + String((e && (e.code || e.message)) || e)); process.exitCode = 1; }
+  );
+}, Math.max(0, Number(process.argv[3]) - Date.now()));
+`
+    );
+
+    const file = nextDbFile();
+    const workerCount = 4;
+    const startAt = Date.now() + 400;
+    const runs = await Promise.all(
+      Array.from({ length: workerCount }, () =>
+        runNode(worker, [file, String(startAt)], nodeEnv, outDir)
+      )
+    );
+    const output = runs.map((r) => r.stdout).join("\n");
+    expect(runs.filter((r) => r.code !== 0), `worker failed:\n${output}`).toHaveLength(0);
+    // 两个实例同时改同一批表结构就会长成这样：这是本轮要消除的 DDL 竞争
+    expect(output, "并发初始化又打起来了").not.toMatch(
+      /SQLITE_BUSY|database is locked|duplicate column/i
+    );
+
+    const results = runs.map(
+      (r) => JSON.parse(r.stdout.replace(/^RESULT /m, "")) as {
+        schema: SchemaInitResult;
+        statements: number;
+      }
+    );
+    expect(results.filter((r) => r.schema.applied)).toHaveLength(1);
+    expect(results.filter((r) => !r.schema.applied)).toHaveLength(workerCount - 1);
+    expect(results.every((r) => r.schema.version === SCHEMA_VERSION)).toBe(true);
+    // 赢家跑一遍整套迁移（新库 ~50 条语句），输家只付出版本探测 + 排队轮询的代价：
+    // 没有任何一个进程重放整套迁移，也没有两个进程同时改结构。
+    const applyCount = results.find((r) => r.schema.applied)!.statements;
+    expect(applyCount).toBeGreaterThan(40);
+    expect(Math.max(...results.map((r) => r.statements))).toBe(applyCount);
+    for (const loser of results.filter((r) => !r.schema.applied)) {
+      expect(loser.statements, `输家跑了 ${loser.statements} 条语句`).toBeLessThan(40);
+    }
+
+    const db = openSqliteAdapter(file);
+    try {
+      expect(await readMetaRow(db)).toMatchObject({
+        version: SCHEMA_VERSION,
+        claim_owner: null,
+        claim_expires_at: null,
+      });
+      expect((await tableNames(db)).has("payment_notifications")).toBe(true);
     } finally {
       db.close();
     }
