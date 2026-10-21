@@ -175,3 +175,54 @@ describe("Typography 三级体系联动（Level 1/2/3 token 存在）", () => {
     expect(GLOBALS).toContain("--text-sm: 0.875rem;");// L3 14
   });
 });
+
+// ===== CSS 层叠契约：全局 border-color 重置必须留在 @layer base =====
+// 2026-10-21 Chrome 实测：`* { border-color: transparent }` 原本是**无层级**规则，
+// 而无层级样式优先于任何 @layer（与特异性无关）。它把 Tailwind v4 @layer utilities 里
+// 所有 border-* / focus:border-* 工具类一起压掉 —— 输入框渲染为无边框、聚焦无可见指示
+// （输入框同时带 focus:outline-none）、定价表格分隔线消失。
+// 静态检查无法替代浏览器断言，但能挡住「把这条规则搬回无层级」的回归。
+describe("CSS 层叠：全局 border-color 重置必须在 @layer base 内", () => {
+  const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  /** 去掉所有 `@layer <name> { ... }` 块（含嵌套花括号），只留无层级的顶层文本 */
+  const stripLayerBlocks = (css: string) => {
+    let out = "";
+    let i = 0;
+    const re = /@layer\s+[A-Za-z-]+\s*\{/g;
+    for (;;) {
+      re.lastIndex = i;
+      const m = re.exec(css);
+      if (!m) {
+        out += css.slice(i);
+        break;
+      }
+      out += css.slice(i, m.index);
+      let depth = 1;
+      let j = re.lastIndex;
+      while (j < css.length && depth > 0) {
+        if (css[j] === "{") depth++;
+        else if (css[j] === "}") depth--;
+        j++;
+      }
+      i = j;
+    }
+    return out;
+  };
+
+  /** 找出无层级文本里所有「通配选择器 + border 声明」的规则体 */
+  const unlayeredUniversalBorderRules = (css: string) =>
+    [...css.matchAll(/(?:^|\})\s*\*\s*\{([^}]*)\}/g)]
+      .map((m) => m[1])
+      .filter((body) => /border(-color)?\s*:/.test(body));
+
+  const CLEAN = stripComments(GLOBALS);
+
+  it("无层级区域不含任何 `* { border… }` 规则", () => {
+    expect(unlayeredUniversalBorderRules(stripLayerBlocks(CLEAN))).toEqual([]);
+  });
+
+  it("默认「边框不可见」的语义仍在，且位于 @layer base 内（不是被删掉）", () => {
+    expect(CLEAN).toMatch(/@layer\s+base\s*\{[\s\S]*?\*\s*\{[^}]*border-color:\s*transparent/);
+  });
+});

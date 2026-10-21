@@ -128,8 +128,16 @@
   --foreground: #111827;
 }
 
-* {
-  border-color: transparent;
+/*
+ * 仅作「没指定颜色时边框不可见」的默认值。
+ * 必须留在 @layer base：无层级规则会压过 Tailwind v4 @layer utilities 里的
+ * border-* / focus:border-* 工具类（无层级样式优先于任何有层级样式，与特异性无关），
+ * 曾导致输入框无边框、聚焦无可见指示、定价表格分隔线消失。
+ */
+@layer base {
+  * {
+    border-color: transparent;
+  }
 }
 
 html {
