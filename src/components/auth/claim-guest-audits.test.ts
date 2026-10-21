@@ -5,7 +5,14 @@
 //   3. claim 成功时请求仍然发出且参数正确（归属规则未变）
 //   4. claim 失败时注册流程不受影响（静默）
 //   5. 无 guest audit（无 domain）时等价于全量认领
-//   6. 成功路径的 loading 在导航之前结束
+//   6. 成功路径在导航前不会被本地 loading 状态「提前结束」（2026-10-21 变更，见下）
+//
+// ⚠️ 契约变更记录（2026-10-21 登录转场修复）：
+//   本文件过去断言「先 setLoading(false)，再 router.push」。那条契约本身就是 bug 来源
+//   ——认证返回即把按钮恢复成可点击，而后台首屏还在加载（用户实测：2 秒后可点、
+//   10 秒后才进后台）。现在成功路径必须保持 loading 直到登录页卸载，因此断言改为
+//   「enterOpening() 在 router.push 之前、且成功块内不出现任何 loading 复位」。
+//   本文件的核心目的（claim 绝不进入等待链）不变。
 //
 // 数据完整性（24h 窗口 / domain 过滤 / 跨用户隔离 / 激活只记一次）由既有测试覆盖：
 //   - src/lib/db/audits-claim.test.ts   → claimGuestAudits 的归属规则
@@ -145,7 +152,7 @@ describe("AuthForm：成功路径不再被 claim 阻塞", () => {
     expect(src).not.toMatch(/await\s+startGuestAuditClaim/);
   });
 
-  it("注册成功路径：先 setLoading(false)，再 router.push", () => {
+  it("注册成功路径：认领先触发、进入 opening 后再导航（不在导航前结束 loading）", () => {
     const start = src.indexOf('track("signup_completed")');
     const end = src.indexOf("router.push(safeRedirect)", start);
     expect(start).toBeGreaterThan(-1);
@@ -153,10 +160,13 @@ describe("AuthForm：成功路径不再被 claim 阻塞", () => {
 
     const successBlock = src.slice(start, end);
     expect(successBlock).toContain("startGuestAuditClaim({ redirectTarget })");
-    expect(successBlock).toContain("setLoading(false)");
+    // 2026-10-21：成功路径不得在导航前把状态退回 idle / 复位 loading
+    expect(successBlock).toContain("enterOpening();");
+    expect(successBlock).not.toContain("setLoading");
+    expect(successBlock).not.toContain('setPhase("idle")');
   });
 
-  it("登录成功路径同样是「先结束 loading，再导航」", () => {
+  it("登录成功路径同样是「先进入 opening，再导航」", () => {
     const start = src.indexOf('track("login_completed")');
     const end = src.indexOf("router.push(safeRedirect)", start);
     expect(start).toBeGreaterThan(-1);
@@ -164,7 +174,9 @@ describe("AuthForm：成功路径不再被 claim 阻塞", () => {
 
     const loginBlock = src.slice(start, end);
     expect(loginBlock).toContain("startGuestAuditClaim({ redirectTarget })");
-    expect(loginBlock).toContain("setLoading(false)");
+    expect(loginBlock).toContain("enterOpening();");
+    expect(loginBlock).not.toContain("setLoading");
+    expect(loginBlock).not.toContain('setPhase("idle")');
   });
 
   it("认领在导航之前就已触发（不依赖导航后再补）", () => {
@@ -174,17 +186,25 @@ describe("AuthForm：成功路径不再被 claim 阻塞", () => {
     expect(claimAt).toBeLessThan(pushAt);
   });
 
-  it("失败路径保持原样：报错并结束 loading", () => {
+  it("失败路径保持原样：报错并回到可重试状态（由 finally 统一收尾，不再就地复位）", () => {
     const signupErrorBlock = src.slice(
       src.indexOf("if (signUpError)"),
       src.indexOf("注册成功后直接跳转")
     );
     expect(signupErrorBlock).toContain("setError(");
-    expect(signupErrorBlock).toContain("setLoading(false)");
+    // 2026-10-21：复位收敛到 handleSubmit 的 finally（if (!navigating) 分支），
+    // 错误块本身只负责报错并 return，避免「报错后仍停在 opening」的双重收尾。
+    expect(signupErrorBlock).not.toContain("setLoading");
+    expect(signupErrorBlock).toContain("return;");
 
     const signinErrorBlock = src.slice(src.indexOf("if (signInError)"), src.indexOf("track(\"login_completed\")"));
     expect(signinErrorBlock).toContain("setError(");
-    expect(signinErrorBlock).toContain("setLoading(false)");
+    expect(signinErrorBlock).not.toContain("setLoading");
+    expect(signinErrorBlock).toContain("return;");
+    // 收尾逻辑本身存在且可恢复（失败后能再次提交）
+    expect(src).toContain("if (!navigating) {");
+    expect(src).toContain('setPhase("idle")');
+    expect(src).toContain("inFlight.current = false;");
   });
 
   it("Analytics 事件定义未被改动（signup_started / signup_completed / login_completed 仍在）", () => {

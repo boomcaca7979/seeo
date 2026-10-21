@@ -179,16 +179,24 @@ export default async function WorkbenchPage() {
     return <Onboarding displayName={displayName} mode="live" />;
   }
 
-  const alerts = await listAlerts(userId, 50);
-  const unread = await countUnreadAlerts(userId);
   const scopedAll = projects.map((p) => ({ id: Number(p.id), domain: p.domain }));
   // UUID → domain 映射来自本人项目列表（RLS 过滤），同时是范围 cookie 的所有权凭证
   const domainByUuid = new Map(
     (userProjects ?? []).map((p) => [p.id as string, p.domain as string]),
   );
   const { scope: initialScope, scopedProjects } = resolveInitialScope(scopeCookie, scopedAll, domainByUuid);
-  // 概览与增长机会面板共用一次队列构建（范围为当前项目时只构建该项目的队列）
-  const dashboard = await loadDashboardData(userId, scopedProjects);
+
+  // 登录后的首屏等待（2026-10-21）：这三件事互不依赖——告警列表、未读数都只按
+  // userId 取，概览/队列只需上面已同步算好的 scopedProjects。此前是三次串行 await，
+  // 在「远程 Supabase + 远程 Turso」下每个往返都直接叠加进用户等待的空白里。
+  // 有真实依赖的链路（项目 → 指标 → 队列）保持原顺序，不做投机并行。
+  const [alerts, unread, dashboard] = await Promise.all([
+    listAlerts(userId, 50),
+    countUnreadAlerts(userId),
+    // 概览与增长机会面板共用一次队列构建（范围为当前项目时只构建该项目的队列）
+    loadDashboardData(userId, scopedProjects),
+  ]);
+
 
   return (
     <WorkbenchBody

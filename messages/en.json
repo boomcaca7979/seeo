@@ -1816,7 +1816,9 @@
       "password": "Password",
       "passwordPlaceholderLogin": "Enter your password",
       "passwordPlaceholderSignup": "At least 8 characters",
-      "processing": "Processing…",
+      "loginVerifying": "Signing in…",
+      "signupVerifying": "Creating your account…",
+      "opening": "Opening workspace…",
       "loginBtn": "Log in",
       "signupBtn": "Sign up and get started",
       "hasAccount": "Already have an account?",
@@ -1828,7 +1830,10 @@
       "errAlreadyRegistered": "This email is already registered — log in directly",
       "errInvalidCredentials": "Invalid email or password",
       "errServiceUnavailable": "Can't reach the sign-in service right now. Check your connection and try again.",
-      "authUnavailableNotice": "We couldn't reach the sign-in service, so you were returned to the login page. Your password was not rejected — please try again."
+      "authUnavailableNotice": "We couldn't reach the sign-in service, so you were returned to the login page. Your password was not rejected — please try again.",
+      "slowHint": "Still opening your workspace. Please wait and don't click again.",
+      "stallNotice": "Still waiting for your workspace. Your sign-in already succeeded, so reloading the page will take you straight in.",
+      "stallAction": "Reload page"
     },
     "projectList": {
       "dataUpdatedAt": "Data updated",

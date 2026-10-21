@@ -1809,7 +1809,9 @@
       "password": "密码",
       "passwordPlaceholderLogin": "输入密码",
       "passwordPlaceholderSignup": "至少 8 位",
-      "processing": "处理中…",
+      "loginVerifying": "正在验证账号…",
+      "signupVerifying": "正在创建账号…",
+      "opening": "正在进入工作区…",
       "loginBtn": "登录",
       "signupBtn": "注册并开始使用",
       "hasAccount": "已有账号？",
@@ -1821,7 +1823,10 @@
       "errAlreadyRegistered": "这个邮箱已注册，请直接登录",
       "errInvalidCredentials": "邮箱或密码不正确",
       "errServiceUnavailable": "暂时连不上登录服务，请检查网络后重试",
-      "authUnavailableNotice": "登录服务一时没有响应，已把你送回登录页。这不是密码输错了，请直接重试一次。"
+      "authUnavailableNotice": "登录服务一时没有响应，已把你送回登录页。这不是密码输错了，请直接重试一次。",
+      "slowHint": "正在进入工作区，请稍候，不要重复点击。",
+      "stallNotice": "仍在等待工作区加载。登录已经成功，刷新页面会直接进入工作区。",
+      "stallAction": "刷新页面"
     },
     "projectList": {
       "dataUpdatedAt": "数据更新时间",
