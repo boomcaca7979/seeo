@@ -454,10 +454,11 @@ function SettingsContent() {
                     // 套餐显示名：优先共享 plan-labels（free/lite/pro），其余回退 API 数据
                     const knownName = PLAN_LABELS[locale][p.plan];
                     const planName = knownName ?? p.display.name;
-                    // 价格周期 "/30天"：数字取自数据，文案按 locale 翻译
+                    // 价格周期 "/30天"：数字取自数据，文案按 locale 翻译；
+                    // 斜杠在渲染侧补（messages 值不以 "/" 开头——payload 卫生，见 CustomService 同注释）
                     const priceDays = p.display.priceUnit.match(/\d+/)?.[0];
                     const priceUnitText = priceDays
-                      ? t("priceUnitDays", { n: priceDays })
+                      ? `/${t("priceUnitDays", { n: priceDays })}`
                       : p.display.priceUnit;
                     const ctaText = knownName
                       ? p.plan === "free"

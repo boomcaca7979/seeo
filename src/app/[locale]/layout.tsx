@@ -12,6 +12,8 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { CookieBanner } from "@/components/cookie-banner";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import JsonLd from "@/components/JsonLd";
+import { PublicPathsProvider } from "@/components/PublicPathsProvider";
+import { DISABLED_PUBLIC_PATHS } from "@/lib/seo/public-tools";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { routing } from "@/i18n/routing";
 import { defaultLocale, type Locale } from "@/i18n/config";
@@ -122,10 +124,14 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
         <JsonLd schema={organizationSchema(loc)} />
         <JsonLd schema={websiteSchema(loc)} />
         <NextIntlClientProvider messages={messages}>
-          {children}
-          {/* CookieBanner 在 Provider 内：文案随 locale 输出 en/zh */}
-          <CookieBanner />
-          <AnalyticsBootstrap />
+          {/* 「暂缓上线」路径开关由服务端读取（client bundle 不可见 env），经 context
+              下发，Footer 等 client 组件据此下线指向暂缓页的内链 */}
+          <PublicPathsProvider disabledPaths={DISABLED_PUBLIC_PATHS}>
+            {children}
+            {/* CookieBanner 在 Provider 内：文案随 locale 输出 en/zh */}
+            <CookieBanner />
+            <AnalyticsBootstrap />
+          </PublicPathsProvider>
         </NextIntlClientProvider>
       </body>
     </html>

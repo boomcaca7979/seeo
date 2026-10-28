@@ -6,6 +6,8 @@ import { CookieBanner } from "@/components/cookie-banner";
 import { ToastProvider } from "@/components/dashboard/Toast";
 import AnalyticsBootstrap from "@/components/analytics/AnalyticsBootstrap";
 import JsonLd from "@/components/JsonLd";
+import { PublicPathsProvider } from "@/components/PublicPathsProvider";
+import { DISABLED_PUBLIC_PATHS } from "@/lib/seo/public-tools";
 import { organizationSchema, websiteSchema } from "@/lib/seo/schema";
 import { localeToHtmlLang } from "@/i18n/config";
 import "../globals.css";
@@ -75,6 +77,9 @@ export default async function RootLayout({
         <JsonLd schema={organizationSchema()} />
         <JsonLd schema={websiteSchema()} />
         <NextIntlClientProvider locale={locale} messages={messages}>
+          {/* 「暂缓上线」路径开关由服务端读取（client bundle 不可见 env），经 context
+              下发，Footer 等 client 组件据此下线指向暂缓页的内链 */}
+          <PublicPathsProvider disabledPaths={DISABLED_PUBLIC_PATHS}>
           {/* 提示条全站唯一实例：一个页面上挂两对 live region 会重复播报，
               两个气泡还会在同一个 fixed 定位上重叠（工作台 = 页面 + 新建项目 Provider）。 */}
           <ToastProvider>
@@ -83,6 +88,7 @@ export default async function RootLayout({
             <CookieBanner />
             <AnalyticsBootstrap />
           </ToastProvider>
+          </PublicPathsProvider>
         </NextIntlClientProvider>
       </body>
     </html>

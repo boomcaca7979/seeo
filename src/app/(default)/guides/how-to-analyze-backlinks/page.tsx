@@ -9,7 +9,7 @@ import {
   webPageSchema,
   articleSchema,
 } from "@/lib/seo/schema";
-import { BACKLINK_CHECKER_ENABLED } from "@/lib/seo/public-tools";
+import { BACKLINK_CHECKER_ENABLED, isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 // ===== /guides/how-to-analyze-backlinks 内容组件（en / zh）=====
 // 信息型指南（Informational intent）：外链分析 / 外链概况解读的可复用流程 + FAQ。
@@ -31,7 +31,10 @@ export default async function GuideBacklinkAnalysisPage() {
   const faqs = t.raw("faqs") as Array<{ q: string; a: string }>;
   const caveats = t.raw("caveats.items") as string[];
 
-  const relatedSlugs = ["backlink-analysis", "competitor-analysis", "rank-tracking"];
+  // 「暂缓上线」的 feature 落地页不出内链（src/lib/seo/public-tools.ts 契约）
+  const relatedSlugs = ["backlink-analysis", "competitor-analysis", "rank-tracking"].filter(
+    (slug) => isPublicPathEnabled(`/features/${slug}`)
+  );
   const relatedKeys: Record<string, string> = {
     "backlink-analysis": "backlinkAnalysis",
     "competitor-analysis": "competitorAnalysis",
@@ -187,12 +190,14 @@ export default async function GuideBacklinkAnalysisPage() {
             <Link href="/signup" className="btn-primary inline-block px-6 py-2">
               {locale === "zh" ? "免费注册" : "Start free"}
             </Link>
-            <Link
-              href={localePath(locale, "/features/backlink-analysis")}
-              className="btn-secondary inline-block px-6 py-2"
-            >
-              {locale === "zh" ? "查看外链分析工具" : "See the backlink tool"}
-            </Link>
+            {isPublicPathEnabled("/features/backlink-analysis") && (
+              <Link
+                href={localePath(locale, "/features/backlink-analysis")}
+                className="btn-secondary inline-block px-6 py-2"
+              >
+                {locale === "zh" ? "查看外链分析工具" : "See the backlink tool"}
+              </Link>
+            )}
           </div>
         </div>
       </div>

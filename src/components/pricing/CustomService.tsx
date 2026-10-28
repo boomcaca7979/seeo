@@ -42,7 +42,9 @@ export default function CustomService({ card, purchasing, onCheckout }: CustomSe
                 <span className="font-mono text-4xl font-semibold leading-none tracking-tight text-white">
                   {card.price.replace("$", "")}
                 </span>
-                <span className="ml-1 font-sans text-xs text-white/70">{card.priceUnit}</span>
+                {/* 斜杠在渲染侧补：文案值不以 "/" 开头（messages 值会被序列化进页面
+                    RSC payload，"/次"/"/project" 这类斜杠开头文案曾被爬虫当路径抓取） */}
+                <span className="ml-1 font-sans text-xs text-white/70">/{card.priceUnit}</span>
               </div>
               <p className="mt-2 font-sans text-xs text-white/70">{t("customNote")}</p>
             </div>

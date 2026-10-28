@@ -10,6 +10,7 @@ import {
   faqPageSchema,
   featureAppSchema,
 } from "@/lib/seo/schema";
+import { isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 // ===== /features/seo-audit 内容组件（en: /features/seo-audit · zh: /zh/features/seo-audit）=====
 // 文案全部走 messages（seoAudit / featureShared），metadata 由 [locale] 页面按 locale 生成。
@@ -190,16 +191,18 @@ export default async function SeoAuditFeaturePage() {
             </h3>
             <p className="mt-1 font-sans text-xs text-ink-60">{t("related.rankTracking.desc")}</p>
           </Link>
-          <Link
-            href={localePath(locale, "/features/backlink-analysis")}
-            className="card-a p-4 transition-colors hover:border-brand"
-          >
-            <span className="font-mono text-xs text-brand">{s("related")}</span>
-            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
-              {t("related.backlinks.title")}
-            </h3>
-            <p className="mt-1 font-sans text-xs text-ink-60">{t("related.backlinks.desc")}</p>
-          </Link>
+          {isPublicPathEnabled("/features/backlink-analysis") && (
+            <Link
+              href={localePath(locale, "/features/backlink-analysis")}
+              className="card-a p-4 transition-colors hover:border-brand"
+            >
+              <span className="font-mono text-xs text-brand">{s("related")}</span>
+              <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+                {t("related.backlinks.title")}
+              </h3>
+              <p className="mt-1 font-sans text-xs text-ink-60">{t("related.backlinks.desc")}</p>
+            </Link>
+          )}
         </div>
 
         {/* Supporting guides (contextual internal linking) */}

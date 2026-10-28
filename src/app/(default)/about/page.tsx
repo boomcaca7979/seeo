@@ -9,6 +9,7 @@ import {
   aboutPageSchema,
   faqPageSchema,
 } from "@/lib/seo/schema";
+import { isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 // ===== /about 内容组件（en: /about · zh: /zh/about）=====
 // 文案全部走 messages（aboutPage / featureShared），metadata 由 [locale] 页面按 locale 生成。
@@ -140,21 +141,25 @@ export default async function AboutPage() {
             <div className="hairline flex-1" />
           </div>
           <div className="space-y-3">
-            {capabilities.map((c) => (
-              <div key={c.name} className="card-a p-4">
-                {c.href ? (
-                  <Link
-                    href={localePath(locale, c.href)}
-                    className="font-mono text-sm font-semibold text-ink hover:text-brand"
-                  >
-                    {c.name} →
-                  </Link>
-                ) : (
-                  <h3 className="font-mono text-sm font-semibold text-ink">{c.name}</h3>
-                )}
-                <p className="mt-1 font-sans text-sm text-ink-60">{c.desc}</p>
-              </div>
-            ))}
+            {capabilities.map((c) => {
+              // 「暂缓上线」的公开路径降级为纯文本，不渲染内链（src/lib/seo/public-tools.ts 契约）
+              const linkHref = c.href && isPublicPathEnabled(c.href) ? c.href : null;
+              return (
+                <div key={c.name} className="card-a p-4">
+                  {linkHref ? (
+                    <Link
+                      href={localePath(locale, linkHref)}
+                      className="font-mono text-sm font-semibold text-ink hover:text-brand"
+                    >
+                      {c.name} →
+                    </Link>
+                  ) : (
+                    <h3 className="font-mono text-sm font-semibold text-ink">{c.name}</h3>
+                  )}
+                  <p className="mt-1 font-sans text-sm text-ink-60">{c.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </section>
 
