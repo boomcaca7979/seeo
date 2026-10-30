@@ -3,10 +3,23 @@
 // 内容只包含可由产品代码验证的真实事实，不编造统计/评分/客户数据
 
 import { SITE_URL } from "@/lib/seo/schema";
+import { isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 export const dynamic = "force-static";
 
 export function GET() {
+  // 「暂缓上线」的公开页不在 llms.txt 下发 URL（与 sitemap / 页面 noindex 同一开关、
+  // 同为构建期产物）：它已被移出索引，继续对外提供入口只会让爬虫反复抓到被排除的页面。
+  const backlinkCapability = isPublicPathEnabled("/features/backlink-analysis")
+    ? `- Backlink Analysis: ${SITE_URL}/features/backlink-analysis
+  Total backlinks, referring domains, Domain Rank, dofollow ratio, anchors. Data from DataForSEO. Pro plan only, 7-day cache.
+`
+    : "";
+  const backlinkPageLink = isPublicPathEnabled("/features/backlink-analysis")
+    ? `- Backlink Analysis: ${SITE_URL}/features/backlink-analysis · Chinese: ${SITE_URL}/zh/features/backlink-analysis
+`
+    : "";
+
   const body = `# SeeO
 
 SeeO is an SEO software platform for keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.
@@ -23,9 +36,7 @@ SeeO provides AI Search (GEO) brand visibility via DataForSEO: brand mentions in
   Crawl-based site audit, 20+ technical checks, health score (0-100), prioritized fixes. Quick mode: 1 page; full mode: up to 50 pages.
 - Keyword Rank Tracking: ${SITE_URL}/features/rank-tracking
   Daily-refreshed Google rankings per keyword x domain x location x device, history trends, volatility alerts. Data from SerpApi.
-- Backlink Analysis: ${SITE_URL}/features/backlink-analysis
-  Total backlinks, referring domains, Domain Rank, dofollow ratio, anchors. Data from DataForSEO. Pro plan only, 7-day cache.
-- Keyword Research: keyword overview and expansion with volume, difficulty, intent (in-app)
+${backlinkCapability}- Keyword Research: keyword overview and expansion with volume, difficulty, intent (in-app)
 - Competitor Analysis: ranking comparison and share of voice (in-app)
 - Content Optimization: content checks against SERP Top 10 (in-app)
 - Reporting: PDF / Excel export, email reports (in-app)
@@ -45,8 +56,7 @@ Marketing pages are bilingual: English (default, no URL prefix) and Chinese (zh,
 - About: ${SITE_URL}/about · Chinese: ${SITE_URL}/zh/about
 - SEO Audit: ${SITE_URL}/features/seo-audit · Chinese: ${SITE_URL}/zh/features/seo-audit
 - Rank Tracking: ${SITE_URL}/features/rank-tracking · Chinese: ${SITE_URL}/zh/features/rank-tracking
-- Backlink Analysis: ${SITE_URL}/features/backlink-analysis · Chinese: ${SITE_URL}/zh/features/backlink-analysis
-- Login: ${SITE_URL}/login
+${backlinkPageLink}- Login: ${SITE_URL}/login
 - Signup: ${SITE_URL}/signup
 - Privacy Policy: ${SITE_URL}/privacy · Chinese: ${SITE_URL}/zh/privacy
 - Terms of Service: ${SITE_URL}/terms · Chinese: ${SITE_URL}/zh/terms

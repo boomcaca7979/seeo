@@ -10,6 +10,7 @@ import {
   faqPageSchema,
   featureAppSchema,
 } from "@/lib/seo/schema";
+import { isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 // ===== /features/rank-tracking 内容组件（en: /features/rank-tracking · zh: /zh/features/rank-tracking）=====
 // 文案全部走 messages（rankTracking / featureShared），metadata 由 [locale] 页面按 locale 生成。
@@ -36,7 +37,10 @@ export default async function RankTrackingFeaturePage() {
   const reading = t.raw("reading.items") as NamedItem[];
   const workflow = t.raw("workflow.steps") as Step[];
 
-  const relatedSlugs = ["seo-audit", "backlink-analysis", "keyword-research"];
+  // 「暂缓上线」的 feature 落地页不出内链（src/lib/seo/public-tools.ts 契约）
+  const relatedSlugs = ["seo-audit", "backlink-analysis", "keyword-research"].filter(
+    (slug) => isPublicPathEnabled(`/features/${slug}`)
+  );
 
   return (
     <div className="min-h-screen bg-paper">

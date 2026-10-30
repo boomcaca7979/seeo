@@ -199,7 +199,7 @@
     "support": "Support"
   },
   "plans": {
-    "priceUnit": "/30 days",
+    "priceUnit": "30 days",
     "free": {
       "name": "Free",
       "tagline": "For personal site owners and beginners",
@@ -218,7 +218,7 @@
     "custom": {
       "name": "Custom Service",
       "tagline": "One-on-one SEO service, delivered per your needs",
-      "priceUnit": "/project"
+      "priceUnit": "project"
     },
     "cta": {
       "start": "Start free",
@@ -3446,7 +3446,7 @@
       "planChangeToast": "Plan changes are completed on the checkout page.",
       "ctaStart": "Get Started",
       "ctaUpgrade": "Upgrade to {plan}",
-      "priceUnitDays": "/{n} days",
+      "priceUnitDays": "{n} days",
       "upgradeSuccessToast": "Upgrade successful — your new plan benefits will be active in a few seconds",
       "usageNoData": "No usage data",
       "planUsageTitle": "Plan Usage",

@@ -199,7 +199,7 @@
     "support": "客服支持"
   },
   "plans": {
-    "priceUnit": "/30天",
+    "priceUnit": "30天",
     "free": {
       "name": "免费版",
       "tagline": "适合个人站长和初学者",
@@ -218,7 +218,7 @@
     "custom": {
       "name": "定制服务",
       "tagline": "一对一 SEO 定制服务，按需求交付",
-      "priceUnit": "/次"
+      "priceUnit": "次"
     },
     "cta": {
       "start": "开始使用",
@@ -3439,7 +3439,7 @@
       "planChangeToast": "套餐变更将在结账页面完成。",
       "ctaStart": "开始使用",
       "ctaUpgrade": "升级到 {plan}",
-      "priceUnitDays": "/{n}天",
+      "priceUnitDays": "{n}天",
       "upgradeSuccessToast": "升级成功，套餐权益将在几秒内生效",
       "usageNoData": "暂无用量数据",
       "planUsageTitle": "套餐用量",

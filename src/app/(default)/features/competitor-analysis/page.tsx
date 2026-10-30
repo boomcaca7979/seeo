@@ -10,6 +10,7 @@ import {
   faqPageSchema,
   featureAppSchema,
 } from "@/lib/seo/schema";
+import { isPublicPathEnabled } from "@/lib/seo/public-tools";
 
 // ===== /features/competitor-analysis 内容组件（en / zh）=====
 // 文案走 messages（competitorAnalysis / featureShared），metadata 由 [locale] 页面按 locale 生成。
@@ -216,12 +217,14 @@ export default async function CompetitorAnalysisFeaturePage() {
           >
             {locale === "zh" ? "如何分析外链 →" : "How to analyze backlinks →"}
           </Link>
-          <Link
-            href={localePath(locale, "/features/backlink-analysis")}
-            className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
-          >
-            {locale === "zh" ? "查竞品的外链概况 →" : "Check competitor link profiles →"}
-          </Link>
+          {isPublicPathEnabled("/features/backlink-analysis") && (
+            <Link
+              href={localePath(locale, "/features/backlink-analysis")}
+              className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"
+            >
+              {locale === "zh" ? "查竞品的外链概况 →" : "Check competitor link profiles →"}
+            </Link>
+          )}
           <Link
             href={localePath(locale, "/alternatives/semrush")}
             className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 font-sans text-xs text-ink-60 transition-colors hover:border-brand hover:text-ink"

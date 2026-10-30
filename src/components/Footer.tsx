@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { localePath } from "@/i18n/seo";
 import { LOCALE_ROUTED_PATHS } from "@/i18n/locale-routed-paths";
+import { useDisabledPublicPaths } from "@/components/PublicPathsProvider";
 
-// 链接定义：href 为逻辑路径，渲染时 locale-routed 路径按 locale 加 /zh 前缀
+// 链接定义：path 为逻辑路径，渲染时 locale-routed 路径按 locale 加 /zh 前缀；
+// 「暂缓上线」的公开路径（见 src/lib/seo/public-tools.ts，由 layout 经 context 注入）
+// 不渲染内链——它们输出 noindex，站内持续导流会让爬虫反复抓到被排除的页面。
 // client 组件：可同时嵌入 server 营销页与 client 页面（如 /pricing），
 // 文案/locale 由 (default)/[locale] layout 的 NextIntlClientProvider 提供
 export default function Footer() {
   const t = useTranslations("footer");
   const locale = useLocale();
+  const disabledPaths = useDisabledPublicPaths();
 
   // locale-routed 路径（/、/pricing、/docs、/features/seo-audit）按 locale 生成；
   // 其余 legacy 页面路径保持原样
@@ -21,36 +25,36 @@ export default function Footer() {
     {
       title: t("colProduct"),
       links: [
-        { label: t("colProductLinks.seoAudit"), href: href("/features/seo-audit") },
-        { label: t("colProductLinks.rankTracking"), href: href("/features/rank-tracking") },
-        { label: t("colProductLinks.keywordResearch"), href: href("/features/keyword-research") },
-        { label: t("colProductLinks.competitorAnalysis"), href: href("/features/competitor-analysis") },
-        { label: t("colProductLinks.contentOptimization"), href: href("/features/content-optimization") },
-        { label: t("colProductLinks.backlinkAnalysis"), href: href("/features/backlink-analysis") },
+        { label: t("colProductLinks.seoAudit"), path: "/features/seo-audit" },
+        { label: t("colProductLinks.rankTracking"), path: "/features/rank-tracking" },
+        { label: t("colProductLinks.keywordResearch"), path: "/features/keyword-research" },
+        { label: t("colProductLinks.competitorAnalysis"), path: "/features/competitor-analysis" },
+        { label: t("colProductLinks.contentOptimization"), path: "/features/content-optimization" },
+        { label: t("colProductLinks.backlinkAnalysis"), path: "/features/backlink-analysis" },
       ],
     },
     {
       title: t("colPlans"),
       links: [
-        { label: t("colPlansLinks.pricing"), href: href("/pricing") },
+        { label: t("colPlansLinks.pricing"), path: "/pricing" },
       ],
     },
     {
       title: t("colResources"),
       links: [
-        { label: t("colResourcesLinks.docs"), href: href("/docs") },
-        { label: t("colResourcesLinks.changelog"), href: href("/changelog") },
-        { label: t("colResourcesLinks.seoIssues"), href: href("/seo-issues") },
+        { label: t("colResourcesLinks.docs"), path: "/docs" },
+        { label: t("colResourcesLinks.changelog"), path: "/changelog" },
+        { label: t("colResourcesLinks.seoIssues"), path: "/seo-issues" },
       ],
     },
     {
       title: t("colCompany"),
       links: [
-        { label: t("colCompanyLinks.about"), href: href("/about") },
-        { label: t("colCompanyLinks.contact"), href: href("/contact") },
-        { label: t("colCompanyLinks.privacy"), href: href("/privacy") },
-        { label: t("colCompanyLinks.terms"), href: href("/terms") },
-        { label: t("colCompanyLinks.refund"), href: href("/refund") },
+        { label: t("colCompanyLinks.about"), path: "/about" },
+        { label: t("colCompanyLinks.contact"), path: "/contact" },
+        { label: t("colCompanyLinks.privacy"), path: "/privacy" },
+        { label: t("colCompanyLinks.terms"), path: "/terms" },
+        { label: t("colCompanyLinks.refund"), path: "/refund" },
       ],
     },
   ];
@@ -96,16 +100,18 @@ export default function Footer() {
                 {col.title}
               </h4>
               <ul className="mt-4 space-y-3">
-                {col.links.map((l) => (
-                  <li key={l.label}>
-                    <Link
-                      href={l.href}
-                      className="font-sans text-sm text-ink-60 transition-colors hover:text-ink"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
+                {col.links
+                  .filter((l) => !disabledPaths.includes(l.path))
+                  .map((l) => (
+                    <li key={l.label}>
+                      <Link
+                        href={href(l.path)}
+                        className="font-sans text-sm text-ink-60 transition-colors hover:text-ink"
+                      >
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
               </ul>
             </div>
           ))}
