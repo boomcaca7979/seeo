@@ -46,15 +46,6 @@ vi.mock("./turso-adapter", () => {
 const GUARD_ERROR = /Production database guard/;
 
 /** 保存并替换本用例关心的环境变量，afterEach 统一还原 */
-const WATCHED_KEYS = [
-  "VERCEL_ENV",
-  "NODE_ENV",
-  "NEXT_PHASE",
-  "NEXT_PUBLIC_ENABLE_AUTH",
-  "TURSO_DATABASE_URL",
-  "TURSO_AUTH_TOKEN",
-  "SEO_SQLITE_DB_PATH",
-] as const;
 const savedEnv = new Map<string, string | undefined>();
 function setEnv(key: string, value: string | undefined): void {
   if (!savedEnv.has(key)) savedEnv.set(key, process.env[key]);
