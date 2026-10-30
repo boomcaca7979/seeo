@@ -1060,7 +1060,7 @@ describe("SCHEMA_VERSION 升级契约", () => {
    * 增删一条迁移语句必然触发。指纹变了只有两条出路——要么这条改动本就不该存在，
    * 要么把它连同版本号一起提交。
    */
-  const MIGRATE_BODY_SHA256 = "ab3568af7aa0b3c6e6413ad9c4e52bbc3e9f5f0bffd2bce6d48ccccfcb69e8b5";
+  const MIGRATE_BODY_SHA256 = "f7493df231697f8ab26130ae85d68b9ae5423e38be8a7ca3cf814892860b0ba0";
 
   function migrateBody(): string {
     const source = fs.readFileSync(path.join(HERE, "migrations.ts"), "utf8");

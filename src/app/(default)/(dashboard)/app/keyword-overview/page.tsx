@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { useToast } from "@/components/dashboard/Toast";
 import { handleBillingError } from "@/lib/billing-error-client";
+import { detectIntent, type KeywordIntent } from "@/lib/seo/keyword-intent";
 import type { SerpResult } from "@/lib/seo/types";
 import {
   RK,
@@ -75,23 +76,28 @@ const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
   },
 };
 
-function detectIntent(query: string): string {
-  const q = query.toLowerCase();
-  // 中文意图规则
-  if (/什么|怎么|为什么|如何|是不是|哪些/.test(q)) return "信息型";
-  if (/推荐|最好|对比|价格|费用|多少钱|哪个好/.test(q)) return "商业型";
-  // 英文意图规则
-  if (/\b(what|how|why|which|guide|tutorial|learn|is|are|does|do)\b/.test(q)) return "信息型";
-  if (/\b(best|top|review|reviews|compare|comparison|vs|price|pricing|cheap|cheapest|alternative|alternatives|buy|cost)\b/.test(q)) return "商业型";
-  return "导航型";
-}
-
-// 意图显示名（detectIntent 返回值保持中文原值，仅展示时翻译）
-function intentText(t: ReturnType<typeof useTranslations>, value: string): string {
+// 意图判定共用 @/lib/seo/keyword-intent（文本规则估算；无规则命中返回「未知」，
+// 不再默认导航型）。intentText 仅做展示名翻译。
+function intentText(t: ReturnType<typeof useTranslations>, value: KeywordIntent): string {
   if (value === "信息型") return t("intentInformational");
   if (value === "商业型") return t("intentCommercial");
-  return t("intentNavigational");
+  if (value === "导航型") return t("intentNavigational");
+  return t("intentUnknown");
 }
+
+// SERP 特征块 → 展示文案 key（provider 真实返回的 featureType；未收录类型原样展示）
+const SERP_FEATURE_LABEL_KEYS: Record<string, string> = {
+  featured_snippet: "featureFeaturedSnippet",
+  ai_overview: "featureAiOverview",
+  local_pack: "featureLocalPack",
+  knowledge_graph: "featureKnowledgeGraph",
+  top_stories: "featureTopStories",
+  video_results: "featureVideoResults",
+  images_results: "featureImagesResults",
+  shopping_results: "featureShoppingResults",
+  twitter_results: "featureTwitter",
+  events_results: "featureEvents",
+};
 
 // ===== 深链入口（Action Center → 关键词机会）=====
 // 支持 /app/keyword-overview?keyword=xxx：直接预填并执行该关键词的研究，
@@ -327,15 +333,17 @@ function KeywordOverviewInner() {
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard
               label={t("metricIntent")}
-              value={intentValue ? intentText(t, intentValue) : null}
+              value={intentValue && intentValue !== "未知" ? intentText(t, intentValue) : null}
               caption={serp.keyword}
               hint={t("intentNote")}
               hintStyle="plain"
+              unavailableLabel={t("intentUnknown")}
+              unavailableReason={t("intentUnknownReason")}
             />
             <MetricCard
               label={t("cardResults")}
               value={formatNumber(serp.data!.organic.length, locale)}
-              caption={t("subTop100")}
+              caption={t("subFirstPage")}
               hint={t("metricResultsHint")}
               hintStyle="plain"
             />
@@ -354,6 +362,32 @@ function KeywordOverviewInner() {
               hintStyle="plain"
             />
           </div>
+
+          {/* SERP 特征（provider 真实返回的块，如 AI 概览/精选摘要；空数组=本次快照未捕获，
+              与接口失败=错误态区分。只展示真实存在的特征，绝不默认全量。） */}
+          {(() => {
+            const features = serp.data!.features ?? [];
+            if (features.length === 0) {
+              return <p className="mt-3 font-sans text-xs text-ink-40">{t("serpFeaturesEmpty")}</p>;
+            }
+            return (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs uppercase tracking-wide text-ink-40">{t("serpFeaturesLabel")}</span>
+                {features.map((feature, i) => {
+                  const labelKey = SERP_FEATURE_LABEL_KEYS[feature.featureType];
+                  return (
+                    <span
+                      key={`${feature.featureType}-${i}`}
+                      title={feature.title ?? undefined}
+                      className="inline-flex items-center rounded-sm border border-line bg-card px-2 py-1 font-sans text-xs text-ink-60"
+                    >
+                      {labelKey ? t(labelKey) : feature.featureType}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* 图表：域名分布 + 相关搜索 */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">

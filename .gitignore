@@ -63,3 +63,8 @@ next-env.d.ts
 /seo-growth/operations/prospecting/runs/
 /seo-growth/operations/prospecting/**/__pycache__/
 seo-growth/operations/prospecting/__pycache__/
+
+# 本地运行产物（验收截图/浏览器驱动/CLI 临时文件），禁止提交
+/.workbuddy/
+/.playwright-cli/
+/supabase/.temp/

@@ -62,7 +62,7 @@ function localPathFromDbUrl(url: string): string | null {
  * 增删迁移步骤时把 SCHEMA_VERSION +1；读到比它更大的值说明代码比库旧（回滚部署），
  * 此时只做观测、不覆写、不报错——绝不能把新库的版本号倒退回旧版本。
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type SchemaInitReason = "applied" | "current" | "ahead";
 
@@ -96,6 +96,21 @@ export function getSchemaInitResult(): SchemaInitResult | null {
   return lastSchemaInit;
 }
 
+/**
+ * 正式生产环境判据（数据库启动守卫的适用范围）：
+ * - Vercel 正式生产部署显式带 VERCEL_ENV=production；
+ * - 非 Vercel 的生产态进程（`next start`：NODE_ENV=production 且没有 VERCEL_ENV）。
+ * Vercel preview / development 与本地 `next dev` 明确不在此列——demo、preview
+ * 与本地开发继续走原有分支。build 阶段（NEXT_PHASE=phase-production-build）由
+ * openAdapter 豁免：构建期不承担运行时数据职责，demo 模式的本地构建不受影响。
+ */
+export function isProductionDatabaseEnvironment(env: Record<string, string | undefined> = process.env): boolean {
+  const vercelEnv = env.VERCEL_ENV;
+  if (vercelEnv === "production") return true;
+  if (vercelEnv === "preview" || vercelEnv === "development") return false;
+  return env.NODE_ENV === "production";
+}
+
 async function openAdapter(): Promise<DBAdapter> {
   const tursoUrl = process.env.TURSO_DATABASE_URL;
   const tursoToken = process.env.TURSO_AUTH_TOKEN;
@@ -104,6 +119,26 @@ async function openAdapter(): Promise<DBAdapter> {
   // （本地常见诱因：next start 加载了从 Vercel 导出的 .env.production 占位值）
   const isAuthEnabled = process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false";
   const urlValid = !!tursoUrl && /^(libsql|https?|file):\/\//i.test(tursoUrl.trim());
+
+  // 正式生产环境启动守卫：认证启用 + 远程 Turso/libSQL 凭据齐全，缺一不可；
+  // 绝不允许 file:// 本地库或 better-sqlite3 回退。任何条件不满足都拒绝初始化
+  // 并明确报错——静默回退只会把生产流量写进临时文件系统然后随实例销毁。
+  if (isProductionDatabaseEnvironment() && process.env.NEXT_PHASE !== "phase-production-build") {
+    const problems: string[] = [];
+    if (!isAuthEnabled) problems.push("auth is disabled (NEXT_PUBLIC_ENABLE_AUTH=false)");
+    if (!tursoUrl) problems.push("TURSO_DATABASE_URL is missing");
+    else if (!urlValid) problems.push("TURSO_DATABASE_URL is not a valid libsql:// or https:// URL");
+    else if (localPathFromDbUrl(tursoUrl.trim())) problems.push("TURSO_DATABASE_URL is a local file:// database");
+    if (!tursoToken) problems.push("TURSO_AUTH_TOKEN is missing");
+    if (problems.length > 0) {
+      throw new Error(
+        "[db] Production database guard: refusing to initialize (" +
+          problems.join("; ") +
+          "). Production requires auth enabled and a remote Turso/libSQL database " +
+          "(libsql://… or https://…); local file:// databases and better-sqlite3 fallbacks are not allowed."
+      );
+    }
+  }
 
   let db: DBAdapter;
   if (urlValid && tursoToken) {
@@ -991,6 +1026,20 @@ async function migrate(db: DBAdapter): Promise<void> {
       ON keyword_group_members(group_id);
     CREATE INDEX IF NOT EXISTS idx_keyword_group_members_user
       ON keyword_group_members(user_id);
+
+    CREATE TABLE IF NOT EXISTS keyword_researches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      seed TEXT NOT NULL,
+      location TEXT NOT NULL,
+      device TEXT NOT NULL,
+      keyword_count INTEGER NOT NULL DEFAULT 0,
+      payload TEXT NOT NULL,
+      saved_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      user_id TEXT NOT NULL DEFAULT 'demo-user'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_keyword_researches_user
+      ON keyword_researches(user_id, saved_at DESC);
 
     CREATE TABLE IF NOT EXISTS competitors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

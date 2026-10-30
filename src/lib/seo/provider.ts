@@ -9,6 +9,8 @@ export interface SeoQueryParams {
   device: "PC" | "移动端";
   /** SerpApi hl 语言码（如 zh-cn / en / ja），缺省 zh-cn 保持既有行为 */
   language?: string;
+  /** SERP 分页偏移（SerpApi start：0=第一页，10=第二条结果起）；缺省/0 保持既有行为 */
+  start?: number;
 }
 
 export interface RankQueryParams extends SeoQueryParams {

@@ -10,6 +10,7 @@ const consumeQuotaMock = vi.fn();
 const peekUsageMock = vi.fn();
 const searchSerpProviderMock = vi.fn();
 const checkRankProviderMock = vi.fn();
+const autocompleteProviderMock = vi.fn();
 
 vi.mock("./cache", () => ({
   readCache: (...args: unknown[]) => readCacheMock(...args),
@@ -18,15 +19,24 @@ vi.mock("./cache", () => ({
   peekUsage: (...args: unknown[]) => peekUsageMock(...args),
 }));
 
+const relatedQuestionsProviderMock = vi.fn();
+
 vi.mock("./serpapi", () => ({
   serpApiProvider: {
     searchSerp: (...args: unknown[]) => searchSerpProviderMock(...args),
     checkRank: (...args: unknown[]) => checkRankProviderMock(...args),
   },
+  fetchRelatedQuestions: (...args: unknown[]) => relatedQuestionsProviderMock(...args),
+  fetchAutocompleteSuggestions: (...args: unknown[]) => autocompleteProviderMock(...args),
+  // 与真实实现同规则的最小镜像（市场默认 hl；显式 language 优先）
+  resolveSerpHl: (location: string, language?: string) =>
+    language?.trim() || (location === "美国" || location === "英国" ? "en" : "zh-cn"),
 }));
 
 import {
   calculateSerpOverlap,
+  expandPaaQuestions,
+  fetchKeywordSuggestions,
   searchRank,
   searchSerp,
   summarizeSerp,
@@ -59,13 +69,15 @@ beforeEach(() => {
   peekUsageMock.mockReset().mockResolvedValue(usage);
   searchSerpProviderMock.mockReset().mockResolvedValue(makeSerpResult());
   checkRankProviderMock.mockReset();
+  autocompleteProviderMock.mockReset().mockResolvedValue([]);
+  relatedQuestionsProviderMock.mockReset().mockResolvedValue({ questions: [] });
 });
 
 describe("searchSerp cache", () => {
   it("cache key 包含 provider 版本 + keyword + location + language + device", async () => {
     await searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC" });
     expect(readCacheMock).toHaveBeenCalledWith("serp", {
-      provider: "serpapi-v2",
+      provider: "serpapi-v5",
       keyword: "kw",
       location: "中国",
       language: "",
@@ -75,10 +87,10 @@ describe("searchSerp cache", () => {
 
   it("不同 device / location / language 使用不同 cache key（不共用快照）", async () => {
     const cases: [string, Record<string, string>][] = [
-      ["desktop-default", { provider: "serpapi-v2", keyword: "kw", location: "中国", language: "", device: "PC" }],
-      ["mobile", { provider: "serpapi-v2", keyword: "kw", location: "中国", language: "", device: "移动端" }],
-      ["us", { provider: "serpapi-v2", keyword: "kw", location: "美国", language: "", device: "PC" }],
-      ["en", { provider: "serpapi-v2", keyword: "kw", location: "中国", language: "en", device: "PC" }],
+      ["desktop-default", { provider: "serpapi-v5", keyword: "kw", location: "中国", language: "", device: "PC" }],
+      ["mobile", { provider: "serpapi-v5", keyword: "kw", location: "中国", language: "", device: "移动端" }],
+      ["us", { provider: "serpapi-v5", keyword: "kw", location: "美国", language: "", device: "PC" }],
+      ["en", { provider: "serpapi-v5", keyword: "kw", location: "中国", language: "en", device: "PC" }],
     ];
     const keys = new Set<string>();
     for (const [, expected] of cases) {
@@ -121,6 +133,36 @@ describe("searchSerp cache", () => {
     expect(consumeQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "lite");
     expect(searchSerpProviderMock).toHaveBeenCalledTimes(1);
     expect(writeCacheMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("SERP 分页：start>0 进入 cache key（逐页独立缓存），start=0/缺省与旧 key 保持一致", async () => {
+    await searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC", start: 10 });
+    expect(readCacheMock).toHaveBeenLastCalledWith("serp", {
+      provider: "serpapi-v5",
+      keyword: "kw",
+      location: "中国",
+      language: "",
+      device: "PC",
+      start: "10",
+    });
+    // 缺省 start：cache key 不含 start 字段（与分页前的历史 key 字节一致）
+    await searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC" });
+    expect(readCacheMock).toHaveBeenLastCalledWith("serp", {
+      provider: "serpapi-v5",
+      keyword: "kw",
+      location: "中国",
+      language: "",
+      device: "PC",
+    });
+    // start=0 等价缺省
+    await searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC", start: 0 });
+    expect(readCacheMock).toHaveBeenLastCalledWith("serp", {
+      provider: "serpapi-v5",
+      keyword: "kw",
+      location: "中国",
+      language: "",
+      device: "PC",
+    });
   });
 });
 
@@ -228,7 +270,7 @@ describe("searchRank（P0-02-D 统一 rank 检查）", () => {
     expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
     expect(consumeQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "lite");
     expect(writeCacheMock).toHaveBeenCalledWith("rank", {
-      provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "PC",
+      provider: "serpapi-v3", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "PC",
     }, rankResult);
     expect(result.result.rank).toBe(8);
     expect(result.fromCache).toBe(false);
@@ -250,7 +292,114 @@ describe("searchRank（P0-02-D 统一 rank 检查）", () => {
     await searchRank("u1", "free", { keyword: "kw", domain: "me.site", location: "中国", device: "PC", language: "en" });
     const keys = readCacheMock.mock.calls.map((call) => JSON.stringify(call[1]));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "移动端" }));
-    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v1", keyword: "kw", domain: "me.site", location: "中国", language: "en", device: "PC" }));
+    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v3", keyword: "kw", domain: "me.site", location: "中国", language: "", device: "移动端" }));
+    expect(keys).toContain(JSON.stringify({ provider: "serpapi-v3", keyword: "kw", domain: "me.site", location: "中国", language: "en", device: "PC" }));
+  });
+});
+
+describe("fetchKeywordSuggestions（Google 自动补全，用户主动触发）", () => {
+  it("cache miss 时：消耗一次 serpapi 配额 → provider 调用 → 写 suggest 缓存（24h TTL 由 cache 层默认）", async () => {
+    autocompleteProviderMock.mockResolvedValue([
+      { value: "seo audit tool free", relevance: 900, type: "QUERY" },
+      { value: "seo audit checklist", relevance: 800 },
+    ]);
+    const result = await fetchKeywordSuggestions("u1", "free", { keyword: "SEO Audit", location: "美国" });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "free");
+    expect(autocompleteProviderMock).toHaveBeenCalledTimes(1);
+    expect(autocompleteProviderMock).toHaveBeenCalledWith("SEO Audit", "美国", undefined);
+    expect(writeCacheMock).toHaveBeenCalledWith("suggest", {
+      provider: "serpapi-ac-v1",
+      keyword: "seo audit",
+      location: "美国",
+      language: "",
+    }, ["seo audit tool free", "seo audit checklist"]);
+    expect(result.suggestions).toEqual(["seo audit tool free", "seo audit checklist"]);
+    expect(result.fromCache).toBe(false);
+    expect(result.language).toBe("en");
+  });
+
+  it("cache 命中时零 provider 调用、零扣费", async () => {
+    readCacheMock.mockResolvedValue(["cached suggestion"]);
+    const result = await fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" });
+    expect(autocompleteProviderMock).not.toHaveBeenCalled();
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(result.suggestions).toEqual(["cached suggestion"]);
+    expect(result.fromCache).toBe(true);
+  });
+
+  it("并发去重：同关键词/市场的并发请求共享同一次 provider 调用（双击不重复扣费）", async () => {
+    autocompleteProviderMock.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve([{ value: "s1" }]), 10))
+    );
+    const [a, b] = await Promise.all([
+      fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" }),
+      fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" }),
+    ]);
+    expect(autocompleteProviderMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(a.suggestions).toEqual(["s1"]);
+    expect(b.suggestions).toEqual(["s1"]);
+  });
+
+  it("provider 失败时错误上抛（路由层负责映射 429/504 等），不写缓存", async () => {
+    autocompleteProviderMock.mockRejectedValue(new Error("TIMEOUT"));
+    await expect(
+      fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" })
+    ).rejects.toThrow("TIMEOUT");
+    expect(writeCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("language 参与缓存 key；不同语言各自独立", async () => {
+    await fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国", language: "en" });
+    await fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" });
+    const keys = readCacheMock.mock.calls
+      .filter((call) => call[0] === "suggest")
+      .map((call) => JSON.stringify(call[1]));
+    expect(new Set(keys).size).toBe(2);
+    expect(keys).toContain(JSON.stringify({ provider: "serpapi-ac-v1", keyword: "kw", location: "中国", language: "en" }));
+  });
+});
+
+// ===== PAA 深度展开（P7）：token 缓存/配额/并发去重 =====
+describe("expandPaaQuestions cache", () => {
+  it("miss：consumeQuota 后调用 provider，写入缓存并返回 fromCache:false", async () => {
+    relatedQuestionsProviderMock.mockResolvedValue({
+      questions: [{ question: "Child?", nextPageToken: "tok2" }],
+    });
+    const { questions, fromCache } = await expandPaaQuestions("u1", "free", "tok1");
+    expect(fromCache).toBe(false);
+    expect(questions).toEqual([{ question: "Child?", nextPageToken: "tok2" }]);
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(consumeQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "free");
+    expect(readCacheMock).toHaveBeenCalledWith("paa", { provider: "serpapi-paa-v1", token: "tok1" });
+    expect(writeCacheMock).toHaveBeenCalledWith(
+      "paa",
+      { provider: "serpapi-paa-v1", token: "tok1" },
+      [{ question: "Child?", nextPageToken: "tok2" }]
+    );
+  });
+
+  it("hit：缓存命中零消耗，不调用 provider", async () => {
+    readCacheMock.mockResolvedValue([{ question: "Cached?" }]);
+    const { questions, fromCache } = await expandPaaQuestions("u1", "free", "tok1");
+    expect(fromCache).toBe(true);
+    expect(questions).toEqual([{ question: "Cached?" }]);
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(relatedQuestionsProviderMock).not.toHaveBeenCalled();
+  });
+
+  it("token 前后空白归一：同 token 共享缓存 key 与并发 Promise", async () => {
+    let resolveProvider: (v: unknown) => void = () => {};
+    relatedQuestionsProviderMock.mockReturnValue(
+      new Promise((resolve) => { resolveProvider = resolve; })
+    );
+    const a = expandPaaQuestions("u1", "free", "  tok-x  ");
+    const b = expandPaaQuestions("u1", "free", "tok-x");
+    resolveProvider({ questions: [{ question: "Q?" }] });
+    const [ra, rb] = await Promise.all([a, b]);
+    expect(ra).toBe(rb);
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
   });
 });

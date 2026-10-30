@@ -103,9 +103,17 @@ interface TrackedKeyword {
   groups: KeywordGroup[];
 }
 interface UsageInfo { used: number; limit: number; month: string; }
-interface RankHistoryPoint { date: string; position: number | null; url: string | null; }
+interface RankHistoryPoint { date: string; position: number | null; url: string | null; featureTypes: string[]; }
 /** 项目列表项（/api/projects）：id 在鉴权模式为 UUID string、演示模式为整数，统一按 string 使用 */
 interface ProjectItem { id: string; name: string; domain: string; }
+
+/** 特征历史展示上限（历史窗口 30 天，每天最多 1 条；超出只截最近 N 条，不伪造更多） */
+const FEATURE_HISTORY_MAX = 14;
+/** 已知 SERP 特征类型（与 serpapi.ts extractFeatures 词表一致）；未知类型原样显示原始值 */
+const KNOWN_FEATURE_TYPES = [
+  "featured_snippet", "ai_overview", "local_pack", "knowledge_graph", "top_stories",
+  "video_results", "images_results", "shopping_results", "twitter_results", "events_results",
+] as const;
 
 type SortKey = "rank" | "change" | "refresh";
 type SortDir = "asc" | "desc";
@@ -156,6 +164,9 @@ function PositionTrackingInner() {
   const { plan: currentPlan } = useEntitlements();
   const display = (name: string) => LOCALE_DISPLAY[locale][name] ?? name;
   const deviceLabel = (d: Device) => (d === "PC" ? "PC" : t("deviceMobile"));
+  /** 已知类型显示本地化标签；未知类型（未来新增词表）原样显示原始值，不猜含义 */
+  const featureLabel = (type: string) =>
+    (KNOWN_FEATURE_TYPES as readonly string[]).includes(type) ? t(`featureType_${type}`) : type;
   const { show, Toast } = useToast();
   const [device, setDevice] = useState<Device>("PC");
   const [country, setCountry] = useState(RANK_LOCATIONS[0]);
@@ -1287,6 +1298,57 @@ function PositionTrackingInner() {
             )
           }
         />
+      )}
+
+      {/* ===== SERP 特征记录（只展示各日期快照实际存储的 feature_types）=====
+          严格规则：历史没有某特征时不能断言它当时不存在——库里 null 既可能是
+          「采集于特征记录上线之前」也可能是「该次快照无特征」，因此空记录日
+          统一显示「未记录到特征数据」，绝不用当前 SERP 快照补齐历史。 */}
+      {selectedKeyword && !historyLoading && !historyError && historyPoints > 0 && (
+        <section className="card-a mt-4 p-5" data-testid="serp-feature-history">
+          <h3 className="font-display text-lg font-semibold text-ink">{t("featureHistoryTitle")}</h3>
+          <p className="mt-1 max-w-3xl font-sans text-xs leading-relaxed text-ink-60">
+            {t("featureHistoryHint")}
+          </p>
+          <ul className="mt-4 divide-y divide-line-soft">
+            {history
+              .slice()
+              .reverse()
+              .slice(0, FEATURE_HISTORY_MAX)
+              .map((h) => (
+                <li key={h.date} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                  <span className="w-24 shrink-0 font-mono text-xs text-ink">{h.date}</span>
+                  <span className="w-14 shrink-0 font-mono text-xs">
+                    {h.position === null ? (
+                      <span className="text-ink-40">{t("notInTop100")}</span>
+                    ) : (
+                      <span className="text-ink-60">#{h.position}</span>
+                    )}
+                  </span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {h.featureTypes.length > 0 ? (
+                      h.featureTypes.map((ft) => (
+                        <span
+                          key={ft}
+                          className="whitespace-nowrap rounded-full border border-line bg-line-soft px-2 py-0.5 font-mono text-xs text-ink-60"
+                          title={ft}
+                        >
+                          {featureLabel(ft)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="font-sans text-xs text-ink-40">{t("featureDayEmpty")}</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+          </ul>
+          {historyPoints > FEATURE_HISTORY_MAX && (
+            <p className="mt-2 font-mono text-xs text-ink-40">
+              {t("featureHistoryLimit", { shown: formatNumber(FEATURE_HISTORY_MAX, locale), total: formatNumber(historyPoints, locale) })}
+            </p>
+          )}
+        </section>
       )}
 
       {/* ===== 第三层：关键词数据表 ===== */}

@@ -22,6 +22,9 @@ export interface RelatedQuestion {
   question: string;
   snippet?: string;
   title?: string;
+  /** SerpApi 真实返回的 next_page_token：可用 engine=google_related_questions 继续展开该问题分支；
+      provider 未返回时为 undefined（UI 必须明确显示无法继续，绝不猜测性请求） */
+  nextPageToken?: string;
 }
 
 /** SERP feature 块（仅记录 provider 真实返回的块，绝不推测） */
@@ -49,6 +52,12 @@ export interface SerpResult {
   features?: SerpFeature[];
   /** SerpApi hl 语言码（P0-02-B 起提供；缺省 zh-cn 保持既有行为） */
   language?: string;
+  /** Google 自报的结果总数（search_information.total_results）；provider 未返回为 null。
+      注意：这是 Google 的估计值，不等于实际获得的 URL 条数，UI 必须区分口径 */
+  totalResults?: number | null;
+  /** 本次快照中真实捕获的广告条数（SerpApi ads 块）；块不存在=0。
+      旧缓存条目可能缺失（undefined），读取端须容忍并按不可用展示 */
+  adsCount?: number;
   /** 是否命中本地缓存（不消耗 API 额度） */
   fromCache?: boolean;
 }

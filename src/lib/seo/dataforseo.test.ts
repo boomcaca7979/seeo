@@ -163,3 +163,127 @@ describe("fetchKeywordMetrics", () => {
     expect(volumeCall.keywords).toHaveLength(700);
   });
 });
+
+// ===== fetchKeywordDiscovery（Labs suggestions + ideas 数据库扩词） =====
+// fixture 按官方文档字段构造（Verified 2026-10-29）：keyword_info.competition 为 0-1（无
+// competition_index/currency 字段）、keyword_properties.keyword_difficulty、
+// search_intent_info.main_intent、seed_keyword_data。
+
+function labsItem(keyword: string, overrides: Record<string, unknown> = {}) {
+  return {
+    keyword,
+    keyword_info: {
+      competition: 0.31,
+      competition_level: "MEDIUM",
+      cpc: 5.1,
+      search_volume: 2400,
+      monthly_searches: [
+        { year: 2026, month: 9, search_volume: 2300 },
+        { year: 2026, month: 8, search_volume: 2500 },
+      ],
+    },
+    keyword_properties: { keyword_difficulty: 72 },
+    search_intent_info: { main_intent: "commercial" },
+    ...overrides,
+  };
+}
+
+function discoveryFetchMock(suggestionsResult: unknown, ideasResult: unknown) {
+  return vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+    const path = typeof input === "string" ? input : input.toString();
+    if (path.includes("keyword_suggestions")) {
+      return dfsResponse(suggestionsResult);
+    }
+    if (path.includes("keyword_ideas")) {
+      return dfsResponse(ideasResult);
+    }
+    throw new Error(`unexpected path: ${path}`);
+  });
+}
+
+describe("fetchKeywordDiscovery", () => {
+  it("解析 suggestions + ideas 两端点，competition 直接使用 0-1 不二次换算", async () => {
+    const fetchMock = discoveryFetchMock(
+      [{ items: [labsItem("seo audit tool free")], seed_keyword_data: [labsItem("seo audit tool", { search_intent_info: { main_intent: "informational" } })] }],
+      [{ items: [labsItem("website auditor", { origin_placeholder: true, search_intent_info: { main_intent: "informational" } })] }]
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchKeywordDiscovery } = await import("./dataforseo");
+    const result = await fetchKeywordDiscovery("SEO audit tool", { location: "美国" });
+
+    expect(result.warnings).toEqual([]);
+    const free = result.rows.get("seo audit tool free");
+    expect(free).toMatchObject({
+      origin: "labs_suggestions",
+      searchVolume: 2400,
+      cpc: 5.1,
+      competition: 0.31, // Labs competition 本身是 0-1，不得被 /100
+      competitionLevel: "MEDIUM",
+      difficulty: 72,
+      intent: "commercial",
+      currency: "USD",
+      trend: [
+        { year: 2026, month: 9, searchVolume: 2300 },
+        { year: 2026, month: 8, searchVolume: 2500 },
+      ],
+    });
+    const idea = result.rows.get("website auditor");
+    expect(idea?.origin).toBe("labs_ideas");
+    expect(idea?.intent).toBe("informational");
+    expect(result.seedRow).toMatchObject({ keyword: "seo audit tool", searchVolume: 2400, intent: "informational" });
+
+    // 请求体：suggestions 携带 include_seed_keyword + limit；ideas 用 keywords 数组
+    const suggestionsCall = fetchMock.mock.calls.find(([p]) => String(p).includes("keyword_suggestions"));
+    const suggestionsBody = JSON.parse((suggestionsCall?.[1] as RequestInit).body as string);
+    expect(suggestionsBody).toMatchObject({
+      keyword: "SEO audit tool",
+      location_name: "United States",
+      language_name: "English",
+      limit: 100,
+      include_seed_keyword: true,
+    });
+    const ideasCall = fetchMock.mock.calls.find(([p]) => String(p).includes("keyword_ideas"));
+    const ideasBody = JSON.parse((ideasCall?.[1] as RequestInit).body as string);
+    expect(ideasBody.keywords).toEqual(["SEO audit tool"]);
+    expect(ideasBody.location_name).toBe("United States");
+  });
+
+  it("单端点失败不阻塞另一端点，并记录 warning", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const path = typeof input === "string" ? input : input.toString();
+      if (path.includes("keyword_suggestions")) {
+        return dfsResponse({ status_message: "Task in queue" }, 50000);
+      }
+      return dfsResponse([{ items: [labsItem("website auditor")] }]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchKeywordDiscovery } = await import("./dataforseo");
+    const result = await fetchKeywordDiscovery("seo audit tool", { location: "美国" });
+
+    expect(result.rows.has("website auditor")).toBe(true);
+    expect(result.warnings.join(" ")).toContain("keyword suggestions 不可用");
+  });
+
+  it("未知 location 返回空结果 + warning，不发起请求", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchKeywordDiscovery } = await import("./dataforseo");
+    const result = await fetchKeywordDiscovery("kw", { location: "火星" });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.rows.size).toBe(0);
+    expect(result.warnings.join(" ")).toContain("火星");
+  });
+
+  it("未配置凭证时抛 DataForSeoNotConfiguredError（由上层优雅降级）", async () => {
+    vi.stubEnv("DATAFORSEO_LOGIN", "");
+    vi.stubEnv("DATAFORSEO_PASSWORD", "");
+    vi.stubGlobal("fetch", vi.fn());
+
+    const { fetchKeywordDiscovery, DataForSeoNotConfiguredError } = await import("./dataforseo");
+    await expect(fetchKeywordDiscovery("kw", { location: "美国" })).rejects.toThrow(DataForSeoNotConfiguredError);
+  });
+});

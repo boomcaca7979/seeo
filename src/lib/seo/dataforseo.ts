@@ -249,8 +249,8 @@ export function isDataForSeoConfigured(): boolean {
 // 数据来源（均为 provider 真实数据，缺失即返回 null，绝不推算）：
 //   - searchVolume / cpc / competition / trend → keywords_data/google_ads/search_volume/live
 //   - difficulty → dataforseo_labs/google/bulk_keyword_difficulty/live
-//   - intent → DataForSEO 仅在 Labs keyword_data（suggestions/related）中提供 intent，
-//     精确关键词批量补全没有对应 endpoint，V1 统一返回 null（由上层标记 unavailable）
+//   - intent → 精确关键词批量补全（search_volume 端点）不提供 intent，统一 null；
+//     Labs 发现端点（fetchKeywordDiscovery）自带 search_intent_info.main_intent，见下节。
 
 export interface KeywordTrendPoint {
   year: number;
@@ -263,13 +263,14 @@ export interface KeywordMetricRow {
   keyword: string;
   searchVolume: number | null;
   cpc: number | null;
-  /** 付费竞争度 0-1，来自 competition_index / 100（单位换算，非推算） */
+  /** 付费竞争度 0-1。search_volume 端点来自 competition_index/100 换算；
+      Labs 发现端点的 keyword_info.competition 本身就是 0-1（官方文档定义），直接使用，不再换算 */
   competition: number | null;
   /** Google Ads 原生竞争度枚举（LOW/MEDIUM/HIGH） */
   competitionLevel: string | null;
   difficulty: number | null;
-  /** DataForSEO 不为精确关键词批量补全提供 intent，固定 null */
-  intent: null;
+  /** search_volume 端点恒 null；Labs 发现行保存 provider 原始 main_intent（如 "informational"），展示层负责翻译 */
+  intent: string | null;
   trend: KeywordTrendPoint[] | null;
   currency: string | null;
 }
@@ -456,6 +457,184 @@ export async function fetchKeywordMetrics(
     normalizeMetricRow(keyword, volumes.get(keyword.toLowerCase()), difficulties.get(keyword.toLowerCase()) ?? null)
   );
   return { rows, difficultyAvailable, warnings: difficultyWarnings };
+}
+
+// ===== Keyword Discovery（数据库扩词：DataForSEO Labs） =====
+// 端点（官方文档 Verified 2026-10-29，字段以当日文档为准）：
+//   - /dataforseo_labs/google/keyword_suggestions/live  （包含种子词的长尾变体）
+//   - /dataforseo_labs/google/keyword_ideas/live        （同产品/服务类别的语义相关词）
+// 相关端点评估结论：related_keywords/live 主要用于「多种子词的近义扩展」，本产品单种子流程
+// 由 suggestions（变体）+ ideas（语义）已覆盖主缺口，暂不接入（避免重复度与额外成本）。
+// 关键字段（两个端点 items 同构）：
+//   - keyword_info.search_volume / cpc（USD）/ competition（0-1，直接使用，无 competition_index）
+//   - keyword_info.competition_level（LOW/MEDIUM/HIGH）、monthly_searches[]（近 12 个月）
+//   - keyword_properties.keyword_difficulty（0-100）
+//   - search_intent_info.main_intent（informational/navigational/commercial/transactional）
+// 指标直接来自发现响应，不再对这些词重复调用 search_volume 批量补全。
+
+/** Labs 发现端点单侧 limit（官方最大 1000；保守取 100 控制单次成本与响应规模） */
+export const DFS_DISCOVERY_LIMIT = 100;
+
+interface DfsLabsKeywordInfo {
+  competition?: number | null;
+  competition_level?: string | null;
+  cpc?: number | null;
+  search_volume?: number | null;
+  monthly_searches?: Array<{ year?: number | null; month?: number | null; search_volume?: number | null }> | null;
+}
+
+interface DfsLabsItem {
+  keyword?: string | null;
+  keyword_info?: DfsLabsKeywordInfo | null;
+  keyword_properties?: { keyword_difficulty?: number | null } | null;
+  search_intent_info?: { main_intent?: string | null } | null;
+}
+
+/** 单条发现结果（KeywordMetricRow 超集语义：intent 保存 provider 原始 main_intent） */
+export interface KeywordDiscoveryRow extends KeywordMetricRow {
+  origin: "labs_suggestions" | "labs_ideas";
+}
+
+export interface KeywordDiscoveryResult {
+  /** 发现行（key = 小写归一关键词）；跨端点重复由上层按 origins 合并 */
+  rows: Map<string, KeywordDiscoveryRow>;
+  /** 种子词自身的指标（suggestions 端点 include_seed_keyword=true 时的 seed_keyword_data） */
+  seedRow: KeywordDiscoveryRow | null;
+  warnings: string[];
+}
+
+function normalizeLabsMonthly(monthly: DfsLabsKeywordInfo["monthly_searches"]): KeywordTrendPoint[] | null {
+  if (!monthly || monthly.length === 0) return null;
+  const points = monthly
+    .map((entry) => ({
+      year: typeof entry.year === "number" ? entry.year : 0,
+      month: typeof entry.month === "number" ? entry.month : 0,
+      searchVolume: typeof entry.search_volume === "number" ? entry.search_volume : 0,
+    }))
+    .filter((point) => point.year > 0 || point.month > 0 || point.searchVolume > 0);
+  return points.length > 0 ? points : null;
+}
+
+function normalizeLabsItem(item: DfsLabsItem, origin: KeywordDiscoveryRow["origin"]): KeywordDiscoveryRow | null {
+  const keyword = typeof item.keyword === "string" ? item.keyword.trim() : "";
+  if (!keyword) return null;
+  const info = item.keyword_info ?? {};
+  const intent = typeof item.search_intent_info?.main_intent === "string" && item.search_intent_info.main_intent.trim()
+    ? item.search_intent_info.main_intent.trim().toLowerCase()
+    : null;
+  // Labs keyword_info.competition 官方定义为 0-1（Google Ads），与 search_volume 端点的
+  // competition_index（0-100）不同——直接使用，绝不二次 /100。
+  const competition = typeof info.competition === "number" ? info.competition : null;
+  return {
+    keyword,
+    origin,
+    searchVolume: typeof info.search_volume === "number" ? info.search_volume : null,
+    cpc: typeof info.cpc === "number" ? info.cpc : null,
+    competition,
+    competitionLevel: typeof info.competition_level === "string" ? info.competition_level : null,
+    difficulty: typeof item.keyword_properties?.keyword_difficulty === "number" ? item.keyword_properties.keyword_difficulty : null,
+    intent,
+    trend: normalizeLabsMonthly(info.monthly_searches),
+    // 官方文档：keyword_info.cpc 单位为 USD（keyword_info 不含 currency 字段）
+    currency: info.cpc != null ? "USD" : null,
+  };
+}
+
+function collectLabsItems(raw: DfsResponse<DfsLabsItem>): DfsLabsItem[] {
+  const result = raw.tasks?.[0]?.result;
+  if (!Array.isArray(result) || result.length === 0) return [];
+  const first = result[0] as { items?: DfsLabsItem[] } | undefined;
+  return Array.isArray(first?.items) ? first.items : [];
+}
+
+/**
+ * 数据库扩词：并行调用 Labs suggestions + ideas，返回带真实指标的发现行。
+ * 单端点失败不阻塞另一端点（warnings 记录原因）；未配置凭证时直接抛
+ * DataForSeoNotConfiguredError（由上层统一优雅降级）。location 未收录时返回空结果 + warning。
+ */
+export async function fetchKeywordDiscovery(
+  keyword: string,
+  options: KeywordMetricsOptions
+): Promise<KeywordDiscoveryResult> {
+  const seed = keyword.trim();
+  const warnings: string[] = [];
+  if (!seed) {
+    return { rows: new Map(), seedRow: null, warnings };
+  }
+  // 未配置凭证：入口早期抛出（避免被 allSettled 吞掉语义），由上层统一优雅降级
+  if (!isDataForSeoConfigured()) {
+    throw new DataForSeoNotConfiguredError();
+  }
+  const market = DFS_KEYWORD_LOCATIONS[options.location];
+  if (!market) {
+    return {
+      rows: new Map(),
+      seedRow: null,
+      warnings: [`location 不受 DataForSEO keyword discovery 支持：${options.location}`],
+    };
+  }
+  const languageName = options.language?.trim() || market.languageName;
+
+  const [suggestionsRes, ideasRes] = await Promise.allSettled([
+    dfsFetch<DfsLabsItem>("/dataforseo_labs/google/keyword_suggestions/live", {
+      keyword: seed,
+      location_name: market.locationName,
+      language_name: languageName,
+      limit: DFS_DISCOVERY_LIMIT,
+      include_seed_keyword: true,
+    }),
+    dfsFetch<DfsLabsItem>("/dataforseo_labs/google/keyword_ideas/live", {
+      keywords: [seed],
+      location_name: market.locationName,
+      language_name: languageName,
+      limit: DFS_DISCOVERY_LIMIT,
+    }),
+  ]);
+
+  const rows = new Map<string, KeywordDiscoveryRow>();
+  const putRow = (row: KeywordDiscoveryRow | null) => {
+    if (!row) return;
+    // 同一端点内去重（保留首条）；跨端点重复由上层按 origins 合并
+    const key = row.keyword.toLowerCase();
+    if (!rows.has(key)) rows.set(key, row);
+  };
+
+  if (suggestionsRes.status === "fulfilled") {
+    for (const item of collectLabsItems(suggestionsRes.value)) {
+      putRow(normalizeLabsItem(item, "labs_suggestions"));
+    }
+  } else {
+    const reason = suggestionsRes.reason instanceof Error ? suggestionsRes.reason.message : String(suggestionsRes.reason);
+    warnings.push(`keyword suggestions 不可用：${reason}`);
+  }
+
+  if (ideasRes.status === "fulfilled") {
+    for (const item of collectLabsItems(ideasRes.value)) {
+      putRow(normalizeLabsItem(item, "labs_ideas"));
+    }
+  } else {
+    const reason = ideasRes.reason instanceof Error ? ideasRes.reason.message : String(ideasRes.reason);
+    warnings.push(`keyword ideas 不可用：${reason}`);
+  }
+
+  // 种子词自身指标：suggestions 的 seed_keyword_data（数组或单对象，防御性兼容）
+  let seedRow: KeywordDiscoveryRow | null = null;
+  if (suggestionsRes.status === "fulfilled") {
+    const result = suggestionsRes.value.tasks?.[0]?.result;
+    const first = Array.isArray(result) && result.length > 0
+      ? (result[0] as { seed_keyword_data?: DfsLabsItem[] | DfsLabsItem | null } | undefined)
+      : undefined;
+    const seedData = Array.isArray(first?.seed_keyword_data)
+      ? first.seed_keyword_data[0]
+      : first?.seed_keyword_data && typeof first.seed_keyword_data === "object"
+        ? (first.seed_keyword_data as DfsLabsItem)
+        : null;
+    if (seedData) {
+      seedRow = normalizeLabsItem(seedData, "labs_suggestions");
+    }
+  }
+
+  return { rows, seedRow, warnings };
 }
 
 // ===== AI Optimization（P0-03-B AI Search Intelligence） =====

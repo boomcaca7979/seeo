@@ -18,6 +18,7 @@
 export { closeDb } from "./migrations";
 
 export * from "./keywords";
+export * from "./researches";
 export * from "./rankings";
 export * from "./projects";
 export * from "./audits";

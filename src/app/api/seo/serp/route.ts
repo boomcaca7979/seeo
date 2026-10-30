@@ -28,6 +28,17 @@ export async function GET(req: Request) {
   const device = (searchParams.get("device") ?? "PC").trim() as "PC" | "移动端";
   // P0-02-B 新增（可选）：SerpApi hl 语言码；缺省行为不变（zh-cn）
   const languageRaw = (searchParams.get("language") ?? "").trim();
+  // P4-D 新增（可选）：SerpApi start 分页偏移（0/10/20…）。>0 的页是独立引擎调用
+  // （独立缓存 key + 配额消耗），须由用户显式触发；缺省 0 保持既有行为不变。
+  const startRaw = (searchParams.get("start") ?? "").trim();
+  let start = 0;
+  if (startRaw) {
+    const parsed = Number(startRaw);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed % 10 !== 0) {
+      return badParams("start 必须是非负的 10 的倍数");
+    }
+    start = parsed;
+  }
 
   if (!keyword) return badParams("keyword 参数不能为空");
   if (device !== "PC" && device !== "移动端") return badParams("device 必须是 PC 或 移动端");
@@ -37,13 +48,20 @@ export async function GET(req: Request) {
     location,
     device,
     ...(languageRaw ? { language: languageRaw } : {}),
+    ...(start > 0 ? { start } : {}),
   };
 
   try {
     const { result } = await searchSerp(userId, plan, params);
+    // 真实响应核实（2026-10-29，P7）：SerpApi start>0 时 organic position 是页内相对位置
+    // （1-10），换算为绝对 Google 位置返回，保证跨页展示排名不重复；缓存仍存原始页内值，
+    // 每次读取一致换算。start=0（第一页）原样透传。
+    const data = start > 0
+      ? { ...result, organic: result.organic.map((row) => ({ ...row, position: row.position + start })) }
+      : result;
     // summary 为 P0-02-B 新增字段；既有 data.* 字段全部原样保留
     return NextResponse.json({
-      data: { ...result, summary: summarizeSerp(result) },
+      data: { ...data, summary: summarizeSerp(data) },
       usage: await getSerpUsage(userId, plan),
     });
   } catch (e) {

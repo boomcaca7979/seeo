@@ -41,14 +41,14 @@ const tools: RegisteredTool[] = [
     const parsed = keywordInputSchema.parse(input); await authorizeProject(ctx, parsed.projectId);
     const results = await Promise.all(parsed.seedKeywords.map(async (seed) => researchKeywords(ctx.userId, ctx.plan, { keyword: seed, location: parsed.location, device: "PC", limit: 100, language: parsed.language, enrichMetrics: true })));
     const seen = new Set<string>();
-    const keywords: { keyword: string; searchVolume: number | null; difficulty: number | null; cpc: number | null; competition: number | null; competitionLevel: string | null; intent: string | null; trend: { year: number; month: number; searchVolume: number }[] | null; source: string; seed: string }[] = [];
+    const keywords: { keyword: string; searchVolume: number | null; difficulty: number | null; cpc: number | null; competition: number | null; competitionLevel: string | null; intent: string | null; intentSource: "provider" | null; origins: string[]; trend: { year: number; month: number; searchVolume: number }[] | null; source: string; seed: string }[] = [];
     for (const result of results) {
       for (const item of result.keywords) {
         if (keywords.length >= parsed.limit) break;
         const key = normalizeKeywordForDedup(item.keyword);
         if (seen.has(key)) continue;
         seen.add(key);
-        keywords.push({ keyword: item.keyword, searchVolume: item.searchVolume, difficulty: item.difficulty, cpc: item.cpc, competition: item.competition, competitionLevel: item.competitionLevel, intent: item.intent, trend: item.trend, source: item.source, seed: item.seed });
+        keywords.push({ keyword: item.keyword, searchVolume: item.searchVolume, difficulty: item.difficulty, cpc: item.cpc, competition: item.competition, competitionLevel: item.competitionLevel, intent: item.intent, intentSource: item.intentSource, origins: item.origins, trend: item.trend, source: item.source, seed: item.seed });
       }
     }
     const metricFields = ["searchVolume", "difficulty", "cpc", "competition", "intent", "trend"] as const;

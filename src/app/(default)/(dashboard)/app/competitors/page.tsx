@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, useCallback, useRef } from "react";
+import { useEffect, useId, useState, useCallback, useRef, useMemo } from "react";
 import {
   CartesianGrid,
   Line,
@@ -84,6 +84,41 @@ interface UsageInfo {
   month: string;
 }
 
+// ===== 关键词差距（区域 C，/api/competitors/gap 只读展示）=====
+type GapCategory = "shared" | "weaklyOwned" | "competitorOnly" | "projectOnly";
+
+interface CompetitorGapKeyword {
+  keyword: string;
+  location: string;
+  device: string;
+  projectRank: number | null;
+  projectUrl: string | null;
+  competitorRank: number | null;
+  competitorUrl: string | null;
+  rankGap: number | null;
+  category: GapCategory;
+  searchVolume: number | null;
+  difficulty: number | null;
+  cpc: number | null;
+  competition: number | null;
+  intent: string | null;
+}
+
+interface CompetitorGapData {
+  competitor: { domain: string; registrableDomain: string; id: number };
+  summary: {
+    analyzedKeywords: number;
+    shared: number;
+    weaklyOwned: number;
+    competitorOnly: number;
+    projectOnly: number;
+  };
+  keywords: CompetitorGapKeyword[];
+  warnings: string[];
+}
+
+type GapSortMode = "opportunity" | "keyword" | "projectRank" | "competitorRank" | "gap" | "volume" | "kd";
+
 interface SOVItem {
   domain: string;
   score: number;
@@ -140,6 +175,29 @@ function sovBarColor(pct: number): string {
   return "bg-neg";
 }
 
+/** gap 设备值（API 返回 "desktop"/"mobile"）→ 展示文案 */
+function gapDeviceLabel(device: string, locale: "en" | "zh"): string {
+  if (device === "desktop") return "PC";
+  if (device === "mobile") return locale === "zh" ? "移动端" : "Mobile";
+  return device;
+}
+
+/** CSV 组装 + 下载（UTF-8 BOM + CRLF，Excel 中文兼容）；缺失值传 null → 空串，不写 0 */
+function downloadCsvFile(filename: string, header: string[], rows: Array<Array<string | number | null>>) {
+  const esc = (value: string | number | null) => {
+    const s = value === null || value === undefined ? "" : String(value);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [header, ...rows].map((cells) => cells.map(esc).join(","));
+  const blob = new Blob([`\uFEFF${lines.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // 地区/城市显示名（仅 UI 展示；API location 参数值保持中文原值不变）
 const LOCALE_DISPLAY: Record<"en" | "zh", Record<string, string>> = {
   zh: {},
@@ -185,6 +243,15 @@ export default function CompetitorsPage() {
   // SOV
   const [sov, setSov] = useState<SOVData | null>(null);
   const [sovLoading, setSovLoading] = useState(false);
+
+  // 关键词差距（区域 C）：GET 是纯读已存数据，但仅由用户显式点击触发，
+  // 不随页面自动加载（enrich 默认 true，生产环境会按 DataForSEO 语义补全指标）
+  const [gapCompetitorId, setGapCompetitorId] = useState<number | null>(null);
+  const [gapData, setGapData] = useState<CompetitorGapData | null>(null);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [gapCategory, setGapCategory] = useState<"all" | GapCategory>("all");
+  const [gapSortMode, setGapSortMode] = useState<GapSortMode>("opportunity");
 
   // 用量
   const [usage, setUsage] = useState<UsageInfo | null>(null);
@@ -300,6 +367,9 @@ export default function CompetitorsPage() {
       setRanks(null);
       setRanksNotice(null);
       setSov(null);
+      setGapCompetitorId(null);
+      setGapData(null);
+      setGapError(null);
       void loadCompetitors(projectId);
       void loadSov(projectId);
     }, 0);
@@ -515,6 +585,51 @@ export default function CompetitorsPage() {
     void loadRanks(selectedKeywordId);
   };
 
+  // ===== 区域 C：关键词差距（只读 GET；显式点击触发，切竞品即取消上一个在途请求）=====
+  const gapAbortRef = useRef<AbortController | null>(null);
+  const loadGap = useCallback(async (pid: string, competitorId: number) => {
+    gapAbortRef.current?.abort();
+    const controller = new AbortController();
+    gapAbortRef.current = controller;
+    setGapLoading(true);
+    setGapError(null);
+    try {
+      const res = await fetch(`/api/competitors/gap?project_id=${pid}&competitor_id=${competitorId}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const json = await res.json();
+      if (controller.signal.aborted) return;
+      if (res.ok) {
+        setGapData(json.data);
+        // gap 路由的 usage 是 {serpapi, dataforseo} 嵌套结构（其余竞品路由为扁平 serpapi 用量），
+        // 只取 serpapi 部分与页面既有用量条口径对齐
+        if (json.usage?.serpapi) setUsage(json.usage.serpapi);
+      } else {
+        // 纯读失败按真实 code 显示原因，不走 handleBillingError（读操作不消耗额度）
+        setGapError(resolveApiErrorMessage(json, readUiLocale(), t("gapLoadFailed")));
+      }
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setGapError(`${tc("networkError")} ${(err as Error).message}`);
+    } finally {
+      if (!controller.signal.aborted) setGapLoading(false);
+    }
+  }, [t, tc]);
+
+  const handleLoadGap = () => {
+    if (!projectId) return;
+    if (gapCompetitorId === null) {
+      show(t("errNoCompetitors"), "info");
+      return;
+    }
+    void loadGap(projectId, gapCompetitorId);
+  };
+
+  const retryGap = () => {
+    if (projectId !== null && gapCompetitorId !== null) void loadGap(projectId, gapCompetitorId);
+  };
+
   const usagePercent = usage ? (usage.used / usage.limit) * 100 : 0;
   const quotaExceeded = usage ? usage.used >= usage.limit : false;
 
@@ -549,6 +664,61 @@ export default function CompetitorsPage() {
         })),
       }]
     : [];
+
+  // ===== 区域 C 派生：分类过滤 + 排序（null 永远排最后，不当作 0）=====
+  const gapCategoryLabel = (c: GapCategory) => t(`gapCat_${c}`);
+  const gapRows = useMemo(() => {
+    if (!gapData) return [];
+    const filtered = gapCategory === "all"
+      ? gapData.keywords
+      : gapData.keywords.filter((r) => r.category === gapCategory);
+    if (gapSortMode === "opportunity") return filtered;
+    const rows = [...filtered];
+    const byMetric = (pick: (r: CompetitorGapKeyword) => number | null, dir: 1 | -1) =>
+      (a: CompetitorGapKeyword, b: CompetitorGapKeyword) => {
+        const av = pick(a);
+        const bv = pick(b);
+        if (av === null && bv === null) return a.keyword.localeCompare(b.keyword);
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        return (av - bv) * dir || a.keyword.localeCompare(b.keyword);
+      };
+    const cmp = {
+      keyword: (a: CompetitorGapKeyword, b: CompetitorGapKeyword) => a.keyword.localeCompare(b.keyword),
+      projectRank: byMetric((r) => r.projectRank, 1),
+      competitorRank: byMetric((r) => r.competitorRank, 1),
+      // 差距降序：竞品领先最多的机会词在前（正数 = 竞品更靠前）
+      gap: byMetric((r) => r.rankGap, -1),
+      volume: byMetric((r) => r.searchVolume, -1),
+      kd: byMetric((r) => r.difficulty, 1),
+    }[gapSortMode];
+    return rows.sort(cmp);
+  }, [gapData, gapCategory, gapSortMode]);
+
+  const handleGapCsv = () => {
+    if (!gapData) return;
+    const header = [
+      t("gapColKeyword"), t("gapColLocation"), t("gapColDevice"), t("gapColCategory"),
+      t("gapColProjectRank"), t("gapColProjectUrl"), t("gapColCompetitorRank"), t("gapColCompetitorUrl"),
+      t("gapColGap"), t("gapColVolume"), t("gapColKd"), t("gapColCpc"),
+    ];
+    const rows = gapRows.map((r) => [
+      r.keyword,
+      r.location,
+      gapDeviceLabel(r.device, locale),
+      gapCategoryLabel(r.category),
+      r.projectRank,
+      r.projectUrl,
+      r.competitorRank,
+      r.competitorUrl,
+      r.rankGap,
+      r.searchVolume,
+      r.difficulty,
+      r.cpc,
+    ]);
+    const safeDomain = gapData.competitor.domain.replace(/[^a-zA-Z0-9.-]/g, "") || "competitor";
+    downloadCsvFile(`seeo-gap-${safeDomain}.csv`, header, rows);
+  };
 
   return (
     <div className="dash-container p-4 lg:p-8">
@@ -1126,6 +1296,232 @@ export default function CompetitorsPage() {
               </div>
             </div>
           )}
+
+          {/* ===== 区域 C：关键词差距（只读已存数据；universe = 项目已追踪关键词，不是全市场关键词库）===== */}
+          <div className="card-a mt-6 p-5">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {t("gapTitle")}
+            </h2>
+            <p className="mt-1.5 max-w-3xl font-sans text-xs leading-relaxed text-ink-60">
+              {t("gapSubtitle")}
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-2">
+                <label htmlFor="gap-competitor-select" className="font-mono text-xs text-ink-40">{t("gapCompetitorLabel")}</label>
+                <select
+                  id="gap-competitor-select"
+                  value={gapCompetitorId ?? ""}
+                  onChange={(e) => setGapCompetitorId(e.target.value === "" ? null : Number(e.target.value))}
+                  className="min-w-0 max-w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                >
+                  {competitors.length === 0 ? (
+                    <option value="">{t("gapNoCompetitors")}</option>
+                  ) : (
+                    competitors.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.domain}{c.name ? ` · ${c.name}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <button
+                onClick={handleLoadGap}
+                disabled={gapLoading || competitors.length === 0}
+                className="btn-secondary disabled:opacity-60"
+              >
+                {gapLoading ? t("gapLoading") : t("gapLoadBtn")}
+              </button>
+            </div>
+
+            {/* 读取失败：显示真实原因，不销毁已展示的旧数据 */}
+            {!gapLoading && gapError && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neg/25 bg-neg/5 px-3 py-2"
+              >
+                <span className="font-mono text-xs text-neg">{gapError}</span>
+                <button type="button" onClick={retryGap} className="btn-secondary">
+                  {t("gapRetry")}
+                </button>
+              </div>
+            )}
+
+            {gapData && (
+              <>
+                <div className="mt-4 font-mono text-xs text-ink-60">
+                  {t("gapSummaryLine", {
+                    total: formatNumber(gapData.summary.analyzedKeywords, locale),
+                    shared: formatNumber(gapData.summary.shared, locale),
+                    weaklyOwned: formatNumber(gapData.summary.weaklyOwned, locale),
+                    competitorOnly: formatNumber(gapData.summary.competitorOnly, locale),
+                    projectOnly: formatNumber(gapData.summary.projectOnly, locale),
+                  })}
+                </div>
+                <p className="mt-2 rounded-lg border border-line-soft bg-line-soft/40 px-3 py-2 font-sans text-xs text-ink-60">
+                  {t("gapScopeNote")}
+                </p>
+                <p className="mt-2 font-mono text-xs text-ink-40">
+                  {t("gapRefreshNote")}
+                </p>
+                {gapData.warnings.length > 0 && (
+                  <p className="mt-2 font-mono text-xs text-warn">
+                    {t("gapWarnings", { count: formatNumber(gapData.warnings.length, locale) })}：{gapData.warnings[0]}
+                  </p>
+                )}
+
+                {/* 过滤 / 排序 / 导出 */}
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="gap-category-select" className="font-mono text-xs text-ink-40">{t("gapFilterCategory")}</label>
+                    <select
+                      id="gap-category-select"
+                      value={gapCategory}
+                      onChange={(e) => setGapCategory(e.target.value as "all" | GapCategory)}
+                      className="min-w-0 max-w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                    >
+                      <option value="all">{t("gapFilterAll")}</option>
+                      <option value="shared">{t("gapCat_shared")}</option>
+                      <option value="weaklyOwned">{t("gapCat_weaklyOwned")}</option>
+                      <option value="competitorOnly">{t("gapCat_competitorOnly")}</option>
+                      <option value="projectOnly">{t("gapCat_projectOnly")}</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="gap-sort-select" className="font-mono text-xs text-ink-40">{t("gapSortLabel")}</label>
+                    <select
+                      id="gap-sort-select"
+                      value={gapSortMode}
+                      onChange={(e) => setGapSortMode(e.target.value as GapSortMode)}
+                      title={t("gapSortHint")}
+                      className="min-w-0 max-w-full rounded-md border border-line bg-card px-3 py-2 font-mono text-sm text-ink focus:border-ink-25 focus:outline-none"
+                    >
+                      <option value="opportunity">{t("gapSortOpportunity")}</option>
+                      <option value="keyword">{t("gapSortKeyword")}</option>
+                      <option value="projectRank">{t("gapSortProjectRank")}</option>
+                      <option value="competitorRank">{t("gapSortCompetitorRank")}</option>
+                      <option value="gap">{t("gapSortGap")}</option>
+                      <option value="volume">{t("gapSortVolume")}</option>
+                      <option value="kd">{t("gapSortKd")}</option>
+                    </select>
+                  </div>
+                  <button onClick={handleGapCsv} className="btn-secondary" title={t("gapExportCsvTitle")}>
+                    {t("gapExportCsv")}
+                  </button>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-line-soft">
+                  {gapRows.length === 0 ? (
+                    <div className="px-4 py-10 text-center font-mono text-xs text-ink-40">
+                      {gapData.keywords.length === 0 ? t("gapEmptyRows") : t("gapFilteredEmpty")}
+                    </div>
+                  ) : (
+                    <DataTable minWidthRem={56}>
+                      <THead>
+                        <Th>{t("gapColKeyword")}</Th>
+                        <Th width="7rem">{t("gapColCategory")}</Th>
+                        <Th align="right" width="6rem">{t("gapColProjectRank")}</Th>
+                        <Th align="right" width="6rem">{t("gapColCompetitorRank")}</Th>
+                        <Th align="right" width="6rem">
+                          <span title={t("gapSortHint")}>{t("gapColGap")}</span>
+                        </Th>
+                        <Th align="right" width="6rem">{t("gapColVolume")}</Th>
+                        <Th align="right" width="6rem">{t("gapColKd")}</Th>
+                        <Th width="12rem">{t("gapColLinks")}</Th>
+                      </THead>
+                      <TBody>
+                        {gapRows.map((r) => (
+                          <TR
+                            key={`${r.keyword}|${r.location}|${r.device}`}
+                            className="transition-colors hover:bg-line-soft/50"
+                          >
+                            <TD>
+                              <div className="font-sans text-sm font-medium text-ink">{r.keyword}</div>
+                              <div className="mt-0.5 font-mono text-xs text-ink-40">
+                                {display(r.location)} · {gapDeviceLabel(r.device, locale)}
+                              </div>
+                            </TD>
+                            <TD>
+                              <span
+                                className={`whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-xs ${
+                                  r.category === "weaklyOwned" ? "bg-warn/10 text-warn"
+                                  : r.category === "competitorOnly" ? "bg-neg/10 text-neg"
+                                  : r.category === "projectOnly" ? "bg-pos/10 text-pos"
+                                  : "bg-line-soft text-ink-60"
+                                }`}
+                              >
+                                {gapCategoryLabel(r.category)}
+                              </span>
+                            </TD>
+                            <TD numeric>
+                              <span className={`text-base font-semibold ${rankColor(r.projectRank)}`}>
+                                {rankText(r.projectRank)}
+                              </span>
+                              {r.projectUrl && (
+                                <a
+                                  href={r.projectUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-0.5 block max-w-[10rem] truncate font-mono text-xs text-brand hover:underline"
+                                  title={r.projectUrl}
+                                >
+                                  {r.projectUrl.replace(/^https?:\/\//, "")}
+                                </a>
+                              )}
+                            </TD>
+                            <TD numeric>
+                              <span className={`text-base font-semibold ${rankColor(r.competitorRank)}`}>
+                                {rankText(r.competitorRank)}
+                              </span>
+                              {r.competitorUrl && (
+                                <a
+                                  href={r.competitorUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-0.5 block max-w-[10rem] truncate font-mono text-xs text-brand hover:underline"
+                                  title={r.competitorUrl}
+                                >
+                                  {r.competitorUrl.replace(/^https?:\/\//, "")}
+                                </a>
+                              )}
+                            </TD>
+                            <TD numeric>
+                              {r.rankGap === null ? (
+                                <span className="font-mono text-sm text-ink-40">—</span>
+                              ) : (
+                                <span
+                                  className={`font-mono text-sm font-semibold ${r.rankGap > 0 ? "text-neg" : r.rankGap < 0 ? "text-pos" : "text-ink-60"}`}
+                                  title={t("gapSortHint")}
+                                >
+                                  {r.rankGap > 0 ? `+${r.rankGap}` : r.rankGap}
+                                </span>
+                              )}
+                            </TD>
+                            <TD numeric className="text-ink-60">
+                              {r.searchVolume === null ? <span className="text-ink-40">—</span> : formatNumber(r.searchVolume, locale)}
+                            </TD>
+                            <TD numeric className="text-ink-60">
+                              {r.difficulty === null ? <span className="text-ink-40">—</span> : formatNumber(r.difficulty, locale)}
+                            </TD>
+                            <TD>
+                              <Link
+                                href={`/app/position-tracking?keyword=${encodeURIComponent(r.keyword)}&domain=${encodeURIComponent(projectDomain)}`}
+                                className="font-sans text-xs font-medium text-brand hover:underline"
+                              >
+                                {t("gapTrackView")} →
+                              </Link>
+                            </TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </DataTable>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </>
       )}
 
