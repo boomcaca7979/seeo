@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { getSerpUsage, searchSerp, summarizeSerp } from "@/lib/seo/serp-service";
 import { serpApiErrorResponse } from "@/lib/seo/serp-route-errors";
+import { normalizeDeviceParam } from "@/lib/seo/device-params";
 import type { SeoApiError } from "@/lib/seo/types";
 import { requireAuthOrDemo } from "@/lib/auth";
 
@@ -25,7 +26,11 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const keyword = (searchParams.get("keyword") ?? "").trim();
   const location = (searchParams.get("location") ?? "中国").trim();
-  const device = (searchParams.get("device") ?? "PC").trim() as "PC" | "移动端";
+  // 设备口径统一走 normalizeDeviceParam（唯一实现）：
+  // 页面内部是 PC/移动端，而 /api/keywords/expand 对外返回 desktop/mobile，
+  // 这里两者都接受并归一化，避免前端混用时 400（2026-11-01 DEF-02）。
+  const deviceRaw = (searchParams.get("device") ?? "").trim();
+  const device = deviceRaw ? normalizeDeviceParam(deviceRaw) : "PC";
   // P0-02-B 新增（可选）：SerpApi hl 语言码；缺省行为不变（zh-cn）
   const languageRaw = (searchParams.get("language") ?? "").trim();
   // P4-D 新增（可选）：SerpApi start 分页偏移（0/10/20…）。>0 的页是独立引擎调用
@@ -41,7 +46,7 @@ export async function GET(req: Request) {
   }
 
   if (!keyword) return badParams("keyword 参数不能为空");
-  if (device !== "PC" && device !== "移动端") return badParams("device 必须是 PC 或 移动端");
+  if (!device) return badParams("device 必须是 PC/desktop 或 移动端/mobile");
 
   const params = {
     keyword,

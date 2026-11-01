@@ -120,7 +120,9 @@ function sourceFiles(): string[] {
 }
 
 describe("dashboard.sidebar：只保留被真实引用的键", () => {
-  const REMOVED = ["currentPlan", "upgradeCta", "login", "logout", "demoToast", "accountMenu"] as const;
+  // keywordExpand：2026-11 关键词研究导航重构（概览/魔法工具/策略构造器/已保存四页）后，
+  // 侧边栏不再有独立「拓词建议」入口，键随入口一并移除。
+  const REMOVED = ["currentPlan", "upgradeCta", "login", "logout", "demoToast", "accountMenu", "keywordExpand"] as const;
 
   it("消费方集合未变化（否则引用扫描结论失效）", () => {
     const binders = sourceFiles()

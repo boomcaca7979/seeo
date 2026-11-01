@@ -15,10 +15,12 @@ vi.mock("./cache", () => ({
   writeCache: (...args: unknown[]) => writeCacheMock(...args),
   consumeQuota: (...args: unknown[]) => consumeQuotaMock(...args),
   peekUsage: (...args: unknown[]) => peekUsageMock(...args),
+  refundQuota: () => Promise.resolve(),
 }));
 
 vi.mock("./serpapi", () => ({
   fetchGoogleTrends: (...args: unknown[]) => fetchTrendsMock(...args),
+  assertSerpApiConfigured: () => undefined,
   TRENDS_DATE_OPTIONS: ["today 12-m", "today 5-y"],
   TRENDS_DEFAULT_DATE: "today 12-m",
 }));

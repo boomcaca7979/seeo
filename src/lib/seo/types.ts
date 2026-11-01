@@ -5,11 +5,19 @@
 export interface OrganicResult {
   position: number; // 1-based
   title: string;
+  /** provider 原始 link（可能是 /goto?url= 内部跳转串，禁止直接当外链用） */
   link: string;
+  /** provider 原始 domain（可能是 /goto?url= 跳转串，禁止直接展示） */
   domain: string;
   snippet: string;
   date?: string;
   displayedLink?: string;
+  /** 规范化后可安全打开的真实地址（见 seo/serp-normalize）；不可还原为 null */
+  resolvedUrl?: string | null;
+  /** 规范化后的真实域名；不可知为 null（绝不回退成 /goto 串） */
+  resolvedDomain?: string | null;
+  /** 链接解析状态：ok / google_redirect_token / unresolvable / missing */
+  linkStatus?: "ok" | "google_redirect_token" | "unresolvable" | "missing";
 }
 
 /** 相关搜索（bottom-of-page related searches） */

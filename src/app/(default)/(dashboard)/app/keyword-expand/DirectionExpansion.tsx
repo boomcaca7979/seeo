@@ -40,9 +40,22 @@ interface DirectionExpansionProps {
   existingKeywords: string[];
   /** 把真实 Autocomplete 返回的新建议词交给父组件并入统一发现表（来源 autocomplete） */
   onNewSuggestions: (words: string[]) => void;
+  /**
+   * 布局变体（默认不变）：
+   * - card：自带描边留白的独立卡片（keyword-expand 页使用）
+   * - embedded：去边框/外边距，供父级卡片内嵌（keyword-magic 右栏顶部），
+   *   内部标题由父级卡片标题承担，避免同一层级出现两个「多方向扩词」。
+   */
+  variant?: "card" | "embedded";
 }
 
-export function DirectionExpansion({ seed, location, existingKeywords, onNewSuggestions }: DirectionExpansionProps) {
+export function DirectionExpansion({
+  seed,
+  location,
+  existingKeywords,
+  onNewSuggestions,
+  variant = "card",
+}: DirectionExpansionProps) {
   const t = useTranslations("dashboard.keywords.expand");
   const tc = useTranslations("dashboard.common");
   const locale = useLocale() as "en" | "zh";
@@ -148,15 +161,17 @@ export function DirectionExpansion({ seed, location, existingKeywords, onNewSugg
   };
 
   return (
-    <div className="mt-4 rounded-lg border border-line-soft p-3">
+    <div className={variant === "embedded" ? "" : "mt-4 rounded-lg border border-line-soft p-3"}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="font-sans text-sm font-medium text-ink">{t("directionsTitle")}</h3>
-        <span className="font-mono text-xs text-ink-40">
+        {variant === "embedded" ? null : (
+          <h3 className="font-sans text-ui-body font-medium leading-[20px] text-ink">{t("directionsTitle")}</h3>
+        )}
+        <span className="font-mono text-ui-caption leading-[16px] text-ink-40">
           {t("directionsCostNote", { max: MAX_QUERIES_PER_DIRECTION })}
         </span>
       </div>
       {directionLang === null ? (
-        <p className="mt-2 font-sans text-xs text-ink-40">
+        <p className="mt-2 font-sans text-ui-caption leading-[16px] text-ink-40">
           {t("directionsUnsupported", { market: location })}
         </p>
       ) : (
@@ -167,7 +182,7 @@ export function DirectionExpansion({ seed, location, existingKeywords, onNewSugg
               onClick={handleRunAll}
               disabled={runAll.phase === "loading"}
               title={t("directionRunAllTitle", { max: MAX_QUERIES_PER_DIRECTION })}
-              className={`rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition-colors ${
+              className={`h-[32px] whitespace-nowrap rounded-md border px-3 font-mono text-ui-caption font-semibold leading-[16px] transition-colors ${
                 runAll.phase === "loading"
                   ? "border-line bg-card text-ink-40 opacity-60"
                   : "border-brand bg-brand text-white hover:opacity-90"
@@ -185,7 +200,7 @@ export function DirectionExpansion({ seed, location, existingKeywords, onNewSugg
                   onClick={() => handleRunDirection(dir.id)}
                   disabled={phase === "loading" || runAll.phase === "loading"}
                   title={t("directionCostTitle", { max: queryCount })}
-                  className={`rounded-md border px-2 py-1.5 font-mono text-xs transition-colors ${
+                  className={`h-[32px] whitespace-nowrap rounded-md border px-3 font-mono text-ui-caption leading-[16px] transition-colors ${
                     phase === "loading"
                       ? "border-line bg-card text-ink-40 opacity-60"
                       : "border-line bg-card text-ink-60 hover:border-ink-25 hover:text-ink"
@@ -196,10 +211,10 @@ export function DirectionExpansion({ seed, location, existingKeywords, onNewSugg
               );
             })}
           </div>
-          <p className="mt-2 font-sans text-xs text-ink-40">{t("directionsDataNote")}</p>
+          <p className="mt-2 font-sans text-ui-caption leading-[16px] text-ink-40">{t("directionsDataNote")}</p>
           {/* 完整扩展聚合统计：真实请求/缓存/新增合计，失败方向的结果保留 */}
           {runAll.phase === "done" && (
-            <p className="mt-1.5 font-sans text-xs font-medium text-ink">
+            <p className="mt-1.5 font-sans text-ui-caption font-medium leading-[16px] text-ink">
               {t("directionRunAllDone", {
                 requests: formatNumber(runAll.requests, locale),
                 cacheHits: formatNumber(runAll.cacheHits, locale),
@@ -212,7 +227,7 @@ export function DirectionExpansion({ seed, location, existingKeywords, onNewSugg
             const st = phases[dir.id];
             if (!st || st.phase === "idle" || st.phase === "loading") return null;
             return (
-              <p key={dir.id} className="mt-1.5 font-sans text-xs text-ink-60">
+              <p key={dir.id} className="mt-1.5 font-sans text-ui-caption leading-[16px] text-ink-60">
                 {t(`direction_${dir.id}`)}：
                 {st.phase === "done" &&
                   t("directionDone", {

@@ -81,4 +81,44 @@ describe("GET /api/seo/serp", () => {
     expect(res.status).toBe(400);
     expect(searchSerpMock).not.toHaveBeenCalled();
   });
+
+  // ===== DEF-02 回归：expand 对外口径是 desktop/mobile，页面直接透传曾导致 400 =====
+  it("device=desktop（expand 口径）被接受并归一化为 PC", async () => {
+    const res = await get("keyword=seo&device=desktop&start=10");
+    expect(res.status).toBe(200);
+    expect(searchSerpMock).toHaveBeenCalledWith("user-1", "lite", {
+      keyword: "seo",
+      location: "中国",
+      device: "PC",
+      start: 10,
+    });
+  });
+
+  it("device=mobile 被接受并归一化为移动端", async () => {
+    const res = await get("keyword=seo&device=mobile");
+    expect(res.status).toBe(200);
+    expect(searchSerpMock).toHaveBeenCalledWith("user-1", "lite", {
+      keyword: "seo",
+      location: "中国",
+      device: "移动端",
+    });
+  });
+
+  it("无法识别的 device 仍返回 400 且带明确文案", async () => {
+    const res = await get("keyword=seo&device=tablet");
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(String(json.error)).toContain("device");
+    expect(searchSerpMock).not.toHaveBeenCalled();
+  });
+
+  it("device 缺省保持既有默认 PC（不改变旧调用方行为）", async () => {
+    const res = await get("keyword=seo");
+    expect(res.status).toBe(200);
+    expect(searchSerpMock).toHaveBeenCalledWith("user-1", "lite", {
+      keyword: "seo",
+      location: "中国",
+      device: "PC",
+    });
+  });
 });

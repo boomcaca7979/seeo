@@ -8,6 +8,8 @@ const readCacheMock = vi.fn();
 const writeCacheMock = vi.fn();
 const consumeQuotaMock = vi.fn();
 const peekUsageMock = vi.fn();
+const refundQuotaMock = vi.fn();
+const assertSerpApiConfiguredMock = vi.fn();
 const searchSerpProviderMock = vi.fn();
 const checkRankProviderMock = vi.fn();
 const autocompleteProviderMock = vi.fn();
@@ -17,6 +19,7 @@ vi.mock("./cache", () => ({
   writeCache: (...args: unknown[]) => writeCacheMock(...args),
   consumeQuota: (...args: unknown[]) => consumeQuotaMock(...args),
   peekUsage: (...args: unknown[]) => peekUsageMock(...args),
+  refundQuota: (...args: unknown[]) => refundQuotaMock(...args),
 }));
 
 const relatedQuestionsProviderMock = vi.fn();
@@ -28,6 +31,8 @@ vi.mock("./serpapi", () => ({
   },
   fetchRelatedQuestions: (...args: unknown[]) => relatedQuestionsProviderMock(...args),
   fetchAutocompleteSuggestions: (...args: unknown[]) => autocompleteProviderMock(...args),
+  // 与真实实现同规则的最小镜像：未配置凭据时抛 INVALID_KEY（预检）
+  assertSerpApiConfigured: () => assertSerpApiConfiguredMock(),
   // 与真实实现同规则的最小镜像（市场默认 hl；显式 language 优先）
   resolveSerpHl: (location: string, language?: string) =>
     language?.trim() || (location === "美国" || location === "英国" ? "en" : "zh-cn"),
@@ -41,6 +46,7 @@ import {
   searchSerp,
   summarizeSerp,
 } from "./serp-service";
+import { SeoProviderError } from "./provider";
 import type { SerpResult } from "./types";
 
 const usage = { used: 1, limit: 30, month: "2026-08" };
@@ -67,6 +73,8 @@ beforeEach(() => {
   writeCacheMock.mockReset().mockResolvedValue(undefined);
   consumeQuotaMock.mockReset().mockResolvedValue(usage);
   peekUsageMock.mockReset().mockResolvedValue(usage);
+  refundQuotaMock.mockReset().mockResolvedValue(undefined);
+  assertSerpApiConfiguredMock.mockReset().mockImplementation(() => undefined);
   searchSerpProviderMock.mockReset().mockResolvedValue(makeSerpResult());
   checkRankProviderMock.mockReset();
   autocompleteProviderMock.mockReset().mockResolvedValue([]);
@@ -401,5 +409,69 @@ describe("expandPaaQuestions cache", () => {
     const [ra, rb] = await Promise.all([a, b]);
     expect(ra).toBe(rb);
     expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ===== 平台凭据错误不得扣减用户额度（2026-11-01 定向修复）=====
+// 契约：
+//   1) 未配置凭据 → 配置预检在 consumeQuota **之前**抛 INVALID_KEY（量=0、不请求）
+//   2) 供应商判定 Key 无效 → 回滚本次预扣（refundQuota 被调用一次）
+//   3) 其他错误（超时/上游故障/额度超限）不回滚：这些是真实请求的正常结果
+describe("凭据错误与额度一致性", () => {
+  it("未配置 SERPAPI_KEY：预检失败，不扣额度、不请求供应商", async () => {
+    assertSerpApiConfiguredMock.mockImplementation(() => {
+      throw new SeoProviderError("INVALID_KEY", "服务端未配置 SERPAPI_KEY");
+    });
+
+    await expect(
+      searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC" })
+    ).rejects.toThrow(SeoProviderError);
+
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+    expect(searchSerpProviderMock).not.toHaveBeenCalled();
+  });
+
+  it("搜索：供应商判定 Key 无效 → 回滚本次预扣（serpapi）", async () => {
+    searchSerpProviderMock.mockRejectedValue(new SeoProviderError("INVALID_KEY", "SerpApi Key 无效"));
+
+    await expect(
+      searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC" })
+    ).rejects.toThrow(SeoProviderError);
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "free");
+    expect(writeCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("rank / 建议词 / PAA 同样预检 + 认证失败回滚", async () => {
+    assertSerpApiConfiguredMock.mockImplementation(() => {
+      throw new SeoProviderError("INVALID_KEY", "未配置");
+    });
+    await expect(
+      searchRank("u1", "free", { keyword: "kw", domain: "a.com", location: "中国", device: "PC" })
+    ).rejects.toThrow(SeoProviderError);
+    await expect(
+      fetchKeywordSuggestions("u1", "free", { keyword: "kw", location: "中国" })
+    ).rejects.toThrow(SeoProviderError);
+    await expect(expandPaaQuestions("u1", "free", "tok-cred")).rejects.toThrow(SeoProviderError);
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+
+    assertSerpApiConfiguredMock.mockImplementation(() => undefined);
+    checkRankProviderMock.mockRejectedValue(new SeoProviderError("INVALID_KEY", "无效"));
+    await expect(
+      searchRank("u1", "free", { keyword: "kw2", domain: "a.com", location: "中国", device: "PC" })
+    ).rejects.toThrow(SeoProviderError);
+    expect(refundQuotaMock).toHaveBeenCalledWith("u1", "serpapi", "free");
+  });
+
+  it("超时/上游故障超出凭据错误范围：不回滚（真实请求已发出）", async () => {
+    searchSerpProviderMock.mockRejectedValue(new SeoProviderError("TIMEOUT", "超时"));
+    await expect(
+      searchSerp("u1", "free", { keyword: "kw", location: "中国", device: "PC" })
+    ).rejects.toThrow(SeoProviderError);
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).not.toHaveBeenCalled();
   });
 });

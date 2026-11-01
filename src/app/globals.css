@@ -92,6 +92,26 @@
   --text-5xl--line-height: 1.08;
   --text-5xl--letter-spacing: -0.025em;
 
+  /* ---------- 工作台固定字号 token（px 锁定，不随根字号漂移） ----------
+   * 为什么单独一套：根字号在 ≥120rem 会升到 17px（见文件末尾断点），上面那套 rem scale
+   * 会整体漂 0.75px（12→12.75 / 14→14.875），而写死 px 的表头/行高不变 —— 同层级文字
+   * 差 0.75px、行高尺与字号不同步，实测表现为「文字错位、间距不齐」。
+   * 因此 dashboard 高密度数据区（关键词系页面）统一用下列 px token；营销页与长文继续用 rem scale。
+   *    caption  12px  表头 · 徽标 · 元信息 · 辅助说明
+   *    compact  13px  高密度控件 · 列表成员 · 表格数字列 · 意图列
+   *    body     14px  表格主体 · 关键词 · 按钮文字 · 正文
+   *    heading  15px  工作区区块标题（H2，如「多方向扩词」）
+   *    title    16px  空态标题（面板内最大一级文字块）
+   *    metric   22px  统计摘要数值
+   * 行高不并入 token：各组件已有显式 px 行高（leading-[20px] 等）或有意继承父级，
+   * 合并会改变未设行高处元素的行盒高度，属于布局变更。 */
+  --text-ui-caption: 12px;
+  --text-ui-compact: 13px;
+  --text-ui-body: 14px;
+  --text-ui-heading: 15px;
+  --text-ui-title: 16px;
+  --text-ui-metric: 22px;
+
   /* 行高语义 token（供 leading-* 与自定义样式使用） */
   --leading-tight: 1.2;
   --leading-snug: 1.35;
@@ -128,8 +148,15 @@
   --foreground: #111827;
 }
 
-* {
-  border-color: transparent;
+/* 通配 border-color 必须留在 base 层。
+ * Tailwind v4 的 border-* 颜色工具类在 @layer utilities，无层级的通配规则优先级更高，
+ * 会把本站所有 `border-line / border-line-soft / border-accent …` 全部压成透明：
+ * 按钮没有可见容器、输入框没有描边、表格没有行分割线（内容越密越像糊成一片）。
+ * 收进 @layer base 后：没写颜色、只写 `border` 的元素仍回落透明，写了工具类的正常生效。 */
+@layer base {
+  * {
+    border-color: transparent;
+  }
 }
 
 html {

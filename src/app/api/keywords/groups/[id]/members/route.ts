@@ -7,11 +7,30 @@ import {
   addKeywordToGroup,
   removeKeywordFromGroup,
   getTrackedKeywordById,
+  listKeywordsInGroup,
 } from "@/lib/db";
 import { requireAuthOrDemo } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireAuthOrDemo();
+  if (!auth.allowed) {
+    return NextResponse.json({ error: auth.error, code: "AUTH_REQUIRED" }, { status: 401 });
+  }
+  const { id: idStr } = await params;
+  const groupId = Number(idStr);
+  if (!Number.isInteger(groupId) || groupId <= 0) {
+    return NextResponse.json({ error: "group id 参数无效", code: "INVALID_GROUP_ID" }, { status: 400 });
+  }
+  const userId = auth.user?.id ?? "demo-user";
+  const members = await listKeywordsInGroup(userId, groupId);
+  return NextResponse.json({ data: members });
+}
 
 export async function POST(
   req: Request,

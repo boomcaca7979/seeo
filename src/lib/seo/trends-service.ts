@@ -6,6 +6,8 @@
 
 import type { PlanTier } from "@/lib/auth";
 import { consumeQuota, peekUsage, readCache, writeCache } from "./cache";
+import { assertSerpApiConfigured } from "./serpapi";
+import { refundOnPlatformCredentialError } from "./credential-guard";
 import {
   fetchGoogleTrends,
   TRENDS_DATE_OPTIONS,
@@ -64,11 +66,19 @@ async function loadTrends(
   if (cached) {
     return { ...cached, fromCache: true };
   }
+  // 配置预检：凭据缺失属平台配置错误 —— 在扣减额度之前失败（不扣费、不请求）
+  assertSerpApiConfigured();
   await consumeQuota(userId, "serpapi", plan);
-  const result = await fetchGoogleTrends(params.keyword, params.location, params.dataType, {
-    date: params.date,
-    language: params.language,
-  });
+  let result: TrendsResult;
+  try {
+    result = await fetchGoogleTrends(params.keyword, params.location, params.dataType, {
+      date: params.date,
+      language: params.language,
+    });
+  } catch (e) {
+    await refundOnPlatformCredentialError(e, userId, "serpapi", plan);
+    throw e;
+  }
   try { await writeCache(namespace, cacheParams, result); } catch { /* cache failure does not fail a provider result */ }
   return { ...result, fromCache: false };
 }

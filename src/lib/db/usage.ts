@@ -151,6 +151,23 @@ export async function tryIncrementUserApiUsage(
   };
 }
 
+/** 用户级用量 -1（回滚用）：仅当 used > 0 时递减，返回递减后的值或 null（无可回滚的记录） */
+export async function tryDecrementUserApiUsage(
+  userId: string,
+  apiType: ApiType,
+  month: string
+): Promise<{ used: number; limit: number } | null> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `UPDATE api_usage_per_user
+    SET used = used - 1, updated_at = datetime('now')
+    WHERE user_id = ? AND api_type = ? AND month = ? AND used > 0
+    RETURNING used, "limit"`,
+    [userId, apiType, month]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
+
 /** 用户级用量 +N（UPSERT，首次自动创建，默认 limit 由调用方传入） */
 export async function incrementUserApiUsage(
   userId: string,
@@ -250,8 +267,24 @@ export async function tryIncrementApiDailyUsage(
   };
 }
 
-// ========== 审计每日用量（P2 商业化改造） ==========
+/** 每日用量 -1（回滚用）：仅当 used > 0 时递减，返回递减后的值或 null（无可回滚的记录） */
+export async function tryDecrementApiDailyUsage(
+  userId: string,
+  apiType: ApiType,
+  date: string
+): Promise<{ used: number; limit: number } | null> {
+  const db = await getAdapter();
+  const row = await db.get(
+    `UPDATE api_usage_daily_per_user
+    SET used = used - 1, updated_at = datetime('now')
+    WHERE user_id = ? AND api_type = ? AND date = ? AND used > 0
+    RETURNING used, "limit"`,
+    [userId, apiType, date]
+  ) as { used: number; limit: number } | undefined;
+  return row ? { used: Number(row.used), limit: Number(row.limit) } : null;
+}
 
+// ========== 审计每日用量（P2 商业化改造） ==========
 export interface AuditUsagePerUserRow {
   user_id: string;
   date: string;

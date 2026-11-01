@@ -24,6 +24,7 @@ import {
   AI_SEARCH_MODEL_WHITELIST,
   AI_SEARCH_PLATFORMS,
   assertAiModelAllowed,
+  assertDataForSeoConfigured,
   fetchAiLlmResponse,
   fetchAiMentionsSearch,
   fetchAiMultiTargetMetrics,
@@ -37,6 +38,7 @@ import {
   type AiTopPageItem,
 } from "./dataforseo";
 import { consumeQuota, readCache, writeCache } from "./cache";
+import { isPlatformCredentialError, refundOnPlatformCredentialError } from "./credential-guard";
 import { createAiSearchRun, listAiSearchRuns } from "@/lib/db/ai-search";
 import { extractRegistrableDomain } from "./serpapi";
 import type { PlanTier } from "@/lib/auth";
@@ -277,6 +279,10 @@ export async function aiBrandLookup(params: AiBrandLookupParams): Promise<AiBran
     return { ...cached, target, fromCache: true, runId: cached.runId };
   }
 
+  // 平台配置预检（先于任何 consumeQuota）：凭据缺失属平台配置错误，用户拿不到任何数据，
+  // 不得消耗套餐额度。位置必须在缓存命中判断之后 —— 缓存读取不依赖 provider。
+  assertDataForSeoConfigured();
+
   // 配额：1 unit = 1 个平台扇出批次（3-4 个 provider task，~$0.10/task）
   // 免费套餐 dataforseo_monthly_limit=0 → consumeQuota 抛 QuotaExceededError（由 API 层映射 429）
   const platformBundles: AiPlatformBundle[] = [];
@@ -337,6 +343,9 @@ export async function aiBrandLookup(params: AiBrandLookupParams): Promise<AiBran
       if (topPagesOk) allCitations.push(...citationsFromTopPages(platform, (topPages as Awaited<ReturnType<typeof fetchAiTopMentionedPages>>).items));
       allCitations.push(...citationsFromMentions(mentionsItems));
     } catch (e) {
+      // 平台侧凭据/账户错误（未配置 / 401xx 认证 / 402xx 欠费 / 403xx 无权）：
+      // 本次为该平台扣的 1 单位回滚。套餐上限、429 语义、额度数字一律不动。
+      await refundOnPlatformCredentialError(e, params.userId, "dataforseo", params.plan);
       if (e instanceof Error && e.message.includes("计费")) throw e; // billing fatal
       warnings.push(`platform ${platform} 查询失败：${(e as Error).message}`);
       platformBundles.push({
@@ -359,6 +368,8 @@ export async function aiBrandLookup(params: AiBrandLookupParams): Promise<AiBran
       groups.map((group) => [group.key.toLowerCase(), null as number | null])
     );
     let anySuccess = false;
+    /** 平台侧凭据/账户错误（整批都没成功时才回滚这 1 单位） */
+    let credentialError: unknown = null;
     for (const platform of AI_SEARCH_PLATFORMS) {
       const effective = {
         locationCode: platform === "chat_gpt" ? AI_SEARCH_DEFAULT_LOCATION_CODE : requested.locationCode,
@@ -381,9 +392,15 @@ export async function aiBrandLookup(params: AiBrandLookupParams): Promise<AiBran
         }
         anySuccess = true;
       } catch (e) {
+        if (isPlatformCredentialError(e)) credentialError = e;
         if (e instanceof Error && e.message.includes("计费")) throw e;
         warnings.push(`platform ${platform} 竞品对比失败：${(e as Error).message}`);
       }
+    }
+    // 全平台都没拿到数据且原因是平台凭据问题 → 回滚本批 1 单位；
+    // 只要有任一平台成功，这 1 单位对应了真实产出，不回滚。
+    if (!anySuccess && credentialError) {
+      await refundOnPlatformCredentialError(credentialError, params.userId, "dataforseo", params.plan);
     }
     if (anySuccess) {
       aiShareOfVoice = computeAiShareOfVoice(
@@ -538,6 +555,9 @@ export async function aiPromptExplore(params: AiPromptExploreParams): Promise<Ai
       results.push({ ...cached, fromCache: true });
       continue;
     }
+    // 平台配置预检（先于 consumeQuota）：凭据缺失 → 不扣额度，直接抛明确配置错误。
+    // 位置在缓存判断之后：命中缓存的模型已在上面 continue，不依赖 provider。
+    assertDataForSeoConfigured();
     try {
       const quota = await consumeQuota(params.userId, "dataforseo", params.plan); // 1 unit = 1 模型响应
       void quota;
@@ -578,6 +598,8 @@ export async function aiPromptExplore(params: AiPromptExploreParams): Promise<Ai
         // 缓存写失败不影响结果
       }
     } catch (e) {
+      // 平台侧凭据/账户错误才回滚本次预扣；额度用尽（429）、超时、上游业务错误一律不回滚
+      await refundOnPlatformCredentialError(e, params.userId, "dataforseo", params.plan);
       if (e instanceof Error && e.message.includes("额度已用尽")) throw e; // QuotaExceededError 透传
       results.push({
         model, status: "error", modelName: null, answerExcerpt: null, mentionsBrand: null,

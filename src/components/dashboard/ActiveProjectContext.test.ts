@@ -93,14 +93,32 @@ describe("五个曾各自兜底的项目页：全部消费共享上下文", () =
   });
 });
 
-describe("keyword-overview：保持独立关键词工具语义", () => {
-  it("不消费项目上下文、不向请求塞项目参数", () => {
-    expect(PAGE.keywordOverview).not.toContain("useActiveProject");
-    expect(PAGE.keywordOverview).not.toContain("project_id");
-    expect(PAGE.keywordOverview).not.toContain("activeDomain");
+describe("keyword-overview：独立关键词工具 + 项目维 GSC 表现（2026-11 契约更新）", () => {
+  // 契约演进说明：概览页升级为 Semrush 式工作台后新增「GSC 实际表现」区，
+  // 该区按当前项目读取 GSC 数据（真实项目依赖）；而关键词研究链路
+  // （SERP 研究 / 市场指标 / 扩词）仍完全独立于顶部项目筛选。
+  // 本测试钉住两条边界：研究请求不带项目参数；GSC 区显式标注项目范围。
+  it("关键词研究请求不带项目参数（SERP/指标/扩词不受顶部项目筛选）", () => {
+    expect(PAGE.keywordOverview).toContain("/api/keywords/");
+    const keywordCalls = [...PAGE.keywordOverview.matchAll(/fetch\(`([^`]*\/api\/keywords\/[^`]*)`/g)].map((m) => m[1]);
+    expect(keywordCalls.length).toBeGreaterThan(0);
+    for (const call of keywordCalls) {
+      expect(call, `关键词请求不得携带项目参数: ${call}`).not.toContain("project");
+    }
+    // GSC 请求是唯一允许携带 project_id 的调用
+    const gscCalls = [...PAGE.keywordOverview.matchAll(/fetch\(`([^`]*\/api\/gsc\/[^`]*)`/g)].map((m) => m[1]);
+    for (const call of gscCalls) {
+      expect(call, "GSC 请求应按当前项目读取").toContain("project_id");
+    }
   });
 
-  it("界面上明确说明不受顶部项目筛选（避免「切了项目却没变」被当成故障）", () => {
+  it("界面上明确说明关键词链路不受顶部项目筛选（避免「切了项目却没变」被当成故障）", () => {
     expect(PAGE.keywordOverview).toContain('t("scopeNote")');
+  });
+
+  it("GSC 表现区消费项目上下文时显式标注项目域名（不静默跟随）", () => {
+    expect(PAGE.keywordOverview).toContain("activeProject?.activeId");
+    expect(PAGE.keywordOverview).toContain("gscNotConnected");
+    expect(PAGE.keywordOverview).toContain("gapDescProject");
   });
 });

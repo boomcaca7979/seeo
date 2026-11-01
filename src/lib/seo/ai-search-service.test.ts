@@ -14,11 +14,14 @@ const fetchAiTopMentionedPagesMock = vi.fn();
 const fetchAiMentionsSearchMock = vi.fn();
 const fetchAiMultiTargetMetricsMock = vi.fn();
 const fetchAiLlmResponseMock = vi.fn();
+const assertDataForSeoConfiguredMock = vi.fn();
+const refundQuotaMock = vi.fn();
 
 vi.mock("./cache", () => ({
   readCache: (...args: unknown[]) => readCacheMock(...args),
   writeCache: (...args: unknown[]) => writeCacheMock(...args),
   consumeQuota: (...args: unknown[]) => consumeQuotaMock(...args),
+  refundQuota: (...args: unknown[]) => refundQuotaMock(...args),
   QuotaExceededError: class QuotaExceededError extends Error {},
 }));
 
@@ -50,12 +53,21 @@ vi.mock("./dataforseo", () => ({
   fetchAiMentionsSearch: (...args: unknown[]) => fetchAiMentionsSearchMock(...args),
   fetchAiMultiTargetMetrics: (...args: unknown[]) => fetchAiMultiTargetMetricsMock(...args),
   fetchAiLlmResponse: (...args: unknown[]) => fetchAiLlmResponseMock(...args),
+  assertDataForSeoConfigured: (...args: unknown[]) => assertDataForSeoConfiguredMock(...args),
+  DataForSeoNotConfiguredError: class DataForSeoNotConfiguredError extends Error {
+    constructor() { super("未配置 DataForSEO 凭证（DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD）"); }
+  },
+  DataForSeoApiError: class DataForSeoApiError extends Error {
+    status_code: number;
+    constructor(statusCode: number, message: string) { super(message); this.status_code = statusCode; }
+  },
   AiSearchProviderError: class AiSearchProviderError extends Error {
     code: string;
     constructor(code: string, message: string) { super(message); this.code = code; }
   },
 }));
 
+import { DataForSeoApiError, DataForSeoNotConfiguredError } from "./dataforseo";
 import {
   aiBrandLookup,
   aiPromptExplore,
@@ -71,6 +83,8 @@ beforeEach(() => {
   writeCacheMock.mockReset().mockResolvedValue(undefined);
   createAiSearchRunMock.mockReset().mockResolvedValue(101);
   listAiSearchRunsMock.mockReset().mockResolvedValue([]);
+  assertDataForSeoConfiguredMock.mockReset(); // 默认通过（不抛）
+  refundQuotaMock.mockReset().mockResolvedValue(undefined);
   fetchAiTargetMetricsMock.mockReset();
   fetchAiTopMentionedPagesMock.mockReset();
   fetchAiMentionsSearchMock.mockReset();
@@ -260,5 +274,152 @@ describe("aiPromptExplore", () => {
     const keys = readCacheMock.mock.calls.map((call) => JSON.stringify(call[1]));
     expect(keys[0]).toContain("Best SEO tools?");
     void keys;
+  });
+});
+
+// ===== 额度保护：平台凭据错误不得消耗用户套餐额度（2026-11-01 R3） =====
+// 三处计费点统一为 dataforseo 月度额度：
+//   brandLookup 平台扇出（1 unit / 平台）、brandLookup 竞品批（1 unit）、promptExplore（1 unit / 模型响应）。
+// 判定与回滚走 credential-guard（真实实现）：本文件只验证 service 的接入位置与调用次数。
+describe("AI Search 额度保护（凭据错误）", () => {
+  const denied = () => new DataForSeoApiError(40100, "Please authorize with your DataForSEO credentials.");
+
+  it("brandLookup：凭据缺失 → 预检先抛错，零 consumeQuota、零 provider 调用、零回滚", async () => {
+    assertDataForSeoConfiguredMock.mockImplementation(() => { throw new DataForSeoNotConfiguredError(); });
+
+    await expect(aiBrandLookup({ userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia" }))
+      .rejects.toBeInstanceOf(DataForSeoNotConfiguredError);
+
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchAiTargetMetricsMock).not.toHaveBeenCalled();
+    expect(fetchAiTopMentionedPagesMock).not.toHaveBeenCalled();
+    expect(fetchAiMentionsSearchMock).not.toHaveBeenCalled();
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("brandLookup：缓存命中不触发配置预检（缓存读取不依赖 provider）", async () => {
+    assertDataForSeoConfiguredMock.mockImplementation(() => { throw new DataForSeoNotConfiguredError(); });
+    readCacheMock.mockResolvedValue({
+      target: { type: "domain", value: "seeo.asia" }, platforms: [], mentionsTotal: 5,
+      citations: [], topCitedDomains: [], aiShareOfVoice: null, warnings: [], hasData: true,
+      fromCache: true, runId: 7, providerCostUsd: null,
+    });
+
+    const result = await aiBrandLookup({ userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia" });
+
+    expect(result.fromCache).toBe(true);
+    expect(assertDataForSeoConfiguredMock).not.toHaveBeenCalled();
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("brandLookup：平台批次遇上游认证失败 → 每平台回滚 1 单位，warning 与结果结构不变", async () => {
+    fetchAiTargetMetricsMock.mockRejectedValue(denied());
+    fetchAiTopMentionedPagesMock.mockRejectedValue(denied());
+    fetchAiMentionsSearchMock.mockRejectedValue(denied());
+
+    const result = await aiBrandLookup({ userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia" });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(2); // 两个平台各扣 1
+    expect(refundQuotaMock).toHaveBeenCalledTimes(2);  // 两个平台各回滚 1（净 0）
+    expect(result.platforms.every((bundle) => bundle.status === "error")).toBe(true);
+    expect(result.warnings.join(" ")).toContain("Please authorize");
+    expect(writeCacheMock).not.toHaveBeenCalled(); // 失败不冻结缓存
+  });
+
+  it("brandLookup：普通上游失败（超时/网络）不回滚", async () => {
+    fetchAiTargetMetricsMock.mockRejectedValue(new Error("DataForSEO 请求超时（30s）"));
+    fetchAiTopMentionedPagesMock.mockRejectedValue(new Error("DataForSEO 请求失败：socket hang up"));
+    fetchAiMentionsSearchMock.mockRejectedValue(new Error("DataForSEO 请求失败：socket hang up"));
+
+    const result = await aiBrandLookup({ userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia" });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(2);
+    expect(refundQuotaMock).not.toHaveBeenCalled(); // 真实请求已发生，额度不退还
+    expect(result.warnings.join(" ")).toContain("超时");
+  });
+
+  it("brandLookup：额度用尽（QuotaExceeded）在扣费处直接抛出，不回滚", async () => {
+    consumeQuotaMock.mockRejectedValue(Object.assign(new Error("额度已用尽（30/30）"), { name: "QuotaExceededError" }));
+
+    await expect(aiBrandLookup({ userId: "u1", plan: "free", projectId: 2, target: "seeo.asia" }))
+      .rejects.toThrow("额度已用尽");
+
+    expect(fetchAiTargetMetricsMock).not.toHaveBeenCalled();
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("brandLookup：竞品批全平台凭据失败 → 回滚 1 单位；主扇出成功不回滚", async () => {
+    fetchAiTargetMetricsMock.mockResolvedValue({ platformGroups: [], totalMentions: 3, totalAiSearchVolume: 300, cost: { usd: 0.1 } });
+    fetchAiTopMentionedPagesMock.mockResolvedValue({ items: [], cost: { usd: 0.1 } });
+    fetchAiMentionsSearchMock.mockResolvedValue({ items: [], cost: { usd: 0.1 } });
+    fetchAiMultiTargetMetricsMock.mockRejectedValue(denied());
+
+    const result = await aiBrandLookup({
+      userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia", competitors: ["rival.com"],
+    });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(3); // 2 平台 + 1 竞品批
+    expect(refundQuotaMock).toHaveBeenCalledTimes(1);  // 只回滚竞品批
+    expect(result.aiShareOfVoice).toBe(null);
+    expect(result.hasData).toBe(true); // 主扇出结果保留
+  });
+
+  it("brandLookup：竞品批有任一平台成功 → 不回滚（该 1 单位有真实产出）", async () => {
+    fetchAiTargetMetricsMock.mockResolvedValue({ platformGroups: [], totalMentions: 3, totalAiSearchVolume: 300, cost: { usd: 0.1 } });
+    fetchAiTopMentionedPagesMock.mockResolvedValue({ items: [], cost: { usd: 0.1 } });
+    fetchAiMentionsSearchMock.mockResolvedValue({ items: [], cost: { usd: 0.1 } });
+    fetchAiMultiTargetMetricsMock.mockImplementation(({ platform }: { platform: string }) =>
+      platform === "google"
+        ? Promise.resolve({ items: [{ key: "seeo.asia", totalMentions: 10, totalAiSearchVolume: null, platformGroups: [] }], cost: { usd: 0.1 } })
+        : Promise.reject(denied()));
+
+    const result = await aiBrandLookup({
+      userId: "u1", plan: "lite", projectId: 2, target: "seeo.asia", competitors: ["rival.com"],
+    });
+
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+    expect(result.aiShareOfVoice).not.toBe(null);
+  });
+
+  it("promptExplore：凭据缺失 → 预检先抛错，零 consumeQuota、零 provider 调用", async () => {
+    assertDataForSeoConfiguredMock.mockImplementation(() => { throw new DataForSeoNotConfiguredError(); });
+
+    await expect(aiPromptExplore({ userId: "u1", plan: "lite", projectId: 2, prompt: "best seo tools?" }))
+      .rejects.toBeInstanceOf(DataForSeoNotConfiguredError);
+
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchAiLlmResponseMock).not.toHaveBeenCalled();
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("promptExplore：上游认证失败 → 回滚 1 单位，per-model 错误结果保留", async () => {
+    fetchAiLlmResponseMock.mockRejectedValue(denied());
+
+    const result = await aiPromptExplore({ userId: "u1", plan: "lite", projectId: 2, prompt: "best seo tools?", models: ["chat_gpt"] });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).toHaveBeenCalledTimes(1);
+    expect(result.results[0]).toMatchObject({ status: "error", model: "chat_gpt" });
+    expect(result.results[0].error).toContain("Please authorize");
+    expect(writeCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("promptExplore：超时 / 上游业务错误不回滚", async () => {
+    fetchAiLlmResponseMock.mockRejectedValue(new Error("DataForSEO 请求超时（30s）"));
+
+    const result = await aiPromptExplore({ userId: "u1", plan: "lite", projectId: 2, prompt: "best seo tools?", models: ["chat_gpt"] });
+
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+    expect(result.results[0].status).toBe("error");
+  });
+
+  it("promptExplore：额度用尽（QuotaExceeded）透传给 API 层映射 429，不回滚", async () => {
+    consumeQuotaMock.mockRejectedValue(Object.assign(new Error("额度已用尽（30/30）"), { name: "QuotaExceededError" }));
+
+    await expect(aiPromptExplore({ userId: "u1", plan: "pro", projectId: 2, prompt: "best seo tools?", models: ["chat_gpt"] }))
+      .rejects.toThrow("额度已用尽");
+
+    expect(refundQuotaMock).not.toHaveBeenCalled();
   });
 });

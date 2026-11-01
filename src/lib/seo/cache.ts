@@ -11,8 +11,10 @@ import {
   setCache as dbSetCache,
   getUserApiUsage,
   tryIncrementUserApiUsage,
+  tryDecrementUserApiUsage,
   getApiDailyUsage,
   tryIncrementApiDailyUsage,
+  tryDecrementApiDailyUsage,
   type ApiType,
 } from "@/lib/db";
 import type { PlanTier } from "@/lib/auth";
@@ -138,6 +140,31 @@ export async function consumeQuota(
       throw new QuotaExceededError(used, limit, apiType, month);
     }
     return { used: used + 1, limit, month };
+  }
+}
+
+/**
+ * 回滚一次已扣减的额度（用于平台侧配置/认证错误：用户拿不到数据，不该被计费）。
+ *
+ * 与 consumeQuota 对称：SerpApi 有日度限额时先回滚日度，再回滚月度（used 不会低于 0）。
+ * **尽力而为**：任何异常都被吞掉，绝不改变原始错误的传播——
+ * 回滚失败最多是多记一次用量，不能让用户看到「额度错误」覆盖真实的失败原因。
+ */
+export async function refundQuota(
+  userId: string,
+  apiType: ApiType,
+  plan: PlanTier = "free"
+): Promise<void> {
+  try {
+    if (apiType === "serpapi") {
+      const dailyLimit = await getSerpApiDailyLimit(plan);
+      if (dailyLimit > 0) {
+        await tryDecrementApiDailyUsage(userId, apiType, todayStr());
+      }
+    }
+    await tryDecrementUserApiUsage(userId, apiType, currentMonth());
+  } catch {
+    // 回滚是尽力而为：DB 不可用/记录已不存在都不影响原始错误返回
   }
 }
 

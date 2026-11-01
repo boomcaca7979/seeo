@@ -427,7 +427,10 @@ describe("6. 排名刷新后的观测（闭环最后一步：执行 → 刷新�
     // 种子：项目 + 真实追踪词 + 排名历史（第 20 位）+ 排名类机会
     const project = await projMod.addProject(USER, "rank observe", DOMAIN);
     const tk = await kwMod.addTrackedKeyword(USER, { keyword: KW, location: "中国", device: "PC", domain: DOMAIN });
-    await rankMod.upsertRankHistory(USER, { keyword_id: tk.id, date: "2026-10-01", position: 20, url: null });
+    // 日期必须相对当前时间：基线捕获只看近 30 天排名历史（getRankHistory(..., 30)），
+    // 硬编码日期会让测试随时间推移变成时间炸弹（2026-11-01 实测复发）。
+    const seedDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await rankMod.upsertRankHistory(USER, { keyword_id: tk.id, date: seedDate, position: 20, url: null });
     await oppMod.upsertOpportunity(USER, {
       user_id: USER,
       project_id: project.id,

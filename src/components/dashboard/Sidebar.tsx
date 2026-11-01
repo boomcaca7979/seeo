@@ -6,13 +6,17 @@ import { usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { localePath } from "@/i18n/seo";
 
+type NavChild = {
+  labelKey: "keywordOverview" | "keywordMagic" | "keywordStrategy" | "keywordSaved";
+  href: string;
+};
+
 type NavItem = {
   labelKey:
     | "overview"
     | "opportunities"
     | "actions"
-    | "keywordOverview"
-    | "keywordExpand"
+    | "keywordResearch"
     | "positionTracking"
     | "rankCheck"
     | "audit"
@@ -23,7 +27,16 @@ type NavItem = {
     | "settings";
   href: string;
   icon: React.ReactNode;
+  /** 二级导航：有 children 时父项是展开/收起开关，children 是可点击链接 */
+  children?: readonly NavChild[];
 };
+
+const KEYWORD_CHILDREN: readonly NavChild[] = [
+  { labelKey: "keywordOverview", href: "/app/keyword-overview" },
+  { labelKey: "keywordMagic", href: "/app/keyword-magic" },
+  { labelKey: "keywordStrategy", href: "/app/keyword-strategy" },
+  { labelKey: "keywordSaved", href: "/app/keyword-saved" },
+];
 
 const navItems: NavItem[] = [
   {
@@ -58,7 +71,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    labelKey: "keywordOverview",
+    labelKey: "keywordResearch",
     href: "/app/keyword-overview",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -66,15 +79,7 @@ const navItems: NavItem[] = [
         <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       </svg>
     ),
-  },
-  {
-    labelKey: "keywordExpand",
-    href: "/app/keyword-expand",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    ),
+    children: KEYWORD_CHILDREN,
   },
   {
     labelKey: "positionTracking",
@@ -181,6 +186,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   const pathname = usePathname();
   const t = useTranslations("dashboard.sidebar");
   const locale = useLocale() as "en" | "zh";
+  // 分组展开状态：默认收起；子路由命中时自动展开（初始化时求值一次即可，
+  // 因为组内切换不会改变"组是否激活"这一事实）
+  const [keywordOpen, setKeywordOpen] = useState(() =>
+    KEYWORD_CHILDREN.some(
+      (c) => pathname === c.href || pathname.startsWith(`${c.href}/`)
+    )
+  );
 
   return (
     <aside
@@ -217,6 +229,90 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             item.href === "/app"
               ? pathname === "/app"
               : pathname.startsWith(item.href);
+          const groupActive = item.children
+            ? item.children.some(
+                (c) => pathname === c.href || pathname.startsWith(`${c.href}/`)
+              )
+            : false;
+
+          // 带二级导航的分组项：父项为展开/收起按钮
+          if (item.children) {
+            const open = keywordOpen;
+            return (
+              <div key={item.href}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (collapsed) {
+                      // 收起态下图标不足以承载子导航：先展开侧边栏再展开分组
+                      setCollapsed(false);
+                      setKeywordOpen(true);
+                      return;
+                    }
+                    setKeywordOpen((o) => !o);
+                  }}
+                  aria-expanded={open}
+                  title={collapsed ? t(item.labelKey) : undefined}
+                  className={`group relative mb-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                    groupActive
+                      ? "bg-line-soft font-semibold text-ink"
+                      : "font-medium text-ink-60 hover:bg-line-soft/60 hover:text-ink"
+                  }`}
+                >
+                  {groupActive && (
+                    <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 bg-ink" />
+                  )}
+                  <span className="flex-shrink-0">{item.icon}</span>
+                  {!collapsed && (
+                    <>
+                      <span className="flex-1 whitespace-nowrap text-left">
+                        {t(item.labelKey)}
+                      </span>
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className={`h-3.5 w-3.5 flex-shrink-0 text-ink-40 transition-transform ${open ? "rotate-90" : ""}`}
+                        aria-hidden="true"
+                      >
+                        <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+                {/* 二级导航：展开时渲染；子项缩进 + 小号文字 */}
+                {open && !collapsed && (
+                  <div role="group" aria-label={t(item.labelKey)}>
+                    {item.children.map((child) => {
+                      const childActive =
+                        pathname === child.href ||
+                        pathname.startsWith(`${child.href}/`);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onMobileClose}
+                          className={`mb-0.5 flex items-center gap-2 rounded-md py-1.5 pl-11 pr-3 text-sm transition-colors ${
+                            childActive
+                              ? "bg-line-soft font-semibold text-ink"
+                              : "font-medium text-ink-60 hover:bg-line-soft/60 hover:text-ink"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                              childActive ? "bg-ink" : "bg-ink-25"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="whitespace-nowrap">{t(child.labelKey)}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={item.href}

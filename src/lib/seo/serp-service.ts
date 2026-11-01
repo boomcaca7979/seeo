@@ -1,5 +1,7 @@
-import { serpApiProvider, fetchAutocompleteSuggestions, fetchRelatedQuestions, resolveSerpHl, type AutocompleteSuggestion } from "./serpapi";
+import { serpApiProvider, fetchAutocompleteSuggestions, fetchRelatedQuestions, resolveSerpHl, assertSerpApiConfigured, type AutocompleteSuggestion } from "./serpapi";
 import { readCache, writeCache, consumeQuota, peekUsage } from "./cache";
+import { refundOnPlatformCredentialError } from "./credential-guard";
+import { normalizeSerpResult } from "./serp-normalize";
 import type { RankResult, SerpResult, RelatedQuestion } from "./types";
 import type { PlanTier } from "@/lib/auth";
 
@@ -50,14 +52,30 @@ export async function searchSerp(
   const cached = await readCache<SerpResult>("serp", cacheParams);
   if (cached) {
     return {
-      result: { ...cached, fromCache: true, features: cached.features ?? [], language: cached.language ?? "zh-cn" },
+      // 读缓存时统一规范化：历史快照里的 /goto?url= 脏值在这里被一次性还原成
+      // resolvedUrl / resolvedDomain / linkStatus（原始 link/domain 保留供内部逻辑）
+      result: {
+        ...normalizeSerpResult(cached),
+        fromCache: true,
+        features: cached.features ?? [],
+        language: cached.language ?? "zh-cn",
+      },
       fromCache: true,
     };
   }
+  // 配置预检：凭据缺失属平台配置错误 —— 在扣减额度之前就失败（不扣费、不请求）
+  assertSerpApiConfigured();
   await consumeQuota(userId, "serpapi", plan);
-  const result = await serpApiProvider.searchSerp(params);
+  let result: SerpResult;
+  try {
+    result = await serpApiProvider.searchSerp(params);
+  } catch (e) {
+    // 供应商判定认证失败＝平台凭据问题，回滚本次预扣（用户没有拿到任何数据）
+    await refundOnPlatformCredentialError(e, userId, "serpapi", plan);
+    throw e;
+  }
   try { await writeCache("serp", cacheParams, result); } catch { /* cache failure does not fail a provider result */ }
-  return { result, fromCache: false };
+  return { result: normalizeSerpResult(result), fromCache: false };
 }
 
 // SERP 分页（P4-D）：SerpApi 官方 start 偏移（0/10/20…），经 SerpServiceParams.start
@@ -109,14 +127,21 @@ export async function searchRank(
   if (cached) {
     return { result: { ...cached, fromCache: true }, fromCache: true };
   }
+  assertSerpApiConfigured();
   await consumeQuota(userId, "serpapi", plan);
-  const result = await serpApiProvider.checkRank({
-    keyword: params.keyword,
-    domain: params.domain,
-    location: params.location,
-    device: params.device,
-    ...(params.language ? { language: params.language } : {}),
-  });
+  let result: RankResult;
+  try {
+    result = await serpApiProvider.checkRank({
+      keyword: params.keyword,
+      domain: params.domain,
+      location: params.location,
+      device: params.device,
+      ...(params.language ? { language: params.language } : {}),
+    });
+  } catch (e) {
+    await refundOnPlatformCredentialError(e, userId, "serpapi", plan);
+    throw e;
+  }
   try { await writeCache("rank", cacheParams, result); } catch { /* cache failure does not fail a provider result */ }
   return { result, fromCache: false };
 }
@@ -191,12 +216,19 @@ async function loadSuggestions(
       fromCache: true,
     };
   }
+  assertSerpApiConfigured();
   await consumeQuota(userId, "serpapi", plan);
-  const rows: AutocompleteSuggestion[] = await fetchAutocompleteSuggestions(
-    params.keyword,
-    params.location,
-    params.language
-  );
+  let rows: AutocompleteSuggestion[];
+  try {
+    rows = await fetchAutocompleteSuggestions(
+      params.keyword,
+      params.location,
+      params.language
+    );
+  } catch (e) {
+    await refundOnPlatformCredentialError(e, userId, "serpapi", plan);
+    throw e;
+  }
   const suggestions = rows.map((row) => row.value);
   try { await writeCache("suggest", cacheParams, suggestions); } catch { /* cache failure does not fail a provider result */ }
   return {
@@ -248,8 +280,15 @@ async function loadPaaQuestions(
   if (cached) {
     return { questions: cached, fromCache: true };
   }
+  assertSerpApiConfigured();
   await consumeQuota(userId, "serpapi", plan);
-  const { questions } = await fetchRelatedQuestions(token);
+  let questions: RelatedQuestion[];
+  try {
+    ({ questions } = await fetchRelatedQuestions(token));
+  } catch (e) {
+    await refundOnPlatformCredentialError(e, userId, "serpapi", plan);
+    throw e;
+  }
   try { await writeCache("paa", cacheParams, questions); } catch { /* cache failure does not fail a provider result */ }
   return { questions, fromCache: false };
 }

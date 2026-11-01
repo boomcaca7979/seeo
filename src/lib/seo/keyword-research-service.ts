@@ -21,15 +21,17 @@
 
 import type { ApiUsage, SerpResult } from "./types";
 import type { PlanTier } from "@/lib/auth";
-import { consumeQuota, peekUsage, readCache, writeCache } from "./cache";
+import { consumeQuota, getPlanLimit, peekUsage, readCache, writeCache, QuotaExceededError } from "./cache";
 import { expandKeyword, getSerpUsage } from "./serp-service";
 import {
   DataForSeoNotConfiguredError,
+  assertDataForSeoConfigured,
   fetchKeywordDiscovery,
   fetchKeywordMetrics,
   type KeywordDiscoveryRow,
   type KeywordMetricRow,
 } from "./dataforseo";
+import { refundOnPlatformCredentialError } from "./credential-guard";
 // 合并/去重/来源类型的单一实现（纯函数，客户端共用）；此处 re-export 保持既有 import 契约
 import {
   mergeKeywordCandidates,
@@ -144,7 +146,27 @@ export interface KeywordMetricsEnrichment {
   source: "dataforseo" | null;
   fromCache: boolean;
   warnings: string[];
+  /**
+   * 当前套餐是否含市场指标额度（额度 > 0）。仅在没有缓存命中时计算
+   * （缓存读取不依赖套餐也不消耗额度，命中时不额外做套餐查询，因此留空表示「未评估」）。
+   */
+  planIncluded?: boolean;
+  /**
+   * 无数据时的机器可读原因，供 API/UI 区分「套餐不含」与「数据源未配置」：
+   * - plan_not_included：套餐额度为 0（未发起任何请求、未扣额度）
+   * - unconfigured：套餐有额度但 DataForSEO 凭据缺失（未发起请求、未扣额度）
+   * - quota_exceeded：额度已用尽（429 语义，未发生供应商请求）
+   * - provider_error：已发起请求但供应商失败
+   * 有数据时为 null。
+   */
+  reason?: KeywordMetricsReason | null;
 }
+
+export type KeywordMetricsReason =
+  | "plan_not_included"
+  | "unconfigured"
+  | "quota_exceeded"
+  | "provider_error";
 
 /**
  * 为精确关键词列表补全 DataForSEO 指标（kw-metrics 缓存优先，配额不足时优雅降级为 null）。
@@ -164,22 +186,75 @@ export async function enrichKeywordMetrics(
   const cacheParams = metricsCacheKey(keywords, location, language ?? "");
   const cached = await readCache<KeywordMetricRow[]>(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams);
   if (cached) {
-    return { rows: cached, source: "dataforseo", fromCache: true, warnings };
+    // 缓存读取与套餐权限无关、不消耗任何新额度：任何套餐命中缓存都按原值返回。
+    // （planIncluded 留空＝本路径未评估套餐额度，避免在缓存热路径上多查一次套餐表）
+    return { rows: cached, source: "dataforseo", fromCache: true, warnings, reason: null };
   }
+
+  // 套餐边界先于数据源配置判定：额度为 0 的套餐（free）不含市场指标，
+  // 此时连「DataForSEO 未配置」都不该说 —— 那不是用户能通过配置解决的问题。
+  // 不发起任何供应商请求、不扣减任何额度。
+  let planLimit: number | null = null;
   try {
+    planLimit = await getPlanLimit(plan, "dataforseo");
+  } catch {
+    // 套餐表不可用时视为「未知」，继续走原有 consumeQuota 兜底语义，不在此处拦断真实调用
+    planLimit = null;
+  }
+  if (planLimit === 0) {
+    return {
+      rows: [],
+      source: null,
+      fromCache: false,
+      warnings: [...warnings, `当前套餐（${plan}）不含市场指标额度（0 次/月），未发起数据请求`],
+      planIncluded: false,
+      reason: "plan_not_included",
+    };
+  }
+
+  try {
+    // 配置预检：凭据缺失属平台配置错误 —— 在扣减额度之前失败（不扣费、不请求）。
+    // 抛出的 DataForSeoNotConfiguredError 由本函数 catch 分支映射为 state="unconfigured"。
+    assertDataForSeoConfigured();
     // DataForSEO 补全批次按 1 个 dataforseo 单位计费（与 backlink-service 的 fetchBacklinks 同惯例），
     // 计费只发生在 provider 真实调用前的这一处；MCP/API 层不再重复记账。
     await consumeQuota(userId, "dataforseo", plan);
-    const result = await fetchKeywordMetrics(keywords, { location, language });
+    let result: Awaited<ReturnType<typeof fetchKeywordMetrics>>;
+    try {
+      result = await fetchKeywordMetrics(keywords, { location, language });
+    } catch (e) {
+      // 供应商认证/账户失败＝平台问题，回滚本次预扣（指标仍按缺失降级，不当成成功）
+      await refundOnPlatformCredentialError(e, userId, "dataforseo", plan);
+      throw e;
+    }
     try {
       await writeCache(KEYWORD_METRICS_CACHE_NAMESPACE, cacheParams, result.rows);
     } catch {
       // 缓存写失败不影响结果
     }
-    return { rows: result.rows, source: "dataforseo", fromCache: false, warnings: [...warnings, ...result.warnings] };
+    return {
+      rows: result.rows,
+      source: "dataforseo",
+      fromCache: false,
+      warnings: [...warnings, ...result.warnings],
+      planIncluded: true,
+      reason: null,
+    };
   } catch (e) {
-    // 优雅降级：指标保持 null，不使调用方失败
-    return { rows: [], source: null, fromCache: false, warnings: [...warnings, `keyword metrics 不可用：${(e as Error).message}`] };
+    // 优雅降级：指标保持 null，不使调用方失败；同时给出机器可读原因，
+    // 让 API/UI 能区分「套餐不含」「数据源未配置」「额度用尽」「供应商失败」。
+    const reason: KeywordMetricsReason =
+      e instanceof DataForSeoNotConfiguredError ? "unconfigured"
+        : e instanceof QuotaExceededError ? "quota_exceeded"
+          : "provider_error";
+    return {
+      rows: [],
+      source: null,
+      fromCache: false,
+      warnings: [...warnings, `keyword metrics 不可用：${(e as Error).message}`],
+      planIncluded: planLimit === null ? undefined : planLimit > 0,
+      reason,
+    };
   }
 }
 
@@ -260,8 +335,16 @@ async function discoverKeywords(
     };
   }
   try {
+    // 配置预检：凭据缺失属平台配置错误 —— 在扣减额度之前失败（不扣费、不请求）
+    assertDataForSeoConfigured();
     await consumeQuota(userId, "dataforseo", plan);
-    const discovery = await fetchKeywordDiscovery(keyword, { location, language });
+    let discovery: Awaited<ReturnType<typeof fetchKeywordDiscovery>>;
+    try {
+      discovery = await fetchKeywordDiscovery(keyword, { location, language });
+    } catch (e) {
+      await refundOnPlatformCredentialError(e, userId, "dataforseo", plan);
+      throw e;
+    }
     try {
       await writeCache(KEYWORD_DISCOVERY_CACHE_NAMESPACE, cacheParams, {
         rows: [...discovery.rows.values()],

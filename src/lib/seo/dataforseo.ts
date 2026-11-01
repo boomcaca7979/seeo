@@ -51,11 +51,9 @@ const UPSTREAM_TIMEOUT_MS = 30_000;
 const API_BASE = "https://api.dataforseo.com/v3";
 
 function getAuthHeader(): string {
-  const login = process.env.DATAFORSEO_LOGIN;
-  const password = process.env.DATAFORSEO_PASSWORD;
-  if (!login || !password) {
-    throw new DataForSeoNotConfiguredError();
-  }
+  assertDataForSeoConfigured();
+  const login = process.env.DATAFORSEO_LOGIN as string;
+  const password = process.env.DATAFORSEO_PASSWORD as string;
   const token = Buffer.from(`${login}:${password}`).toString("base64");
   return `Basic ${token}`;
 }
@@ -243,6 +241,16 @@ export async function fetchBacklinks(
 /** 是否已配置凭证（供路由层提前判断） */
 export function isDataForSeoConfigured(): boolean {
   return Boolean(process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD);
+}
+
+/**
+ * 配置预检：供 service 层在**扣减用户额度之前**调用。
+ * 凭据缺失属平台配置错误，用户拿不到数据，不得消耗用户套餐额度。
+ */
+export function assertDataForSeoConfigured(): void {
+  if (!isDataForSeoConfigured()) {
+    throw new DataForSeoNotConfiguredError();
+  }
 }
 
 // ===== Keyword Metrics（P0-02-A Keyword Intelligence） =====
@@ -562,9 +570,7 @@ export async function fetchKeywordDiscovery(
     return { rows: new Map(), seedRow: null, warnings };
   }
   // 未配置凭证：入口早期抛出（避免被 allSettled 吞掉语义），由上层统一优雅降级
-  if (!isDataForSeoConfigured()) {
-    throw new DataForSeoNotConfiguredError();
-  }
+  assertDataForSeoConfigured();
   const market = DFS_KEYWORD_LOCATIONS[options.location];
   if (!market) {
     return {

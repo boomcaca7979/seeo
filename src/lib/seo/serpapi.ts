@@ -247,11 +247,25 @@ function domainToUnicode(hostname: string): string {
  * 通用 SerpApi JSON 请求 + 错误映射（search / google_autocomplete 等引擎共用）。
  * 错误契约一致：INVALID_KEY / QUOTA_EXCEEDED / UPSTREAM_ERROR / TIMEOUT。
  */
-async function fetchSerpApiJson(params: Record<string, string>): Promise<Record<string, unknown>> {
-  const apiKey = process.env.SERPAPI_KEY;
-  if (!apiKey) {
+/**
+ * 是否已配置 SerpApi 凭据。
+ * 供 service 层在**扣减用户额度之前**做配置预检：凭据缺失属平台配置错误，
+ * 用户拿不到任何数据，不得因此消耗用户的套餐额度。
+ */
+export function isSerpApiConfigured(): boolean {
+  return Boolean(process.env.SERPAPI_KEY);
+}
+
+/** 未配置凭据时抛出明确的配置错误（401 INVALID_KEY），不发起任何网络请求 */
+export function assertSerpApiConfigured(): void {
+  if (!isSerpApiConfigured()) {
     throw new SeoProviderError("INVALID_KEY", "服务端未配置 SERPAPI_KEY，请在 .env.local 中填入");
   }
+}
+
+async function fetchSerpApiJson(params: Record<string, string>): Promise<Record<string, unknown>> {
+  assertSerpApiConfigured();
+  const apiKey = process.env.SERPAPI_KEY as string;
 
   const url = new URL("https://serpapi.com/search.json");
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));

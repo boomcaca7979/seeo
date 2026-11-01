@@ -8,6 +8,9 @@ const readCacheMock = vi.fn();
 const writeCacheMock = vi.fn();
 const consumeQuotaMock = vi.fn();
 const peekUsageMock = vi.fn();
+const refundQuotaMock = vi.fn();
+const getPlanLimitMock = vi.fn();
+const assertDataForSeoConfiguredSpy = vi.fn();
 const expandKeywordMock = vi.fn();
 const getSerpUsageMock = vi.fn();
 const fetchKeywordMetricsMock = vi.fn();
@@ -19,6 +22,8 @@ vi.mock("./cache", () => ({
   writeCache: (...args: unknown[]) => writeCacheMock(...args),
   consumeQuota: (...args: unknown[]) => consumeQuotaMock(...args),
   peekUsage: (...args: unknown[]) => peekUsageMock(...args),
+  getPlanLimit: (...args: unknown[]) => getPlanLimitMock(...args),
+  refundQuota: (...args: unknown[]) => refundQuotaMock(...args),
   QuotaExceededError: class QuotaExceededError extends Error {
     readonly code = "QUOTA_EXCEEDED";
     constructor(used: number, limit: number, apiType: string, month: string) {
@@ -37,6 +42,8 @@ vi.mock("./dataforseo", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./dataforseo")>();
   return {
     ...actual,
+    // 真实预检照常执行（决定是否抛错），额外记录调用次数
+    assertDataForSeoConfigured: () => { assertDataForSeoConfiguredSpy(); return actual.assertDataForSeoConfigured(); },
     fetchKeywordMetrics: (...args: unknown[]) => fetchKeywordMetricsMock(...args),
     fetchKeywordDiscovery: (...args: unknown[]) => fetchKeywordDiscoveryMock(...args),
     fetchBacklinks: (...args: unknown[]) => fetchBacklinksMock(...args),
@@ -45,22 +52,32 @@ vi.mock("./dataforseo", async (importOriginal) => {
 
 import {
   computeUnavailableMetrics,
+  enrichKeywordMetrics,
   mergeKeywordCandidates,
   normalizeKeywordForDedup,
   researchKeywords,
 } from "./keyword-research-service";
 import { dedupeKeywordList } from "./keyword-merge";
-import { DataForSeoNotConfiguredError } from "./dataforseo";
+import { DataForSeoApiError, DataForSeoNotConfiguredError } from "./dataforseo";
 import { QuotaExceededError } from "./cache";
 
 const serpUsage = { used: 3, limit: 30, month: "2026-08" };
 const dfsUsage = { used: 1, limit: 5, month: "2026-08" };
 
 beforeEach(() => {
+  // DataForSEO 凭据预检要求环境变量存在（预检本身在真实模块里，未被 mock）；
+  // 具体 provider 调用仍由 mock 决定，凭据值不参与任何断言。
+  vi.stubEnv("DATAFORSEO_LOGIN", "test-login");
+  vi.stubEnv("DATAFORSEO_PASSWORD", "test-password");
   readCacheMock.mockReset().mockResolvedValue(null);
   writeCacheMock.mockReset().mockResolvedValue(undefined);
   consumeQuotaMock.mockReset().mockResolvedValue(dfsUsage);
   peekUsageMock.mockReset().mockResolvedValue(dfsUsage);
+  refundQuotaMock.mockReset().mockResolvedValue(undefined);
+  // 套餐额度：free = 0（不含市场指标），lite/pro 有额度。与 DEFAULT_PLAN_LIMITS 一致。
+  getPlanLimitMock.mockReset().mockImplementation(async (plan: unknown, apiType: unknown) =>
+    apiType === "dataforseo" ? (plan === "free" ? 0 : 5) : 30);
+  assertDataForSeoConfiguredSpy.mockReset();
   expandKeywordMock.mockReset().mockResolvedValue({
     seed: "seo 工具",
     related: ["seo 工具 推荐", "免费 SEO 工具"],
@@ -178,7 +195,7 @@ describe("researchKeywords", () => {
       warnings: ["keyword difficulty 端点未返回数据"],
     });
 
-    const result = await researchKeywords("user-1", "free", { keyword: "seo 工具", location: "中国", device: "PC" });
+    const result = await researchKeywords("user-1", "lite", { keyword: "seo 工具", location: "中国", device: "PC" });
 
     expect(result.related).toEqual(["seo 工具 推荐", "免费 SEO 工具"]);
     expect(result.paa).toEqual(["什么是 SEO 工具？", "SEO 工具 推荐"]);
@@ -343,7 +360,7 @@ describe("researchKeywords", () => {
       new QuotaExceededError(5, 5, "dataforseo", "2026-08")
     );
 
-    const result = await researchKeywords("user-1", "free", { keyword: "seo 工具", location: "中国", device: "PC" });
+    const result = await researchKeywords("user-1", "lite", { keyword: "seo 工具", location: "中国", device: "PC" });
 
     expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
     expect(result.keywords).toHaveLength(4);
@@ -394,5 +411,133 @@ describe("researchKeywords", () => {
     expect(result.keywords[0]).toMatchObject({ searchVolume: 5000, difficulty: 55, competition: 0.62, source: "dataforseo" });
     expect(result.keywords[1].source).toBe("dataforseo"); // provider 返回了该行（即使值为 null）
     expect(result.unavailableMetrics).toEqual(["intent", "trend"]);
+  });
+});
+
+// ===== 市场指标套餐边界（2026-11-01 R3）=====
+// A. free(0) + 无缓存 + 无凭据 → 必须说「套餐不含」，不能说「DataForSEO 未配置」
+// B. lite/pro + 无缓存 + 无凭据 → 必须说「数据源未配置」，不能说「套餐不含」
+// C. 有效缓存 → 任何套餐都按原值返回，不消耗额度、不查套餐表
+describe("市场指标套餐边界", () => {
+  const metricRow = (keyword: string) => ({ ...emptyMetricRow(keyword), searchVolume: 1200 });
+
+  it("A. free 套餐（额度 0）：不请求 provider、不扣额度、reason=plan_not_included", async () => {
+    const result = await enrichKeywordMetrics("user-1", "free", ["seo 工具"], "中国");
+
+    expect(getPlanLimitMock).toHaveBeenCalledWith("free", "dataforseo");
+    expect(result.planIncluded).toBe(false);
+    expect(result.reason).toBe("plan_not_included");
+    expect(result.source).toBe(null);
+    expect(result.rows).toEqual([]);
+    // 未发起任何请求、未扣任何额度
+    expect(assertDataForSeoConfiguredSpy).not.toHaveBeenCalled();
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+    // 文案指向套餐，而不是凭据
+    expect(result.warnings.join(" ")).toContain("不含市场指标额度");
+    expect(result.warnings.join(" ")).not.toContain("未配置");
+  });
+
+  it("A'. free 套餐即便凭据齐全也仍然不发请求（额度是唯一判定）", async () => {
+    vi.stubEnv("DATAFORSEO_LOGIN", "test-login");
+    vi.stubEnv("DATAFORSEO_PASSWORD", "test-password");
+    const result = await enrichKeywordMetrics("user-1", "free", ["seo 工具"], "中国");
+    expect(result.reason).toBe("plan_not_included");
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("B. lite 套餐 + 凭据缺失：reason=unconfigured，不扣额度、不请求", async () => {
+    vi.stubEnv("DATAFORSEO_LOGIN", "");
+    vi.stubEnv("DATAFORSEO_PASSWORD", "");
+
+    const result = await enrichKeywordMetrics("user-1", "lite", ["seo 工具"], "中国");
+
+    expect(result.planIncluded).toBe(true);
+    expect(result.reason).toBe("unconfigured");
+    expect(result.source).toBe(null);
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+    expect(result.warnings.join(" ")).toContain("未配置 DataForSEO");
+    expect(result.warnings.join(" ")).not.toContain("不含市场指标额度");
+  });
+
+  it("B'. pro 套餐 + 凭据缺失：同样归因为数据源未配置", async () => {
+    vi.stubEnv("DATAFORSEO_LOGIN", "");
+    vi.stubEnv("DATAFORSEO_PASSWORD", "");
+    const result = await enrichKeywordMetrics("user-1", "pro", ["seo 工具"], "中国");
+    expect(result.reason).toBe("unconfigured");
+    expect(result.planIncluded).toBe(true);
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+  });
+
+  it("B''. lite 套餐额度用尽：reason=quota_exceeded，不退款、不请求 provider", async () => {
+    consumeQuotaMock.mockRejectedValue(new QuotaExceededError(5, 5, "dataforseo", "2026-11"));
+
+    const result = await enrichKeywordMetrics("user-1", "lite", ["seo 工具"], "中国");
+
+    // 扣费动作发生了尝试（429 是真实计费边界），但供应商请求为零、无退款
+    expect(consumeQuotaMock).toHaveBeenCalledTimes(1);
+    expect(refundQuotaMock).not.toHaveBeenCalled();
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+    expect(result.planIncluded).toBe(true);
+    expect(result.reason).toBe("quota_exceeded");
+    expect(result.source).toBe(null);
+    expect(result.rows).toEqual([]);
+    // 不得把 429 误标成「套餐不含」或「未配置」
+    expect(result.warnings.join(" ")).not.toContain("不含市场指标额度");
+    expect(result.warnings.join(" ")).not.toContain("未配置 DataForSEO");
+  });
+
+  it("C. free 套餐命中有效缓存：按原值返回、零额度、零套餐查询", async () => {
+    readCacheMock.mockResolvedValue([metricRow("seo 工具")]);
+
+    const result = await enrichKeywordMetrics("user-1", "free", ["seo 工具"], "中国");
+
+    expect(result.fromCache).toBe(true);
+    expect(result.source).toBe("dataforseo");
+    expect(result.rows[0].searchVolume).toBe(1200);
+    expect(result.reason).toBe(null);
+    expect(getPlanLimitMock).not.toHaveBeenCalled(); // 缓存热路径不查套餐表
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+  });
+});
+
+// ===== 平台凭据错误不得扣减用户额度（2026-11-01 定向修复）=====
+describe("DataForSEO 凭据预检与额度", () => {
+  it("未配置凭据：扣额度之前就失败，state=unconfigured 且量=0", async () => {
+    vi.stubEnv("DATAFORSEO_LOGIN", "");
+    vi.stubEnv("DATAFORSEO_PASSWORD", "");
+
+    const result = await researchKeywords("user-1", "pro", {
+      keyword: "seo 工具",
+      location: "中国",
+      device: "PC",
+    });
+
+    expect(result.metrics.discovery.state).toBe("unconfigured");
+    // 补全与发现都必须失败在扣费之前
+    expect(consumeQuotaMock).not.toHaveBeenCalled();
+    expect(fetchKeywordDiscoveryMock).not.toHaveBeenCalled();
+    expect(fetchKeywordMetricsMock).not.toHaveBeenCalled();
+  });
+
+  it("供应商认证失败（401xx）：回滚本次预扣，指标仍按缺失降级", async () => {
+    const authError = new DataForSeoApiError(40102, "Invalid login or password");
+    fetchKeywordDiscoveryMock.mockRejectedValue(authError);
+    fetchKeywordMetricsMock.mockRejectedValue(authError);
+
+    const result = await researchKeywords("user-1", "pro", {
+      keyword: "seo 工具",
+      location: "中国",
+      device: "PC",
+    });
+
+    expect(refundQuotaMock).toHaveBeenCalled();
+    expect(refundQuotaMock.mock.calls.every((c) => c[1] === "dataforseo")).toBe(true);
+    // 指标不外泄成假数值
+    expect(result.keywords.every((k) => k.searchVolume === null || typeof k.searchVolume === "number")).toBe(true);
+    expect(result.metrics.discovery.state).toBe("error");
   });
 });
