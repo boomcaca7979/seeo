@@ -37,7 +37,7 @@ SEO audits, rank tracking and keyword research in one place
 ## 3. Short Description
 
 ```
-An SEO workbench for site owners and small teams: technical audit, rank tracking, keyword research, competitor and backlink analysis.
+An SEO workbench for site owners and small teams: technical audit, rank tracking, keyword research, competitor analysis.
 ```
 
 ## 4. Full Description
@@ -48,7 +48,7 @@ Running a technical audit, checking rankings, and deciding what to write next us
 
 **Product**
 
-SeeO is an SEO analytics workbench. Audits, rank tracking, keyword research, competitor and backlink analysis live in one place, on one data set.
+SeeO is an SEO analytics workbench. Audits, rank tracking, keyword research, competitor analysis, and content optimisation live in one place, on one data set.
 
 **Core workflow**
 
@@ -56,7 +56,7 @@ Run an audit to find what is wrong, pick the issues that affect real pages, expa
 
 **Main capabilities**
 
-Technical SEO audit with per-issue affected pages; rank tracking over time by location and device; keyword research from a seed term; competitor ranking comparison; content optimisation against current results; backlink analysis with referring domains.
+Technical SEO audit with per-issue affected pages; rank tracking over time by location and device; keyword research from a seed term; competitor ranking comparison; content optimisation against current results.
 
 **Free entry**
 
@@ -69,7 +69,7 @@ Try it on your own site.
 > 长描述必须与站上 `messages/en.json → meta.siteDescription` **逐字一致**（有测试强制）：
 >
 > ```
-> SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.
+> SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization.
 > ```
 
 ## 5. Maker Bio
@@ -102,7 +102,6 @@ What it does today:
 - Keyword research: expand a seed keyword into related terms
 - Competitor analysis: compare rankings and share of voice
 - Content optimisation: check a page against the current top results
-- Backlink analysis: referring domains and anchor text distribution
 
 There is a free plan that covers the audit, and a free audit you can run without an account.
 
@@ -114,7 +113,7 @@ Where I would most like feedback: whether the audit output is actually readable 
 ## 7. FAQ
 
 **Q: What is SeeO?**
-A: An SEO analytics platform that puts technical audits, rank tracking, keyword research, competitor analysis, content optimisation and backlink analysis in one workbench.
+A: An SEO analytics platform that puts technical audits, rank tracking, keyword research, competitor analysis and content optimisation in one workbench.
 
 **Q: Who is it for?**
 A: Site owners, founders and small SEO teams who need the audit → fix → track loop in one place, plus SEO practitioners who want a first pass before a deeper crawl.

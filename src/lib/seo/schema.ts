@@ -16,7 +16,7 @@ export const SITE_NAME = "SeeO";
 const APP_TEXT = {
   en: {
     description:
-      "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.",
+      "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization.",
     offers: [
       { key: "free", name: "Free", description: "Free plan: for personal site owners and beginners" },
       { key: "lite", name: "Lite", description: "Lite plan: 30-day membership, one-time purchase" },
@@ -25,7 +25,7 @@ const APP_TEXT = {
   },
   zh: {
     description:
-      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析、内容优化与外链分析。",
+      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析与内容优化。",
     offers: [
       { key: "free", name: "免费版", description: "免费版：适合个人站长和初学者" },
       { key: "lite", name: "Lite 版", description: "Lite 版：30 天会员，一次性购买" },
@@ -45,7 +45,7 @@ export function organizationSchema(locale?: "en" | "zh") {
     name: SITE_NAME,
     url: SITE_URL,
     description:
-      "SeeO is an independent all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.",
+      "SeeO is an independent all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization.",
     logo: {
       "@type": "ImageObject",
       url: `${SITE_URL}/og.jpg`,

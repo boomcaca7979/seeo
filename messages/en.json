@@ -1,7 +1,7 @@
 {
   "meta": {
     "siteTitle": "SeeO · SEO Analytics, Rank Tracking & Audit Platform",
-    "siteDescription": "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis."
+    "siteDescription": "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization."
   },
   "nav": {
     "features": "Features",
@@ -495,7 +495,7 @@
       },
       {
         "q": "What makes SeeO different from other website SEO checker tools?",
-        "a": "Most checkers stop at a single page. SeeO crawls up to 50 pages per run, scores every page, keeps full audit history, and connects results to rank tracking, keyword research, and backlink data on the same workbench — so improvements are provable rather than anecdotal."
+        "a": "Most checkers stop at a single page. SeeO crawls up to 50 pages per run, scores every page, keeps full audit history, and connects results to rank tracking and keyword research on the same workbench — so improvements are provable rather than anecdotal."
       }
     ],
     "related": {
@@ -609,7 +609,7 @@
         },
         {
           "name": "Connect movement to what you shipped",
-          "body": "A ranking change is an observation, not an explanation. Pair it with a technical audit or a backlink check before concluding what caused it."
+          "body": "A ranking change is an observation, not an explanation. Pair it with a technical audit before concluding what caused it."
         }
       ]
     },
@@ -701,7 +701,7 @@
       },
       {
         "q": "What makes SeeO different from other rank tracking tools?",
-        "a": "The SEO rank tracker sits on the same workbench as technical audits, keyword research, and backlink data, so a ranking drop can be investigated next to the technical issue or lost link that caused it — no exporting between tools. That shortens the loop between \"rankings dropped\" and \"here's why\"."
+        "a": "The SEO rank tracker sits on the same workbench as technical audits and keyword research, so a ranking drop can be investigated next to the technical issue that caused it — no exporting between tools. That shortens the loop between \"rankings dropped\" and \"here's why\"."
       }
     ],
     "related": {
@@ -965,7 +965,7 @@
   "docsPage": {
     "meta": {
       "title": "SeeO Documentation: Features, Data Sources & Guides",
-      "description": "SeeO product docs: what SeeO is, how the six core features work, where the data comes from, plan limits, and common questions to get you started."
+      "description": "SeeO product docs: what SeeO is, how the core features work, where the data comes from, plan limits, and common questions to get you started."
     },
     "eyebrow": "DOCS",
     "title": "Product Docs",
@@ -978,8 +978,8 @@
     },
     "intro": [
       "SeeO is an SEO analytics platform that helps site owners and SEO practitioners make search optimization decisions based on real data.",
-      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, backlink analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
-      "SeeO does not build its own search index. Real-time SERP data comes from third-party APIs such as SerpApi and DataForSEO, combined with SeeO's own crawler for technical audits and content analysis."
+      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
+      "SeeO does not build its own search index. Real-time SERP data comes from SerpApi, combined with SeeO's own crawler for technical audits and content analysis."
     ],
     "features": [
       {
@@ -996,12 +996,12 @@
       {
         "id": "keyword-research",
         "name": "Keyword Research",
-        "desc": "Expand seed keywords into related terms with search volume, difficulty, CPC, and intent.",
+        "desc": "Expand seed keywords into related terms; market metrics appear where provider data is available.",
         "capabilities": [
           "Keyword overview",
           "Related keyword expansion",
-          "Search intent",
-          "KD difficulty score"
+          "Search intent (from provider data where available)",
+          "Saved keyword groups"
         ]
       },
       {
@@ -1027,17 +1027,6 @@
         ]
       },
       {
-        "id": "backlink-analysis",
-        "name": "Backlink Analysis",
-        "desc": "View total backlinks, referring domains, anchor distribution, and growth / loss trends.",
-        "capabilities": [
-          "Backlink overview",
-          "Referring domain analysis",
-          "Anchor distribution",
-          "Growth / loss trends"
-        ]
-      },
-      {
         "id": "content-optimization",
         "name": "Content Optimization",
         "desc": "Compare page content against the SERP top 10 for topic coverage, content score, and fixes.",
@@ -1052,13 +1041,8 @@
     "dataSources": [
       {
         "name": "SerpApi",
-        "scope": "Keyword search volume, rank queries, SERP results, related keyword expansion",
+        "scope": "Rank queries, SERP results, related keyword expansion (Google keyword ideas)",
         "note": "Third-party API billed per call; SeeO adds usage counting and circuit-breaker protection"
-      },
-      {
-        "name": "DataForSEO",
-        "scope": "Backlink data, referring domains, domain authority",
-        "note": "Third-party API used by the backlink analysis module"
       },
       {
         "name": "In-house crawler",
@@ -1090,8 +1074,8 @@
     ],
     "contact": {
       "title": "Still have questions?",
-      "body": "Our official support email will be published here once confirmed.",
-      "note": "Contact channel pending announcement"
+      "body": "Email us at support@seeo.asia.",
+      "note": "We typically respond within 1–2 business days"
     }
   },
   "aboutPage": {
@@ -1113,7 +1097,7 @@
     },
     "what": [
       "SeeO is an SEO analytics platform that helps site owners and SEO practitioners make search optimization decisions based on real data.",
-      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, backlink analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
+      "The problem SeeO solves: it brings SEO workflows that usually live in separate tools — keyword research, rank tracking, technical audits, competitor analysis, and content optimization — onto a single workbench, with data flowing automatically between modules instead of constant import and export.",
       "Compared with stitching together multiple tools, SeeO covers the complete SEO data workflow with one account and one workbench, organized around a single project (website) dimension."
     ],
     "who": [
@@ -1132,7 +1116,7 @@
     ],
     "how": {
       "input": "Users create projects and add website domains and keyword lists",
-      "process": "SeeO's own crawler fetches pages for technical checks; SerpApi queries keyword rankings; DataForSEO pulls backlink data; a scheduled job refreshes rankings daily and generates volatility alerts",
+      "process": "SeeO's own crawler fetches pages for technical checks; SerpApi queries keyword rankings; a scheduled job refreshes rankings daily and generates volatility alerts",
       "output": "Health scores with fixes, rank trend curves, competitor comparisons, content optimization suggestions, and exportable PDF / CSV reports"
     },
     "capabilities": [
@@ -1147,13 +1131,8 @@
         "href": "/features/rank-tracking"
       },
       {
-        "name": "Backlink Analysis",
-        "desc": "View total backlinks, referring domains, and anchor distribution via DataForSEO",
-        "href": "/features/backlink-analysis"
-      },
-      {
         "name": "Keyword Research",
-        "desc": "Expand seed keywords and view volume, difficulty, and search intent"
+        "desc": "Expand seed keywords into related terms, with market metrics where provider data is available"
       },
       {
         "name": "Competitor Analysis",
@@ -1167,11 +1146,7 @@
     "dataSources": [
       {
         "name": "SerpApi",
-        "scope": "Keyword search volume, rank queries, SERP results, related keyword expansion"
-      },
-      {
-        "name": "DataForSEO",
-        "scope": "Backlink data, referring domains, domain authority"
+        "scope": "Rank queries, SERP results, related keyword expansion (Google keyword ideas)"
       },
       {
         "name": "In-house crawler",
@@ -1190,6 +1165,7 @@
     "notDoing": [
       "AI citation tracking",
       "LLM rank monitoring and GEO scoring",
+      "Backlink analysis (in preparation — not currently available)",
       "Team collaboration",
       "Bing, Baidu, and other non-Google search engine data",
       "A self-built search index (data comes from third-party APIs)"
@@ -1197,7 +1173,7 @@
     "faqs": [
       {
         "q": "Is SeeO an AI tool?",
-        "a": "No. SeeO is a data-driven SEO analytics platform that gets real data from third-party APIs such as SerpApi and DataForSEO plus its own crawler. SeeO currently does not offer AI citation tracking, LLM rank monitoring, or GEO scoring."
+        "a": "No. SeeO is a data-driven SEO analytics platform that gets real data from third-party APIs such as SerpApi plus its own crawler. SeeO currently does not offer AI citation tracking, LLM rank monitoring, or GEO scoring."
       },
       {
         "q": "Which search engines does SeeO support?",
@@ -1398,7 +1374,7 @@
     "emailLabel": "Customer Support"
   },
   "dashboard": {
-    "metaDescription": "The SeeO workspace: run technical SEO audits, track keyword rankings daily, export reports, and analyze competitors and backlinks for the selected project.",
+    "metaDescription": "The SeeO workspace: run technical SEO audits, track keyword rankings daily, export reports, and analyze competitors for the selected project.",
     "viz": {
       "tableLabel": "Data table",
       "thPriority": "Priority",
@@ -4504,28 +4480,28 @@
   },
   "keywordResearch": {
     "meta": {
-      "title": "Keyword Research Tool - Search Volume, Difficulty & CPC | SeeO",
-      "description": "SeeO expands a seed keyword into related terms with search volume, SEO difficulty, CPC, search intent, and trend so you can pick high-value targets to target."
+      "title": "Keyword Research Tool - Expansion, Intent & Market Metrics | SeeO",
+      "description": "SeeO expands a seed keyword into related terms and shows volume, difficulty, CPC, and intent where verified provider data is available, so you can pick targets."
     },
     "title": "Keyword Research Tool for Real Search Demand",
-    "subtitle": "Turn one seed keyword into a mapped set of opportunities — with the volume, difficulty, intent, and CPC data you need to decide what is actually worth targeting",
-    "whatItDoes": "SeeO's keyword research tool takes a seed term and expands it into a set of related keywords, then attaches the metrics that matter for prioritization: monthly search volume, SEO difficulty (KD), CPC, competition, search intent (informational, commercial, transactional, or navigational), and a recent trend signal. Instead of guessing which terms to chase, you get a side-by-side view of demand and effort so you can spot long-tail and lower-difficulty opportunities that still carry real traffic potential. Keywords can be grouped into saved lists, so the research you do today becomes the input for rank tracking and content optimization tomorrow — no exporting between tools.",
+    "subtitle": "Turn one seed keyword into a mapped set of opportunities — expansion, intent signals, and market metrics where provider data is available",
+    "whatItDoes": "SeeO's keyword research tool takes a seed term and expands it into a set of related keywords, then attaches the metrics that matter for prioritization where verified provider data is available: monthly search volume, SEO difficulty (KD), CPC, competition, search intent (informational, commercial, transactional, or navigational), and a recent trend signal. Keyword metrics are displayed only when provider data exists — a value without a verified source is shown as \"—\" rather than estimated. Instead of guessing which terms to chase, you get a side-by-side view of demand and effort so you can spot long-tail and lower-difficulty opportunities that still carry real traffic potential. Keywords can be grouped into saved lists, so the research you do today becomes the input for rank tracking and content optimization tomorrow — no exporting between tools.",
     "how": {
       "input": "A seed keyword or short phrase",
       "process": [
         "Expands the seed into related and phrase-match keyword variants (SerpApi Google results)",
-        "Enriches each term with volume, difficulty, CPC, competition, intent, and trend from search-data APIs",
+        "Enriches terms with volume, difficulty, CPC, competition, intent, and trend where provider metrics are available — values without a verified source display as \"—\", never estimates",
         "Caches results so repeat lookups of the same term stay efficient",
         "Lets you group keywords into named lists saved to your account",
         "Feeds grouped keywords straight into rank tracking and content optimization"
       ],
       "output": [
-        "Related keyword sets with volume and difficulty for each term",
-        "CPC, competition, search intent, and trend per keyword",
+        "Related keyword sets, with market metrics attached where provider data exists",
+        "Search intent per keyword, plus CPC, competition, and trend where available",
         "Saved keyword groups you can reuse across modules",
         "A ready-to-track list for rank monitoring"
       ],
-      "dataSource": "SerpApi (Google keyword ideas) plus DataForSEO metrics — both billed per call, with usage counting and a circuit breaker"
+      "dataSource": "SerpApi (Google keyword ideas) plus DataForSEO metrics when configured — both billed per call, with usage counting and a circuit breaker"
     },
     "capabilities": [
       {
@@ -4534,11 +4510,11 @@
       },
       {
         "cat": "Keyword metrics",
-        "items": "Search volume, SEO difficulty (KD), CPC, and competition for every returned term"
+        "items": "Search volume, SEO difficulty (KD), CPC, and competition — shown for terms where provider data is available; \"—\" means no verified data, not zero"
       },
       {
         "cat": "Search intent",
-        "items": "Each keyword is classified as informational, commercial, transactional, or navigational to match content type"
+        "items": "Keywords are classified as informational, commercial, transactional, or navigational — from provider data where available, otherwise a conservative estimate based on the query wording"
       },
       {
         "cat": "Keyword grouping",
@@ -4553,6 +4529,7 @@
     ],
     "limits": [
       "Google keyword data only (no Bing or Baidu yet)",
+      "Market metrics depend on third-party data availability — not every keyword returns volume, difficulty, or CPC; missing values show as \"—\"",
       "Tracked and grouped keyword counts are limited by plan",
       "API calls are billed per request and protected by a circuit breaker, so usage stays predictable",
       "Trend is a recent signal, not a multi-year history"
@@ -4560,7 +4537,7 @@
     "faqs": [
       {
         "q": "Where does keyword data come from?",
-        "a": "Expansion comes from SerpApi's Google keyword ideas, and the per-term metrics (volume, difficulty, CPC, competition, intent, trend) come from DataForSEO. Both are third-party data providers billed per call."
+        "a": "Expansion comes from SerpApi's Google keyword ideas. Market metrics (volume, difficulty, CPC, competition, intent, trend) come from DataForSEO when configured and available. Values without verified provider data show as \"—\" — SeeO does not estimate or fabricate them. Both are third-party data providers billed per call."
       },
       {
         "q": "Can I group keywords for later use?",
@@ -4568,11 +4545,11 @@
       },
       {
         "q": "What does the difficulty score mean?",
-        "a": "Difficulty (KD) estimates how hard it is to rank for a term based on the competition already ranking. A lower KD with decent volume is usually the better target for a newer site."
+        "a": "Difficulty (KD), where available, estimates how hard it is to rank for a term based on the competition already ranking. A lower KD with decent volume is usually the better target for a newer site. Keywords without a verified difficulty value show as \"—\"."
       },
       {
         "q": "Does it classify search intent?",
-        "a": "Yes. Each keyword is tagged as informational, commercial, transactional, or navigational, which helps you match the right page type — a guide for informational, a product or pricing page for transactional."
+        "a": "Yes, with a caveat: keywords with provider intent data are tagged as informational, commercial, transactional, or navigational; the rest receive a conservative text-based estimate. This helps you match the right page type — a guide for informational, a product or pricing page for transactional."
       },
       {
         "q": "Is there a limit on how many keywords I can track?",
@@ -4580,7 +4557,7 @@
       },
       {
         "q": "How is this different from a spreadsheet?",
-        "a": "SeeO returns the metrics and intent in one pass and connects the list to rank tracking and content optimization on the same workbench, so research turns into tracked progress instead of a static sheet."
+        "a": "SeeO returns the available metrics and intent in one pass and connects the list to rank tracking and content optimization on the same workbench, so research turns into tracked progress instead of a static sheet."
       }
     ],
     "related": {
@@ -4864,7 +4841,7 @@
       },
       {
         "q": "Does SeeO have as much backlink data as Semrush?",
-        "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Semrush is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Semrush is the stronger choice."
+        "a": "No. SeeO currently focuses on technical audits, rank tracking, keyword research, and competitor analysis — it does not offer a backlink index comparable to Semrush's. If backlink data depth is your top priority, Semrush is the stronger choice."
       },
       {
         "q": "Which is better for a small team or solo SEO?",
@@ -4968,7 +4945,7 @@
       },
       {
         "q": "Does SeeO have as much backlink data as Ahrefs?",
-        "a": "No. SeeO's backlink analysis is powered by DataForSEO and is a Pro feature, whereas Ahrefs is known for one of the largest backlink indexes in the industry. If backlink data depth is your top priority, Ahrefs is the stronger choice."
+        "a": "No. SeeO currently focuses on technical audits, rank tracking, keyword research, and competitor analysis — it does not offer a backlink index comparable to Ahrefs'. If backlink data depth is your top priority, Ahrefs is the stronger choice."
       },
       {
         "q": "Which is better for a small team or solo SEO?",
@@ -5335,8 +5312,8 @@
       }
     },
     "cta": {
-      "title": "Run link profile analysis on a stored snapshot",
-      "subtitle": "SeeO caches each domain query for seven days, so you can compare the same profile across weeks instead of re-sampling"
+      "title": "Put link findings into context",
+      "subtitle": "Pair what you learned with rank tracking and technical audits — SeeO tracks Google rankings daily and re-audits your site to verify fixes"
     }
   },
   "backlinkChecker": {
@@ -5566,9 +5543,9 @@
   },
   "authPage": {
     "loginTitle": "Log In to SeeO — SEO Audits & Rank Tracking",
-    "loginDescription": "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks from one dashboard.",
+    "loginDescription": "Log in to SeeO to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors from one dashboard.",
     "signupTitle": "Create a SeeO Account — SEO Audits & Rank Tracking",
-    "signupDescription": "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors and backlinks.",
+    "signupDescription": "Create a free SeeO account to run technical SEO audits, track keyword rankings daily, research keywords, and monitor competitors.",
     "ogAlt": "SeeO — SEO Audits, Rank Tracking & Keyword Research"
   },
   "unsubscribePage": {

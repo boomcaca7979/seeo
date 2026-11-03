@@ -201,10 +201,18 @@ describe("G4–G8 playbook 与契合度矩阵", () => {
     }
   });
 
-  it("五个 playbook 文件存在，且 Product Hunt 素材与站上描述逐字一致", () => {
-    const file = path.join(process.cwd(), "seo-growth/community/PRODUCT_HUNT_KIT.md");
-    expect(fs.existsSync(file)).toBe(true);
-    const kit = fs.readFileSync(file, "utf-8");
+  it("五个 playbook 文件存在，且 Product Hunt 渲染产物与站上描述逐字一致", () => {
+    // PRODUCT_HUNT_KIT.md 自 J 阶段起是纯指针（不再承载文案）；
+    // 逐字一致性改钉渲染产物 LAUNCH_KIT.md（由 scripts/product-hunt.mts renderKit 生成，
+    // 且 launch-kit.test.ts 已单独钉死 siteLong === meta.siteDescription）。
+    const pointerFile = path.join(process.cwd(), "seo-growth/community/PRODUCT_HUNT_KIT.md");
+    expect(fs.existsSync(pointerFile)).toBe(true);
+    const pointer = fs.readFileSync(pointerFile, "utf-8");
+    expect(pointer).toContain("src/lib/product-hunt/launch-kit.ts");
+
+    const kitFile = path.join(process.cwd(), "seo-growth/product-hunt/LAUNCH_KIT.md");
+    expect(fs.existsSync(kitFile)).toBe(true);
+    const kit = fs.readFileSync(kitFile, "utf-8");
     const messages = JSON.parse(fs.readFileSync(path.join(process.cwd(), "messages/en.json"), "utf-8")) as {
       meta: { siteDescription: string };
     };

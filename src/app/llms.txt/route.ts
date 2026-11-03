@@ -22,11 +22,11 @@ export function GET() {
 
   const body = `# SeeO
 
-SeeO is an SEO software platform for keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.
+SeeO is an SEO software platform for keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization.
 
 ## Overview
 
-SeeO is a web-based SEO analytics platform. Users add projects (websites), track keyword rankings, run technical SEO audits, analyze competitors, optimize content, and review backlink data. SeeO does not build its own search index; SERP data comes from SerpApi and backlink data from DataForSEO. Technical audits use SeeO's own crawler.
+SeeO is a web-based SEO analytics platform. Users add projects (websites), track keyword rankings, run technical SEO audits, analyze competitors, and optimize content. SeeO does not build its own search index; SERP data comes from SerpApi. Technical audits use SeeO's own crawler.
 
 SeeO provides AI Search (GEO) brand visibility via DataForSEO: brand mentions in ChatGPT / Google AI Overview answers, citation pages, and AI Share of Voice versus competitors. SeeO does NOT provide: LLM content generation, GEO scoring, or team collaboration.
 
@@ -36,7 +36,7 @@ SeeO provides AI Search (GEO) brand visibility via DataForSEO: brand mentions in
   Crawl-based site audit, 20+ technical checks, health score (0-100), prioritized fixes. Quick mode: 1 page; full mode: up to 50 pages.
 - Keyword Rank Tracking: ${SITE_URL}/features/rank-tracking
   Daily-refreshed Google rankings per keyword x domain x location x device, history trends, volatility alerts. Data from SerpApi.
-${backlinkCapability}- Keyword Research: keyword overview and expansion with volume, difficulty, intent (in-app)
+${backlinkCapability}- Keyword Research: keyword overview and expansion (in-app); market metrics (volume, difficulty, intent) shown where provider data is available
 - Competitor Analysis: ranking comparison and share of voice (in-app)
 - Content Optimization: content checks against SERP Top 10 (in-app)
 - Reporting: PDF / Excel export, email reports (in-app)

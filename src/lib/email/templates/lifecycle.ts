@@ -40,7 +40,7 @@ export const LIFECYCLE_TEMPLATES: Record<string, LifecycleTemplate> = {
         eyebrow: "WELCOME",
         title: `Hi ${vars.firstName}, welcome to SeeO`,
         body: [
-          "Your account is ready. SeeO gives you technical SEO audits, daily rank tracking, keyword research, competitor and backlink analysis — all in one workbench.",
+          "Your account is ready. SeeO gives you technical SEO audits, daily rank tracking, keyword research, and competitor analysis — all in one workbench.",
           "The fastest way to start: run a free SEO audit on your site. It crawls your pages, runs 20+ technical checks, and shows a health score with prioritized fixes.",
         ],
         cta: { label: "Run your first SEO audit", url: vars.auditUrl },
@@ -111,7 +111,7 @@ export const LIFECYCLE_TEMPLATES: Record<string, LifecycleTemplate> = {
         title: "What you can do in your SeeO workbench",
         body: [
           "A quick tour of what is included in your plan:",
-          "· Technical Audit — crawl your site and get a prioritized fix list\n· Keyword Research — expand a seed keyword into related terms with volume and difficulty\n· Rank Tracking — follow positions daily, by location and device\n· Competitor Analysis — compare rankings and share of voice side by side\n· Content Optimization — check a page against the current top results\n· Backlink Analysis — see referring domains and anchor text distribution",
+          "· Technical Audit — crawl your site and get a prioritized fix list\n· Keyword Research — expand a seed keyword into related terms\n· Rank Tracking — follow positions daily, by location and device\n· Competitor Analysis — compare rankings and share of voice side by side\n· Content Optimization — check a page against the current top results",
           "Everything lives in one workbench, so data moves between modules without exports.",
         ],
         cta: { label: "Open SeeO", url: vars.appUrl },

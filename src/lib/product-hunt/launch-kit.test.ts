@@ -130,7 +130,7 @@ describe("J2/J3/J4 positioning · tagline · description", () => {
     for (const s of FULL_DESCRIPTION_SECTIONS) expect(s.body.trim().length).toBeGreaterThan(20);
   });
 
-  it("定位与实际产品一致：六个模块都真实存在，且不出现禁止卖点", () => {
+  it("定位与实际产品一致：五个模块都真实存在，且不出现禁止卖点", () => {
     const text = [
       JSON.stringify(DESCRIPTIONS),
       JSON.stringify(FULL_DESCRIPTION_SECTIONS),
@@ -138,10 +138,14 @@ describe("J2/J3/J4 positioning · tagline · description", () => {
       FIRST_COMMENT,
     ].join("\n");
 
-    // 六个真实模块
-    for (const mod of ["audit", "rank", "keyword", "competitor", "content", "backlink"]) {
+    // 五个真实模块（backlink analysis 暂缓上线，重新开放前不得进入宣传物料，
+    // 见 src/lib/seo/public-tools.ts 与 2026-11-03 宣传一致性修正）
+    for (const mod of ["audit", "rank", "keyword", "competitor", "content"]) {
       expect(text.toLowerCase()).toContain(mod);
     }
+
+    // 暂缓模块不得出现在对外物料里
+    expect(text.toLowerCase()).not.toContain("backlink");
 
     // 禁止的虚假能力与无证据断言
     const banned = [

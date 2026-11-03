@@ -51,10 +51,10 @@ export function recommendedTagline(): string {
 export const DESCRIPTIONS = {
   /** Product Hunt 列表页的一句话 */
   short:
-    "An SEO workbench for site owners and small teams: technical audit, rank tracking, keyword research, competitor and backlink analysis.",
+    "An SEO workbench for site owners and small teams: technical audit, rank tracking, keyword research, competitor analysis.",
   /** 与 messages/en.json → meta.siteDescription 完全一致 */
   siteLong:
-    "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, content optimization, and backlink analysis.",
+    "SeeO is an all-in-one SEO analytics platform: keyword research, rank tracking, technical SEO audits, competitor analysis, and content optimization.",
   /** 补充段：说明它解决什么问题（不夸大） */
   why:
     "Most SEO work is split across separate tools — a crawler here, a rank tracker there, a keyword tool somewhere else. SeeO puts those steps in one workbench so the output of one feeds the next.",
@@ -68,7 +68,7 @@ export const FULL_DESCRIPTION_SECTIONS = [
   },
   {
     heading: "Product",
-    body: "SeeO is an SEO analytics workbench. Audits, rank tracking, keyword research, competitor and backlink analysis live in one place, on one data set.",
+    body: "SeeO is an SEO analytics workbench. Audits, rank tracking, keyword research, competitor analysis, and content optimisation live in one place, on one data set.",
   },
   {
     heading: "Core workflow",
@@ -76,7 +76,7 @@ export const FULL_DESCRIPTION_SECTIONS = [
   },
   {
     heading: "Main capabilities",
-    body: "Technical SEO audit with per-issue affected pages; rank tracking over time by location and device; keyword research from a seed term; competitor ranking comparison; content optimisation against current results; backlink analysis with referring domains.",
+    body: "Technical SEO audit with per-issue affected pages; rank tracking over time by location and device; keyword research from a seed term; competitor ranking comparison; content optimisation against current results.",
   },
   {
     heading: "Free entry",
@@ -118,7 +118,6 @@ What it does today:
 - Keyword research: expand a seed keyword into related terms
 - Competitor analysis: compare rankings and share of voice
 - Content optimisation: check a page against the current top results
-- Backlink analysis: referring domains and anchor text distribution
 
 There is a free plan that covers the audit, and a free audit you can run without an account.
 
@@ -128,7 +127,7 @@ Where I would most like feedback: whether the audit output is actually readable 
 export const FAQ = [
   {
     q: "What is SeeO?",
-    a: "An SEO analytics platform that puts technical audits, rank tracking, keyword research, competitor analysis, content optimisation and backlink analysis in one workbench.",
+    a: "An SEO analytics platform that puts technical audits, rank tracking, keyword research, competitor analysis and content optimisation in one workbench.",
   },
   {
     q: "Who is it for?",
