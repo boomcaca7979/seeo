@@ -1745,7 +1745,8 @@
       "keywordResearch": "Keyword Research",
       "keywordMagic": "Keyword Magic Tool",
       "keywordStrategy": "Keyword Strategy Builder",
-      "keywordSaved": "Saved Keywords"
+      "keywordSaved": "Saved Keywords",
+      "contentGap": "Content Gap"
     },
     "topbar": {
       "noProject": "No project selected",
@@ -4480,7 +4481,26 @@
     "EXECUTION_NOT_APPROVED": "Approve the opportunity and this action before executing it.",
     "EXECUTION_INVALID_STATE": "The current action state doesn't allow this operation.",
     "EXECUTION_ADAPTER_ERROR": "The execution provider returned an error. Please retry later.",
-    "RESEARCH_NOT_FOUND": "Saved research not found"
+    "RESEARCH_NOT_FOUND": "Saved research not found",
+    "STRATEGY_NOT_FOUND": "Strategy not found or no longer available.",
+    "STRATEGY_NOT_READY": "This strategy is still generating. Try again later.",
+    "STRATEGY_RUNNING": "This strategy is currently generating. Please wait.",
+    "STRATEGY_EMPTY": "This strategy has no keywords yet.",
+    "NOTHING_TO_RETRY": "No failed seeds to retry.",
+    "QUOTA_INSUFFICIENT": "Not enough SerpApi quota for this request.",
+    "BAD_NAME": "Name must be 1-120 characters.",
+    "BAD_PRIORITY": "Invalid priority override payload.",
+    "BAD_BRIEF": "Invalid brief payload.",
+    "BAD_BRIEF_TOPIC": "This topic does not belong to the strategy.",
+    "BAD_BRIEF_TOO_LARGE": "Brief is too large.",
+    "BAD_SEEDS": "Invalid seed keywords.",
+    "TOO_MANY_SEEDS": "Too many seed keywords.",
+    "DUPLICATE_SEEDS": "Duplicate seed keywords detected.",
+    "BAD_KEYWORD_COUNT": "Please select 2-5 keywords to compare.",
+    "CONTEXT_MISMATCH": "Snapshots come from different market/device/language and cannot be compared.",
+    "SHARE_TOKEN_FAILED": "Failed to create share link. Please retry.",
+    "SCAN_RUNNING": "A scan is already running for this project.",
+    "SCAN_NOT_FOUND": "Scan not found."
   },
   "keywordResearch": {
     "meta": {

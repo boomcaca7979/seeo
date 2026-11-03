@@ -357,9 +357,26 @@ describe("K 边界与不变量", () => {
 
   it("不进入 sitemap、不创建任何 referral 路由或 landing page", () => {
     expect(read("src/app/sitemap.ts")).not.toMatch(/referral|\bref\b/);
-    for (const p of ["referral", "invite", "ref", "share", "r"]) {
+    for (const p of ["referral", "invite", "ref", "r"]) {
       expect(fs.existsSync(path.join(ROOT, "src/app/(default)", p)), `不应存在公开路由 /${p}`).toBe(false);
       expect(fs.existsSync(path.join(ROOT, "src/app/[locale]", p))).toBe(false);
+    }
+    // /share 现在承载关键词策略的只读分享（合法产品功能，见 share/keyword-strategy/[token]），
+    // 不再笼统禁止；但仍必须与 referral 无关——share 目录下不得出现 referral 模块引用。
+    for (const shareDir of ["src/app/(default)/share", "src/app/[locale]/share"]) {
+      if (!fs.existsSync(path.join(ROOT, shareDir))) continue;
+      const walkShare = (d: string): string[] => {
+        const out: string[] = [];
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+          const full = path.join(d, e.name);
+          if (e.isDirectory()) out.push(...walkShare(full));
+          else if (/\.tsx?$/.test(e.name)) out.push(full);
+        }
+        return out;
+      };
+      for (const f of walkShare(path.join(ROOT, shareDir))) {
+        expect(read(f.replace(`${ROOT}/`, "")), `${f} 不应引用 referral`).not.toMatch(/from\s+["'].*referral|referral-service|referral\.test/);
+      }
     }
     expect(read("src/app/robots.ts")).not.toMatch(/referral/);
   });

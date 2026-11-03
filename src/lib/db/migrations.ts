@@ -62,7 +62,7 @@ function localPathFromDbUrl(url: string): string | null {
  * 增删迁移步骤时把 SCHEMA_VERSION +1；读到比它更大的值说明代码比库旧（回滚部署），
  * 此时只做观测、不覆写、不报错——绝不能把新库的版本号倒退回旧版本。
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 7;
 
 export type SchemaInitReason = "applied" | "current" | "ahead";
 
@@ -645,9 +645,39 @@ async function migrate(db: DBAdapter): Promise<void> {
   // P0-02-D：rank_history 补 feature_types 列（旧库已存在表，需 ALTER；新库由 CREATE TABLE 建出）
   await addColumnIfMissing(db, "rank_history", "feature_types", "TEXT");
 
+  // 策略：用户手动追加的种子（Add keywords）单独存一列，原始 seeds 永不覆盖
+  await addColumnIfMissing(db, "keyword_strategies", "added_seeds_json", "TEXT");
+
+  // 策略：用户编辑并保存的 Content Brief（按 topicId）。
+  // 单独一列而不是塞进 meta_json：meta_json 会在每次重新生成（Add keywords / 重试）时
+  // 被 saveStrategyDoc 整块覆盖，放进去等于用户保存的大纲会被静默丢掉。
+  await addColumnIfMissing(db, "keyword_strategies", "briefs_json", "TEXT");
+
   // 2026-10-09 合规整改：email_preferences 补**显式营销同意**时间列。
   // 旧库只有退订列（opt-out），需 ALTER；新库由下方 CREATE TABLE 建出。NULL = 未同意。
   await addColumnIfMissing(db, "email_preferences", "marketing_opt_in_at", "TEXT");
+
+  // 关键词策略升级（Strategy Priority）：
+  //   priority_overrides_json：用户手动调整的主题优先级覆盖（与自动计算分离，
+  //   重新生成不覆盖用户决定）。SERP 快照存储在 meta_json（serpSnapshots 字段），
+  //   由 saveStrategyDoc 随策略整体持久化，避免两处真值。
+  await addColumnIfMissing(db, "keyword_strategies", "priority_overrides_json", "TEXT");
+
+  // P1 迁移修复：idx_tracked_unique 旧定义缺 user_id（跨用户互相阻断追踪词 +
+  // 存在性探测面）。索引是纯派生结构，幂等重建：读到旧定义才 DROP + CREATE，
+  // 新库（上面 CREATE TABLE 已带新定义）与已修复库都直接跳过。
+  const trackedUniqueSql = (
+    (await db.get(
+      `SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_tracked_unique'`
+    )) as { sql?: string | null } | undefined
+  )?.sql;
+  if (trackedUniqueSql && !trackedUniqueSql.includes("user_id")) {
+    await db.run(`DROP INDEX idx_tracked_unique`);
+    await db.run(
+      `CREATE UNIQUE INDEX idx_tracked_unique
+         ON tracked_keywords(user_id, keyword, location, device, domain)`
+    );
+  }
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tracked_keywords (
@@ -661,8 +691,11 @@ async function migrate(db: DBAdapter): Promise<void> {
       user_id TEXT NOT NULL DEFAULT 'demo-user'
     );
 
+    -- 唯一性必须含 user_id：旧定义 (keyword, location, device, domain) 缺 user_id，
+    -- 多用户下会互相「抢注」同一追踪词（后者收到虚假的「已存在」错误，且构成存在性探测面）。
+    -- 旧库由下方 migrate() 的索引重建逻辑迁移；这里只服务新库。
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_unique
-      ON tracked_keywords(keyword, location, device, domain);
+      ON tracked_keywords(user_id, keyword, location, device, domain);
 
     CREATE INDEX IF NOT EXISTS idx_tracked_keywords_user
       ON tracked_keywords(user_id);
@@ -1040,6 +1073,78 @@ async function migrate(db: DBAdapter): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_keyword_researches_user
       ON keyword_researches(user_id, saved_at DESC);
+
+    -- 关键词策略构造器：一份策略的完整快照（seeds/market/device + topics + keywords + meta）
+    -- status: running | ready | partial | failed；favorites_json 为收藏关键词 id 数组
+    CREATE TABLE IF NOT EXISTS keyword_strategies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL DEFAULT 'demo-user',
+      name TEXT NOT NULL,
+      seeds TEXT NOT NULL,
+      added_seeds_json TEXT,
+      briefs_json TEXT,
+      priority_overrides_json TEXT,
+      market TEXT NOT NULL,
+      device TEXT NOT NULL DEFAULT 'PC',
+      status TEXT NOT NULL DEFAULT 'running',
+      progress INTEGER NOT NULL DEFAULT 0,
+      keyword_count INTEGER NOT NULL DEFAULT 0,
+      keywords_json TEXT,
+      topics_json TEXT,
+      meta_json TEXT,
+      favorites_json TEXT,
+      share_token TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_keyword_strategies_user
+      ON keyword_strategies(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_keyword_strategies_share
+      ON keyword_strategies(share_token);
+
+    -- Website Content Gap：扫描任务（一次 sitemap 扫描 = 一行）
+    -- status: running | completed | failed | cancelled
+    CREATE TABLE IF NOT EXISTS site_scans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      domain TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'running',
+      sitemap_url TEXT,
+      requested INTEGER NOT NULL DEFAULT 0,
+      crawled INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      finished_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_site_scans_user
+      ON site_scans(user_id, project_id, created_at DESC);
+
+    -- Website Content Gap：页面内容资产清单（每 URL 一行，重复扫描 upsert）
+    -- 只存 title/h1/meta/状态等清单数据，不存页面正文。
+    CREATE TABLE IF NOT EXISTS site_content_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      scan_id INTEGER,
+      url TEXT NOT NULL,
+      canonical_url TEXT,
+      title TEXT,
+      h1 TEXT,
+      meta_description TEXT,
+      http_status INTEGER,
+      internal_links INTEGER,
+      fetched_at TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE(user_id, project_id, url)
+    );
+    CREATE INDEX IF NOT EXISTS idx_site_content_pages_user
+      ON site_content_pages(user_id, project_id);
 
     CREATE TABLE IF NOT EXISTS competitors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

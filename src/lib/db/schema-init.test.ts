@@ -1060,7 +1060,7 @@ describe("SCHEMA_VERSION 升级契约", () => {
    * 增删一条迁移语句必然触发。指纹变了只有两条出路——要么这条改动本就不该存在，
    * 要么把它连同版本号一起提交。
    */
-  const MIGRATE_BODY_SHA256 = "f7493df231697f8ab26130ae85d68b9ae5423e38be8a7ca3cf814892860b0ba0";
+  const MIGRATE_BODY_SHA256 = "5111857905c521dba0bc1a35dc3d27c183947efab94229730e4c04f4a0bd97b0";
 
   function migrateBody(): string {
     const source = fs.readFileSync(path.join(HERE, "migrations.ts"), "utf8");
@@ -1613,7 +1613,11 @@ setTimeout(() => {
     }
     expect(readUserVersion(file)).toBe(SCHEMA_VERSION);
 
-    const holdMs = 2000;
+    // holdMs 必须显著大于满载下的子进程冷启动噪声（import better-sqlite3 原生模块
+    // + WAL 打开在 9 worker 满载时可达 2.5–3s，2026-11-03 审计实测 2315–3774ms），
+    // 否则「等锁」与「负载噪声」落在同一时序区间，断言无法归因。
+    // 判据：噪声 < holdMs；真等锁必然 ≥ holdMs。阈值取 holdMs − 500ms。
+    const holdMs = 5000;
     const [blockRun, initRun] = await Promise.all([
       runNode(path.join(outDir, "blocker.cjs"), [file, String(holdMs)], nodeEnv, outDir),
       new Promise((resolve) => setTimeout(resolve, 200)).then(() =>
@@ -1632,13 +1636,13 @@ setTimeout(() => {
       ms: number;
       schema: SchemaInitResult;
     };
-    // 稳态：一次 PRAGMA 读就够了，不该因为别人占着写锁而等满 2 秒
+    // 稳态：一次 PRAGMA 读就够了，不该因为别人占着写锁而等满持锁时间
     expect(parsed.schema).toEqual({
       applied: false,
       version: SCHEMA_VERSION,
       reason: "current",
     });
-    expect(parsed.ms, `等了 ${parsed.ms}ms，说明稳态初始化还在申请写锁`).toBeLessThan(800);
+    expect(parsed.ms, `等了 ${parsed.ms}ms，说明稳态初始化还在申请写锁`).toBeLessThan(holdMs - 500);
   }, 90_000);
 });
 

@@ -1738,7 +1738,8 @@
       "keywordResearch": "关键词研究",
       "keywordMagic": "关键词魔法工具",
       "keywordStrategy": "关键词策略构造器",
-      "keywordSaved": "已保存的关键词"
+      "keywordSaved": "已保存的关键词",
+      "contentGap": "内容缺口"
     },
     "topbar": {
       "noProject": "未选择项目",
@@ -4473,7 +4474,26 @@
     "EXECUTION_NOT_APPROVED": "请先批准该机会与执行动作，再执行。",
     "EXECUTION_INVALID_STATE": "当前执行状态不允许该操作。",
     "EXECUTION_ADAPTER_ERROR": "执行服务返回错误，请稍后重试。",
-    "RESEARCH_NOT_FOUND": "未找到该保存的研究成果"
+    "RESEARCH_NOT_FOUND": "未找到该保存的研究成果",
+    "STRATEGY_NOT_FOUND": "未找到该策略，可能已被删除。",
+    "STRATEGY_NOT_READY": "策略尚未生成完成，请稍后重试。",
+    "STRATEGY_RUNNING": "策略正在生成中，请稍候。",
+    "STRATEGY_EMPTY": "该策略还没有关键词数据。",
+    "NOTHING_TO_RETRY": "没有失败的种子需要重试。",
+    "QUOTA_INSUFFICIENT": "SerpApi 配额不足，无法完成该请求。",
+    "BAD_NAME": "名称需为 1-120 个字符。",
+    "BAD_PRIORITY": "优先级覆盖参数无效。",
+    "BAD_BRIEF": "大纲内容无效。",
+    "BAD_BRIEF_TOPIC": "该主题不属于当前策略。",
+    "BAD_BRIEF_TOO_LARGE": "大纲内容过长。",
+    "BAD_SEEDS": "种子关键词无效。",
+    "TOO_MANY_SEEDS": "种子关键词数量过多。",
+    "DUPLICATE_SEEDS": "种子关键词重复。",
+    "BAD_KEYWORD_COUNT": "请选择 2-5 个关键词进行比较。",
+    "CONTEXT_MISMATCH": "所选关键词的 SERP 快照来自不同市场/设备/语言，无法直接比较。",
+    "SHARE_TOKEN_FAILED": "生成分享链接失败，请重试。",
+    "SCAN_RUNNING": "该项目已有进行中的扫描。",
+    "SCAN_NOT_FOUND": "扫描记录不存在。"
   },
   "keywordResearch": {
     "meta": {

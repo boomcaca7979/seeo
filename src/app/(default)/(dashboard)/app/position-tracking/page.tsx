@@ -1462,7 +1462,20 @@ function PositionTrackingInner() {
               <div className="md:hidden">
                 {sortedRows.map((row) => (
                   <div key={row.id} className="border-b border-line-soft py-3 last:border-b-0">
-                    <button onClick={() => setSelectedId(row.id)} className="flex w-full flex-col gap-1.5 text-left">
+                    {/* 外层不能用 <button>：分组 chip 的移除按钮是真按钮，button 嵌 button
+                        是无效 HTML，会触发 hydration 错误。div[role=button] 保留键盘可达性。 */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedId(row.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedId(row.id);
+                        }
+                      }}
+                      className="flex w-full cursor-pointer flex-col gap-1.5 text-left"
+                    >
                       <span className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-sans text-sm font-medium text-ink">{row.keyword}</span>
                         <span className="flex items-center gap-2">
@@ -1488,7 +1501,7 @@ function PositionTrackingInner() {
                           ))}
                         </span>
                       )}
-                    </button>
+                    </div>
                     <div className="mt-2">{rowActions(row, "start")}</div>
                   </div>
                 ))}

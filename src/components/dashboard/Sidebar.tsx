@@ -7,7 +7,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { localePath } from "@/i18n/seo";
 
 type NavChild = {
-  labelKey: "keywordOverview" | "keywordMagic" | "keywordStrategy" | "keywordSaved";
+  labelKey: "keywordOverview" | "keywordMagic" | "keywordStrategy" | "keywordSaved" | "contentGap";
   href: string;
 };
 
@@ -36,6 +36,7 @@ const KEYWORD_CHILDREN: readonly NavChild[] = [
   { labelKey: "keywordMagic", href: "/app/keyword-magic" },
   { labelKey: "keywordStrategy", href: "/app/keyword-strategy" },
   { labelKey: "keywordSaved", href: "/app/keyword-saved" },
+  { labelKey: "contentGap", href: "/app/content-gap" },
 ];
 
 const navItems: NavItem[] = [
