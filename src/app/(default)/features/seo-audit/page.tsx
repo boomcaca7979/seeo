@@ -28,6 +28,7 @@ export default async function SeoAuditFeaturePage() {
   const limits = t.raw("limits") as string[];
   const processItems = t.raw("how.process") as string[];
   const outputItems = t.raw("how.output") as string[];
+  const workflowSteps = t.raw("workflow.steps") as string[];
 
   return (
     <div className="min-h-screen bg-paper">
@@ -59,7 +60,31 @@ export default async function SeoAuditFeaturePage() {
         <h1 className="mt-3 font-display text-3xl font-semibold text-ink mb-2">
           {t("title")}
         </h1>
-        <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
+        <p className="font-sans text-sm text-ink-60">{t("subtitle")}</p>
+
+        {/* 免注册首屏入口（P0）：与产品真实 guest audit 流程一致 */}
+        <div className="mt-6 card-a p-5">
+          <h2 className="font-display text-base font-semibold text-ink">
+            {t("freeAudit.title")}
+          </h2>
+          <p className="mt-1 font-sans text-sm leading-relaxed text-ink-60">
+            {t("freeAudit.body")}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link href="/app/audit" className="btn-primary inline-block px-5 py-2">
+              {t("freeAudit.btn")}
+            </Link>
+            <a
+              href="#audit-workflow"
+              className="font-sans text-xs text-ink-60 transition-colors hover:text-ink"
+            >
+              {locale === "zh" ? "先看审计流程 ↓" : "See the workflow first ↓"}
+            </a>
+          </div>
+          <p className="mt-2 font-mono text-xs text-ink-40">{t("freeAudit.note")}</p>
+        </div>
+
+        <div className="h-12" />
 
         {/* What it does */}
         <section className="mb-14">
@@ -114,10 +139,57 @@ export default async function SeoAuditFeaturePage() {
           </div>
         </section>
 
+        {/* Workflow：输入 → 审计 → 按优先级查看 → 修复 → 复审计验证（与产品真实流程一致） */}
+        <section id="audit-workflow" className="mb-14 scroll-mt-16">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">03</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {s("sections.workflow")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <ol className="space-y-2">
+            {workflowSteps.map((step, i) => (
+              <li key={step} className="card-a flex gap-3 p-4">
+                <span className="font-mono text-xs text-brand">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-sans text-sm leading-relaxed text-ink-80">{step}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* P0/P1/P2 优先级语义（与 issue-priority.ts 真实输出一致） */}
+        <section className="mb-14">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="font-mono text-sm text-brand">04</span>
+            <h2 className="font-display text-lg font-semibold text-ink">
+              {s("sections.priorities")}
+            </h2>
+            <div className="hairline flex-1" />
+          </div>
+          <p className="font-sans text-sm leading-relaxed text-ink-80 mb-4">
+            {t("priorities.intro")}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(["p0", "p1", "p2"] as const).map((k) => (
+              <div key={k} className="card-a p-4">
+                <h3 className="font-display text-sm font-semibold text-ink">
+                  {t(`priorities.${k}.title`)}
+                </h3>
+                <p className="mt-1 font-sans text-sm text-ink-60">
+                  {t(`priorities.${k}.body`)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Check categories */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
-            <span className="font-mono text-sm text-brand">03</span>
+            <span className="font-mono text-sm text-brand">05</span>
             <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.checkCoverage")}
             </h2>
@@ -136,7 +208,7 @@ export default async function SeoAuditFeaturePage() {
         {/* Who + limits */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
-            <span className="font-mono text-sm text-brand">04</span>
+            <span className="font-mono text-sm text-brand">06</span>
             <h2 className="font-display text-lg font-semibold text-ink">
               {s("sections.fitAndLimits")}
             </h2>
@@ -165,7 +237,7 @@ export default async function SeoAuditFeaturePage() {
         {/* FAQ */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
-            <span className="font-mono text-sm text-brand">05</span>
+            <span className="font-mono text-sm text-brand">07</span>
             <h2 className="font-display text-lg font-semibold text-ink">{s("sections.faq")}</h2>
             <div className="hairline flex-1" />
           </div>
@@ -230,15 +302,15 @@ export default async function SeoAuditFeaturePage() {
         <div className="mt-8 card-a p-6 text-center">
           <h2 className="font-display text-lg font-semibold text-ink mb-2">{t("cta.title")}</h2>
           <p className="font-sans text-sm text-ink-60 mb-4">{t("cta.subtitle")}</p>
-          <div className="flex items-center justify-center gap-3">
-            <Link href="/signup" className="btn-primary inline-block px-6 py-2">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link href="/app/audit" className="btn-primary inline-block px-6 py-2">
+              {s("cta.freeAudit")}
+            </Link>
+            <Link href="/signup" className="btn-secondary inline-block px-6 py-2">
               {s("cta.signup")}
             </Link>
             <Link href={localePath(locale, "/pricing")} className="btn-secondary inline-block px-6 py-2">
               {s("cta.pricing")}
-            </Link>
-            <Link href={localePath(locale, "/docs")} className="btn-secondary inline-block px-6 py-2">
-              {s("cta.docs")}
             </Link>
           </div>
         </div>

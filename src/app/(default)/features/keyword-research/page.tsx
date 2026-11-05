@@ -56,6 +56,11 @@ export default async function KeywordResearchFeaturePage() {
         </h1>
         <p className="font-sans text-sm text-ink-60 mb-12">{t("subtitle")}</p>
 
+        {/* 产品闭环定位：审计 → 研究 → 追踪 */}
+        <div className="card-a border-l-2 border-l-brand p-4 mb-12">
+          <p className="font-sans text-sm leading-relaxed text-ink-80">{t("flow")}</p>
+        </div>
+
         {/* What it does */}
         <section className="mb-14">
           <div className="flex items-center gap-3 mb-6">
@@ -176,6 +181,30 @@ export default async function KeywordResearchFeaturePage() {
 
         {/* Related */}
         <div className="mt-12 grid gap-3 sm:grid-cols-2">
+          <Link
+            href={localePath(locale, "/features/seo-audit")}
+            className="card-a p-4 transition-colors hover:border-brand"
+          >
+            <span className="font-mono text-xs text-brand">{s("related")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+              {t("related.seoAudit.title")}
+            </h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">
+              {t("related.seoAudit.desc")}
+            </p>
+          </Link>
+          <Link
+            href={localePath(locale, "/features/rank-tracking")}
+            className="card-a p-4 transition-colors hover:border-brand"
+          >
+            <span className="font-mono text-xs text-brand">{s("related")}</span>
+            <h3 className="mt-1 font-display text-sm font-semibold text-ink">
+              {t("related.tracking.title")}
+            </h3>
+            <p className="mt-1 font-sans text-xs text-ink-60">
+              {t("related.tracking.desc")}
+            </p>
+          </Link>
           <Link
             href={localePath(locale, "/features/competitor-analysis")}
             className="card-a p-4 transition-colors hover:border-brand"

@@ -23,14 +23,14 @@ interface LocaleHomePageProps {
 
 const homeMeta = {
   en: {
-    title: "SeeO — Find the SEO Problem Worth Fixing First, Then Verify the Fix",
+    title: "SeeO: Free SEO Audit Tool - Find, Fix & Verify Issues",
     description:
-      "Run a free technical SEO audit of your real site. SeeO tells you which issue is worth fixing first and why, and re-audits after your fix to verify whether it's actually resolved.",
+      "Run a free technical SEO audit without signup: SeeO crawls your real site, prioritizes what to fix first with reasons, and re-audits to verify. Rank tracking included.",
   },
   zh: {
-    title: "SeeO · 找出最值得先处理的 SEO 问题，修完再验证",
+    title: "SeeO：免费 SEO 审计工具——找出先修什么，修完再验证效果",
     description:
-      "免费审计你的真实网站：SeeO 告诉你哪个技术问题最值得先处理、依据是什么；修复之后重新审计，验证问题是否真的解决。真实抓取、真实证据，不估算流量、不承诺排名。",
+      "免注册运行一次真实的技术 SEO 审计：SeeO 用自建爬虫逐页抓取你的网站，执行 45 项技术检查，按 P0/P1/P2 优先级告诉你先修什么、依据是什么；修复之后重新审计，验证问题是否真的解决。关键词研究与每日排名追踪包含在内，让每一次修复都有据可查。",
   },
 } as const;
 

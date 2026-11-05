@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import UrlAuditBox from "./UrlAuditBox";
-import { isAuthEnabled } from "@/lib/auth-config";
 
 export default function Hero() {
   const t = useTranslations("hero");
@@ -9,8 +8,9 @@ export default function Hero() {
   // 首屏视觉直接表达「审计 → 判断 → 修复 → 验证」闭环，不再使用工具集合演示。
   // 只复用 preview 既有文案，不引入任何演示数据/动画/排名流量数字。
   const tp = useTranslations("preview");
-  // 演示模式：主按钮直接进 /app；启用模式：进 /signup
-  const primaryHref = isAuthEnabled ? "/signup" : "/app";
+  // 主 CTA 聚焦免费审计：/app/audit 对游客与登录用户都可用（guest audit 在案），
+  // 注册引导交给审计页内的 guest CTA，而不是首页直接跳 /signup。
+  const primaryHref = "/app/audit";
 
   const loopSteps = [
     tp("what.label"),

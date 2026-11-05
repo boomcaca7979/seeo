@@ -41,19 +41,18 @@ export default function DashboardPreview() {
   return (
     <section id="dashboard" className="bg-paper px-5 py-10 sm:px-8 sm:py-12">
       <div className="site-shell">
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-          <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
-              {t("sectionHeading")}
-            </h2>
-            <p className="mt-3 font-display text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-              {t("sectionSubheading")}
-            </p>
-            <p className="mt-4 text-sm text-ink-60 sm:text-base">
-              {t("realDemo.sectionSubtitle")}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 card-a px-3 py-2 font-mono text-xs text-ink-60">
+        {/* 区块头四元素垂直居中层级：标题 → 强调语 → 正文 → 时间标注（真实快照卡内部对齐不受影响） */}
+        <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+          <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
+            {t("sectionHeading")}
+          </h2>
+          <p className="mt-3 font-display text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+            {t("sectionSubheading")}
+          </p>
+          <p className="mt-4 text-sm leading-relaxed text-ink-60 sm:text-base">
+            {t("realDemo.sectionSubtitle")}
+          </p>
+          <div className="mt-5 flex items-center gap-2 card-a px-3 py-2 font-mono text-xs text-ink-60">
             <span className="h-2 w-2 rounded-full bg-pos" />
             {t("realDemo.badge", { time: DEMO_AUDIT_META.auditedAtLabel })}
           </div>

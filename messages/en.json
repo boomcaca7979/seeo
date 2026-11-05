@@ -24,7 +24,7 @@
     "badge": "Real site audit · What to fix first · Verify the fix",
     "title": "Find the SEO problem worth fixing first. Then verify the fix.",
     "subtitle": "Run a free audit of your real site. SeeO tells you which issue is worth fixing first and why — and re-audits after your fix to verify whether it's actually resolved.",
-    "primaryCta": "Start free",
+    "primaryCta": "Run a free audit",
     "secondaryCta": "Explore features",
     "auditBox": {
       "placeholder": "Enter your website domain, e.g. example.com",
@@ -38,47 +38,50 @@
   },
   "features": {
     "sectionTitle": "From problem to proof",
-    "sectionSubtitle": "SeeO is built around one loop on your real site: find the issue worth fixing first, understand why it matters, and verify the fix with a fresh audit.",
+    "sectionSubtitle": "Three tools, one loop: audit to find the problem, research to pick the target, tracking to verify the result.",
     "cardLink": "Try it with a free audit",
     "cards": [
       {
-        "tag": "Find",
+        "tag": "01 · Audit",
         "title": "Find what to fix first",
         "desc": "A free audit of your real site surfaces technical issues and picks the one worth fixing first — not just another long list to triage.",
         "bullets": [
-          "Health score + 20+ technical checks",
+          "Health score + 45-rule audit engine",
           "Priority decision, with reasons",
-          "Runs on your real pages"
+          "Re-audit to verify the fix"
         ],
         "metricLabel": "Step",
         "metricValue": "01",
-        "href": "/app/audit"
+        "href": "/features/seo-audit",
+        "link": "Try it with a free audit"
       },
       {
-        "tag": "Understand",
-        "title": "Understand why it matters",
-        "desc": "Every priority comes with its evidence: severity, how many pages are affected, and where the problem was found — so you can judge before you act.",
+        "tag": "02 · Research",
+        "title": "Decide what to target next",
+        "desc": "Expand one seed keyword into a related set — volume and difficulty shown where provider data exists, never estimated.",
         "bullets": [
-          "Why-now reasons in plain language",
-          "Affected pages, findings, sample URLs",
-          "No traffic guessing"
+          "Related-keyword expansion (SerpApi)",
+          "Volume / KD / CPC when available — \"—\" otherwise",
+          "Content gap vs the terms you target"
         ],
         "metricLabel": "Step",
         "metricValue": "02",
-        "href": "/app/audit"
+        "href": "/features/keyword-research",
+        "link": "Explore keyword research"
       },
       {
-        "tag": "Verify",
-        "title": "Verify the fix",
-        "desc": "Fix the issue, run the audit again, and SeeO re-checks your pages — telling you honestly whether the problem is resolved or still there.",
+        "tag": "03 · Track",
+        "title": "Verify the fix in rankings",
+        "desc": "Daily Google rank tracking that ties your fixes to outcomes — the measurement half of the audit loop.",
         "bullets": [
-          "Re-audit verification",
-          "Honest pass / fail / inconclusive",
-          "Progress tracked per issue"
+          "Daily refresh, Top-100 depth",
+          "Location & device dimensions",
+          "Trend direction once history accrues"
         ],
         "metricLabel": "Step",
         "metricValue": "03",
-        "href": "/app/audit"
+        "href": "/features/rank-tracking",
+        "link": "Explore rank tracking"
       }
     ]
   },
@@ -393,7 +396,9 @@
       "checkCoverage": "Check coverage",
       "capabilities": "Capabilities",
       "fitAndLimits": "Fit & limits",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "workflow": "From detection to verified fix",
+      "priorities": "What P0 / P1 / P2 mean"
     },
     "fitTitle": "Who it's for",
     "limitsTitle": "Real limitations",
@@ -403,7 +408,8 @@
     "cta": {
       "signup": "Start free",
       "pricing": "View pricing",
-      "docs": "Product docs"
+      "docs": "Product docs",
+      "freeAudit": "Run a free audit"
     },
     "backHome": "← Back to home",
     "labels": {
@@ -415,17 +421,17 @@
   },
   "seoAudit": {
     "meta": {
-      "title": "SEO Audit Tool - Technical SEO Analysis & Website SEO Checker | SeeO",
-      "description": "SeeO audits your real site: crawl it, run 20+ technical checks, and get a technical SEO analysis with health score and a clear SEO audit report."
+      "title": "Free Technical SEO Audit & Website Checker | SeeO",
+      "description": "Run a free SEO audit with no signup. SeeO crawls your real site, runs up to 45 checks, and tells you what to fix first — then re-audit to verify the fix."
     },
     "title": "SEO Audit Tool for Complete Website SEO Analysis",
-    "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority, with SEO issues detection across 20+ checks",
-    "whatItDoes": "SeeO's SEO audit tool crawls a target site automatically, runs 20+ technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Think of it as a website SEO checker that goes far beyond a single homepage snapshot: every crawled page is inspected for on-page basics, indexability, security, performance, and link structure problems, so SEO issues detection happens in one pass instead of across five separate tools. Each technical SEO audit run is saved to history, so you can compare scores and issue counts over time and verify that your fixes actually moved the numbers. The SEO audit report groups every finding by category and severity, so triage takes minutes instead of hours — fix the high-impact errors first, then work through warnings and notices as capacity allows. Because every run is stored, the report doubles as a progress log: watch the health score climb and the issue count drop as fixes land. Nothing needs to be installed; the audit runs server-side against public pages and works the same way on static sites, framework apps, WordPress, or large e-commerce catalogs.",
+    "subtitle": "Crawl your website, run technical checks page by page, and know exactly what to fix first — ranked by score and priority, with SEO issues detection across 45 checks",
+    "whatItDoes": "SeeO's SEO audit tool crawls a target site automatically, runs up to 45 technical SEO checks on every page, rolls the results into a health score (0–100), and lists issues with corresponding fixes ordered by priority. Think of it as a website SEO checker that goes far beyond a single homepage snapshot: every crawled page is inspected for on-page basics, indexability, security, performance, and link structure problems, so SEO issues detection happens in one pass instead of across five separate tools. Each technical SEO audit run is saved to history, so you can compare scores and issue counts over time and verify that your fixes actually moved the numbers. The SEO audit report groups every finding by category and severity, so triage takes minutes instead of hours — fix the high-impact errors first, then work through warnings and notices as capacity allows. Because every run is stored, the report doubles as a progress log: watch the health score climb and the issue count drop as fixes land. Nothing needs to be installed; the audit runs server-side against public pages and works the same way on static sites, framework apps, WordPress, or large e-commerce catalogs.",
     "how": {
       "input": "A website URL (one domain)",
       "process": [
         "In-house crawler (server-side fetching based on cheerio) retrieves page HTML for each URL, following same-domain links up to the crawl limit",
-        "Runs 20+ rule-based checks on each page — the core of every technical SEO audit, from title tags to SSL",
+        "Runs up to 45 rule-based checks per audit — the core of every technical SEO audit, from title tags to SSL",
         "Computes a health score weighted across checks so severity reflects real impact",
         "Ranks issues by impact rather than the order they were found",
         "Groups findings by category and severity for faster triage",
@@ -442,19 +448,27 @@
     "checks": [
       {
         "cat": "On-page basics",
-        "items": "Title tags, meta descriptions, H1 heading hierarchy, image alt text, and word-count basics — the on-page fundamentals every website SEO checker should cover before anything else"
+        "items": "Title tags and length, meta descriptions, H1 hierarchy, heading structure, image alt text, semantic HTML usage, and word-count basics across every crawled page"
       },
       {
-        "cat": "Indexability",
-        "items": "Canonical tags, robots.txt rules, sitemap presence, noindex detection, and redirect chains that can quietly block indexing on otherwise healthy pages"
+        "cat": "Indexability & canonicals",
+        "items": "Canonical tags, robots meta, noindex detection, lang attributes, and viewport basics that decide whether pages can be indexed at all"
+      },
+      {
+        "cat": "Structured data & sharing",
+        "items": "JSON-LD presence, validity, and duplicates; Open Graph and Twitter cards; favicon"
       },
       {
         "cat": "Security & performance",
-        "items": "SSL certificate validity, page load performance, and mobile readiness signals — the trust and speed factors search engines weigh"
+        "items": "HTTPS/SSL, page response time, inline CSS, and text-to-HTML ratio"
       },
       {
         "cat": "Link structure",
-        "items": "Internal link structure, broken link detection, and orphaned-page risks that starve important pages of authority"
+        "items": "Internal linking and pages with zero internal links"
+      },
+      {
+        "cat": "Duplicates & consistency",
+        "items": "Duplicate titles and descriptions across pages"
       }
     ],
     "who": [
@@ -475,7 +489,7 @@
       },
       {
         "q": "What does the audit check?",
-        "a": "20+ technical SEO checks covering title tags, meta descriptions, H1 hierarchy, image alt text, canonical, SSL certificates, robots.txt, sitemap, mobile readiness, and page performance. Each check maps to a category — on-page basics, indexability, security and performance, link structure — and every issue carries a severity so you can triage."
+        "a": "Up to 45 technical SEO checks covering title tags, meta descriptions, H1 hierarchy, image alt text, canonical, SSL certificates, robots.txt, sitemap, mobile readiness, and page performance. A single-page quick audit runs the 25 page-level rules; multi-page audits add duplicate, dead-link, and sitemap checks. Every issue carries a severity so you can triage."
       },
       {
         "q": "How deep can audits go?",
@@ -496,12 +510,20 @@
       {
         "q": "What makes SeeO different from other website SEO checker tools?",
         "a": "Most checkers stop at a single page. SeeO crawls up to 50 pages per run, scores every page, keeps full audit history, and connects results to rank tracking and keyword research on the same workbench — so improvements are provable rather than anecdotal."
+      },
+      {
+        "q": "What do P0, P1, and P2 mean?",
+        "a": "Explainable priority levels, not marketing labels: P0 combines high severity, wide reach, or a site-wide pattern — fix these first. P1 issues are real but moderate; P2 are notices and low-impact cleanups. Every priority shows the reasons behind it, and SeeO discloses ties."
+      },
+      {
+        "q": "How is this different from a traditional crawler report?",
+        "a": "Classic crawlers hand you a long URL-level list. SeeO scores and prioritizes the findings, explains why each one matters, tracks your fixes, and re-audits to verify whether the fix actually worked — the loop closes instead of ending at a CSV."
       }
     ],
     "related": {
       "rankTracking": {
         "title": "SEO Rank Tracking Tool →",
-        "desc": "Daily Google rank monitoring"
+        "desc": "Verify the fix moved rankings — daily Google tracking"
       },
       "backlinks": {
         "title": "Backlink Analysis Tool →",
@@ -510,7 +532,37 @@
     },
     "cta": {
       "title": "Run your first audit",
-      "subtitle": "Single-page quick audits are available on the free plan — no credit card required"
+      "subtitle": "No account needed for your first audit — enter a domain and see the full report."
+    },
+    "freeAudit": {
+      "title": "Try it on your real site — before signing up",
+      "body": "The audit runs without an account: enter a domain and get the same health score, prioritized issues, and evidence registered users see. Fixed something? Re-run the audit and SeeO tells you honestly whether it is resolved.",
+      "btn": "Run a free audit",
+      "note": "Sign up free to keep audit history and unlock report exports (Pro)."
+    },
+    "priorities": {
+      "intro": "A flat list of forty issues helps no one. Every finding gets an explainable priority — scored from severity, how much of the site is affected, the health-score impact, and whether one fix covers many pages. The reasons are always shown; when top issues tie, SeeO says so instead of pretending one is definitive.",
+      "p0": {
+        "title": "P0 — fix first",
+        "body": "High severity, wide reach, or a site-wide pattern that one change repairs across many pages."
+      },
+      "p1": {
+        "title": "P1 — schedule next",
+        "body": "Real issues with moderate impact or reach — worth doing, not at the cost of P0s."
+      },
+      "p2": {
+        "title": "P2 — batch when convenient",
+        "body": "Notices and low-impact cleanups. Fixing them is fine; doing them first is not."
+      }
+    },
+    "workflow": {
+      "steps": [
+        "Enter your site — the crawler fetches your real pages, up to 50 per run",
+        "Run the audit — up to 45 rule-based checks across on-page basics, indexability, structured data, performance, and links",
+        "Review issues by priority — P0 / P1 / P2, with the reasons behind every call",
+        "Fix what matters — start with P0s; many site-wide patterns are a one-line fix",
+        "Re-audit to verify — compare health score and issue counts; SeeO reports honestly whether each fix landed"
+      ]
     }
   },
   "rankTracking": {
@@ -707,7 +759,7 @@
     "related": {
       "seoAudit": {
         "title": "Technical SEO Audit →",
-        "desc": "20+ technical checks and a health score"
+        "desc": "Find the problem, then verify the fix in rankings"
       },
       "backlinks": {
         "title": "Backlink Analysis Tool →",
@@ -4568,12 +4620,21 @@
       "contentOptimization": {
         "title": "Content Optimization →",
         "desc": "Score pages against target terms"
+      },
+      "seoAudit": {
+        "title": "Technical SEO Audit →",
+        "desc": "Find the issues before choosing keywords"
+      },
+      "tracking": {
+        "title": "Keyword Rank Tracking →",
+        "desc": "Track the keywords you pick, daily"
       }
     },
     "cta": {
       "title": "Start your keyword research",
       "subtitle": "Expand a seed term on the free plan — no credit card required"
-    }
+    },
+    "flow": "Where it fits: the audit finds what is broken → keyword research decides what to target → rank tracking verifies the results. Metrics appear only where provider data exists; a \"—\" means no verified data, never a guess."
   },
   "competitorAnalysis": {
     "meta": {
@@ -4982,7 +5043,7 @@
     },
     "title": "How to Do a Technical SEO Audit (Step-by-Step)",
     "subtitle": "A practical framework for auditing a website's technical health — what to check, in what order, and how to prioritize fixes that actually move rankings",
-    "intro": "A technical SEO audit reviews the foundation a site is built on: can search engines crawl and index it, is the on-page markup correct, does it load fast, and is it secure and mobile-friendly? This guide walks through a repeatable audit process you can run yourself, whether you use SeeO's audit tool or another crawler. Each step lists what to look for and why it matters, so you can turn a long to-do list into a prioritized plan.",
+    "intro": "A technical SEO audit reviews the foundation a site is built on: can search engines crawl and index it, is the on-page markup correct, does it load fast, and is it secure and mobile-friendly? This guide walks through a repeatable audit process you can run yourself, whether you use SeeO's audit tool or another crawler. Each step lists what to look for and why it matters, so you can turn a long to-do list into a prioritized plan. The checks below cover on-page and technical fundamentals — they do not cover off-page signals like backlinks.",
     "steps": [
       {
         "n": "01",
@@ -5026,13 +5087,13 @@
       },
       {
         "n": "09",
-        "title": "Backlinks and off-page signals",
-        "body": "Review the link profile: total backlinks, referring domains, and anchor text distribution. A sudden drop in referring domains often explains a rankings drop."
+        "title": "Prioritize: separate P0 from noise",
+        "body": "Not every finding deserves a fix. Weigh severity, reach, and effort: a missing canonical on every page (site-wide) outranks one thin blog post you could retire anyway. SeeO labels this P0/P1/P2 with reasons; if you audit manually, write the same judgment down. Deliberate choices — two pages with intentionally similar titles — are not duplicates to 'fix'. Don't chase warnings into over-optimization."
       },
       {
         "n": "10",
-        "title": "Prioritize and track fixes",
-        "body": "Score issues by impact and sort them into a fix list. Re-audit after changes so you can prove the health score and rankings improved."
+        "title": "Fix, then re-audit to verify",
+        "body": "Work P0s first — many are one-line site-wide fixes. Then re-run the audit and compare: health score, failing checks, affected pages. A fix is done when the re-audit says so, not when you feel done. To watch keyword movements over the following weeks, connect rank tracking to the same fixes."
       }
     ],
     "faqs": [
@@ -5051,6 +5112,10 @@
       {
         "q": "How do I know if my fixes worked?",
         "a": "Re-run the audit and compare the health score and issue count against the previous run. Pair it with rank tracking so you can connect a fix to a ranking change."
+      },
+      {
+        "q": "Should I fix every warning the audit finds?",
+        "a": "No. Warnings and notices are judgment calls: some are real problems, others are deliberate choices — a short page that converts, intentionally similar titles. Fix errors and site-wide patterns first; treat low-impact warnings as batch work, or leave them."
       }
     ],
     "related": {

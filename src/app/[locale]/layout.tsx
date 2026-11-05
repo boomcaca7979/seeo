@@ -36,14 +36,14 @@ const SITE_URL = "https://www.seeo.asia";
 
 const metaText: Record<Locale, { title: string; description: string }> = {
   en: {
-    title: "SeeO — SEO Tool: Site Audits, Rank Tracking & Keyword Research",
+    title: "SeeO: Free SEO Audit Tool - Find, Fix & Verify Issues",
     description:
-      "SeeO is an all-in-one SEO tool: technical site audits, daily rank tracking, keyword research, competitor analysis, and content optimization.",
+      "Run a free SEO audit without signup: SeeO crawls your real site, prioritizes what to fix first with reasons, and re-audits to verify. Rank tracking included.",
   },
   zh: {
-    title: "SeeO · 一站式 SEO 数据分析平台：关键词排名追踪与技术审计",
+    title: "SeeO：免费 SEO 审计工具——找出先修什么，修完再验证效果",
     description:
-      "SeeO 是一站式 SEO 数据分析平台，提供关键词研究、排名追踪、技术审计、竞品分析与内容优化等核心功能。每日自动刷新 Google 关键词排名数据，生成可视化审计报告与健康评分，帮助你基于真实数据做出搜索优化决策，持续提升自然搜索流量。",
+      "免注册运行一次真实的技术 SEO 审计：SeeO 用自建爬虫逐页抓取你的网站，执行 45 项技术检查，按 P0/P1/P2 优先级告诉你先修什么、依据是什么；修复之后重新审计，验证问题是否真的解决。关键词研究与每日排名追踪包含在内，让每一次修复都有据可查。",
   },
 };
 
