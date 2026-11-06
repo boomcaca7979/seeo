@@ -34,12 +34,12 @@ export default function Hero() {
 
       <div className="relative site-shell">
         {/* 标题 */}
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper px-3 py-1 font-mono text-xs text-ink-60">
             <span className="h-1.5 w-1.5 rounded-full bg-pos" />
             {t("badge")}
           </span>
-          <h1 className="mt-5 font-display text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl">
+          <h1 className="mt-5 text-balance font-display text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl">
             {t("title")}
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-ink-60 sm:text-lg">

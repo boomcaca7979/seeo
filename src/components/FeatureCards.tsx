@@ -8,8 +8,8 @@ export default function FeatureCards() {
     title: string;
     desc: string;
     bullets: string[];
-    metricLabel: string;
-    metricValue: string;
+    metricLabel?: string;
+    metricValue?: string;
     href?: string;
     link?: string;
   }>;
@@ -19,7 +19,7 @@ export default function FeatureCards() {
       <div className="site-shell">
         {/* 标题（U2：删除 06/核心模块 eyebrow，仅保留 sectionTitle） */}
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
+          <h2 className="text-balance font-display text-3xl font-semibold tracking-tight text-ink sm:text-5xl">
             {t("sectionTitle")}
           </h2>
           <p className="mt-4 text-base text-ink-60 sm:text-lg">
@@ -34,21 +34,23 @@ export default function FeatureCards() {
               key={f.title}
               className="group flex flex-col card-a p-6 transition-colors hover:border-ink-25"
             >
-              {/* 顶部标签 + 指标 */}
+              {/* 顶部标签（+ 可选指标，产品总览卡不再展示步骤号） */}
               <div className="flex items-center justify-between">
                 <span className="rounded-md bg-accent/10 px-3 py-1 font-mono text-xs font-semibold text-accent">
                   {f.tag}
                 </span>
-                <div className="text-right">
-                  <div className="font-mono text-xs text-ink-40">
-                    {f.metricLabel}
+                {f.metricLabel && f.metricValue ? (
+                  <div className="text-right">
+                    <div className="font-mono text-xs text-ink-40">
+                      {f.metricLabel}
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="font-mono text-sm font-semibold text-ink">
+                        {f.metricValue}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-end gap-1">
-                    <span className="font-mono text-sm font-semibold text-ink">
-                      {f.metricValue}
-                    </span>
-                  </div>
-                </div>
+                ) : null}
               </div>
 
               {/* 标题 + 描述 */}

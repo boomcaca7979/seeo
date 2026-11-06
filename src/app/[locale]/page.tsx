@@ -12,6 +12,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import FeatureCards from "@/components/FeatureCards";
 import DashboardPreview from "@/components/DashboardPreview";
+import HomeUseCases from "@/components/HomeUseCases";
 import Footer from "@/components/Footer";
 import JsonLd from "@/components/JsonLd";
 import HreflangAlternates from "@/components/HreflangAlternates";
@@ -23,14 +24,14 @@ interface LocaleHomePageProps {
 
 const homeMeta = {
   en: {
-    title: "SeeO: Free SEO Audit Tool - Find, Fix & Verify Issues",
+    title: "SeeO: All-in-One SEO Toolkit — Keywords, Rankings & Audits",
     description:
-      "Run a free technical SEO audit without signup: SeeO crawls your real site, prioritizes what to fix first with reasons, and re-audits to verify. Rank tracking included.",
+      "SeeO is an all-in-one SEO toolkit and analytics platform: technical audits with prioritized fixes, keyword research with intent labels, daily rank tracking, competitor analysis and content optimization.",
   },
   zh: {
-    title: "SeeO：免费 SEO 审计工具——找出先修什么，修完再验证效果",
+    title: "SeeO：综合 SEO 工具平台——关键词、排名与技术审计",
     description:
-      "免注册运行一次真实的技术 SEO 审计：SeeO 用自建爬虫逐页抓取你的网站，执行 45 项技术检查，按 P0/P1/P2 优先级告诉你先修什么、依据是什么；修复之后重新审计，验证问题是否真的解决。关键词研究与每日排名追踪包含在内，让每一次修复都有据可查。",
+      "SeeO 是综合 SEO 工具与数据分析平台：技术审计逐页检查并给出修复优先级，关键词研究扩展选词并标注意图，每日排名追踪验证效果，另有竞品分析与内容优化。",
   },
 } as const;
 
@@ -65,6 +66,7 @@ export default async function LocaleHomePage({ params }: LocaleHomePageProps) {
         <Hero />
         <FeatureCards />
         <DashboardPreview />
+        <HomeUseCases />
       </main>
       <Footer />
     </>

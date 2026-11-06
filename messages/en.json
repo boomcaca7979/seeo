@@ -21,11 +21,11 @@
     "accept": "Accept"
   },
   "hero": {
-    "badge": "Real site audit · What to fix first · Verify the fix",
-    "title": "Find the SEO problem worth fixing first. Then verify the fix.",
-    "subtitle": "Run a free audit of your real site. SeeO tells you which issue is worth fixing first and why — and re-audits after your fix to verify whether it's actually resolved.",
+    "badge": "All-in-one SEO workspace · Free audit · Daily rank tracking",
+    "title": "Keyword research, rank tracking and technical audits in one SEO workspace",
+    "subtitle": "SeeO is an all-in-one SEO toolkit and analytics platform: a free audit finds the technical issues, keyword research decides what to target next, and daily rank tracking verifies whether the change worked. Competitor analysis and content optimization share the same data.",
     "primaryCta": "Run a free audit",
-    "secondaryCta": "Explore features",
+    "secondaryCta": "Browse core tools",
     "auditBox": {
       "placeholder": "Enter your website domain, e.g. example.com",
       "submit": "Run free SEO audit",
@@ -37,51 +37,100 @@
     }
   },
   "features": {
-    "sectionTitle": "From problem to proof",
-    "sectionSubtitle": "Three tools, one loop: audit to find the problem, research to pick the target, tracking to verify the result.",
-    "cardLink": "Try it with a free audit",
+    "sectionTitle": "Five core SEO tools",
+    "sectionSubtitle": "Keyword research, rank tracking, technical audits, competitor analysis and content optimization — each solves a specific job, and they connect.",
+    "cardLink": "Learn more",
     "cards": [
       {
-        "tag": "01 · Audit",
-        "title": "Find what to fix first",
-        "desc": "A free audit of your real site surfaces technical issues and picks the one worth fixing first — not just another long list to triage.",
+        "tag": "Technical audit",
+        "title": "Technical SEO audit",
+        "desc": "Not sure where the technical problems are? Our own crawler fetches real pages, runs up to 45 rule checks, and returns a 0–100 health score with P0/P1/P2 priorities.",
         "bullets": [
-          "Health score + 45-rule audit engine",
-          "Priority decision, with reasons",
-          "Re-audit to verify the fix"
+          "Page-by-page crawl, up to 45 rules",
+          "Health score plus priority and reasons",
+          "Free quick audit, no signup required"
         ],
-        "metricLabel": "Step",
-        "metricValue": "01",
         "href": "/features/seo-audit",
-        "link": "Try it with a free audit"
+        "link": "Explore technical SEO audit"
       },
       {
-        "tag": "02 · Research",
-        "title": "Decide what to target next",
-        "desc": "Expand one seed keyword into a related set — volume and difficulty shown where provider data exists, never estimated.",
+        "tag": "Keywords",
+        "title": "Keyword research",
+        "desc": "Not sure what to target next? Expand one seed keyword into a related set with intent labels; volume, difficulty and CPC appear when provider data exists, otherwise \"—\".",
         "bullets": [
-          "Related-keyword expansion (SerpApi)",
-          "Volume / KD / CPC when available — \"—\" otherwise",
-          "Content gap vs the terms you target"
+          "Seed-keyword expansion",
+          "Search intent (informational / commercial / transactional / navigational)",
+          "\"—\" when a metric is unavailable — never estimated"
         ],
-        "metricLabel": "Step",
-        "metricValue": "02",
         "href": "/features/keyword-research",
         "link": "Explore keyword research"
       },
       {
-        "tag": "03 · Track",
-        "title": "Verify the fix in rankings",
-        "desc": "Daily Google rank tracking that ties your fixes to outcomes — the measurement half of the audit loop.",
+        "tag": "Rankings",
+        "title": "Keyword rank tracking",
+        "desc": "Changed a title and want to know if it worked? SeeO records your real Google positions daily, split by location and device, with full history.",
         "bullets": [
-          "Daily refresh, Top-100 depth",
-          "Location & device dimensions",
+          "Daily refresh, top 100 results",
+          "Location and device dimensions",
           "Trend direction once history accrues"
         ],
-        "metricLabel": "Step",
-        "metricValue": "03",
         "href": "/features/rank-tracking",
         "link": "Explore rank tracking"
+      },
+      {
+        "tag": "Competitors",
+        "title": "Competitor analysis",
+        "desc": "Why does a competitor outrank you on the same term? Find the domains actually competing for your keywords in live SERPs, and see the keyword gap and overlap.",
+        "bullets": [
+          "Competitor domains found in live SERPs",
+          "Keyword gap and shared keywords",
+          "Platforms and aggregators excluded"
+        ],
+        "href": "/features/competitor-analysis",
+        "link": "Explore competitor analysis"
+      },
+      {
+        "tag": "Content",
+        "title": "Content optimization",
+        "desc": "Is the page itself up to standard? Score a URL or draft at page level: keyword usage, heading structure, readability, internal/external links and image alt text.",
+        "bullets": [
+          "Page score and a fix list",
+          "Keyword density and missing terms",
+          "Heading levels, links, image alt"
+        ],
+        "href": "/features/content-optimization",
+        "link": "Explore content optimization"
+      }
+    ]
+  },
+  "homeUseCases": {
+    "sectionTitle": "Start from the job on your desk",
+    "sectionSubtitle": "You don't need the whole methodology first — start with what is most urgent.",
+    "items": [
+      {
+        "task": "The site just launched or was rebuilt — check for technical issues first",
+        "tool": "Technical SEO audit",
+        "href": "/features/seo-audit"
+      },
+      {
+        "task": "Not sure which keywords to target or what to write next",
+        "tool": "Keyword research",
+        "href": "/features/keyword-research"
+      },
+      {
+        "task": "You changed titles and content — did rankings move?",
+        "tool": "Keyword rank tracking",
+        "href": "/features/rank-tracking"
+      },
+      {
+        "task": "Competitors keep outranking you — where is the gap?",
+        "tool": "Competitor analysis",
+        "href": "/features/competitor-analysis"
+      },
+      {
+        "task": "Before publishing, check whether the page itself is ready",
+        "tool": "Content optimization",
+        "href": "/features/content-optimization"
       }
     ]
   },
