@@ -19,8 +19,11 @@ import {
   verificationOutcome,
 } from "./indexnow";
 import { autoCheckRunName, buildSummary, createCheckRun, type GithubContext } from "./indexnow-github";
+import { buildPathIndex, computeAffectedPaths, urlsToPaths } from "./indexnow-map";
+import sitemap from "@/app/sitemap";
 
 const ROOT = process.cwd();
+const logicalPaths = urlsToPaths(sitemap().map((e) => e.url));
 const KEY = "k".repeat(32);
 const DEPLOY_SHA = "a".repeat(40);
 const MAIN_SHA = "b".repeat(40);
@@ -216,13 +219,66 @@ describe("F. verification-only（首次上线闸门）", () => {
     expect(block).toContain("updateCheckRun");
   });
 
-  it("auto job 固定带 --no-submit；manual job 不带", () => {
+  it("auto job 已开启真实提交：workflow 可执行部分不再带 --no-submit", () => {
     const workflow = fs.readFileSync(path.join(ROOT, ".github/workflows/indexnow.yml"), "utf-8");
-    const doc = workflow.split(/^\s{2}manual:/m);
-    const autoPart = doc[0];
-    const manualPart = doc[1] ?? "";
-    expect(autoPart).toContain("--no-submit");
-    expect(manualPart).not.toContain("--no-submit");
+    // 注释里提到该参数名是文档说明，不算调用
+    const executable = workflow
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    expect(executable).not.toContain("--no-submit");
+    expect(executable).toContain("--trigger auto");
+    expect(executable).toContain("--mode submit");
+  });
+
+  it("CLI 仍保留 --no-submit 能力（verification-only 不删除）", () => {
+    const cli = fs.readFileSync(path.join(ROOT, "scripts/indexnow.mts"), "utf-8");
+    expect(cli).toContain('argv.includes("--no-submit")');
+    expect(cli).toContain("if (args.noSubmit)");
+    expect(cli).toContain("verificationOutcome");
+  });
+});
+
+describe("G. 自动提交路径（开启后）", () => {
+  const cli = fs.readFileSync(path.join(ROOT, "scripts/indexnow.mts"), "utf-8");
+  const iDryRun = cli.indexOf('if (args.mode === "dry-run")');
+  const iVerify = cli.indexOf("if (args.noSubmit)");
+  const iNoop = cli.indexOf("if (urls.length === 0)");
+  const iCreate = cli.indexOf("await createCheckRun(");
+  const iSubmit = cli.indexOf("await submitIndexNow(");
+
+  it("非空计划能到达 submitIndexNow（dry-run 与 verification 都提前返回）", () => {
+    expect(iDryRun).toBeGreaterThan(0);
+    expect(iVerify).toBeGreaterThan(0);
+    expect(iSubmit).toBeGreaterThan(0);
+    expect(iDryRun).toBeLessThan(iSubmit);
+    expect(iVerify).toBeLessThan(iSubmit);
+  });
+
+  it("空计划仍走 no-op：分支在 submit 之前且整体 return", () => {
+    expect(iNoop).toBeGreaterThan(0);
+    expect(iNoop).toBeLessThan(iSubmit);
+    const block = cli.slice(iNoop, iSubmit);
+    expect(block).toContain("no-op");
+    expect(block).toContain("return;");
+  });
+
+  it("不存在绕过 Check Run 的提交路径：createCheckRun 早于 submitIndexNow", () => {
+    expect(iCreate).toBeGreaterThan(0);
+    expect(iCreate).toBeLessThan(iSubmit);
+    // 且只有一个 submit 调用点
+    expect(cli.match(/await submitIndexNow\(/g)).toHaveLength(1);
+  });
+
+  it("submit 之前必须已经解析并校验 headSha", () => {
+    const iSha = cli.indexOf("const headSha = requireHeadSha(");
+    expect(iSha).toBeGreaterThan(0);
+    expect(iSha).toBeLessThan(iSubmit);
+  });
+
+  it("workflow 文件本身的改动不触发任何 URL（本次发布应为 0 条）", () => {
+    const changed = [".github/workflows/indexnow.yml"];
+    expect(computeAffectedPaths(changed, buildPathIndex(logicalPaths, ROOT)).paths.size).toBe(0);
   });
 });
 

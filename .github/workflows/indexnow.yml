@@ -8,8 +8,9 @@
 # 权限：contents(read) + deployments(read) + checks(write)。无 Secret、无 PAT、无 GitHub App。
 # 不新增定时任务、不新增 API 路由、不发送任何构建期请求。
 #
-# 首次上线为 verification-only：auto job 固定带 --no-submit，只计算计划并写 Check Run，
-# 不向 IndexNow 发送任何请求。启用真实提交需单独授权并移除该参数。
+# 自动提交已开启：auto job 按真实部署 Sitemap 差异提交变化 URL。
+# CLI 仍保留 --no-submit（verification-only）能力，供人工核验或灰度使用；
+# 手动入口不启用该参数，manual dry-run 依旧不发送任何请求。
 
 name: IndexNow
 
@@ -73,7 +74,6 @@ jobs:
           node --no-warnings --experimental-strip-types scripts/indexnow.mts \
             --mode submit \
             --trigger auto \
-            --no-submit \
             --deployment-id "$DEPLOYMENT_ID" \
             --environment-url "$ENVIRONMENT_URL" \
             --sha "$DEPLOY_SHA"
