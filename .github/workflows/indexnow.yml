@@ -1,0 +1,119 @@
+# ===== IndexNow 自动通知 =====
+#
+# 唯一自动调用方。两个 job 严格隔离：
+#   auto   ：只在「Production 部署成功」后运行，不检查 github.ref
+#            （Vercel 的 deployment.ref 是完整 SHA，不是 refs/heads/main）
+#   manual ：只在 main 上手动运行，默认 dry-run，all 模式需输入 SUBMIT-ALL
+#
+# 权限：contents(read) + deployments(read) + checks(write)。无 Secret、无 PAT、无 GitHub App。
+# 不新增定时任务、不新增 API 路由、不发送任何构建期请求。
+#
+# 首次上线为 verification-only：auto job 固定带 --no-submit，只计算计划并写 Check Run，
+# 不向 IndexNow 发送任何请求。启用真实提交需单独授权并移除该参数。
+
+name: IndexNow
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run = 只计算；submit = 只提交变更 URL；all = 提交当前全部公开 URL"
+        type: choice
+        options: [dry-run, submit, all]
+        default: dry-run
+      deployment_id:
+        description: "submit 必填：目标 Production deployment id"
+        type: string
+        required: false
+      confirm:
+        description: "all 必填：精确输入 SUBMIT-ALL"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  deployments: read
+  checks: write
+
+jobs:
+  auto:
+    name: auto (production deployment)
+    if: >
+      github.event_name == 'deployment_status' &&
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    concurrency:
+      group: indexnow-auto-${{ github.event.deployment.id }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Submit changed URLs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+          ENVIRONMENT_URL: ${{ github.event.deployment_status.environment_url }}
+          DEPLOY_SHA: ${{ github.event.deployment.sha }}
+        run: |
+          node --no-warnings --experimental-strip-types scripts/indexnow.mts \
+            --mode submit \
+            --trigger auto \
+            --no-submit \
+            --deployment-id "$DEPLOYMENT_ID" \
+            --environment-url "$ENVIRONMENT_URL" \
+            --sha "$DEPLOY_SHA"
+
+  manual:
+    name: manual (${{ inputs.mode }})
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main'
+    concurrency:
+      group: indexnow-manual-${{ github.run_id }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run IndexNow
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          MODE: ${{ inputs.mode }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          # --sha 用于 all 模式（无 deployment，Check Run 需挂在 main 的提交上）；
+          # submit 模式会以目标部署的 SHA 优先，不会被这里覆盖。
+          args=(--mode "$MODE" --trigger manual --run-id "$GITHUB_RUN_ID" --sha "$GITHUB_SHA")
+          if [ -n "${DEPLOYMENT_ID:-}" ]; then args+=(--deployment-id "$DEPLOYMENT_ID"); fi
+          if [ -n "${CONFIRM:-}" ]; then args+=(--confirm "$CONFIRM"); fi
+          node --no-warnings --experimental-strip-types scripts/indexnow.mts "${args[@]}"

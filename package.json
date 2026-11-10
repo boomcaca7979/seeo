@@ -16,7 +16,8 @@
     "cases": "node --no-warnings scripts/cases.mts",
     "product-hunt": "node --no-warnings scripts/product-hunt.mts",
     "referral": "node --no-warnings scripts/referral.mts",
-    "ops": "node --no-warnings scripts/ops.mts"
+    "ops": "node --no-warnings scripts/ops.mts",
+    "indexnow": "node --no-warnings --experimental-strip-types scripts/indexnow.mts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
